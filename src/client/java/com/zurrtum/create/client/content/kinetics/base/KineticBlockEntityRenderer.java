@@ -1,7 +1,5 @@
 package com.zurrtum.create.client.content.kinetics.base;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.zurrtum.create.AllBlocks;
 import com.zurrtum.create.catnip.theme.Color;
 import com.zurrtum.create.client.catnip.animation.AnimationTickHolder;
@@ -12,24 +10,22 @@ import com.zurrtum.create.client.content.kinetics.KineticDebugger;
 import com.zurrtum.create.client.flywheel.api.visualization.VisualizationManager;
 import com.zurrtum.create.content.kinetics.base.IRotate;
 import com.zurrtum.create.content.kinetics.base.KineticBlockEntity;
-import net.minecraft.client.renderer.ItemBlockRenderTypes;
-import net.minecraft.client.renderer.LevelRenderer;
-import net.minecraft.client.renderer.LightTexture;
-import net.minecraft.client.renderer.SubmitNodeCollector;
-import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
-import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
-import net.minecraft.client.renderer.blockentity.state.BlockEntityRenderState;
-import net.minecraft.client.renderer.feature.ModelFeatureRenderer;
-import net.minecraft.client.renderer.rendertype.RenderType;
-import net.minecraft.client.renderer.state.CameraRenderState;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.core.Direction.Axis;
-import net.minecraft.core.Direction.AxisDirection;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.properties.BlockStateProperties;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.block.BlockState;
+import net.minecraft.client.render.*;
+import net.minecraft.client.render.block.entity.BlockEntityRenderer;
+import net.minecraft.client.render.block.entity.BlockEntityRendererFactory;
+import net.minecraft.client.render.block.entity.state.BlockEntityRenderState;
+import net.minecraft.client.render.command.ModelCommandRenderer;
+import net.minecraft.client.render.command.OrderedRenderCommandQueue;
+import net.minecraft.client.render.state.CameraRenderState;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.state.property.Properties;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Direction.Axis;
+import net.minecraft.util.math.Direction.AxisDirection;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
 public class KineticBlockEntityRenderer<T extends KineticBlockEntity, S extends KineticBlockEntityRenderer.KineticRenderState> implements BlockEntityRenderer<T, S> {
@@ -37,7 +33,7 @@ public class KineticBlockEntityRenderer<T extends KineticBlockEntity, S extends 
     public static final SuperByteBufferCache.Compartment<BlockState> KINETIC_BLOCK = new SuperByteBufferCache.Compartment<>();
     public static boolean rainbowMode = false;
 
-    public KineticBlockEntityRenderer(BlockEntityRendererProvider.Context context) {
+    public KineticBlockEntityRenderer(BlockEntityRendererFactory.Context context) {
     }
 
     @Override
@@ -47,57 +43,52 @@ public class KineticBlockEntityRenderer<T extends KineticBlockEntity, S extends 
     }
 
     @Override
-    public void extractRenderState(
+    public void updateRenderState(
         T be,
         S state,
         float tickProgress,
-        Vec3 cameraPos,
-        @Nullable ModelFeatureRenderer.CrumblingOverlay crumblingOverlay
+        Vec3d cameraPos,
+        @Nullable ModelCommandRenderer.CrumblingOverlayCommand crumblingOverlay
     ) {
-        Level world = be.getLevel();
+        World world = be.getWorld();
         state.support = VisualizationManager.supportsVisualization(world);
         if (state.support) {
             return;
         }
         updateBaseRenderState(be, state, world, crumblingOverlay);
         state.model = getRotatedModel(be, state);
-        state.angle = getAngleForBe(be, state.blockPos, state.axis);
+        state.angle = getAngleForBe(be, state.pos, state.axis);
     }
 
-    public void updateBaseRenderState(
-        T be,
-        S state,
-        Level world,
-        @Nullable ModelFeatureRenderer.CrumblingOverlay crumblingOverlay
-    ) {
-        state.blockPos = be.getBlockPos();
+    public void updateBaseRenderState(T be, S state, World world, @Nullable ModelCommandRenderer.CrumblingOverlayCommand crumblingOverlay) {
+        state.pos = be.getPos();
         state.blockState = getRenderedBlockState(be);
-        state.blockEntityType = be.getType();
-        state.lightCoords = world != null ? LevelRenderer.getLightColor(
+        state.type = be.getType();
+        state.lightmapCoordinates = world != null ? WorldRenderer.getLightmapCoordinates(
             world,
-            state.blockPos
-        ) : LightTexture.FULL_BRIGHT;
-        state.breakProgress = crumblingOverlay;
+            state.pos
+        ) : LightmapTextureManager.MAX_LIGHT_COORDINATE;
+        state.crumblingOverlay = crumblingOverlay;
         state.layer = getRenderType(be, state.blockState);
         state.axis = ((IRotate) state.blockState.getBlock()).getRotationAxis(state.blockState);
-        state.direction = Direction.fromAxisAndDirection(state.axis, AxisDirection.POSITIVE);
+        state.direction = Direction.from(state.axis, AxisDirection.POSITIVE);
         state.color = getColor(be);
     }
 
     @Override
-    public void submit(S state, PoseStack matrices, SubmitNodeCollector queue, CameraRenderState cameraState) {
+    public void render(S state, MatrixStack matrices, OrderedRenderCommandQueue queue, CameraRenderState cameraState) {
         if (state.support) {
             return;
         }
-        queue.submitCustomGeometry(matrices, state.layer, state);
+        queue.submitCustom(matrices, state.layer, state);
     }
 
     protected BlockState getRenderedBlockState(T be) {
-        return be.getBlockState();
+        return be.getCachedState();
     }
 
-    protected RenderType getRenderType(T be, BlockState state) {
-        return ItemBlockRenderTypes.getMovingBlockRenderType(state);
+    protected RenderLayer getRenderType(T be, BlockState state) {
+        return RenderLayers.getMovingBlockLayer(state);
     }
 
     protected SuperByteBuffer getRotatedModel(T be, S state) {
@@ -105,7 +96,7 @@ public class KineticBlockEntityRenderer<T extends KineticBlockEntity, S extends 
     }
 
     public static float getAngleForBe(KineticBlockEntity be, final BlockPos pos, Axis axis) {
-        float time = AnimationTickHolder.getRenderTime(be.getLevel());
+        float time = AnimationTickHolder.getRenderTime(be.getWorld());
         float offset = getRotationOffsetForPosition(be, pos, axis);
         return ((time * be.getSpeed() * 3f / 10 + offset) % 360) / 180 * (float) Math.PI;
     }
@@ -128,20 +119,20 @@ public class KineticBlockEntityRenderer<T extends KineticBlockEntity, S extends 
     }
 
     public static float getRotationOffsetForPosition(KineticBlockEntity be, final BlockPos pos, final Axis axis) {
-        return KineticBlockEntityVisual.rotationOffset(be.getBlockState(), axis, pos) + be.getRotationAngleOffset(axis);
+        return KineticBlockEntityVisual.rotationOffset(be.getCachedState(), axis, pos) + be.getRotationAngleOffset(axis);
     }
 
     public static BlockState shaft(Axis axis) {
-        return AllBlocks.SHAFT.defaultBlockState().setValue(BlockStateProperties.AXIS, axis);
+        return AllBlocks.SHAFT.getDefaultState().with(Properties.AXIS, axis);
     }
 
     public static Axis getRotationAxisOf(KineticBlockEntity be) {
-        return ((IRotate) be.getBlockState().getBlock()).getRotationAxis(be.getBlockState());
+        return ((IRotate) be.getCachedState().getBlock()).getRotationAxis(be.getCachedState());
     }
 
-    public static class KineticRenderState extends BlockEntityRenderState implements SubmitNodeCollector.CustomGeometryRenderer {
+    public static class KineticRenderState extends BlockEntityRenderState implements OrderedRenderCommandQueue.Custom {
         public boolean support;
-        public RenderType layer;
+        public RenderLayer layer;
         public SuperByteBuffer model;
         public float angle;
         public Axis axis;
@@ -149,8 +140,8 @@ public class KineticBlockEntityRenderer<T extends KineticBlockEntity, S extends 
         public Color color;
 
         @Override
-        public void render(PoseStack.Pose matricesEntry, VertexConsumer vertexConsumer) {
-            model.light(lightCoords);
+        public void render(MatrixStack.Entry matricesEntry, VertexConsumer vertexConsumer) {
+            model.light(lightmapCoordinates);
             model.rotateCentered(angle, direction);
             model.color(color);
             model.renderInto(matricesEntry, vertexConsumer);

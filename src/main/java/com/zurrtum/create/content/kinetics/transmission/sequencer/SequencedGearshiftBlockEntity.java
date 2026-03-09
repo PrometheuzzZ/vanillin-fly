@@ -7,13 +7,13 @@ import com.zurrtum.create.catnip.nbt.NBTHelper;
 import com.zurrtum.create.compat.computercraft.AbstractComputerBehaviour;
 import com.zurrtum.create.content.kinetics.base.KineticBlockEntity;
 import com.zurrtum.create.content.kinetics.transmission.SplitShaftBlockEntity;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
+import net.minecraft.nbt.NbtCompound;
+import net.minecraft.storage.ReadView;
+import net.minecraft.storage.WriteView;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
 
 import java.util.Objects;
 import java.util.Vector;
@@ -33,36 +33,25 @@ public class SequencedGearshiftBlockEntity extends SplitShaftBlockEntity {
             Codec.DOUBLE.fieldOf("Value").forGetter(SequenceContext::relativeValue)
         ).apply(instance, SequenceContext::new));
 
-        public static SequenceContext fromGearshift(
-            SequencerInstructions instruction,
-            double kineticSpeed,
-            int absoluteValue
-        ) {
-            return instruction.needsPropagation() ? new SequenceContext(
-                instruction,
-                kineticSpeed == 0 ? 0 : absoluteValue / kineticSpeed
-            ) : null;
+        public static SequenceContext fromGearshift(SequencerInstructions instruction, double kineticSpeed, int absoluteValue) {
+            return instruction.needsPropagation() ? new SequenceContext(instruction, kineticSpeed == 0 ? 0 : absoluteValue / kineticSpeed) : null;
         }
 
         public double getEffectiveValue(double speedAtTarget) {
             return Math.abs(relativeValue * speedAtTarget);
         }
 
-        public CompoundTag serializeNBT() {
-            CompoundTag nbt = new CompoundTag();
+        public NbtCompound serializeNBT() {
+            NbtCompound nbt = new NbtCompound();
             NBTHelper.writeEnum(nbt, "Mode", instruction);
             nbt.putDouble("Value", relativeValue);
             return nbt;
         }
 
-        public static SequenceContext fromNBT(CompoundTag nbt) {
-            if (nbt.isEmpty()) {
+        public static SequenceContext fromNBT(NbtCompound nbt) {
+            if (nbt.isEmpty())
                 return null;
-            }
-            return new SequenceContext(
-                NBTHelper.readEnum(nbt, "Mode", SequencerInstructions.class),
-                nbt.getDoubleOr("Value", 0)
-            );
+            return new SequenceContext(NBTHelper.readEnum(nbt, "Mode", SequencerInstructions.class), nbt.getDouble("Value", 0));
         }
 
     }
@@ -81,15 +70,12 @@ public class SequencedGearshiftBlockEntity extends SplitShaftBlockEntity {
     public void tick() {
         super.tick();
 
-        if (isIdle()) {
+        if (isIdle())
             return;
-        }
-        if (level.isClientSide()) {
+        if (world.isClient())
             return;
-        }
-        if (currentInstructionDuration < 0) {
+        if (currentInstructionDuration < 0)
             return;
-        }
         if (timer < currentInstructionDuration) {
             timer++;
             currentInstructionProgress += getInstruction(currentInstruction).getTickProgress(speed);
@@ -101,20 +87,16 @@ public class SequencedGearshiftBlockEntity extends SplitShaftBlockEntity {
     @Override
     public void onSpeedChanged(float previousSpeed) {
         super.onSpeedChanged(previousSpeed);
-        if (isIdle()) {
+        if (isIdle())
             return;
-        }
         float currentSpeed = Math.abs(speed);
-        if (Math.abs(previousSpeed) == currentSpeed) {
+        if (Math.abs(previousSpeed) == currentSpeed)
             return;
-        }
         Instruction instruction = getInstruction(currentInstruction);
-        if (instruction == null) {
+        if (instruction == null)
             return;
-        }
-        if (getSpeed() == 0) {
+        if (getSpeed() == 0)
             run(-1);
-        }
 
         // Update instruction time with regards to new speed
         currentInstructionDuration = instruction.getDuration(currentInstructionProgress, getTheoreticalSpeed());
@@ -126,37 +108,30 @@ public class SequencedGearshiftBlockEntity extends SplitShaftBlockEntity {
     }
 
     public void onRedstoneUpdate(boolean isPowered, boolean isRunning) {
-        if (AbstractComputerBehaviour.contains(this)) {
+        if (AbstractComputerBehaviour.contains(this))
             return;
-        }
-        if (!poweredPreviously && isPowered) {
+        if (!poweredPreviously && isPowered)
             risingFlank();
-        }
         poweredPreviously = isPowered;
-        if (!isIdle()) {
+        if (!isIdle())
+            return;
+        if (isPowered == isRunning)
+            return;
+        if (!world.isReceivingRedstonePower(pos)) {
+            world.setBlockState(pos, getCachedState().with(SequencedGearshiftBlock.STATE, 0), Block.NOTIFY_ALL);
             return;
         }
-        if (isPowered == isRunning) {
+        if (getSpeed() == 0)
             return;
-        }
-        if (!level.hasNeighborSignal(worldPosition)) {
-            level.setBlock(worldPosition, getBlockState().setValue(SequencedGearshiftBlock.STATE, 0), Block.UPDATE_ALL);
-            return;
-        }
-        if (getSpeed() == 0) {
-            return;
-        }
         run(0);
     }
 
     public void risingFlank() {
         Instruction instruction = getInstruction(currentInstruction);
-        if (instruction == null) {
+        if (instruction == null)
             return;
-        }
-        if (poweredPreviously) {
+        if (poweredPreviously)
             return;
-        }
         poweredPreviously = true;
 
         if (Objects.requireNonNull(instruction.onRedstonePulse()) == OnIsPoweredResult.CONTINUE) {
@@ -167,23 +142,17 @@ public class SequencedGearshiftBlockEntity extends SplitShaftBlockEntity {
     public void run(int instructionIndex) {
         Instruction instruction = getInstruction(instructionIndex);
         if (instruction == null || instruction.instruction == SequencerInstructions.END) {
-            if (getModifier() != 0) {
+            if (getModifier() != 0)
                 detachKinetics();
-            }
             currentInstruction = -1;
             currentInstructionDuration = -1;
             currentInstructionProgress = 0;
             sequenceContext = null;
             timer = 0;
-            if (!level.hasNeighborSignal(worldPosition)) {
-                level.setBlock(
-                    worldPosition,
-                    getBlockState().setValue(SequencedGearshiftBlock.STATE, 0),
-                    Block.UPDATE_ALL
-                );
-            } else {
+            if (!world.isReceivingRedstonePower(pos))
+                world.setBlockState(pos, getCachedState().with(SequencedGearshiftBlock.STATE, 0), Block.NOTIFY_ALL);
+            else
                 sendData();
-            }
             return;
         }
 
@@ -191,17 +160,9 @@ public class SequencedGearshiftBlockEntity extends SplitShaftBlockEntity {
         currentInstructionDuration = instruction.getDuration(0, getTheoreticalSpeed());
         currentInstruction = instructionIndex;
         currentInstructionProgress = 0;
-        sequenceContext = SequenceContext.fromGearshift(
-            instruction.instruction,
-            getTheoreticalSpeed() * getModifier(),
-            instruction.value
-        );
+        sequenceContext = SequenceContext.fromGearshift(instruction.instruction, getTheoreticalSpeed() * getModifier(), instruction.value);
         timer = 0;
-        level.setBlock(
-            worldPosition,
-            getBlockState().setValue(SequencedGearshiftBlock.STATE, instructionIndex + 1),
-            Block.UPDATE_ALL
-        );
+        world.setBlockState(pos, getCachedState().with(SequencedGearshiftBlock.STATE, instructionIndex + 1), Block.NOTIFY_ALL);
     }
 
     public Instruction getInstruction(int instructionIndex) {
@@ -213,27 +174,27 @@ public class SequencedGearshiftBlockEntity extends SplitShaftBlockEntity {
     }
 
     @Override
-    public void write(ValueOutput view, boolean clientPacket) {
+    public void write(WriteView view, boolean clientPacket) {
         view.putInt("InstructionIndex", currentInstruction);
         view.putInt("InstructionDuration", currentInstructionDuration);
         view.putFloat("InstructionProgress", currentInstructionProgress);
         view.putInt("Timer", timer);
         view.putBoolean("PrevPowered", poweredPreviously);
         if (!instructions.isEmpty()) {
-            ValueOutput.TypedOutputList<Instruction> list = view.list("Instructions", Instruction.CODEC);
+            WriteView.ListAppender<Instruction> list = view.getListAppender("Instructions", Instruction.CODEC);
             instructions.forEach(list::add);
         }
         super.write(view, clientPacket);
     }
 
     @Override
-    protected void read(ValueInput view, boolean clientPacket) {
-        currentInstruction = view.getIntOr("InstructionIndex", 0);
-        currentInstructionDuration = view.getIntOr("InstructionDuration", 0);
-        currentInstructionProgress = view.getFloatOr("InstructionProgress", 0);
-        poweredPreviously = view.getBooleanOr("PrevPowered", false);
-        timer = view.getIntOr("Timer", 0);
-        view.list("Instructions", Instruction.CODEC).ifPresentOrElse(
+    protected void read(ReadView view, boolean clientPacket) {
+        currentInstruction = view.getInt("InstructionIndex", 0);
+        currentInstructionDuration = view.getInt("InstructionDuration", 0);
+        currentInstructionProgress = view.getFloat("InstructionProgress", 0);
+        poweredPreviously = view.getBoolean("PrevPowered", false);
+        timer = view.getInt("Timer", 0);
+        view.getOptionalTypedListView("Instructions", Instruction.CODEC).ifPresentOrElse(
             list -> {
                 instructions = new Vector<>(5);
                 list.forEach(instructions::add);
@@ -244,16 +205,14 @@ public class SequencedGearshiftBlockEntity extends SplitShaftBlockEntity {
 
     @Override
     public float getRotationSpeedModifier(Direction face) {
-        if (isVirtual()) {
+        if (isVirtual())
             return 1;
-        }
         return (!hasSource() || face == getSourceFacing()) ? 1 : getModifier();
     }
 
     public int getModifier() {
-        if (currentInstruction >= instructions.size()) {
+        if (currentInstruction >= instructions.size())
             return 0;
-        }
         return isIdle() ? 0 : instructions.get(currentInstruction).getSpeedModifier();
     }
 

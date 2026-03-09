@@ -5,31 +5,31 @@ import com.zurrtum.create.AllItems;
 import com.zurrtum.create.AllShapes;
 import com.zurrtum.create.content.kinetics.base.KineticBlock;
 import com.zurrtum.create.foundation.block.IBE;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.core.Direction.Axis;
-import net.minecraft.world.InteractionHand;
-import net.minecraft.world.InteractionResult;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
-import net.minecraft.world.item.context.BlockPlaceContext;
-import net.minecraft.world.item.context.UseOnContext;
-import net.minecraft.world.level.BlockGetter;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.LevelReader;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.entity.BlockEntityType;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.BlockHitResult;
-import net.minecraft.world.phys.shapes.CollisionContext;
-import net.minecraft.world.phys.shapes.Shapes;
-import net.minecraft.world.phys.shapes.VoxelShape;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.ShapeContext;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.block.entity.BlockEntityType;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.item.ItemPlacementContext;
+import net.minecraft.item.ItemStack;
+import net.minecraft.item.ItemUsageContext;
+import net.minecraft.item.Items;
+import net.minecraft.util.ActionResult;
+import net.minecraft.util.Hand;
+import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Direction.Axis;
+import net.minecraft.util.shape.VoxelShape;
+import net.minecraft.util.shape.VoxelShapes;
+import net.minecraft.world.BlockView;
+import net.minecraft.world.World;
+import net.minecraft.world.WorldView;
 import org.jetbrains.annotations.Nullable;
 
 public class ChainConveyorBlock extends KineticBlock implements IBE<ChainConveyorBlockEntity> {
 
-    public ChainConveyorBlock(Properties properties) {
+    public ChainConveyorBlock(Settings properties) {
         super(properties);
     }
 
@@ -39,77 +39,63 @@ public class ChainConveyorBlock extends KineticBlock implements IBE<ChainConveyo
     }
 
     @Override
-    public VoxelShape getInteractionShape(BlockState pState, BlockGetter pLevel, BlockPos pPos) {
+    public VoxelShape getRaycastShape(BlockState pState, BlockView pLevel, BlockPos pPos) {
         return AllShapes.CHAIN_CONVEYOR_INTERACTION;
     }
 
     @Override
-    public VoxelShape getShape(BlockState pState, BlockGetter pLevel, BlockPos pPos, CollisionContext pContext) {
+    public VoxelShape getOutlineShape(BlockState pState, BlockView pLevel, BlockPos pPos, ShapeContext pContext) {
         return AllShapes.CHAIN_CONVEYOR_INTERACTION;
     }
 
     @Override
-    protected InteractionResult useItemOn(
+    protected ActionResult onUseWithItem(
         ItemStack stack,
         BlockState state,
-        Level level,
+        World level,
         BlockPos pos,
-        Player player,
-        InteractionHand hand,
+        PlayerEntity player,
+        Hand hand,
         BlockHitResult hitResult
     ) {
-        if (!level.isClientSide() && stack.is(Items.IRON_CHAIN)) {
-            return InteractionResult.SUCCESS;
-        }
-        if (stack.is(AllItems.PACKAGE_FROGPORT)) {
-            return InteractionResult.SUCCESS;
-        }
-        return InteractionResult.TRY_WITH_EMPTY_HAND;
+        if (!level.isClient() && stack.isOf(Items.IRON_CHAIN))
+            return ActionResult.SUCCESS;
+        if (stack.isOf(AllItems.PACKAGE_FROGPORT))
+            return ActionResult.SUCCESS;
+        return ActionResult.PASS_TO_DEFAULT_BLOCK_ACTION;
     }
 
     @Override
-    public BlockState playerWillDestroy(Level pLevel, BlockPos pPos, BlockState pState, Player pPlayer) {
-        super.playerWillDestroy(pLevel, pPos, pState, pPlayer);
-        if (pLevel.isClientSide()) {
+    public BlockState onBreak(World pLevel, BlockPos pPos, BlockState pState, PlayerEntity pPlayer) {
+        super.onBreak(pLevel, pPos, pState, pPlayer);
+        if (pLevel.isClient())
             return pState;
-        }
-        if (!pPlayer.isCreative()) {
+        if (!pPlayer.isCreative())
             return pState;
-        }
         withBlockEntityDo(pLevel, pPos, be -> be.cancelDrops = true);
         return pState;
     }
 
     @Override
-    public void playerDestroy(
-        Level level,
-        Player player,
-        BlockPos pos,
-        BlockState state,
-        @Nullable BlockEntity blockEntity,
-        ItemStack tool
-    ) {
-        super.playerDestroy(level, player, pos, state, blockEntity, tool);
+    public void afterBreak(World level, PlayerEntity player, BlockPos pos, BlockState state, @Nullable BlockEntity blockEntity, ItemStack tool) {
+        super.afterBreak(level, player, pos, state, blockEntity, tool);
     }
 
     @Override
-    public InteractionResult onSneakWrenched(BlockState state, UseOnContext context) {
-        Player player = context.getPlayer();
-        if (player == null) {
+    public ActionResult onSneakWrenched(BlockState state, ItemUsageContext context) {
+        PlayerEntity player = context.getPlayer();
+        if (player == null)
             return super.onSneakWrenched(state, context);
-        }
 
         withBlockEntityDo(
-            context.getLevel(), context.getClickedPos(), be -> {
+            context.getWorld(), context.getBlockPos(), be -> {
                 be.cancelDrops = true;
-                if (player.isCreative()) {
+                if (player.isCreative())
                     return;
-                }
                 for (BlockPos targetPos : be.connections) {
                     int chainCost = ChainConveyorBlockEntity.getChainCost(targetPos);
                     while (chainCost > 0) {
-                        player.getInventory()
-                            .placeItemBackInInventory(new ItemStack(Items.IRON_CHAIN, Math.min(chainCost, 64)));
+                        player.getInventory().offerOrDrop(new ItemStack(Items.IRON_CHAIN, Math.min(chainCost, 64)));
                         chainCost -= 64;
                     }
                 }
@@ -120,30 +106,22 @@ public class ChainConveyorBlock extends KineticBlock implements IBE<ChainConveyo
     }
 
     @Override
-    public BlockState getStateForPlacement(BlockPlaceContext pContext) {
-        for (int x = -1; x <= 1; x++) {
-            for (int z = -1; z <= 1; z++) {
-                if (pContext.getLevel().getBlockState(pContext.getClickedPos().offset(x, 0, z)).getBlock() == this) {
+    public BlockState getPlacementState(ItemPlacementContext pContext) {
+        for (int x = -1; x <= 1; x++)
+            for (int z = -1; z <= 1; z++)
+                if (pContext.getWorld().getBlockState(pContext.getBlockPos().add(x, 0, z)).getBlock() == this)
                     return null;
-                }
-            }
-        }
 
-        return super.getStateForPlacement(pContext);
+        return super.getPlacementState(pContext);
     }
 
     @Override
-    public VoxelShape getCollisionShape(
-        BlockState pState,
-        BlockGetter pLevel,
-        BlockPos pPos,
-        CollisionContext pContext
-    ) {
-        return Shapes.block();
+    public VoxelShape getCollisionShape(BlockState pState, BlockView pLevel, BlockPos pPos, ShapeContext pContext) {
+        return VoxelShapes.fullCube();
     }
 
     @Override
-    public boolean hasShaftTowards(LevelReader world, BlockPos pos, BlockState state, Direction face) {
+    public boolean hasShaftTowards(WorldView world, BlockPos pos, BlockState state, Direction face) {
         return face.getAxis() == getRotationAxis(state);
     }
 

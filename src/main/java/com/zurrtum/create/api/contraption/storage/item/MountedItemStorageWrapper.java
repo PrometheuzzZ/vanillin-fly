@@ -2,8 +2,8 @@ package com.zurrtum.create.api.contraption.storage.item;
 
 import com.google.common.collect.ImmutableMap;
 import com.zurrtum.create.infrastructure.items.CombinedInvWrapper;
-import net.minecraft.core.BlockPos;
-import net.minecraft.world.Container;
+import net.minecraft.inventory.Inventory;
+import net.minecraft.util.math.BlockPos;
 
 /**
  * Wrapper around many MountedItemStorages, providing access to all of them as one storage.
@@ -19,18 +19,18 @@ public class MountedItemStorageWrapper extends CombinedInvWrapper {
     private final int[] slotOffsets;     // Starting slot for each storage
 
     public MountedItemStorageWrapper(ImmutableMap<BlockPos, MountedItemStorage> storages) {
-        super(storages.values().toArray(Container[]::new));
+        super(storages.values().toArray(Inventory[]::new));
         this.storages = storages;
 
         // Build lookup arrays
-        int totalSlots = getContainerSize();
+        int totalSlots = size();
         this.slotToStorage = new int[totalSlots];
         this.slotOffsets = new int[itemHandler.length];
 
         int currentSlot = 0;
         for (int storageIdx = 0; storageIdx < itemHandler.length; storageIdx++) {
             slotOffsets[storageIdx] = currentSlot;
-            int slotsInStorage = itemHandler[storageIdx].getContainerSize();
+            int slotsInStorage = itemHandler[storageIdx].size();
 
             for (int i = 0; i < slotsInStorage; i++) {
                 slotToStorage[currentSlot + i] = storageIdx;

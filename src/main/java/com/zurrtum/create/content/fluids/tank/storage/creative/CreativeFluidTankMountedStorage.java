@@ -7,14 +7,15 @@ import com.zurrtum.create.api.contraption.storage.fluid.WrapperMountedFluidStora
 import com.zurrtum.create.content.fluids.tank.CreativeFluidTankBlockEntity;
 import com.zurrtum.create.content.fluids.tank.CreativeFluidTankBlockEntity.CreativeFluidTankInventory;
 import com.zurrtum.create.foundation.fluid.FluidTank;
-import net.minecraft.core.BlockPos;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
 public class CreativeFluidTankMountedStorage extends WrapperMountedFluidStorage<CreativeFluidTankInventory> {
-    public static final MapCodec<CreativeFluidTankMountedStorage> CODEC = CreativeFluidTankInventory.CODEC.xmap(CreativeFluidTankMountedStorage::new,
+    public static final MapCodec<CreativeFluidTankMountedStorage> CODEC = CreativeFluidTankInventory.CODEC.xmap(
+        CreativeFluidTankMountedStorage::new,
         storage -> storage.wrapped
     ).fieldOf("value");
 
@@ -27,7 +28,7 @@ public class CreativeFluidTankMountedStorage extends WrapperMountedFluidStorage<
     }
 
     @Override
-    public void unmount(Level level, BlockState state, BlockPos pos, @Nullable BlockEntity be) {
+    public void unmount(World level, BlockState state, BlockPos pos, @Nullable BlockEntity be) {
         // no need to do anything, supplied stack can't change while mounted
     }
 

@@ -1,11 +1,11 @@
 package com.zurrtum.create.client.foundation.sound;
 
 import com.zurrtum.create.client.catnip.animation.AnimationTickHolder;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.multiplayer.ClientLevel;
-import net.minecraft.sounds.SoundEvent;
-import net.minecraft.sounds.SoundSource;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.world.ClientWorld;
+import net.minecraft.sound.SoundCategory;
+import net.minecraft.sound.SoundEvent;
+import net.minecraft.util.math.Vec3d;
 
 public class RepeatingSound {
 
@@ -15,13 +15,7 @@ public class RepeatingSound {
     private final SoundScape scape;
     private final float relativeVolume;
 
-    public RepeatingSound(
-        SoundEvent event,
-        SoundScape scape,
-        float sharedPitch,
-        float relativeVolume,
-        int repeatDelay
-    ) {
+    public RepeatingSound(SoundEvent event, SoundScape scape, float sharedPitch, float relativeVolume, int repeatDelay) {
         this.event = event;
         this.scape = scape;
         this.sharedPitch = sharedPitch;
@@ -30,23 +24,13 @@ public class RepeatingSound {
     }
 
     public void tick() {
-        if (AnimationTickHolder.getTicks() % repeatDelay != 0) {
+        if (AnimationTickHolder.getTicks() % repeatDelay != 0)
             return;
-        }
 
-        ClientLevel world = Minecraft.getInstance().level;
-        Vec3 meanPos = scape.getMeanPos();
+        ClientWorld world = MinecraftClient.getInstance().world;
+        Vec3d meanPos = scape.getMeanPos();
 
-        world.playLocalSound(
-            meanPos.x,
-            meanPos.y,
-            meanPos.z,
-            event,
-            SoundSource.AMBIENT,
-            scape.getVolume() * relativeVolume,
-            sharedPitch,
-            true
-        );
+        world.playSoundClient(meanPos.x, meanPos.y, meanPos.z, event, SoundCategory.AMBIENT, scape.getVolume() * relativeVolume, sharedPitch, true);
     }
 
 }

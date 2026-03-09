@@ -4,37 +4,28 @@ import com.zurrtum.create.client.AllSpriteShifts;
 import com.zurrtum.create.client.foundation.block.connected.CTSpriteShiftEntry;
 import com.zurrtum.create.client.foundation.block.connected.ConnectedTextureBehaviour;
 import com.zurrtum.create.content.decoration.girder.GirderBlock;
-import net.minecraft.client.renderer.texture.TextureAtlasSprite;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.core.Direction.Axis;
-import net.minecraft.world.level.BlockAndTintGetter;
-import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.block.BlockState;
+import net.minecraft.client.texture.Sprite;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Direction.Axis;
+import net.minecraft.world.BlockRenderView;
 import org.jetbrains.annotations.Nullable;
 
 public class GirderCTBehaviour extends ConnectedTextureBehaviour.Base {
 
     @Override
-    public CTSpriteShiftEntry getShift(BlockState state, Direction direction, @Nullable TextureAtlasSprite sprite) {
-        if (!state.hasProperty(GirderBlock.X)) {
+    public CTSpriteShiftEntry getShift(BlockState state, Direction direction, @Nullable Sprite sprite) {
+        if (!state.contains(GirderBlock.X))
             return null;
-        }
-        return !state.getValue(GirderBlock.X) && !state.getValue(GirderBlock.Z) && direction.getAxis() != Axis.Y ? AllSpriteShifts.GIRDER_POLE : null;
+        return !state.get(GirderBlock.X) && !state.get(GirderBlock.Z) && direction.getAxis() != Axis.Y ? AllSpriteShifts.GIRDER_POLE : null;
     }
 
     @Override
-    public boolean connectsTo(
-        BlockState state,
-        BlockState other,
-        BlockAndTintGetter reader,
-        BlockPos pos,
-        BlockPos otherPos,
-        Direction face
-    ) {
-        if (other.getBlock() != state.getBlock()) {
+    public boolean connectsTo(BlockState state, BlockState other, BlockRenderView reader, BlockPos pos, BlockPos otherPos, Direction face) {
+        if (other.getBlock() != state.getBlock())
             return false;
-        }
-        return !other.getValue(GirderBlock.X) && !other.getValue(GirderBlock.Z);
+        return !other.get(GirderBlock.X) && !other.get(GirderBlock.Z);
     }
 
 }

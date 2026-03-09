@@ -21,21 +21,21 @@ import com.zurrtum.create.content.trains.track.TrackBlockEntity;
 import com.zurrtum.create.foundation.blockEntity.SmartBlockEntity;
 import com.zurrtum.create.infrastructure.component.ClipboardContent;
 import com.zurrtum.create.infrastructure.packet.s2c.*;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.core.Direction.Axis;
-import net.minecraft.core.component.DataComponentMap;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.game.ClientGamePacketListener;
-import net.minecraft.network.protocol.game.ServerGamePacketListener;
-import net.minecraft.world.InteractionHand;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.entity.vehicle.minecart.AbstractMinecart;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.context.BlockPlaceContext;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.component.ComponentMap;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.entity.vehicle.AbstractMinecartEntity;
+import net.minecraft.item.ItemPlacementContext;
+import net.minecraft.item.ItemStack;
+import net.minecraft.network.listener.ClientPlayPacketListener;
+import net.minecraft.network.listener.ServerPlayPacketListener;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.util.Hand;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Direction.Axis;
+import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.UUID;
@@ -55,15 +55,15 @@ public class AllClientHandle {
         return false;
     }
 
-    public void onSymmetryEffect(ClientGamePacketListener listener, SymmetryEffectPacket packet) {
+    public void onSymmetryEffect(ClientPlayPacketListener listener, SymmetryEffectPacket packet) {
         warn();
     }
 
-    public void onLimbSwingUpdate(ClientGamePacketListener listener, LimbSwingUpdatePacket packet) {
+    public void onLimbSwingUpdate(ClientPlayPacketListener listener, LimbSwingUpdatePacket packet) {
         warn();
     }
 
-    public void onLogisticalStockResponse(ClientGamePacketListener listener, LogisticalStockResponsePacket packet) {
+    public void onLogisticalStockResponse(ClientPlayPacketListener listener, LogisticalStockResponsePacket packet) {
         warn();
     }
 
@@ -79,7 +79,7 @@ public class AllClientHandle {
         warn();
     }
 
-    public void onElevatorFloorList(ClientGamePacketListener listener, ElevatorFloorListPacket packet) {
+    public void onElevatorFloorList(ClientPlayPacketListener listener, ElevatorFloorListPacket packet) {
         warn();
     }
 
@@ -87,7 +87,7 @@ public class AllClientHandle {
         warn();
     }
 
-    public void onWiFiEffect(ClientGamePacketListener listener, WiFiEffectPacket packet) {
+    public void onWiFiEffect(ClientPlayPacketListener listener, WiFiEffectPacket packet) {
         warn();
     }
 
@@ -99,7 +99,7 @@ public class AllClientHandle {
         warn();
     }
 
-    public void onZapperBeam(ClientGamePacketListener listener, ZapperBeamPacket packet) {
+    public void onZapperBeam(ClientPlayPacketListener listener, ZapperBeamPacket packet) {
         warn();
     }
 
@@ -115,7 +115,7 @@ public class AllClientHandle {
         warn();
     }
 
-    public void onGlueEffect(ClientGamePacketListener listener, GlueEffectPacket packet) {
+    public void onGlueEffect(ClientPlayPacketListener listener, GlueEffectPacket packet) {
         warn();
     }
 
@@ -143,11 +143,11 @@ public class AllClientHandle {
         warn();
     }
 
-    public void onFunnelFlap(ClientGamePacketListener listener, FunnelFlapPacket packet) {
+    public void onFunnelFlap(ClientPlayPacketListener listener, FunnelFlapPacket packet) {
         warn();
     }
 
-    public void onPotatoCannon(ClientGamePacketListener listener, PotatoCannonPacket packet) {
+    public void onPotatoCannon(ClientPlayPacketListener listener, PotatoCannonPacket packet) {
         warn();
     }
 
@@ -163,7 +163,7 @@ public class AllClientHandle {
         warn();
     }
 
-    public void onRemoveBlockEntity(ClientGamePacketListener listener, RemoveBlockEntityPacket packet) {
+    public void onRemoveBlockEntity(ClientPlayPacketListener listener, RemoveBlockEntityPacket packet) {
         warn();
     }
 
@@ -191,11 +191,11 @@ public class AllClientHandle {
         warn();
     }
 
-    public void onContraptionDisableActor(ClientGamePacketListener listener, ContraptionDisableActorPacket packet) {
+    public void onContraptionDisableActor(ClientPlayPacketListener listener, ContraptionDisableActorPacket packet) {
         warn();
     }
 
-    public void onAttachedComputer(ClientGamePacketListener listener, AttachedComputerPacket packet) {
+    public void onAttachedComputer(ClientPlayPacketListener listener, AttachedComputerPacket packet) {
         warn();
     }
 
@@ -203,15 +203,15 @@ public class AllClientHandle {
         warn();
     }
 
-    public void onPackageDestroy(ClientGamePacketListener listener, PackageDestroyPacket packet) {
+    public void onPackageDestroy(ClientPlayPacketListener listener, PackageDestroyPacket packet) {
         warn();
     }
 
-    public void onFactoryPanelEffect(ClientGamePacketListener listener, FactoryPanelEffectPacket packet) {
+    public void onFactoryPanelEffect(ClientPlayPacketListener listener, FactoryPanelEffectPacket packet) {
         warn();
     }
 
-    public void onRedstoneRequesterEffect(ClientGamePacketListener listener, RedstoneRequesterEffectPacket packet) {
+    public void onRedstoneRequesterEffect(ClientPlayPacketListener listener, RedstoneRequesterEffectPacket packet) {
         warn();
     }
 
@@ -219,7 +219,7 @@ public class AllClientHandle {
         warn();
     }
 
-    public void onShopUpdate(ClientGamePacketListener listener, ShopUpdatePacket packet) {
+    public void onShopUpdate(ClientPlayPacketListener listener, ShopUpdatePacket packet) {
         warn();
     }
 
@@ -231,7 +231,7 @@ public class AllClientHandle {
         warn();
     }
 
-    public void onOpenScreen(ClientGamePacketListener listener, OpenScreenPacket packet) {
+    public void onOpenScreen(ClientPlayPacketListener listener, OpenScreenPacket packet) {
         warn();
     }
 
@@ -243,7 +243,7 @@ public class AllClientHandle {
         warn();
     }
 
-    public Player getPlayer() {
+    public PlayerEntity getPlayer() {
         warn();
         return null;
     }
@@ -252,7 +252,7 @@ public class AllClientHandle {
         warn();
     }
 
-    public void addAirFlowParticle(Level world, BlockPos airCurrentPos, double x, double y, double z) {
+    public void addAirFlowParticle(World world, BlockPos airCurrentPos, double x, double y, double z) {
         warn();
     }
 
@@ -260,7 +260,7 @@ public class AllClientHandle {
         warn();
     }
 
-    public void showWaterBounds(Axis axis, BlockPlaceContext ctx) {
+    public void showWaterBounds(Axis axis, ItemPlacementContext ctx) {
         warn();
     }
 
@@ -281,14 +281,7 @@ public class AllClientHandle {
         return null;
     }
 
-    public void spawnPipeParticles(
-        Level world,
-        BlockPos pos,
-        PipeConnection.Flow flow,
-        boolean openEnd,
-        Direction side,
-        int amount
-    ) {
+    public void spawnPipeParticles(World world, BlockPos pos, PipeConnection.Flow flow, boolean openEnd, Direction side, int amount) {
         warn();
     }
 
@@ -296,7 +289,7 @@ public class AllClientHandle {
         warn();
     }
 
-    public void spawnSuperGlueParticles(Level world, BlockPos pos, Direction direction, boolean fullBlock) {
+    public void spawnSuperGlueParticles(World world, BlockPos pos, Direction direction, boolean fullBlock) {
         warn();
     }
 
@@ -304,19 +297,19 @@ public class AllClientHandle {
         warn();
     }
 
-    public void sendPacket(Packet<ServerGamePacketListener> packet) {
+    public void sendPacket(Packet<ServerPlayPacketListener> packet) {
         warn();
     }
 
-    public void sendPacket(Player player, Packet<ServerGamePacketListener> packet) {
+    public void sendPacket(PlayerEntity player, Packet<ServerPlayPacketListener> packet) {
         warn();
     }
 
-    public void createBasinFluidParticles(Level world, BasinBlockEntity blockEntity) {
+    public void createBasinFluidParticles(World world, BasinBlockEntity blockEntity) {
         warn();
     }
 
-    public void cartClicked(Player player, AbstractMinecart minecart) {
+    public void cartClicked(PlayerEntity player, AbstractMinecartEntity minecart) {
         warn();
     }
 
@@ -345,7 +338,7 @@ public class AllClientHandle {
         warn();
     }
 
-    public void startControlling(Player player, AbstractContraptionEntity be, BlockPos pos) {
+    public void startControlling(PlayerEntity player, AbstractContraptionEntity be, BlockPos pos) {
         warn();
     }
 
@@ -353,7 +346,7 @@ public class AllClientHandle {
         warn();
     }
 
-    public void cannonDontAnimateItem(InteractionHand hand) {
+    public void cannonDontAnimateItem(Hand hand) {
         warn();
     }
 
@@ -373,12 +366,12 @@ public class AllClientHandle {
         warn();
     }
 
-    public boolean factoryPanelClicked(Level world, Player player, ServerFactoryPanelBehaviour behaviour) {
+    public boolean factoryPanelClicked(World world, PlayerEntity player, ServerFactoryPanelBehaviour behaviour) {
         warn();
         return false;
     }
 
-    public void zapperDontAnimateItem(InteractionHand hand) {
+    public void zapperDontAnimateItem(Hand hand) {
         warn();
     }
 
@@ -386,31 +379,31 @@ public class AllClientHandle {
         warn();
     }
 
-    public void openClipboardScreen(Player player, DataComponentMap components, BlockPos pos) {
+    public void openClipboardScreen(PlayerEntity player, ComponentMap components, BlockPos pos) {
         warn();
     }
 
-    public void openDisplayLinkScreen(DisplayLinkBlockEntity be, Player player) {
+    public void openDisplayLinkScreen(DisplayLinkBlockEntity be, PlayerEntity player) {
         warn();
     }
 
-    public void openThresholdSwitchScreen(ThresholdSwitchBlockEntity be, Player player) {
+    public void openThresholdSwitchScreen(ThresholdSwitchBlockEntity be, PlayerEntity player) {
         warn();
     }
 
-    public void openElevatorContactScreen(ElevatorContactBlockEntity be, Player player) {
+    public void openElevatorContactScreen(ElevatorContactBlockEntity be, PlayerEntity player) {
         warn();
     }
 
-    public void openStationScreen(Level world, BlockPos pos, Player player) {
+    public void openStationScreen(World world, BlockPos pos, PlayerEntity player) {
         warn();
     }
 
-    public void openFactoryPanelScreen(ServerFactoryPanelBehaviour behaviour, Player player) {
+    public void openFactoryPanelScreen(ServerFactoryPanelBehaviour behaviour, PlayerEntity player) {
         warn();
     }
 
-    public void openSymmetryWandScreen(ItemStack stack, InteractionHand hand) {
+    public void openSymmetryWandScreen(ItemStack stack, Hand hand) {
         warn();
     }
 
@@ -418,7 +411,7 @@ public class AllClientHandle {
         warn();
     }
 
-    public void openWorldshaperScreen(ItemStack item, InteractionHand hand) {
+    public void openWorldshaperScreen(ItemStack item, Hand hand) {
         warn();
     }
 }

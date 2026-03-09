@@ -4,11 +4,11 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import com.zurrtum.create.catnip.nbt.NBTHelper;
 import com.zurrtum.create.content.kinetics.base.KineticBlockEntity;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.nbt.NbtCompound;
+import net.minecraft.nbt.NbtList;
+import net.minecraft.network.PacketByteBuf;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
 
 import java.util.List;
 import java.util.Vector;
@@ -19,12 +19,12 @@ public class Instruction {
         InstructionSpeedModifiers.CODEC.fieldOf("Modifier").forGetter(instruction -> instruction.speedModifier),
         Codec.INT.fieldOf("Value").forGetter(instruction -> instruction.value)
     ).apply(instance, Instruction::new));
-    public static final StreamCodec<FriendlyByteBuf, Instruction> STREAM_CODEC = StreamCodec.composite(
+    public static final PacketCodec<PacketByteBuf, Instruction> STREAM_CODEC = PacketCodec.tuple(
         SequencerInstructions.STREAM_CODEC,
         instruction -> instruction.instruction,
         InstructionSpeedModifiers.STREAM_CODEC,
         instruction -> instruction.speedModifier,
-        ByteBufCodecs.VAR_INT,
+        PacketCodecs.VAR_INT,
         instruction -> instruction.value,
         Instruction::new
     );
@@ -117,18 +117,17 @@ public class Instruction {
         return instruction == SequencerInstructions.AWAIT ? OnIsPoweredResult.CONTINUE : OnIsPoweredResult.NOTHING;
     }
 
-    public static ListTag serializeAll(List<Instruction> instructions) {
-        ListTag list = new ListTag();
+    public static NbtList serializeAll(List<Instruction> instructions) {
+        NbtList list = new NbtList();
         instructions.forEach(i -> list.add(i.serialize()));
         return list;
     }
 
-    public static Vector<Instruction> deserializeAll(ListTag list) {
-        if (list.isEmpty()) {
+    public static Vector<Instruction> deserializeAll(NbtList list) {
+        if (list.isEmpty())
             return createDefault();
-        }
         Vector<Instruction> instructions = new Vector<>(5);
-        list.forEach(inbt -> instructions.add(deserialize((CompoundTag) inbt)));
+        list.forEach(inbt -> instructions.add(deserialize((NbtCompound) inbt)));
         return instructions;
     }
 
@@ -139,18 +138,18 @@ public class Instruction {
         return instructions;
     }
 
-    CompoundTag serialize() {
-        CompoundTag tag = new CompoundTag();
+    NbtCompound serialize() {
+        NbtCompound tag = new NbtCompound();
         NBTHelper.writeEnum(tag, "Type", instruction);
         NBTHelper.writeEnum(tag, "Modifier", speedModifier);
         tag.putInt("Value", value);
         return tag;
     }
 
-    static Instruction deserialize(CompoundTag tag) {
+    static Instruction deserialize(NbtCompound tag) {
         Instruction instruction = new Instruction(NBTHelper.readEnum(tag, "Type", SequencerInstructions.class));
         instruction.speedModifier = NBTHelper.readEnum(tag, "Modifier", InstructionSpeedModifiers.class);
-        instruction.value = tag.getIntOr("Value", 0);
+        instruction.value = tag.getInt("Value", 0);
         return instruction;
     }
 

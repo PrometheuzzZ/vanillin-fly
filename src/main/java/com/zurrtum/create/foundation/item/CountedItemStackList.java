@@ -2,10 +2,10 @@ package com.zurrtum.create.foundation.item;
 
 import com.zurrtum.create.catnip.data.IntAttached;
 import com.zurrtum.create.foundation.blockEntity.behaviour.filtering.ServerFilteringBehaviour;
-import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.world.Container;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.inventory.Inventory;
+import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
+import net.minecraft.text.MutableText;
 
 import java.util.*;
 import java.util.stream.Stream;
@@ -14,18 +14,17 @@ public class CountedItemStackList {
 
     Map<Item, Set<ItemStackEntry>> items = new HashMap<>();
 
-    public CountedItemStackList(Container inventory, ServerFilteringBehaviour filteringBehaviour) {
-        for (int slot = 0, size = inventory.getContainerSize(); slot < size; slot++) {
-            ItemStack extractItem = inventory.getItem(slot);
-            if (filteringBehaviour.test(extractItem)) {
+    public CountedItemStackList(Inventory inventory, ServerFilteringBehaviour filteringBehaviour) {
+        for (int slot = 0, size = inventory.size(); slot < size; slot++) {
+            ItemStack extractItem = inventory.getStack(slot);
+            if (filteringBehaviour.test(extractItem))
                 add(extractItem);
-            }
         }
     }
 
-    public Stream<IntAttached<MutableComponent>> getTopNames(int limit) {
+    public Stream<IntAttached<MutableText>> getTopNames(int limit) {
         return items.values().stream().flatMap(Collection::stream).sorted(IntAttached.comparator()).limit(limit)
-            .map(entry -> IntAttached.with(entry.count(), entry.stack().getHoverName().copy()));
+            .map(entry -> IntAttached.with(entry.count(), entry.stack().getName().copy()));
     }
 
     public void add(ItemStack stack) {
@@ -33,15 +32,13 @@ public class CountedItemStackList {
     }
 
     public void add(ItemStack stack, int amount) {
-        if (stack.isEmpty()) {
+        if (stack.isEmpty())
             return;
-        }
 
         Set<ItemStackEntry> stackSet = getOrCreateItemSet(stack);
         for (ItemStackEntry entry : stackSet) {
-            if (!entry.matches(stack)) {
+            if (!entry.matches(stack))
                 continue;
-            }
             entry.grow(amount);
             return;
         }
@@ -49,9 +46,8 @@ public class CountedItemStackList {
     }
 
     private Set<ItemStackEntry> getOrCreateItemSet(ItemStack stack) {
-        if (!items.containsKey(stack.getItem())) {
+        if (!items.containsKey(stack.getItem()))
             items.put(stack.getItem(), new HashSet<>());
-        }
         return getItemSet(stack);
     }
 
@@ -70,7 +66,7 @@ public class CountedItemStackList {
         }
 
         public boolean matches(ItemStack other) {
-            return ItemStack.isSameItemSameComponents(other, stack());
+            return ItemStack.areItemsAndComponentsEqual(other, stack());
         }
 
         public ItemStack stack() {

@@ -3,41 +3,42 @@ package com.zurrtum.create.infrastructure.packet.s2c;
 import com.zurrtum.create.AllClientHandle;
 import com.zurrtum.create.AllPackets;
 import com.zurrtum.create.catnip.codecs.stream.CatnipStreamCodecs;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.PacketType;
-import net.minecraft.network.protocol.game.ClientGamePacketListener;
-import net.minecraft.world.InteractionHand;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.item.ItemStack;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.network.listener.ClientPlayPacketListener;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.PacketType;
+import net.minecraft.util.Hand;
+import net.minecraft.util.math.Vec3d;
 
-public record PotatoCannonPacket(Vec3 location, Vec3 motion, ItemStack item, InteractionHand hand, float pitch,
-                                 boolean self) implements Packet<ClientGamePacketListener> {
-    public static final StreamCodec<RegistryFriendlyByteBuf, PotatoCannonPacket> CODEC = StreamCodec.composite(
-        Vec3.STREAM_CODEC,
+public record PotatoCannonPacket(
+    Vec3d location, Vec3d motion, ItemStack item, Hand hand, float pitch, boolean self
+) implements Packet<ClientPlayPacketListener> {
+    public static final PacketCodec<RegistryByteBuf, PotatoCannonPacket> CODEC = PacketCodec.tuple(
+        Vec3d.PACKET_CODEC,
         PotatoCannonPacket::location,
-        Vec3.STREAM_CODEC,
+        Vec3d.PACKET_CODEC,
         PotatoCannonPacket::motion,
-        ItemStack.OPTIONAL_STREAM_CODEC,
+        ItemStack.OPTIONAL_PACKET_CODEC,
         PotatoCannonPacket::item,
         CatnipStreamCodecs.HAND,
         PotatoCannonPacket::hand,
-        ByteBufCodecs.FLOAT,
+        PacketCodecs.FLOAT,
         PotatoCannonPacket::pitch,
-        ByteBufCodecs.BOOL,
+        PacketCodecs.BOOLEAN,
         PotatoCannonPacket::self,
         PotatoCannonPacket::new
     );
 
     @Override
-    public void handle(ClientGamePacketListener listener) {
+    public void apply(ClientPlayPacketListener listener) {
         AllClientHandle.INSTANCE.onPotatoCannon(listener, this);
     }
 
     @Override
-    public PacketType<PotatoCannonPacket> type() {
+    public PacketType<PotatoCannonPacket> getPacketType() {
         return AllPackets.POTATO_CANNON;
     }
 }

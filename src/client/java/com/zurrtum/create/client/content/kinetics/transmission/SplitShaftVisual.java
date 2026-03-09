@@ -12,8 +12,8 @@ import com.zurrtum.create.client.flywheel.lib.model.Models;
 import com.zurrtum.create.client.foundation.render.AllInstanceTypes;
 import com.zurrtum.create.content.kinetics.base.IRotate;
 import com.zurrtum.create.content.kinetics.transmission.SplitShaftBlockEntity;
-import net.minecraft.core.Direction;
-import net.minecraft.world.level.block.Block;
+import net.minecraft.block.Block;
+import net.minecraft.util.math.Direction;
 
 import java.util.ArrayList;
 import java.util.function.Consumer;
@@ -33,13 +33,9 @@ public class SplitShaftVisual extends KineticBlockEntityVisual<SplitShaftBlockEn
 
             float splitSpeed = speed * blockEntity.getRotationSpeedModifier(dir);
 
-            var instance = instancerProvider().instancer(
-                AllInstanceTypes.ROTATING,
-                Models.partial(AllPartialModels.SHAFT_HALF)
-            ).createInstance();
+            var instance = instancerProvider().instancer(AllInstanceTypes.ROTATING, Models.partial(AllPartialModels.SHAFT_HALF)).createInstance();
 
-            instance.setup(blockEntity, splitSpeed).setPosition(getVisualPosition()).rotateToFace(Direction.SOUTH, dir)
-                .setChanged();
+            instance.setup(blockEntity, splitSpeed).setPosition(getVisualPosition()).rotateToFace(Direction.SOUTH, dir).setChanged();
 
             keys.add(instance);
         }
@@ -53,8 +49,7 @@ public class SplitShaftVisual extends KineticBlockEntityVisual<SplitShaftBlockEn
         Direction[] directions = Iterate.directionsInAxis(boxAxis);
 
         for (int i : Iterate.zeroAndOne) {
-            keys.get(i).setup(blockEntity, blockEntity.getSpeed() * blockEntity.getRotationSpeedModifier(directions[i]))
-                .setChanged();
+            keys.get(i).setup(blockEntity, blockEntity.getSpeed() * blockEntity.getRotationSpeedModifier(directions[i])).setChanged();
         }
     }
 

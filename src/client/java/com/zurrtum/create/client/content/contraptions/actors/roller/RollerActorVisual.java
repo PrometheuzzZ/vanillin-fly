@@ -9,32 +9,25 @@ import com.zurrtum.create.client.flywheel.lib.model.Models;
 import com.zurrtum.create.client.flywheel.lib.model.baked.PartialModel;
 import com.zurrtum.create.client.foundation.virtualWorld.VirtualRenderWorld;
 import com.zurrtum.create.content.contraptions.behaviour.MovementContext;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.util.math.Vec3d;
 
 public class RollerActorVisual extends HarvesterActorVisual {
 
     TransformedInstance frame;
 
-    public RollerActorVisual(
-        VisualizationContext visualizationContext,
-        VirtualRenderWorld simulationWorld,
-        MovementContext movementContext
-    ) {
+    public RollerActorVisual(VisualizationContext visualizationContext, VirtualRenderWorld simulationWorld, MovementContext movementContext) {
         super(visualizationContext, simulationWorld, movementContext);
 
-        frame = instancerProvider.instancer(InstanceTypes.TRANSFORMED, Models.partial(AllPartialModels.ROLLER_FRAME))
-            .createInstance();
+        frame = instancerProvider.instancer(InstanceTypes.TRANSFORMED, Models.partial(AllPartialModels.ROLLER_FRAME)).createInstance();
         frame.light(localBlockLight(), 0);
     }
 
     @Override
     public void beginFrame() {
-        harvester.setIdentityTransform().translate(context.localPos).center().rotateYDegrees(horizontalAngle).uncenter()
-            .translate(0, -.25, 17 / 16f).rotateXDegrees((float) getRotation()).translate(0, -.5, .5).rotateYDegrees(90)
-            .setChanged();
+        harvester.setIdentityTransform().translate(context.localPos).center().rotateYDegrees(horizontalAngle).uncenter().translate(0, -.25, 17 / 16f)
+            .rotateXDegrees((float) getRotation()).translate(0, -.5, .5).rotateYDegrees(90).setChanged();
 
-        frame.setIdentityTransform().translate(context.localPos).center().rotateYDegrees(horizontalAngle + 180)
-            .uncenter().setChanged();
+        frame.setIdentityTransform().translate(context.localPos).center().rotateYDegrees(horizontalAngle + 180).uncenter().setChanged();
     }
 
     @Override
@@ -43,8 +36,8 @@ public class RollerActorVisual extends HarvesterActorVisual {
     }
 
     @Override
-    protected Vec3 getRotationOffset() {
-        return Vec3.ZERO;
+    protected Vec3d getRotationOffset() {
+        return Vec3d.ZERO;
     }
 
     @Override

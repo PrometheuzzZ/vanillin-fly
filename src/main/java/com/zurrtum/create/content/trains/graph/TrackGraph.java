@@ -11,14 +11,14 @@ import com.zurrtum.create.content.trains.signal.SignalEdgeGroup;
 import com.zurrtum.create.content.trains.signal.TrackEdgePoint;
 import com.zurrtum.create.content.trains.track.BezierConnection;
 import com.zurrtum.create.content.trains.track.TrackMaterial;
-import net.minecraft.core.UUIDUtil;
-import net.minecraft.resources.ResourceKey;
+import net.minecraft.registry.RegistryKey;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.LevelAccessor;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.storage.ReadView;
+import net.minecraft.storage.WriteView;
+import net.minecraft.util.Uuids;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.World;
+import net.minecraft.world.WorldAccess;
 import org.apache.commons.lang3.mutable.MutableInt;
 import org.jetbrains.annotations.Nullable;
 
@@ -38,7 +38,7 @@ public class TrackGraph {
     Map<Integer, TrackNode> nodesById;
     public Map<TrackNode, Map<TrackNode, TrackEdge>> connectionsByNode;
     public EdgePointStorage edgePoints;
-    Map<ResourceKey<Level>, TrackGraphBounds> bounds;
+    Map<RegistryKey<World>, TrackGraphBounds> bounds;
 
     List<TrackEdge> deferredIntersectionUpdates;
 
@@ -79,9 +79,8 @@ public class TrackGraph {
 
     public <T extends TrackEdgePoint> T removePoint(MinecraftServer server, EdgePointType<T> type, UUID id) {
         T removed = edgePoints.remove(type, id);
-        if (removed == null) {
+        if (removed == null)
             return null;
-        }
         EdgePointManager.onEdgePointRemoved(server, this, removed, type);
         Create.RAILWAYS.sync.pointRemoved(this, removed);
         markDirty();
@@ -94,8 +93,8 @@ public class TrackGraph {
 
     //
 
-    public TrackGraphBounds getBounds(Level level) {
-        return bounds.computeIfAbsent(level.dimension(), dim -> new TrackGraphBounds(this, dim));
+    public TrackGraphBounds getBounds(World level) {
+        return bounds.computeIfAbsent(level.getRegistryKey(), dim -> new TrackGraphBounds(this, dim));
     }
 
     public void invalidateBounds() {
@@ -109,7 +108,7 @@ public class TrackGraph {
         return nodes.keySet();
     }
 
-    public TrackNode locateNode(Level level, Vec3 position) {
+    public TrackNode locateNode(World level, Vec3d position) {
         return locateNode(new TrackNodeLocation(position).in(level));
     }
 
@@ -122,9 +121,8 @@ public class TrackGraph {
     }
 
     public boolean createNodeIfAbsent(DiscoveredLocation location) {
-        if (!addNodeIfAbsent(new TrackNode(location, nextNodeId(), location.normal))) {
+        if (!addNodeIfAbsent(new TrackNode(location, nextNodeId(), location.normal)))
             return false;
-        }
         TrackNode newNode = nodes.get(location);
         Create.RAILWAYS.sync.nodeAdded(this, newNode);
         invalidateBounds();
@@ -132,50 +130,44 @@ public class TrackGraph {
         return true;
     }
 
-    public void loadNode(TrackNodeLocation location, int netId, Vec3 normal) {
+    public void loadNode(TrackNodeLocation location, int netId, Vec3d normal) {
         addNode(new TrackNode(location, netId, normal));
     }
 
     public void addNode(TrackNode node) {
         TrackNodeLocation location = node.getLocation();
-        if (nodes.containsKey(location)) {
+        if (nodes.containsKey(location))
             removeNode(null, location);
-        }
         nodes.put(location, node);
         nodesById.put(node.getNetId(), node);
     }
 
     public boolean addNodeIfAbsent(TrackNode node) {
-        if (nodes.putIfAbsent(node.getLocation(), node) != null) {
+        if (nodes.putIfAbsent(node.getLocation(), node) != null)
             return false;
-        }
         nodesById.put(node.getNetId(), node);
         return true;
     }
 
-    public boolean removeNode(@Nullable LevelAccessor level, TrackNodeLocation location) {
+    public boolean removeNode(@Nullable WorldAccess level, TrackNodeLocation location) {
         TrackNode removed = nodes.remove(location);
-        if (removed == null) {
+        if (removed == null)
             return false;
-        }
 
         Map<UUID, Train> trains = Create.RAILWAYS.trains;
         for (UUID uuid : trains.keySet()) {
             Train train = trains.get(uuid);
-            if (train.graph != this) {
+            if (train.graph != this)
                 continue;
-            }
-            if (train.isTravellingOn(removed)) {
+            if (train.isTravellingOn(removed))
                 train.detachFromTracks();
-            }
         }
 
         nodesById.remove(removed.netId);
         invalidateBounds();
 
-        if (!connectionsByNode.containsKey(removed)) {
+        if (!connectionsByNode.containsKey(removed))
             return true;
-        }
 
         Map<TrackNode, TrackEdge> connections = connectionsByNode.remove(removed);
         MinecraftServer server = level != null ? level.getServer() : null;
@@ -183,27 +175,23 @@ public class TrackGraph {
             TrackEdge trackEdge = entry.getValue();
             EdgeData edgeData = trackEdge.getEdgeData();
             for (TrackEdgePoint point : edgeData.getPoints()) {
-                if (level != null) {
+                if (level != null)
                     point.invalidate(level);
-                }
                 edgePoints.remove(point.getType(), point.getId());
             }
             if (level != null) {
                 for (TrackEdgeIntersection intersection : edgeData.getIntersections()) {
                     Couple<TrackNodeLocation> target = intersection.target;
                     TrackGraph graph = Create.RAILWAYS.getGraph(target.getFirst());
-                    if (graph != null) {
+                    if (graph != null)
                         graph.removeIntersection(server, intersection);
-                    }
                 }
             }
         }
 
-        for (TrackNode railNode : connections.keySet()) {
-            if (connectionsByNode.containsKey(railNode)) {
+        for (TrackNode railNode : connections.keySet())
+            if (connectionsByNode.containsKey(railNode))
                 connectionsByNode.get(railNode).remove(removed);
-            }
-        }
 
         return true;
     }
@@ -211,24 +199,21 @@ public class TrackGraph {
     private void removeIntersection(MinecraftServer server, TrackEdgeIntersection intersection) {
         TrackNode node1 = locateNode(intersection.target.getFirst());
         TrackNode node2 = locateNode(intersection.target.getSecond());
-        if (node1 == null || node2 == null) {
+        if (node1 == null || node2 == null)
             return;
-        }
 
         Map<TrackNode, TrackEdge> from1 = getConnectionsFrom(node1);
         if (from1 != null) {
             TrackEdge edge = from1.get(node2);
-            if (edge != null) {
+            if (edge != null)
                 edge.getEdgeData().removeIntersection(server, this, intersection.id);
-            }
         }
 
         Map<TrackNode, TrackEdge> from2 = getConnectionsFrom(node2);
         if (from2 != null) {
             TrackEdge edge = from2.get(node1);
-            if (edge != null) {
+            if (edge != null)
                 edge.getEdgeData().removeIntersection(server, this, intersection.id);
-            }
         }
     }
 
@@ -242,17 +227,15 @@ public class TrackGraph {
 
     public void transferAll(TrackGraph toOther) {
         nodes.forEach((loc, node) -> {
-            if (toOther.addNodeIfAbsent(node)) {
+            if (toOther.addNodeIfAbsent(node))
                 Create.RAILWAYS.sync.nodeAdded(toOther, node);
-            }
         });
 
         connectionsByNode.forEach((node1, map) -> map.forEach((node2, edge) -> {
             TrackNode n1 = toOther.locateNode(node1.location);
             TrackNode n2 = toOther.locateNode(node2.location);
-            if (n1 == null || n2 == null) {
+            if (n1 == null || n2 == null)
                 return;
-            }
             if (toOther.putConnection(n1, n2, edge)) {
                 Create.RAILWAYS.sync.edgeAdded(toOther, n1, n2, edge);
                 Create.RAILWAYS.sync.edgeDataChanged(toOther, n1, n2, edge);
@@ -267,26 +250,21 @@ public class TrackGraph {
         Map<UUID, Train> trains = Create.RAILWAYS.trains;
         for (UUID uuid : trains.keySet()) {
             Train train = trains.get(uuid);
-            if (train.graph != this) {
+            if (train.graph != this)
                 continue;
-            }
             train.graph = toOther;
         }
     }
 
-    public Set<TrackGraph> findDisconnectedGraphs(
-        @Nullable LevelAccessor level,
-        @Nullable Map<Integer, Pair<Integer, UUID>> splitSubGraphs
-    ) {
+    public Set<TrackGraph> findDisconnectedGraphs(@Nullable WorldAccess level, @Nullable Map<Integer, Pair<Integer, UUID>> splitSubGraphs) {
         Set<TrackGraph> dicovered = new HashSet<>();
         Set<TrackNodeLocation> vertices = new HashSet<>(nodes.keySet());
         List<TrackNodeLocation> frontier = new ArrayList<>();
         TrackGraph target = null;
 
         while (!vertices.isEmpty()) {
-            if (target != null) {
+            if (target != null)
                 dicovered.add(target);
-            }
 
             TrackNodeLocation start = vertices.stream().findFirst().get();
             frontier.add(start);
@@ -297,11 +275,9 @@ public class TrackGraph {
                 TrackNode currentNode = locateNode(current);
 
                 Map<TrackNode, TrackEdge> connections = getConnectionsFrom(currentNode);
-                for (TrackNode connected : connections.keySet()) {
-                    if (vertices.remove(connected.getLocation())) {
+                for (TrackNode connected : connections.keySet())
+                    if (vertices.remove(connected.getLocation()))
                         frontier.add(connected.getLocation());
-                    }
-                }
 
                 if (target != null) {
                     if (splitSubGraphs != null && splitSubGraphs.containsKey(currentNode.getNetId())) {
@@ -330,13 +306,12 @@ public class TrackGraph {
     }
 
     public int getChecksum() {
-        if (checksum == 0) {
+        if (checksum == 0)
             checksum = nodes.values().stream().collect(Collectors.summingInt(TrackNode::getNetId));
-        }
         return checksum;
     }
 
-    public void transfer(LevelAccessor level, TrackNode node, TrackGraph target) {
+    public void transfer(WorldAccess level, TrackNode node, TrackGraph target) {
         target.addNode(node);
         target.invalidateBounds();
 
@@ -355,18 +330,15 @@ public class TrackGraph {
             }
         }
 
-        if (level != null) {
+        if (level != null)
             for (UUID uuid : trains.keySet()) {
                 Train train = trains.get(uuid);
-                if (train.graph != this) {
+                if (train.graph != this)
                     continue;
-                }
-                if (!train.isTravellingOn(node)) {
+                if (!train.isTravellingOn(node))
                     continue;
-                }
                 train.graph = target;
             }
-        }
 
         nodes.remove(nodeLoc);
         nodesById.remove(node.getNetId());
@@ -379,26 +351,19 @@ public class TrackGraph {
     }
 
     public Map<TrackNode, TrackEdge> getConnectionsFrom(TrackNode node) {
-        if (node == null) {
+        if (node == null)
             return null;
-        }
         return connectionsByNode.getOrDefault(node, new HashMap<>());
     }
 
     public TrackEdge getConnection(Couple<TrackNode> nodes) {
         Map<TrackNode, TrackEdge> connectionsFrom = getConnectionsFrom(nodes.getFirst());
-        if (connectionsFrom == null) {
+        if (connectionsFrom == null)
             return null;
-        }
         return connectionsFrom.get(nodes.getSecond());
     }
 
-    public void connectNodes(
-        LevelAccessor reader,
-        DiscoveredLocation location,
-        DiscoveredLocation location2,
-        @Nullable BezierConnection turn
-    ) {
+    public void connectNodes(WorldAccess reader, DiscoveredLocation location, DiscoveredLocation location2, @Nullable BezierConnection turn) {
         TrackNode node1 = nodes.get(location);
         TrackNode node2 = nodes.get(location2);
 
@@ -410,42 +375,28 @@ public class TrackGraph {
         for (TrackGraph graph : Create.RAILWAYS.trackNetworks.values()) {
             for (TrackNode otherNode1 : graph.nodes.values()) {
                 Map<TrackNode, TrackEdge> connections = graph.connectionsByNode.get(otherNode1);
-                if (connections == null) {
+                if (connections == null)
                     continue;
-                }
                 for (Map.Entry<TrackNode, TrackEdge> entry : connections.entrySet()) {
                     TrackNode otherNode2 = entry.getKey();
                     TrackEdge otherEdge = entry.getValue();
 
-                    if (graph == this) {
-                        if (otherNode1 == node1 || otherNode2 == node1 || otherNode1 == node2 || otherNode2 == node2) {
+                    if (graph == this)
+                        if (otherNode1 == node1 || otherNode2 == node1 || otherNode1 == node2 || otherNode2 == node2)
                             continue;
-                        }
-                    }
 
-                    if (edge == otherEdge) {
+                    if (edge == otherEdge)
                         continue;
-                    }
-                    if (otherEdge.isInterDimensional() || edge.isInterDimensional()) {
+                    if (otherEdge.isInterDimensional() || edge.isInterDimensional())
                         continue;
-                    }
-                    if (node1.location.dimension != otherNode1.location.dimension) {
+                    if (node1.location.dimension != otherNode1.location.dimension)
                         continue;
-                    }
-                    if (!bezier && !otherEdge.isTurn()) {
+                    if (!bezier && !otherEdge.isTurn())
                         continue;
-                    }
-                    if (otherEdge.isTurn() && otherEdge.turn.isPrimary()) {
+                    if (otherEdge.isTurn() && otherEdge.turn.isPrimary())
                         continue;
-                    }
 
-                    Collection<double[]> intersections = edge.getIntersection(
-                        node1,
-                        node2,
-                        otherEdge,
-                        otherNode1,
-                        otherNode2
-                    );
+                    Collection<double[]> intersections = edge.getIntersection(node1, node2, otherEdge, otherNode1, otherNode2);
 
                     UUID id = UUID.randomUUID();
                     for (double[] intersection : intersections) {
@@ -455,9 +406,8 @@ public class TrackGraph {
                         edge2.edgeData.addIntersection(this, id, edge.getLength() - s, otherNode1, otherNode2, t);
                         otherEdge.edgeData.addIntersection(graph, id, t, node1, node2, s);
                         TrackEdge otherEdge2 = graph.getConnection(Couple.create(otherNode2, otherNode1));
-                        if (otherEdge2 != null) {
+                        if (otherEdge2 != null)
                             otherEdge2.edgeData.addIntersection(graph, id, otherEdge.getLength() - t, node1, node2, s);
-                        }
                     }
                 }
             }
@@ -474,29 +424,25 @@ public class TrackGraph {
     public void disconnectNodes(TrackNode node1, TrackNode node2) {
         Map<TrackNode, TrackEdge> map1 = connectionsByNode.get(node1);
         Map<TrackNode, TrackEdge> map2 = connectionsByNode.get(node2);
-        if (map1 != null) {
+        if (map1 != null)
             map1.remove(node2);
-        }
-        if (map2 != null) {
+        if (map2 != null)
             map2.remove(node1);
-        }
     }
 
     public boolean putConnection(TrackNode node1, TrackNode node2, TrackEdge edge) {
         Map<TrackNode, TrackEdge> connections = connectionsByNode.computeIfAbsent(node1, n -> new IdentityHashMap<>());
-        if (connections.containsKey(node2) && connections.get(node2).getEdgeData().hasPoints()) {
+        if (connections.containsKey(node2) && connections.get(node2).getEdgeData().hasPoints())
             return false;
-        }
         return connections.put(node2, edge) == null;
     }
 
-    public float distanceToLocationSqr(Level level, Vec3 location) {
+    public float distanceToLocationSqr(World level, Vec3d location) {
         float nearest = Float.MAX_VALUE;
         for (TrackNodeLocation tnl : nodes.keySet()) {
-            if (!Objects.equals(tnl.dimension, level.dimension())) {
+            if (!Objects.equals(tnl.dimension, level.getRegistryKey()))
                 continue;
-            }
-            nearest = Math.min(nearest, (float) tnl.getLocation().distanceToSqr(location));
+            nearest = Math.min(nearest, (float) tnl.getLocation().squaredDistanceTo(location));
         }
         return nearest;
     }
@@ -505,39 +451,33 @@ public class TrackGraph {
         deferredIntersectionUpdates.add(edge);
     }
 
-    public void resolveIntersectingEdgeGroups(Level level) {
+    public void resolveIntersectingEdgeGroups(World level) {
         MinecraftServer server = level.getServer();
         for (TrackEdge edge : deferredIntersectionUpdates) {
-            if (!connectionsByNode.containsKey(edge.node1) || edge != connectionsByNode.get(edge.node1)
-                .get(edge.node2)) {
+            if (!connectionsByNode.containsKey(edge.node1) || edge != connectionsByNode.get(edge.node1).get(edge.node2))
                 continue;
-            }
             EdgeData edgeData = edge.getEdgeData();
             for (TrackEdgeIntersection intersection : edgeData.getIntersections()) {
                 UUID groupId = edgeData.getGroupAtPosition(this, intersection.location);
                 Couple<TrackNodeLocation> target = intersection.target;
                 TrackGraph graph = Create.RAILWAYS.getGraph(target.getFirst());
-                if (graph == null) {
+                if (graph == null)
                     continue;
-                }
 
                 TrackNode node1 = graph.locateNode(target.getFirst());
                 TrackNode node2 = graph.locateNode(target.getSecond());
                 Map<TrackNode, TrackEdge> connectionsFrom = graph.getConnectionsFrom(node1);
-                if (connectionsFrom == null) {
+                if (connectionsFrom == null)
                     continue;
-                }
                 TrackEdge otherEdge = connectionsFrom.get(node2);
-                if (otherEdge == null) {
+                if (otherEdge == null)
                     continue;
-                }
                 UUID otherGroupId = otherEdge.getEdgeData().getGroupAtPosition(graph, intersection.targetLocation);
 
                 SignalEdgeGroup group = Create.RAILWAYS.signalEdgeGroups.get(groupId);
                 SignalEdgeGroup otherGroup = Create.RAILWAYS.signalEdgeGroups.get(otherGroupId);
-                if (group == null || otherGroup == null || groupId == null || otherGroupId == null) {
+                if (group == null || otherGroup == null || groupId == null || otherGroupId == null)
                     continue;
-                }
 
                 intersection.groupId = groupId;
                 group.putIntersection(server, intersection.id, otherGroupId);
@@ -551,52 +491,45 @@ public class TrackGraph {
         Create.RAILWAYS.markTracksDirty();
     }
 
-    public void write(ValueOutput view, DimensionPalette dimensions) {
-        view.store("Id", UUIDUtil.CODEC, id);
+    public void write(WriteView view, DimensionPalette dimensions) {
+        view.put("Id", Uuids.INT_STREAM_CODEC, id);
         view.putInt("Color", color.getRGB());
 
         Map<TrackNode, Integer> indexTracker = new HashMap<>();
-        ValueOutput.ValueOutputList list = view.childrenList("Nodes");
-        ValueOutput[] nodesList = new ValueOutput[nodes.size()];
+        WriteView.ListView list = view.getList("Nodes");
+        WriteView[] nodesList = new WriteView[nodes.size()];
         int i = 0;
         for (TrackNode railNode : nodes.values()) {
             indexTracker.put(railNode, i);
-            ValueOutput node = list.addChild();
-            railNode.getLocation().write(node.child("Location"), dimensions);
-            node.store("Normal", Vec3.CODEC, railNode.getNormal());
+            WriteView node = list.add();
+            railNode.getLocation().write(node.get("Location"), dimensions);
+            node.put("Normal", Vec3d.CODEC, railNode.getNormal());
             nodesList[i] = node;
             i++;
         }
 
         connectionsByNode.forEach((node1, map) -> {
             Integer index1 = indexTracker.get(node1);
-            if (index1 == null) {
+            if (index1 == null)
                 return;
-            }
-            ValueOutput.ValueOutputList connections = nodesList[index1].childrenList("Connections");
+            WriteView.ListView connections = nodesList[index1].getList("Connections");
             map.forEach((node2, edge) -> {
                 Integer index2 = indexTracker.get(node2);
-                if (index2 == null) {
+                if (index2 == null)
                     return;
-                }
-                ValueOutput connection = connections.addChild();
+                WriteView connection = connections.add();
                 connection.putInt("To", index2);
-                edge.write(connection.child("EdgeData"), dimensions);
+                edge.write(connection.get("EdgeData"), dimensions);
             });
         });
 
-        edgePoints.write(view.child("Points"), dimensions);
+        edgePoints.write(view.get("Points"), dimensions);
     }
 
     @SuppressWarnings("unchecked")
-    public static <T> DataResult<T> encode(
-        final TrackGraph input,
-        final DynamicOps<T> ops,
-        final T empty,
-        DimensionPalette dimensions
-    ) {
+    public static <T> DataResult<T> encode(final TrackGraph input, final DynamicOps<T> ops, final T empty, DimensionPalette dimensions) {
         RecordBuilder<T> builder = ops.mapBuilder();
-        builder.add("Id", input.id, UUIDUtil.CODEC);
+        builder.add("Id", input.id, Uuids.INT_STREAM_CODEC);
         builder.add("Color", ops.createInt(input.color.getRGB()));
 
         Map<TrackNode, Integer> indexTracker = new HashMap<>();
@@ -606,22 +539,20 @@ public class TrackGraph {
             indexTracker.put(railNode, i);
             RecordBuilder<T> node = ops.mapBuilder();
             node.add("Location", TrackNodeLocation.encode(railNode.getLocation(), ops, empty, dimensions));
-            node.add("Normal", railNode.getNormal(), Vec3.CODEC);
+            node.add("Normal", railNode.getNormal(), Vec3d.CODEC);
             nodesList[i] = node;
             i++;
         }
         input.connectionsByNode.forEach((node1, map) -> {
             Integer index1 = indexTracker.get(node1);
-            if (index1 == null) {
+            if (index1 == null)
                 return;
-            }
             RecordBuilder<T> node = nodesList[index1];
             ListBuilder<T> connections = ops.listBuilder();
             map.forEach((node2, edge) -> {
                 Integer index2 = indexTracker.get(node2);
-                if (index2 == null) {
+                if (index2 == null)
                     return;
-                }
                 RecordBuilder<T> connection = ops.mapBuilder();
                 connection.add("To", ops.createInt(index2));
                 connection.add("EdgeData", TrackEdge.encode(edge, ops, empty, dimensions));
@@ -638,31 +569,31 @@ public class TrackGraph {
         return builder.build(empty);
     }
 
-    public static TrackGraph read(ValueInput view, DimensionPalette dimensions) {
-        TrackGraph graph = new TrackGraph(view.read("Id", UUIDUtil.CODEC).orElseThrow());
-        graph.color = new Color(view.getIntOr("Color", 0));
-        graph.edgePoints.read(view.childOrEmpty("Points"), dimensions);
+    public static TrackGraph read(ReadView view, DimensionPalette dimensions) {
+        TrackGraph graph = new TrackGraph(view.read("Id", Uuids.INT_STREAM_CODEC).orElseThrow());
+        graph.color = new Color(view.getInt("Color", 0));
+        graph.edgePoints.read(view.getReadView("Points"), dimensions);
 
         Map<Integer, TrackNode> indexTracker = new HashMap<>();
-        ValueInput.ValueInputList nodes = view.childrenListOrEmpty("Nodes");
+        ReadView.ListReadView nodes = view.getListReadView("Nodes");
 
         int i = 0;
-        for (ValueInput node : nodes) {
-            TrackNodeLocation location = TrackNodeLocation.read(node.childOrEmpty("Location"), dimensions);
-            Vec3 normal = view.read("Normal", Vec3.CODEC).orElseThrow();
+        for (ReadView node : nodes) {
+            TrackNodeLocation location = TrackNodeLocation.read(node.getReadView("Location"), dimensions);
+            Vec3d normal = view.read("Normal", Vec3d.CODEC).orElseThrow();
             graph.loadNode(location, nextNodeId(), normal);
             indexTracker.put(i, graph.locateNode(location));
             i++;
         }
 
         i = 0;
-        for (ValueInput node : nodes) {
+        for (ReadView node : nodes) {
             TrackNode node1 = indexTracker.get(i);
             i++;
 
-            node.childrenList("Connections").ifPresent(connections -> connections.forEach(connection -> {
-                TrackNode node2 = indexTracker.get(connection.getIntOr("To", 0));
-                TrackEdge edge = TrackEdge.read(node1, node2, connection.childOrEmpty("EdgeData"), graph, dimensions);
+            node.getOptionalListReadView("Connections").ifPresent(connections -> connections.forEach(connection -> {
+                TrackNode node2 = indexTracker.get(connection.getInt("To", 0));
+                TrackEdge edge = TrackEdge.read(node1, node2, connection.getReadView("EdgeData"), graph, dimensions);
                 graph.putConnection(node1, node2, edge);
             }));
         }
@@ -672,7 +603,7 @@ public class TrackGraph {
 
     public static <T> TrackGraph decode(final DynamicOps<T> ops, final T input, DimensionPalette dimensions) {
         MapLike<T> map = ops.getMap(input).getOrThrow();
-        TrackGraph graph = new TrackGraph(UUIDUtil.CODEC.decode(ops, map.get("Id")).getOrThrow().getFirst());
+        TrackGraph graph = new TrackGraph(Uuids.INT_STREAM_CODEC.decode(ops, map.get("Id")).getOrThrow().getFirst());
         graph.color = new Color(ops.getNumberValue(map.get("Color"), 0).intValue());
         graph.edgePoints.decode(ops, map.get("Points"), dimensions);
 
@@ -682,7 +613,7 @@ public class TrackGraph {
         ops.getList(map.get("Nodes")).getOrThrow().accept(item -> {
             MapLike<T> node = ops.getMap(item).getOrThrow();
             TrackNodeLocation location = TrackNodeLocation.decode(ops, node.get("Location"), dimensions);
-            Vec3 normal = Vec3.CODEC.decode(ops, node.get("Normal")).getOrThrow().getFirst();
+            Vec3d normal = Vec3d.CODEC.decode(ops, node.get("Normal")).getOrThrow().getFirst();
             graph.loadNode(location, nextNodeId(), normal);
             int index = i.getAndIncrement();
             nodes.put(index, node);

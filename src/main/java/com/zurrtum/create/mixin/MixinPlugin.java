@@ -28,11 +28,11 @@ public class MixinPlugin implements IMixinConfigPlugin {
             mixins.add("JustEnoughItemsMixin");
         }
         if (Create.Lazy) {
-            mixins.add("RegistriesMixin");
+            mixins.add("RegistryKeysMixin");
         } else {
-            mixins.add("CreativeModeTabMixin");
-            mixins.add("CreativeModeTabsMixin");
-            mixins.add("DimensionDataStorageMixin");
+            mixins.add("ItemGroupMixin");
+            mixins.add("ItemGroupsMixin");
+            mixins.add("PersistentStateManagerMixin");
             mixins.add("IngredientMixin");
         }
         if (loader.isModLoaded("fabric-resource-loader-v1")) {

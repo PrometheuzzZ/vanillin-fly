@@ -10,11 +10,11 @@ import me.shedaniel.rei.api.common.display.Display;
 import me.shedaniel.rei.api.common.display.DisplaySerializer;
 import me.shedaniel.rei.api.common.entry.EntryIngredient;
 import me.shedaniel.rei.api.common.util.EntryIngredients;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.resources.Identifier;
-import net.minecraft.world.item.crafting.Recipe;
-import net.minecraft.world.item.crafting.RecipeHolder;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.recipe.Recipe;
+import net.minecraft.recipe.RecipeEntry;
+import net.minecraft.util.Identifier;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -27,19 +27,19 @@ public record CrushingDisplay(EntryIngredient input, List<ProcessingOutput> outp
             EntryIngredient.codec().fieldOf("input").forGetter(CrushingDisplay::input),
             ProcessingOutput.CODEC.listOf().fieldOf("outputs").forGetter(CrushingDisplay::outputs),
             Identifier.CODEC.optionalFieldOf("location").forGetter(CrushingDisplay::location)
-        ).apply(instance, CrushingDisplay::new)), StreamCodec.composite(
+        ).apply(instance, CrushingDisplay::new)), PacketCodec.tuple(
             EntryIngredient.streamCodec(),
             CrushingDisplay::input,
-            ProcessingOutput.STREAM_CODEC.apply(ByteBufCodecs.list()),
+            ProcessingOutput.STREAM_CODEC.collect(PacketCodecs.toList()),
             CrushingDisplay::outputs,
-            ByteBufCodecs.optional(Identifier.STREAM_CODEC),
+            PacketCodecs.optional(Identifier.PACKET_CODEC),
             CrushingDisplay::location,
             CrushingDisplay::new
         )
     );
 
-    public static CrushingDisplay of(RecipeHolder<?> entry) {
-        Identifier id = entry.id().identifier();
+    public static CrushingDisplay of(RecipeEntry<?> entry) {
+        Identifier id = entry.id().getValue();
         Recipe<?> recipe = entry.value();
         if (recipe instanceof CrushingRecipe crushingRecipe) {
             return new CrushingDisplay(id, crushingRecipe);

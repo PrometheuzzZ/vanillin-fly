@@ -37,9 +37,8 @@ public class StringHelper {
             }
         }
 
-        if (!builder.isEmpty() && builder.charAt(0) == '_') {
+        if (!builder.isEmpty() && builder.charAt(0) == '_')
             builder.deleteCharAt(0);
-        }
 
         return builder.toString();
     }

@@ -1,46 +1,42 @@
 package com.zurrtum.create.client.foundation.gui.render;
 
-import com.mojang.blaze3d.platform.Lighting;
+import com.mojang.blaze3d.systems.ProjectionType;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.textures.FilterMode;
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
-import com.mojang.math.Axis;
 import com.zurrtum.create.AllBlocks;
 import com.zurrtum.create.client.catnip.gui.render.GpuTexture;
 import com.zurrtum.create.client.catnip.render.FluidRenderHelper;
 import com.zurrtum.create.client.flywheel.lib.model.baked.SinglePosVirtualBlockGetter;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.render.TextureSetup;
-import net.minecraft.client.gui.render.pip.PictureInPictureRenderer;
-import net.minecraft.client.gui.render.state.BlitRenderState;
+import net.minecraft.block.BlockState;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gl.RenderPipelines;
+import net.minecraft.client.gui.render.SpecialGuiElementRenderer;
 import net.minecraft.client.gui.render.state.GuiRenderState;
-import net.minecraft.client.renderer.LightTexture;
-import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.RenderPipelines;
-import net.minecraft.client.renderer.Sheets;
-import net.minecraft.client.renderer.block.BlockRenderDispatcher;
-import net.minecraft.client.renderer.block.model.BlockModelPart;
-import net.minecraft.core.BlockPos;
-import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.client.gui.render.state.TexturedQuadGuiElementRenderState;
+import net.minecraft.client.render.*;
+import net.minecraft.client.render.block.BlockRenderManager;
+import net.minecraft.client.render.model.BlockModelPart;
+import net.minecraft.client.texture.TextureSetup;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.RotationAxis;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.List;
 
-public class DrainRenderer extends PictureInPictureRenderer<DrainRenderState> {
+public class DrainRenderer extends SpecialGuiElementRenderer<DrainRenderState> {
     public static int MAX = 6;
     private int allocate = MAX;
     private static final Deque<GpuTexture> TEXTURES = new ArrayDeque<>(MAX);
-    private final PoseStack matrices = new PoseStack();
+    private final MatrixStack matrices = new MatrixStack();
     private int windowScaleFactor;
 
-    public DrainRenderer(MultiBufferSource.BufferSource vertexConsumers) {
+    public DrainRenderer(VertexConsumerProvider.Immediate vertexConsumers) {
         super(vertexConsumers);
     }
 
     @Override
-    public void prepare(DrainRenderState element, GuiRenderState state, int windowScaleFactor) {
+    public void render(DrainRenderState element, GuiRenderState state, int windowScaleFactor) {
         if (this.windowScaleFactor != windowScaleFactor) {
             this.windowScaleFactor = windowScaleFactor;
             TEXTURES.forEach(GpuTexture::close);
@@ -57,27 +53,28 @@ public class DrainRenderer extends PictureInPictureRenderer<DrainRenderState> {
             texture = TEXTURES.poll();
             assert texture != null;
         }
-        texture.prepare(projectionMatrixBuffer);
-        matrices.pushPose();
+        RenderSystem.setProjectionMatrix(projectionMatrix.set(width, height), ProjectionType.ORTHOGRAPHIC);
+        texture.prepare();
+        matrices.push();
         matrices.translate(width / 2.0F, height, 0.0F);
         float scale = 20 * windowScaleFactor;
         matrices.scale(scale, scale, scale);
 
-        Minecraft mc = Minecraft.getInstance();
-        mc.gameRenderer.getLighting().setupFor(Lighting.Entry.ENTITY_IN_UI);
-        matrices.mulPose(Axis.XP.rotationDegrees(-15.5f));
-        matrices.mulPose(Axis.YP.rotationDegrees(22.5f));
+        MinecraftClient mc = MinecraftClient.getInstance();
+        mc.gameRenderer.getDiffuseLighting().setShaderLights(DiffuseLighting.Type.ENTITY_IN_UI);
+        matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(-15.5f));
+        matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(22.5f));
         matrices.scale(1, -1, 1);
         matrices.translate(-0.5f, 0.2f, -0.5f);
 
-        BlockRenderDispatcher blockRenderManager = mc.getBlockRenderer();
+        BlockRenderManager blockRenderManager = mc.getBlockRenderManager();
         SinglePosVirtualBlockGetter world = SinglePosVirtualBlockGetter.createFullBright();
-        VertexConsumer buffer = bufferSource.getBuffer(Sheets.cutoutBlockSheet());
+        VertexConsumer buffer = vertexConsumers.getBuffer(TexturedRenderLayers.getEntityCutout());
 
-        BlockState blockState = AllBlocks.ITEM_DRAIN.defaultBlockState();
+        BlockState blockState = AllBlocks.ITEM_DRAIN.getDefaultState();
         world.blockState(blockState);
-        List<BlockModelPart> parts = blockRenderManager.getBlockModel(blockState).collectParts(mc.level.random);
-        blockRenderManager.renderBatched(blockState, BlockPos.ZERO, world, matrices, buffer, false, parts);
+        List<BlockModelPart> parts = blockRenderManager.getModel(blockState).getParts(mc.world.random);
+        blockRenderManager.renderBlock(blockState, BlockPos.ORIGIN, world, matrices, buffer, false, parts);
 
         float from = 2 / 16f;
         float to = 1f - from;
@@ -90,26 +87,24 @@ public class DrainRenderer extends PictureInPictureRenderer<DrainRenderState> {
             to,
             3 / 4f,
             to,
-            bufferSource,
+            vertexConsumers,
             matrices,
-            LightTexture.FULL_BRIGHT,
+            LightmapTextureManager.MAX_LIGHT_COORDINATE,
             false,
             true
         );
 
-        bufferSource.endBatch();
-        matrices.popPose();
+        vertexConsumers.draw();
+        matrices.pop();
         texture.clear();
-        state.submitBlitToCurrentLayer(new BlitRenderState(
+        state.addSimpleElementToCurrentLayer(new TexturedQuadGuiElementRenderState(
             RenderPipelines.GUI_TEXTURED_PREMULTIPLIED_ALPHA,
-            TextureSetup.singleTexture(texture.textureView(),
-                RenderSystem.getSamplerCache().getRepeat(FilterMode.NEAREST)
-            ),
+            TextureSetup.withoutGlTexture(texture.textureView()),
             element.pose(),
-            element.x0(),
-            element.y0(),
             element.x1(),
             element.y1(),
+            element.x2(),
+            element.y2(),
             0.0F,
             1.0F,
             1.0F,
@@ -122,16 +117,16 @@ public class DrainRenderer extends PictureInPictureRenderer<DrainRenderState> {
     }
 
     @Override
-    protected void renderToTexture(DrainRenderState state, PoseStack matrices) {
+    protected void render(DrainRenderState state, MatrixStack matrices) {
     }
 
     @Override
-    protected String getTextureLabel() {
+    protected String getName() {
         return "Drain";
     }
 
     @Override
-    public Class<DrainRenderState> getRenderStateClass() {
+    public Class<DrainRenderState> getElementClass() {
         return DrainRenderState.class;
     }
 }

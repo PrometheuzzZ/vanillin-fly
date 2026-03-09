@@ -3,25 +3,24 @@ package com.zurrtum.create.client.flywheel.lib.util;
 import com.mojang.brigadier.StringReader;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
-import net.minecraft.IdentifierException;
-import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
+import net.minecraft.text.Text;
+import net.minecraft.util.Identifier;
+import net.minecraft.util.InvalidIdentifierException;
 
 import static com.zurrtum.create.client.flywheel.impl.Flywheel.MOD_ID;
 
 public final class ResourceUtil {
-    private static final SimpleCommandExceptionType ERROR_INVALID = new SimpleCommandExceptionType(Component.translatable(
-        "argument.id.invalid"));
+    private static final SimpleCommandExceptionType ERROR_INVALID = new SimpleCommandExceptionType(Text.translatable("argument.id.invalid"));
 
     private ResourceUtil() {
     }
 
     public static Identifier rl(String path) {
-        return Identifier.fromNamespaceAndPath(MOD_ID, path);
+        return Identifier.of(MOD_ID, path);
     }
 
     /**
-     * Same as {@link Identifier#parse(String)}, but defaults to Flywheel namespace.
+     * Same as {@link Identifier#of(String)}, but defaults to Flywheel namespace.
      */
     public static Identifier parseFlywheelDefault(String location) {
         String namespace = MOD_ID;
@@ -34,16 +33,16 @@ public final class ResourceUtil {
             }
         }
 
-        return Identifier.fromNamespaceAndPath(namespace, path);
+        return Identifier.of(namespace, path);
     }
 
     /**
-     * Same as {@link Identifier#read(StringReader)}, but defaults to Flywheel namespace.
+     * Same as {@link Identifier#fromCommandInput(StringReader)}, but defaults to Flywheel namespace.
      */
     public static Identifier readFlywheelDefault(StringReader reader) throws CommandSyntaxException {
         int i = reader.getCursor();
 
-        while (reader.canRead() && Identifier.isAllowedInIdentifier(reader.peek())) {
+        while (reader.canRead() && Identifier.isCharValid(reader.peek())) {
             reader.skip();
         }
 
@@ -51,17 +50,17 @@ public final class ResourceUtil {
 
         try {
             return parseFlywheelDefault(s);
-        } catch (IdentifierException var4) {
+        } catch (InvalidIdentifierException var4) {
             reader.setCursor(i);
             throw ERROR_INVALID.createWithContext(reader);
         }
     }
 
     /**
-     * Same as {@link Identifier#toDebugFileName()}, but also removes the file extension.
+     * Same as {@link Identifier#toUnderscoreSeparatedString()}, but also removes the file extension.
      */
-    public static String toDebugFileNameNoExtension(Identifier Identifier) {
-        String stringLoc = Identifier.toDebugFileName();
+    public static String toDebugFileNameNoExtension(Identifier resourceLocation) {
+        String stringLoc = resourceLocation.toUnderscoreSeparatedString();
         return stringLoc.substring(0, stringLoc.lastIndexOf('.'));
     }
 }

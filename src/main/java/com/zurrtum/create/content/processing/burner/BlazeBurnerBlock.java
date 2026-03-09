@@ -15,259 +15,228 @@ import com.zurrtum.create.content.processing.basin.BasinBlockEntity;
 import com.zurrtum.create.content.schematics.requirement.ItemRequirement;
 import com.zurrtum.create.content.schematics.requirement.ItemRequirement.ItemUseType;
 import com.zurrtum.create.foundation.block.IBE;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.sounds.SoundEvents;
-import net.minecraft.sounds.SoundSource;
-import net.minecraft.util.RandomSource;
-import net.minecraft.util.StringRepresentable;
-import net.minecraft.world.InteractionHand;
-import net.minecraft.world.InteractionResult;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.FlintAndSteelItem;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.context.BlockPlaceContext;
-import net.minecraft.world.level.BlockGetter;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.LevelReader;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.HorizontalDirectionalBlock;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.entity.BlockEntityType;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.StateDefinition.Builder;
-import net.minecraft.world.level.block.state.properties.EnumProperty;
-import net.minecraft.world.level.pathfinder.PathComputationType;
-import net.minecraft.world.phys.BlockHitResult;
-import net.minecraft.world.phys.shapes.CollisionContext;
-import net.minecraft.world.phys.shapes.VoxelShape;
+import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.HorizontalFacingBlock;
+import net.minecraft.block.ShapeContext;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.block.entity.BlockEntityType;
+import net.minecraft.entity.ai.pathing.NavigationType;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.item.FlintAndSteelItem;
+import net.minecraft.item.Item;
+import net.minecraft.item.ItemPlacementContext;
+import net.minecraft.item.ItemStack;
+import net.minecraft.sound.SoundCategory;
+import net.minecraft.sound.SoundEvents;
+import net.minecraft.state.StateManager.Builder;
+import net.minecraft.state.property.EnumProperty;
+import net.minecraft.util.ActionResult;
+import net.minecraft.util.Hand;
+import net.minecraft.util.StringIdentifiable;
+import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.random.Random;
+import net.minecraft.util.shape.VoxelShape;
+import net.minecraft.world.BlockView;
+import net.minecraft.world.World;
+import net.minecraft.world.WorldView;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Locale;
 
-public class BlazeBurnerBlock extends HorizontalDirectionalBlock implements IBE<BlazeBurnerBlockEntity>, IWrenchable, SpecialBlockItemRequirement {
-    public static final MapCodec<BlazeBurnerBlock> CODEC = simpleCodec(BlazeBurnerBlock::new);
-    public static final EnumProperty<HeatLevel> HEAT_LEVEL = EnumProperty.create("blaze", HeatLevel.class);
+public class BlazeBurnerBlock extends HorizontalFacingBlock implements IBE<BlazeBurnerBlockEntity>, IWrenchable, SpecialBlockItemRequirement {
+    public static final MapCodec<BlazeBurnerBlock> CODEC = createCodec(BlazeBurnerBlock::new);
+    public static final EnumProperty<HeatLevel> HEAT_LEVEL = EnumProperty.of("blaze", HeatLevel.class);
 
-    public BlazeBurnerBlock(Properties settings) {
+    public BlazeBurnerBlock(Settings settings) {
         super(settings);
-        registerDefaultState(defaultBlockState().setValue(HEAT_LEVEL, HeatLevel.NONE));
+        setDefaultState(getDefaultState().with(HEAT_LEVEL, HeatLevel.NONE));
     }
 
     @Override
-    protected void createBlockStateDefinition(Builder<Block, BlockState> builder) {
-        super.createBlockStateDefinition(builder);
+    protected void appendProperties(Builder<Block, BlockState> builder) {
+        super.appendProperties(builder);
         builder.add(HEAT_LEVEL, FACING);
     }
 
     @Override
-    public void onPlace(BlockState state, Level world, BlockPos pos, BlockState p_220082_4_, boolean p_220082_5_) {
-        if (world.isClientSide()) {
+    public void onBlockAdded(BlockState state, World world, BlockPos pos, BlockState p_220082_4_, boolean p_220082_5_) {
+        if (world.isClient())
             return;
-        }
-        BlockEntity blockEntity = world.getBlockEntity(pos.above());
-        if (!(blockEntity instanceof BasinBlockEntity basin)) {
+        BlockEntity blockEntity = world.getBlockEntity(pos.up());
+        if (!(blockEntity instanceof BasinBlockEntity basin))
             return;
-        }
         basin.notifyChangeOfContents();
     }
 
     @Nullable
     @Override
-    public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
-        if (state.getValue(HEAT_LEVEL) == HeatLevel.NONE) {
+    public BlockEntity createBlockEntity(BlockPos pos, BlockState state) {
+        if (state.get(HEAT_LEVEL) == HeatLevel.NONE)
             return null;
-        }
-        return IBE.super.newBlockEntity(pos, state);
+        return IBE.super.createBlockEntity(pos, state);
     }
 
     @Override
-    protected InteractionResult useItemOn(
+    protected ActionResult onUseWithItem(
         ItemStack stack,
         BlockState state,
-        Level level,
+        World level,
         BlockPos pos,
-        Player player,
-        InteractionHand hand,
+        PlayerEntity player,
+        Hand hand,
         BlockHitResult hitResult
     ) {
-        HeatLevel heat = state.getValue(HEAT_LEVEL);
+        HeatLevel heat = state.get(HEAT_LEVEL);
 
-        if (stack.is(AllItems.GOGGLES) && heat != HeatLevel.NONE) {
+        if (stack.isOf(AllItems.GOGGLES) && heat != HeatLevel.NONE)
             return onBlockEntityUseItemOn(
                 level, pos, bbte -> {
-                    if (bbte.goggles) {
-                        return InteractionResult.TRY_WITH_EMPTY_HAND;
-                    }
+                    if (bbte.goggles)
+                        return ActionResult.PASS_TO_DEFAULT_BLOCK_ACTION;
                     bbte.goggles = true;
                     bbte.notifyUpdate();
-                    return InteractionResult.SUCCESS;
+                    return ActionResult.SUCCESS;
                 }
             );
-        }
 
         BlazeBurnerBlockEntity be = getBlockEntity(level, pos);
         if (be != null && be.stockKeeper) {
             StockTickerBlockEntity stockTicker = BlazeBurnerBlockEntity.getStockTicker(level, pos);
-            if (stockTicker != null) {
-                StockTickerInteractionHandler.interactWithLogisticsManagerAt(player, level, stockTicker.getBlockPos());
-            }
-            return InteractionResult.SUCCESS;
+            if (stockTicker != null)
+                StockTickerInteractionHandler.interactWithLogisticsManagerAt(player, level, stockTicker.getPos());
+            return ActionResult.SUCCESS;
         }
 
-        if (stack.isEmpty() && heat != HeatLevel.NONE) {
+        if (stack.isEmpty() && heat != HeatLevel.NONE)
             return onBlockEntityUseItemOn(
                 level, pos, bbte -> {
-                    if (!bbte.goggles) {
-                        return InteractionResult.TRY_WITH_EMPTY_HAND;
-                    }
+                    if (!bbte.goggles)
+                        return ActionResult.PASS_TO_DEFAULT_BLOCK_ACTION;
                     bbte.goggles = false;
                     bbte.notifyUpdate();
-                    return InteractionResult.SUCCESS;
+                    return ActionResult.SUCCESS;
                 }
             );
-        }
 
         if (heat == HeatLevel.NONE) {
             if (stack.getItem() instanceof FlintAndSteelItem) {
-                level.playSound(
-                    player,
-                    pos,
-                    SoundEvents.FLINTANDSTEEL_USE,
-                    SoundSource.BLOCKS,
-                    1.0F,
-                    level.random.nextFloat() * 0.4F + 0.8F
-                );
-                if (level.isClientSide()) {
-                    return InteractionResult.SUCCESS;
-                }
-                stack.hurtAndBreak(1, player, hand.asEquipmentSlot());
-                level.setBlockAndUpdate(pos, AllBlocks.LIT_BLAZE_BURNER.defaultBlockState());
-                return InteractionResult.SUCCESS;
+                level.playSound(player, pos, SoundEvents.ITEM_FLINTANDSTEEL_USE, SoundCategory.BLOCKS, 1.0F, level.random.nextFloat() * 0.4F + 0.8F);
+                if (level.isClient())
+                    return ActionResult.SUCCESS;
+                stack.damage(1, player, hand.getEquipmentSlot());
+                level.setBlockState(pos, AllBlocks.LIT_BLAZE_BURNER.getDefaultState());
+                return ActionResult.SUCCESS;
             }
-            return InteractionResult.TRY_WITH_EMPTY_HAND;
+            return ActionResult.PASS_TO_DEFAULT_BLOCK_ACTION;
         }
 
         boolean doNotConsume = player.isCreative();
         boolean forceOverflow = !FakePlayerHandler.has(player);
 
-        InteractionResult res = tryInsert(state, level, pos, stack, doNotConsume, forceOverflow, false);
-        if (res instanceof InteractionResult.Success success) {
-            ItemStack leftover = success.heldItemTransformedTo();
-            if (!level.isClientSide() && !doNotConsume && leftover != null && !leftover.isEmpty()) {
+        ActionResult res = tryInsert(state, level, pos, stack, doNotConsume, forceOverflow, false);
+        if (res instanceof ActionResult.Success success) {
+            ItemStack leftover = success.getNewHandStack();
+            if (!level.isClient() && !doNotConsume && leftover != null && !leftover.isEmpty()) {
                 if (stack.isEmpty()) {
-                    player.setItemInHand(hand, leftover);
-                } else if (!player.getInventory().add(leftover)) {
-                    player.drop(leftover, false);
+                    player.setStackInHand(hand, leftover);
+                } else if (!player.getInventory().insertStack(leftover)) {
+                    player.dropItem(leftover, false);
                 }
             }
         }
 
-        if (res.consumesAction()) {
+        if (res.isAccepted())
             return res;
-        }
-        return InteractionResult.TRY_WITH_EMPTY_HAND;
+        return ActionResult.PASS_TO_DEFAULT_BLOCK_ACTION;
     }
 
-    public static InteractionResult tryInsert(
+    public static ActionResult tryInsert(
         BlockState state,
-        Level world,
+        World world,
         BlockPos pos,
         ItemStack stack,
         boolean doNotConsume,
         boolean forceOverflow,
         boolean simulate
     ) {
-        if (!state.hasBlockEntity()) {
-            return InteractionResult.FAIL;
-        }
+        if (!state.hasBlockEntity())
+            return ActionResult.FAIL;
 
         BlockEntity be = world.getBlockEntity(pos);
-        if (!(be instanceof BlazeBurnerBlockEntity burnerBE)) {
-            return InteractionResult.FAIL;
-        }
+        if (!(be instanceof BlazeBurnerBlockEntity burnerBE))
+            return ActionResult.FAIL;
 
         if (burnerBE.isCreativeFuel(stack)) {
-            if (!simulate) {
+            if (!simulate)
                 burnerBE.applyCreativeFuel();
-            }
-            return InteractionResult.SUCCESS.heldItemTransformedTo(ItemStack.EMPTY);
+            return ActionResult.SUCCESS.withNewHandStack(ItemStack.EMPTY);
         }
-        if (!burnerBE.tryUpdateFuel(stack, forceOverflow, simulate)) {
-            return InteractionResult.FAIL;
-        }
+        if (!burnerBE.tryUpdateFuel(stack, forceOverflow, simulate))
+            return ActionResult.FAIL;
 
         if (!doNotConsume) {
-            ItemStack container = stack.getItem().getCraftingRemainder();
-            if (!world.isClientSide()) {
-                stack.shrink(1);
+            ItemStack container = stack.getItem().getRecipeRemainder();
+            if (!world.isClient()) {
+                stack.decrement(1);
             }
-            return InteractionResult.SUCCESS.heldItemTransformedTo(container);
+            return ActionResult.SUCCESS.withNewHandStack(container);
         }
-        return InteractionResult.SUCCESS.heldItemTransformedTo(ItemStack.EMPTY);
+        return ActionResult.SUCCESS.withNewHandStack(ItemStack.EMPTY);
     }
 
     @Override
-    public BlockState getStateForPlacement(BlockPlaceContext context) {
-        ItemStack stack = context.getItemInHand();
+    public BlockState getPlacementState(ItemPlacementContext context) {
+        ItemStack stack = context.getStack();
         Item item = stack.getItem();
-        BlockState defaultState = defaultBlockState();
-        if (!(item instanceof BlazeBurnerBlockItem)) {
+        BlockState defaultState = getDefaultState();
+        if (!(item instanceof BlazeBurnerBlockItem))
             return defaultState;
-        }
         HeatLevel initialHeat = ((BlazeBurnerBlockItem) item).hasCapturedBlaze() ? HeatLevel.SMOULDERING : HeatLevel.NONE;
-        return defaultState.setValue(HEAT_LEVEL, initialHeat)
-            .setValue(FACING, context.getHorizontalDirection().getOpposite());
+        return defaultState.with(HEAT_LEVEL, initialHeat).with(FACING, context.getHorizontalPlayerFacing().getOpposite());
     }
 
     @Override
-    public VoxelShape getShape(BlockState state, BlockGetter reader, BlockPos pos, CollisionContext context) {
+    public VoxelShape getOutlineShape(BlockState state, BlockView reader, BlockPos pos, ShapeContext context) {
         return AllShapes.HEATER_BLOCK_SHAPE;
     }
 
     @Override
-    public VoxelShape getCollisionShape(
-        BlockState p_220071_1_,
-        BlockGetter p_220071_2_,
-        BlockPos p_220071_3_,
-        CollisionContext p_220071_4_
-    ) {
-        if (p_220071_4_ == CollisionContext.empty()) {
+    public VoxelShape getCollisionShape(BlockState p_220071_1_, BlockView p_220071_2_, BlockPos p_220071_3_, ShapeContext p_220071_4_) {
+        if (p_220071_4_ == ShapeContext.absent())
             return AllShapes.HEATER_BLOCK_SPECIAL_COLLISION_SHAPE;
-        }
-        return getShape(p_220071_1_, p_220071_2_, p_220071_3_, p_220071_4_);
+        return getOutlineShape(p_220071_1_, p_220071_2_, p_220071_3_, p_220071_4_);
     }
 
     @Override
-    public boolean hasAnalogOutputSignal(BlockState p_149740_1_) {
+    public boolean hasComparatorOutput(BlockState p_149740_1_) {
         return true;
     }
 
     @Override
-    public int getAnalogOutputSignal(BlockState state, Level p_180641_2_, BlockPos p_180641_3_, Direction direction) {
-        return Math.max(0, state.getValue(HEAT_LEVEL).ordinal() - 1);
+    public int getComparatorOutput(BlockState state, World p_180641_2_, BlockPos p_180641_3_, Direction direction) {
+        return Math.max(0, state.get(HEAT_LEVEL).ordinal() - 1);
     }
 
     @Override
-    protected boolean isPathfindable(BlockState state, PathComputationType pathComputationType) {
+    protected boolean canPathfindThrough(BlockState state, NavigationType pathComputationType) {
         return false;
     }
 
     @Override
-    public void animateTick(BlockState state, Level world, BlockPos pos, RandomSource random) {
-        if (random.nextInt(10) != 0) {
+    public void randomDisplayTick(BlockState state, World world, BlockPos pos, Random random) {
+        if (random.nextInt(10) != 0)
             return;
-        }
-        if (!state.getValue(HEAT_LEVEL).isAtLeast(HeatLevel.SMOULDERING)) {
+        if (!state.get(HEAT_LEVEL).isAtLeast(HeatLevel.SMOULDERING))
             return;
-        }
-        world.playLocalSound(
+        world.playSoundClient(
             pos.getX() + 0.5F,
             pos.getY() + 0.5F,
             pos.getZ() + 0.5F,
-            SoundEvents.CAMPFIRE_CRACKLE,
-            SoundSource.BLOCKS,
+            SoundEvents.BLOCK_CAMPFIRE_CRACKLE,
+            SoundCategory.BLOCKS,
             0.5F + random.nextFloat(),
             random.nextFloat() * 0.7F + 0.6F,
             false
@@ -275,16 +244,16 @@ public class BlazeBurnerBlock extends HorizontalDirectionalBlock implements IBE<
     }
 
     @Override
-    protected MapCodec<? extends HorizontalDirectionalBlock> codec() {
+    protected MapCodec<? extends HorizontalFacingBlock> getCodec() {
         return CODEC;
     }
 
     public static HeatLevel getHeatLevelOf(BlockState blockState) {
-        return blockState.hasProperty(BlazeBurnerBlock.HEAT_LEVEL) ? blockState.getValue(BlazeBurnerBlock.HEAT_LEVEL) : HeatLevel.NONE;
+        return blockState.contains(BlazeBurnerBlock.HEAT_LEVEL) ? blockState.get(BlazeBurnerBlock.HEAT_LEVEL) : HeatLevel.NONE;
     }
 
     public static int getLight(BlockState state) {
-        HeatLevel level = state.getValue(HEAT_LEVEL);
+        HeatLevel level = state.get(HEAT_LEVEL);
         return switch (level) {
             case NONE -> 0;
             case SMOULDERING -> 8;
@@ -293,7 +262,7 @@ public class BlazeBurnerBlock extends HorizontalDirectionalBlock implements IBE<
     }
 
     @Override
-    protected ItemStack getCloneItemStack(LevelReader world, BlockPos pos, BlockState state, boolean includeData) {
+    protected ItemStack getPickStack(WorldView world, BlockPos pos, BlockState state, boolean includeData) {
         return getLitOrUnlitStack(state);
     }
 
@@ -313,21 +282,25 @@ public class BlazeBurnerBlock extends HorizontalDirectionalBlock implements IBE<
     }
 
     private static ItemStack getLitOrUnlitStack(BlockState state) {
-        boolean isLit = state.getValue(HEAT_LEVEL) != HeatLevel.NONE;
-        return (isLit ? AllItems.BLAZE_BURNER : AllItems.EMPTY_BLAZE_BURNER).getDefaultInstance();
+        boolean isLit = state.get(HEAT_LEVEL) != HeatLevel.NONE;
+        return (isLit ? AllItems.BLAZE_BURNER : AllItems.EMPTY_BLAZE_BURNER).getDefaultStack();
     }
 
-    public enum HeatLevel implements StringRepresentable {
-        NONE, SMOULDERING, FADING, KINDLED, SEETHING;
+    public enum HeatLevel implements StringIdentifiable {
+        NONE,
+        SMOULDERING,
+        FADING,
+        KINDLED,
+        SEETHING;
 
-        public static final Codec<HeatLevel> CODEC = StringRepresentable.fromEnum(HeatLevel::values);
+        public static final Codec<HeatLevel> CODEC = StringIdentifiable.createCodec(HeatLevel::values);
 
         public static HeatLevel byIndex(int index) {
             return values()[index];
         }
 
         @Override
-        public String getSerializedName() {
+        public String asString() {
             return name().toLowerCase(Locale.ROOT);
         }
 

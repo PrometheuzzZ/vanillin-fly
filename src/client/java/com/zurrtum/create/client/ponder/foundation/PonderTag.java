@@ -1,18 +1,15 @@
 package com.zurrtum.create.client.ponder.foundation;
 
-import com.google.common.base.Suppliers;
 import com.zurrtum.create.client.catnip.gui.element.GuiGameElement;
 import com.zurrtum.create.client.catnip.gui.element.GuiGameElement.GuiItemRenderBuilder;
 import com.zurrtum.create.client.catnip.gui.element.ScreenElement;
 import com.zurrtum.create.client.ponder.Ponder;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.renderer.RenderPipelines;
-import net.minecraft.resources.Identifier;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.client.gl.RenderPipelines;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.item.ItemStack;
+import net.minecraft.util.Identifier;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix3x2fStack;
-
-import java.util.function.Supplier;
 
 public class PonderTag implements ScreenElement {
 
@@ -25,38 +22,20 @@ public class PonderTag implements ScreenElement {
     }
 
     private final Identifier id;
-    private final @Nullable TextureIconRenderer textureIcon;
+    @Nullable
+    private final Identifier textureIconLocation;
     private final ItemStack mainItem;
-    private final @Nullable Supplier<GuiItemRenderBuilder> itemIcon;
+    private final GuiItemRenderBuilder itemIcon;
 
 
     public PonderTag(Identifier id, @Nullable Identifier textureIconLocation, ItemStack itemIcon, ItemStack mainItem) {
         this.id = id;
-        this.textureIcon = textureIconLocation == null ? null : (graphics, poseStack, x, y) -> {
-            poseStack.translate(x, y);
-            poseStack.scale(0.25f, 0.25f);
-            graphics.blit(RenderPipelines.GUI_TEXTURED, textureIconLocation, 0, 0, 0, 0, 0, 64, 64, 64, 64);
-        };
+        this.textureIconLocation = textureIconLocation;
         this.mainItem = mainItem;
         if (textureIconLocation == null && !itemIcon.isEmpty()) {
-            this.itemIcon = Suppliers.memoize(() -> GuiGameElement.of(itemIcon).scale(1.25f).at(-2, -2));
+            this.itemIcon = GuiGameElement.of(itemIcon).scale(1.25f).at(-2, -2);
         } else {
             this.itemIcon = null;
-        }
-    }
-
-    public PonderTag(PonderTag tag, float scale) {
-        id = tag.id;
-        TextureIconRenderer prevTextureIcon = tag.textureIcon;
-        textureIcon = prevTextureIcon == null ? null : (graphics, poseStack, x, y) -> {
-            poseStack.scale(scale);
-            prevTextureIcon.render(graphics, poseStack, x, y);
-        };
-        mainItem = tag.mainItem;
-        if (prevTextureIcon == null && tag.itemIcon != null) {
-            itemIcon = Suppliers.memoize(() -> tag.itemIcon.get().copy().scale(1.25f * scale));
-        } else {
-            itemIcon = null;
         }
     }
 
@@ -76,38 +55,34 @@ public class PonderTag implements ScreenElement {
         return PonderIndex.getLangAccess().getTagDescription(id);
     }
 
-    public void render(GuiGraphics graphics, int x, int y) {
-        Matrix3x2fStack poseStack = graphics.pose();
+    public void render(DrawContext graphics, int x, int y) {
+        Matrix3x2fStack poseStack = graphics.getMatrices();
         poseStack.pushMatrix();
-        if (textureIcon != null) {
-            textureIcon.render(graphics, poseStack, x, y);
+        poseStack.translate(x, y);
+        if (textureIconLocation != null) {
+            //RenderSystem.setShaderTexture(0, icon);
+            poseStack.scale(0.25f, 0.25f);
+            graphics.drawTexture(RenderPipelines.GUI_TEXTURED, textureIconLocation, 0, 0, 0, 0, 0, 64, 64, 64, 64);
         } else if (itemIcon != null) {
-            poseStack.translate(x, y);
-            itemIcon.get().render(graphics);
+            itemIcon.render(graphics);
         }
         poseStack.popMatrix();
     }
 
     public void clear() {
         if (itemIcon != null) {
-            itemIcon.get().clear();
+            itemIcon.clear();
         }
     }
 
     @Override
     public boolean equals(Object other) {
-        if (this == other) {
+        if (this == other)
             return true;
-        }
 
-        if (!(other instanceof PonderTag otherTag)) {
+        if (!(other instanceof PonderTag otherTag))
             return false;
-        }
 
         return getId().equals(otherTag.getId());
-    }
-
-    private interface TextureIconRenderer {
-        void render(GuiGraphics graphics, Matrix3x2fStack poseStack, int x, int y);
     }
 }

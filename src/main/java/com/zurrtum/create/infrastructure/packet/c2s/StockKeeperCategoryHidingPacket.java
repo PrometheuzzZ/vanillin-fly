@@ -4,33 +4,32 @@ import com.zurrtum.create.AllHandle;
 import com.zurrtum.create.AllPackets;
 import com.zurrtum.create.catnip.codecs.stream.CatnipStreamCodecBuilders;
 import io.netty.buffer.ByteBuf;
-import net.minecraft.core.BlockPos;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.PacketType;
-import net.minecraft.network.protocol.game.ServerGamePacketListener;
-import net.minecraft.server.network.ServerGamePacketListenerImpl;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.network.listener.ServerPlayPacketListener;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.PacketType;
+import net.minecraft.server.network.ServerPlayNetworkHandler;
+import net.minecraft.util.math.BlockPos;
 
 import java.util.List;
 
-public record StockKeeperCategoryHidingPacket(BlockPos pos,
-                                              List<Integer> indices) implements Packet<ServerGamePacketListener> {
-    public static final StreamCodec<ByteBuf, StockKeeperCategoryHidingPacket> CODEC = StreamCodec.composite(
-        BlockPos.STREAM_CODEC,
+public record StockKeeperCategoryHidingPacket(BlockPos pos, List<Integer> indices) implements Packet<ServerPlayPacketListener> {
+    public static final PacketCodec<ByteBuf, StockKeeperCategoryHidingPacket> CODEC = PacketCodec.tuple(
+        BlockPos.PACKET_CODEC,
         StockKeeperCategoryHidingPacket::pos,
-        CatnipStreamCodecBuilders.list(ByteBufCodecs.INT),
+        CatnipStreamCodecBuilders.list(PacketCodecs.INTEGER),
         StockKeeperCategoryHidingPacket::indices,
         StockKeeperCategoryHidingPacket::new
     );
 
     @Override
-    public void handle(ServerGamePacketListener listener) {
-        AllHandle.onStockKeeperCategoryHiding((ServerGamePacketListenerImpl) listener, this);
+    public void apply(ServerPlayPacketListener listener) {
+        AllHandle.onStockKeeperCategoryHiding((ServerPlayNetworkHandler) listener, this);
     }
 
     @Override
-    public PacketType<StockKeeperCategoryHidingPacket> type() {
+    public PacketType<StockKeeperCategoryHidingPacket> getPacketType() {
         return AllPackets.STOCK_KEEPER_HIDE_CATEGORY;
     }
 }

@@ -1,15 +1,15 @@
 package com.zurrtum.create.client.content.schematics.client;
 
-import com.mojang.blaze3d.platform.Window;
 import com.zurrtum.create.client.AllKeys;
 import com.zurrtum.create.client.content.schematics.client.tools.ToolType;
 import com.zurrtum.create.client.foundation.gui.AllGuiTextures;
 import com.zurrtum.create.client.foundation.utility.CreateLang;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.renderer.RenderPipelines;
-import net.minecraft.network.chat.Component;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gl.RenderPipelines;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.util.Window;
+import net.minecraft.text.Text;
 import org.joml.Matrix3x2fStack;
 
 import java.util.List;
@@ -30,8 +30,9 @@ public class ToolSelectionScreen extends Screen {
     protected int w;
     protected int h;
 
-    public ToolSelectionScreen(Minecraft mc, List<ToolType> tools, Consumer<ToolType> callback) {
-        super(mc, mc.font, Component.literal("Tool Selection"));
+    public ToolSelectionScreen(MinecraftClient mc, List<ToolType> tools, Consumer<ToolType> callback) {
+        super(Text.literal("Tool Selection"));
+        this.client = mc;
         this.tools = tools;
         this.callback = callback;
         focused = false;
@@ -46,9 +47,8 @@ public class ToolSelectionScreen extends Screen {
     }
 
     public void setSelectedElement(ToolType tool) {
-        if (!tools.contains(tool)) {
+        if (!tools.contains(tool))
             return;
-        }
         selection = tools.indexOf(tool);
     }
 
@@ -57,14 +57,13 @@ public class ToolSelectionScreen extends Screen {
         selection = (selection + tools.size()) % tools.size();
     }
 
-    private void draw(GuiGraphics graphics, float partialTicks) {
-        Matrix3x2fStack matrixStack = graphics.pose();
-        Window mainWindow = minecraft.getWindow();
-        int scaledWidth = mainWindow.getGuiScaledWidth();
-        int scaledHeight = mainWindow.getGuiScaledHeight();
-        if (!initialized) {
-            init(scaledWidth, scaledHeight);
-        }
+    private void draw(DrawContext graphics, float partialTicks) {
+        Matrix3x2fStack matrixStack = graphics.getMatrices();
+        Window mainWindow = client.getWindow();
+        int scaledWidth = mainWindow.getScaledWidth();
+        int scaledHeight = mainWindow.getScaledHeight();
+        if (!initialized)
+            init(client, scaledWidth, scaledHeight);
 
         int x = (scaledWidth - w) / 2 + 15;
         int y = scaledHeight - h - 75;
@@ -74,7 +73,7 @@ public class ToolSelectionScreen extends Screen {
 
         AllGuiTextures gray = AllGuiTextures.HUD_BACKGROUND;
 
-        graphics.blit(
+        graphics.drawTexture(
             RenderPipelines.GUI_TEXTURED,
             gray.location,
             x - 15,
@@ -89,11 +88,11 @@ public class ToolSelectionScreen extends Screen {
         );
 
         float toolTipAlpha = yOffset / 10;
-        List<Component> toolTip = tools.get(selection).getDescription();
+        List<Text> toolTip = tools.get(selection).getDescription();
         int stringAlphaComponent = ((int) (toolTipAlpha * 0xFF)) << 24;
 
         if (toolTipAlpha > 0.25f) {
-            graphics.blit(
+            graphics.drawTexture(
                 RenderPipelines.GUI_TEXTURED,
                 gray.location,
                 x - 15,
@@ -107,33 +106,28 @@ public class ToolSelectionScreen extends Screen {
                 0xB2B2CC | stringAlphaComponent
             );
 
-            if (toolTip.size() > 0) {
-                graphics.drawString(font, toolTip.get(0), x - 10, y + 38, 0xEEEEEE | stringAlphaComponent, false);
-            }
-            if (toolTip.size() > 1) {
-                graphics.drawString(font, toolTip.get(1), x - 10, y + 50, 0xCCDDFF | stringAlphaComponent, false);
-            }
-            if (toolTip.size() > 2) {
-                graphics.drawString(font, toolTip.get(2), x - 10, y + 60, 0xCCDDFF | stringAlphaComponent, false);
-            }
-            if (toolTip.size() > 3) {
-                graphics.drawString(font, toolTip.get(3), x - 10, y + 72, 0xCCCCDD | stringAlphaComponent, false);
-            }
+            if (toolTip.size() > 0)
+                graphics.drawText(textRenderer, toolTip.get(0), x - 10, y + 38, 0xEEEEEE | stringAlphaComponent, false);
+            if (toolTip.size() > 1)
+                graphics.drawText(textRenderer, toolTip.get(1), x - 10, y + 50, 0xCCDDFF | stringAlphaComponent, false);
+            if (toolTip.size() > 2)
+                graphics.drawText(textRenderer, toolTip.get(2), x - 10, y + 60, 0xCCDDFF | stringAlphaComponent, false);
+            if (toolTip.size() > 3)
+                graphics.drawText(textRenderer, toolTip.get(3), x - 10, y + 72, 0xCCCCDD | stringAlphaComponent, false);
         }
 
         if (tools.size() > 1) {
-            String keyName = AllKeys.TOOL_MENU.getTranslatedKeyMessage().getString().toUpperCase();
-            if (!focused) {
-                graphics.drawCenteredString(
-                    font,
+            String keyName = AllKeys.TOOL_MENU.getBoundKeyLocalizedText().getString().toUpperCase();
+            if (!focused)
+                graphics.drawCenteredTextWithShadow(
+                    textRenderer,
                     CreateLang.translateDirect(holdToFocus, keyName),
                     scaledWidth / 2,
                     y - 10,
                     0xFFCCDDFF
                 );
-            } else {
-                graphics.drawCenteredString(font, scrollToCycle, scaledWidth / 2, y - 10, 0xFFCCDDFF);
-            }
+            else
+                graphics.drawCenteredTextWithShadow(textRenderer, scrollToCycle, scaledWidth / 2, y - 10, 0xFFCCDDFF);
         } else {
             x += 65;
         }
@@ -145,13 +139,7 @@ public class ToolSelectionScreen extends Screen {
             float alpha = focused ? 1 : .2f;
             if (i == selection) {
                 matrixStack.translate(0, -10);
-                graphics.drawCenteredString(
-                    font,
-                    tools.get(i).getDisplayName().getString(),
-                    x + i * 50 + 24,
-                    y + 28,
-                    0xFFCCDDFF
-                );
+                graphics.drawCenteredTextWithShadow(textRenderer, tools.get(i).getDisplayName().getString(), x + i * 50 + 24, y + 28, 0xFFCCDDFF);
                 alpha = 1;
             }
             int color = ((int) (alpha * 0xFF)) << 24;
@@ -165,19 +153,18 @@ public class ToolSelectionScreen extends Screen {
     }
 
     public void update() {
-        if (focused) {
+        if (focused)
             yOffset += (10 - yOffset) * .1f;
-        } else {
+        else
             yOffset *= .9f;
-        }
     }
 
-    public void renderPassive(GuiGraphics graphics, float partialTicks) {
+    public void renderPassive(DrawContext graphics, float partialTicks) {
         draw(graphics, partialTicks);
     }
 
     @Override
-    public void onClose() {
+    public void close() {
         callback.accept(tools.get(selection));
     }
 

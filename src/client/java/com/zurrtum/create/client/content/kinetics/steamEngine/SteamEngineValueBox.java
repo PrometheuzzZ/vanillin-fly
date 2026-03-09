@@ -1,62 +1,54 @@
 package com.zurrtum.create.client.content.kinetics.steamEngine;
 
-import com.mojang.blaze3d.vertex.PoseStack;
 import com.zurrtum.create.catnip.math.AngleHelper;
 import com.zurrtum.create.catnip.math.Pointing;
 import com.zurrtum.create.catnip.math.VecHelper;
 import com.zurrtum.create.client.flywheel.lib.transform.TransformStack;
 import com.zurrtum.create.client.foundation.blockEntity.behaviour.ValueBoxTransform;
 import com.zurrtum.create.content.kinetics.steamEngine.SteamEngineBlock;
-import net.minecraft.core.Direction;
-import net.minecraft.core.Direction.Axis;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.block.BlockState;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Direction.Axis;
+import net.minecraft.util.math.Vec3d;
 
 public class SteamEngineValueBox extends ValueBoxTransform.Sided {
 
     @Override
     protected boolean isSideActive(BlockState state, Direction side) {
         Direction engineFacing = SteamEngineBlock.getFacing(state);
-        if (engineFacing.getAxis() == side.getAxis()) {
+        if (engineFacing.getAxis() == side.getAxis())
             return false;
-        }
 
         float roll = 0;
-        for (Pointing p : Pointing.values()) {
-            if (p.getCombinedDirection(engineFacing) == side) {
+        for (Pointing p : Pointing.values())
+            if (p.getCombinedDirection(engineFacing) == side)
                 roll = p.getXRotation();
-            }
-        }
-        if (engineFacing == Direction.UP) {
+        if (engineFacing == Direction.UP)
             roll += 180;
-        }
 
         boolean recessed = roll % 180 == 0;
-        if (engineFacing.getAxis() == Axis.Y) {
-            recessed ^= state.getValue(SteamEngineBlock.FACING).getAxis() == Axis.X;
-        }
+        if (engineFacing.getAxis() == Axis.Y)
+            recessed ^= state.get(SteamEngineBlock.FACING).getAxis() == Axis.X;
 
         return !recessed;
     }
 
     @Override
-    public Vec3 getLocalOffset(BlockState state) {
+    public Vec3d getLocalOffset(BlockState state) {
         Direction side = getSide();
         Direction engineFacing = SteamEngineBlock.getFacing(state);
 
         float roll = 0;
-        for (Pointing p : Pointing.values()) {
-            if (p.getCombinedDirection(engineFacing) == side) {
+        for (Pointing p : Pointing.values())
+            if (p.getCombinedDirection(engineFacing) == side)
                 roll = p.getXRotation();
-            }
-        }
-        if (engineFacing == Direction.UP) {
+        if (engineFacing == Direction.UP)
             roll += 180;
-        }
 
         float horizontalAngle = AngleHelper.horizontalAngle(engineFacing);
         float verticalAngle = AngleHelper.verticalAngle(engineFacing);
-        Vec3 local = VecHelper.voxelSpace(8, 14.5, 9);
+        Vec3d local = VecHelper.voxelSpace(8, 14.5, 9);
 
         local = VecHelper.rotateCentered(local, roll, Axis.Z);
         local = VecHelper.rotateCentered(local, horizontalAngle, Axis.Y);
@@ -66,7 +58,7 @@ public class SteamEngineValueBox extends ValueBoxTransform.Sided {
     }
 
     @Override
-    public void rotate(BlockState state, PoseStack ms) {
+    public void rotate(BlockState state, MatrixStack ms) {
         Direction facing = SteamEngineBlock.getFacing(state);
 
         if (facing.getAxis() == Axis.Y) {
@@ -75,20 +67,17 @@ public class SteamEngineValueBox extends ValueBoxTransform.Sided {
         }
 
         float roll = 0;
-        for (Pointing p : Pointing.values()) {
-            if (p.getCombinedDirection(facing) == getSide()) {
+        for (Pointing p : Pointing.values())
+            if (p.getCombinedDirection(facing) == getSide())
                 roll = p.getXRotation();
-            }
-        }
 
         float yRot = AngleHelper.horizontalAngle(facing) + (facing == Direction.DOWN ? 180 : 0);
-        TransformStack.of(ms).rotateYDegrees(yRot).rotateXDegrees(facing == Direction.DOWN ? -90 : 90)
-            .rotateYDegrees(roll);
+        TransformStack.of(ms).rotateYDegrees(yRot).rotateXDegrees(facing == Direction.DOWN ? -90 : 90).rotateYDegrees(roll);
     }
 
     @Override
-    protected Vec3 getSouthLocation() {
-        return Vec3.ZERO;
+    protected Vec3d getSouthLocation() {
+        return Vec3d.ZERO;
     }
 
 }

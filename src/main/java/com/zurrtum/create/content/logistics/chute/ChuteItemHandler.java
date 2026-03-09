@@ -1,8 +1,8 @@
 package com.zurrtum.create.content.logistics.chute;
 
 import com.zurrtum.create.infrastructure.items.ItemInventory;
-import net.minecraft.core.component.DataComponents;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.component.DataComponentTypes;
+import net.minecraft.item.ItemStack;
 
 public class ChuteItemHandler implements ItemInventory {
     private final ChuteBlockEntity blockEntity;
@@ -12,17 +12,17 @@ public class ChuteItemHandler implements ItemInventory {
     }
 
     @Override
-    public int getContainerSize() {
+    public int size() {
         return 1;
     }
 
     @Override
-    public boolean canPlaceItem(int slot, ItemStack stack) {
+    public boolean isValid(int slot, ItemStack stack) {
         return blockEntity.canAcceptItem(stack);
     }
 
     @Override
-    public ItemStack getItem(int slot) {
+    public ItemStack getStack(int slot) {
         if (slot != 0) {
             return ItemStack.EMPTY;
         }
@@ -30,7 +30,7 @@ public class ChuteItemHandler implements ItemInventory {
     }
 
     @Override
-    public void setItem(int slot, ItemStack stack) {
+    public void setStack(int slot, ItemStack stack) {
         if (slot != 0) {
             return;
         }
@@ -38,7 +38,7 @@ public class ChuteItemHandler implements ItemInventory {
     }
 
     @Override
-    public int getMaxStackSize(ItemStack stack) {
-        return stack.getOrDefault(DataComponents.MAX_STACK_SIZE, 64);
+    public int getMaxCount(ItemStack stack) {
+        return stack.getOrDefault(DataComponentTypes.MAX_STACK_SIZE, 64);
     }
 }

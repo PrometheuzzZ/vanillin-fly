@@ -1,12 +1,12 @@
 package com.zurrtum.create.client.flywheel.impl;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.zurrtum.create.client.flywheel.impl.compat.IrisCompat;
 import com.zurrtum.create.client.flywheel.impl.extension.PoseStackExtension;
 import com.zurrtum.create.client.flywheel.lib.internal.FlwLibLink;
 import com.zurrtum.create.client.flywheel.lib.transform.PoseTransformStack;
-import net.minecraft.client.model.geom.ModelPart;
+import net.minecraft.client.model.ModelPart;
+import net.minecraft.client.render.VertexConsumer;
+import net.minecraft.client.util.math.MatrixStack;
 import org.slf4j.Logger;
 
 import java.util.List;
@@ -19,7 +19,7 @@ public class FlwLibLinkImpl implements FlwLibLink {
     }
 
     @Override
-    public PoseTransformStack getPoseTransformStackOf(PoseStack stack) {
+    public PoseTransformStack getPoseTransformStackOf(MatrixStack stack) {
         return ((PoseStackExtension) stack).flywheel$transformStack();
     }
 
@@ -29,20 +29,13 @@ public class FlwLibLinkImpl implements FlwLibLink {
     }
 
     @Override
-    public void compileModelPart(
-        ModelPart part,
-        PoseStack.Pose pose,
-        VertexConsumer consumer,
-        int light,
-        int overlay,
-        int color
-    ) {
-        part.compile(pose, consumer, light, overlay, color);
+    public void compileModelPart(ModelPart part, MatrixStack.Entry pose, VertexConsumer consumer, int light, int overlay, int color) {
+        part.renderCuboids(pose, consumer, light, overlay, color);
     }
 
     @Override
-    public List<PoseStack.Pose> getPoseStack(PoseStack stack) {
-        return stack.poses;
+    public List<MatrixStack.Entry> getPoseStack(MatrixStack stack) {
+        return stack.stack;
     }
 
     @Override

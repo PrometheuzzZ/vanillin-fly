@@ -4,54 +4,50 @@ import com.zurrtum.create.AllBlockEntityTypes;
 import com.zurrtum.create.AllShapes;
 import com.zurrtum.create.content.kinetics.base.HorizontalKineticBlock;
 import com.zurrtum.create.foundation.block.IBE;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.core.Direction.Axis;
-import net.minecraft.world.InteractionHand;
-import net.minecraft.world.InteractionResult;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.BlockGetter;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.LevelReader;
-import net.minecraft.world.level.block.entity.BlockEntityType;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.BlockHitResult;
-import net.minecraft.world.phys.shapes.CollisionContext;
-import net.minecraft.world.phys.shapes.VoxelShape;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.ShapeContext;
+import net.minecraft.block.entity.BlockEntityType;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.item.ItemStack;
+import net.minecraft.util.ActionResult;
+import net.minecraft.util.Hand;
+import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Direction.Axis;
+import net.minecraft.util.shape.VoxelShape;
+import net.minecraft.world.BlockView;
+import net.minecraft.world.World;
+import net.minecraft.world.WorldView;
 
 public class ElevatorPulleyBlock extends HorizontalKineticBlock implements IBE<ElevatorPulleyBlockEntity> {
 
-    public ElevatorPulleyBlock(Properties properties) {
+    public ElevatorPulleyBlock(Settings properties) {
         super(properties);
     }
 
     @Override
-    protected InteractionResult useItemOn(
+    protected ActionResult onUseWithItem(
         ItemStack stack,
         BlockState state,
-        Level level,
+        World level,
         BlockPos pos,
-        Player player,
-        InteractionHand hand,
+        PlayerEntity player,
+        Hand hand,
         BlockHitResult hitResult
     ) {
-        if (!player.mayBuild()) {
-            return InteractionResult.FAIL;
-        }
-        if (player.isShiftKeyDown()) {
-            return InteractionResult.FAIL;
-        }
-        if (!stack.isEmpty()) {
-            return InteractionResult.TRY_WITH_EMPTY_HAND;
-        }
-        if (level.isClientSide()) {
-            return InteractionResult.SUCCESS;
-        }
+        if (!player.canModifyBlocks())
+            return ActionResult.FAIL;
+        if (player.isSneaking())
+            return ActionResult.FAIL;
+        if (!stack.isEmpty())
+            return ActionResult.PASS_TO_DEFAULT_BLOCK_ACTION;
+        if (level.isClient())
+            return ActionResult.SUCCESS;
         return onBlockEntityUseItemOn(
             level, pos, be -> {
                 be.clicked();
-                return InteractionResult.SUCCESS;
+                return ActionResult.SUCCESS;
             }
         );
     }
@@ -63,16 +59,16 @@ public class ElevatorPulleyBlock extends HorizontalKineticBlock implements IBE<E
 
     @Override
     public Axis getRotationAxis(BlockState state) {
-        return state.getValue(HORIZONTAL_FACING).getClockWise().getAxis();
+        return state.get(HORIZONTAL_FACING).rotateYClockwise().getAxis();
     }
 
     @Override
-    public VoxelShape getShape(BlockState state, BlockGetter worldIn, BlockPos pos, CollisionContext context) {
-        return AllShapes.ELEVATOR_PULLEY.get(state.getValue(HORIZONTAL_FACING));
+    public VoxelShape getOutlineShape(BlockState state, BlockView worldIn, BlockPos pos, ShapeContext context) {
+        return AllShapes.ELEVATOR_PULLEY.get(state.get(HORIZONTAL_FACING));
     }
 
     @Override
-    public boolean hasShaftTowards(LevelReader world, BlockPos pos, BlockState state, Direction face) {
+    public boolean hasShaftTowards(WorldView world, BlockPos pos, BlockState state, Direction face) {
         return getRotationAxis(state) == face.getAxis();
     }
 

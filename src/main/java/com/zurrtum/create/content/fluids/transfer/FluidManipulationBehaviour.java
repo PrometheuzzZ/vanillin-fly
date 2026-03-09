@@ -10,19 +10,19 @@ import com.zurrtum.create.foundation.fluid.FluidHelper;
 import com.zurrtum.create.infrastructure.config.AllConfigs;
 import com.zurrtum.create.infrastructure.fluids.FluidStack;
 import com.zurrtum.create.infrastructure.packet.s2c.FluidSplashPacket;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.core.Direction.Axis;
-import net.minecraft.server.level.ServerLevel;
-import net.minecraft.sounds.SoundEvent;
-import net.minecraft.sounds.SoundSource;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.levelgen.structure.BoundingBox;
-import net.minecraft.world.level.material.Fluid;
-import net.minecraft.world.level.material.FluidState;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.fluid.Fluid;
+import net.minecraft.fluid.FluidState;
+import net.minecraft.server.world.ServerWorld;
+import net.minecraft.sound.SoundCategory;
+import net.minecraft.sound.SoundEvent;
+import net.minecraft.storage.ReadView;
+import net.minecraft.storage.WriteView;
+import net.minecraft.util.math.BlockBox;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Direction.Axis;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.World;
 
 import java.io.Serial;
 import java.util.ArrayList;
@@ -42,7 +42,7 @@ public abstract class FluidManipulationBehaviour extends BlockEntityBehaviour<Sm
         private static final long serialVersionUID = 1L;
     }
 
-    BoundingBox affectedArea;
+    BlockBox affectedArea;
     BlockPos rootPos;
     boolean infinite;
     protected boolean counterpartActed;
@@ -98,9 +98,8 @@ public abstract class FluidManipulationBehaviour extends BlockEntityBehaviour<Sm
     }
 
     public void reset() {
-        if (affectedArea != null) {
+        if (affectedArea != null)
             scheduleUpdatesInAffectedArea();
-        }
         affectedArea = null;
         setValidationTimer();
         frontier.clear();
@@ -115,33 +114,30 @@ public abstract class FluidManipulationBehaviour extends BlockEntityBehaviour<Sm
     }
 
     protected void scheduleUpdatesInAffectedArea() {
-        Level world = getLevel();
-        BlockPos.betweenClosedStream(
-            new BlockPos(affectedArea.minX() - 1, affectedArea.minY() - 1, affectedArea.minZ() - 1),
-            new BlockPos(affectedArea.maxX() + 1, affectedArea.maxY() + 1, affectedArea.maxZ() + 1)
+        World world = getWorld();
+        BlockPos.stream(
+            new BlockPos(affectedArea.getMinX() - 1, affectedArea.getMinY() - 1, affectedArea.getMinZ() - 1),
+            new BlockPos(affectedArea.getMaxX() + 1, affectedArea.getMaxY() + 1, affectedArea.getMaxZ() + 1)
         ).forEach(pos -> {
             FluidState nextFluidState = world.getFluidState(pos);
-            if (nextFluidState.isEmpty()) {
+            if (nextFluidState.isEmpty())
                 return;
-            }
-            world.scheduleTick(pos, nextFluidState.getType(), world.getRandom().nextInt(5));
+            world.scheduleFluidTick(pos, nextFluidState.getFluid(), world.getRandom().nextInt(5));
         });
     }
 
     protected int comparePositions(BlockPosEntry e1, BlockPosEntry e2) {
-        Vec3 centerOfRoot = VecHelper.getCenterOf(rootPos);
+        Vec3d centerOfRoot = VecHelper.getCenterOf(rootPos);
         BlockPos pos2 = e2.pos;
         BlockPos pos1 = e1.pos;
-        if (pos1.getY() != pos2.getY()) {
+        if (pos1.getY() != pos2.getY())
             return Integer.compare(pos2.getY(), pos1.getY());
-        }
         int compareDistance = Integer.compare(e2.distance, e1.distance);
-        if (compareDistance != 0) {
+        if (compareDistance != 0)
             return compareDistance;
-        }
         return Double.compare(
-            VecHelper.getCenterOf(pos2).distanceToSqr(centerOfRoot),
-            VecHelper.getCenterOf(pos1).distanceToSqr(centerOfRoot)
+            VecHelper.getCenterOf(pos2).squaredDistanceTo(centerOfRoot),
+            VecHelper.getCenterOf(pos1).squaredDistanceTo(centerOfRoot)
         );
     }
 
@@ -152,67 +148,52 @@ public abstract class FluidManipulationBehaviour extends BlockEntityBehaviour<Sm
         BiConsumer<BlockPos, Integer> add,
         boolean searchDownward
     ) throws ChunkNotLoadedException {
-        Level world = getLevel();
+        World world = getWorld();
         int maxBlocks = maxBlocks();
         int maxRange = maxRange();
         int maxRangeSq = maxRange * maxRange;
         int i;
 
-        for (i = 0; i < searchedPerTick && !frontier.isEmpty() && (visited.size() <= maxBlocks || !canDrainInfinitely(
-            fluid)); i++) {
+        for (i = 0; i < searchedPerTick && !frontier.isEmpty() && (visited.size() <= maxBlocks || !canDrainInfinitely(fluid)); i++) {
             BlockPosEntry entry = frontier.remove(0);
             BlockPos currentPos = entry.pos;
-            if (visited.contains(currentPos)) {
+            if (visited.contains(currentPos))
                 continue;
-            }
             visited.add(currentPos);
 
-            if (!world.isLoaded(currentPos)) {
+            if (!world.isPosLoaded(currentPos))
                 throw new ChunkNotLoadedException();
-            }
 
             FluidState fluidState = world.getFluidState(currentPos);
-            if (fluidState.isEmpty()) {
+            if (fluidState.isEmpty())
                 continue;
-            }
 
-            Fluid currentFluid = FluidHelper.convertToStill(fluidState.getType());
-            if (fluid == null) {
+            Fluid currentFluid = FluidHelper.convertToStill(fluidState.getFluid());
+            if (fluid == null)
                 fluid = currentFluid;
-            }
-            if (!currentFluid.isSame(fluid)) {
+            if (!currentFluid.matchesType(fluid))
                 continue;
-            }
 
             add.accept(currentPos, entry.distance);
 
             for (Direction side : Iterate.directions) {
-                if (!searchDownward && side == Direction.DOWN) {
+                if (!searchDownward && side == Direction.DOWN)
                     continue;
-                }
 
-                BlockPos offsetPos = currentPos.relative(side);
-                if (!world.isLoaded(offsetPos)) {
+                BlockPos offsetPos = currentPos.offset(side);
+                if (!world.isPosLoaded(offsetPos))
                     throw new ChunkNotLoadedException();
-                }
-                if (visited.contains(offsetPos)) {
+                if (visited.contains(offsetPos))
                     continue;
-                }
-                if (offsetPos.distSqr(rootPos) > maxRangeSq) {
+                if (offsetPos.getSquaredDistance(rootPos) > maxRangeSq)
                     continue;
-                }
 
                 FluidState nextFluidState = world.getFluidState(offsetPos);
-                if (nextFluidState.isEmpty()) {
+                if (nextFluidState.isEmpty())
                     continue;
-                }
-                Fluid nextFluid = nextFluidState.getType();
-                if (nextFluid == FluidHelper.convertToFlowing(nextFluid) && side == Direction.UP && !VecHelper.onSameAxis(rootPos,
-                    offsetPos,
-                    Axis.Y
-                )) {
+                Fluid nextFluid = nextFluidState.getFluid();
+                if (nextFluid == FluidHelper.convertToFlowing(nextFluid) && side == Direction.UP && !VecHelper.onSameAxis(rootPos, offsetPos, Axis.Y))
                     continue;
-                }
 
                 frontier.add(new BlockPosEntry(offsetPos, entry.distance + 1));
             }
@@ -221,74 +202,63 @@ public abstract class FluidManipulationBehaviour extends BlockEntityBehaviour<Sm
         return fluid;
     }
 
-    protected void playEffect(Level world, BlockPos pos, Fluid fluid, boolean fillSound) {
-        if (fluid == null) {
+    protected void playEffect(World world, BlockPos pos, Fluid fluid, boolean fillSound) {
+        if (fluid == null)
             return;
-        }
 
-        BlockPos splooshPos = pos == null ? blockEntity.getBlockPos() : pos;
+        BlockPos splooshPos = pos == null ? blockEntity.getPos() : pos;
         FluidStack stack = new FluidStack(fluid, 1);
 
         SoundEvent soundevent = fillSound ? FluidHelper.getFillSound(stack) : FluidHelper.getEmptySound(stack);
-        world.playSound(null, splooshPos, soundevent, SoundSource.BLOCKS, 0.3F, 1.0F);
-        if (world instanceof ServerLevel serverLevel) {
-            serverLevel.getServer().getPlayerList().broadcast(
+        world.playSound(null, splooshPos, soundevent, SoundCategory.BLOCKS, 0.3F, 1.0F);
+        if (world instanceof ServerWorld serverLevel) {
+            serverLevel.getServer().getPlayerManager().sendToAround(
                 null,
                 splooshPos.getX(),
                 splooshPos.getY(),
                 splooshPos.getZ(),
                 10,
-                serverLevel.dimension(),
+                serverLevel.getRegistryKey(),
                 new FluidSplashPacket(splooshPos, stack.getFluid())
             );
         }
     }
 
     protected boolean canDrainInfinitely(Fluid fluid) {
-        if (fluid == null) {
+        if (fluid == null)
             return false;
-        }
         return maxBlocks() != -1 && AllConfigs.server().fluids.bottomlessFluidMode.get().test(fluid);
     }
 
     @Override
-    public void write(ValueOutput view, boolean clientPacket) {
-        if (infinite) {
+    public void write(WriteView view, boolean clientPacket) {
+        if (infinite)
             view.putBoolean("Infinite", true);
-        }
-        if (rootPos != null) {
-            view.store("LastPos", BlockPos.CODEC, rootPos);
-        }
+        if (rootPos != null)
+            view.put("LastPos", BlockPos.CODEC, rootPos);
         if (affectedArea != null) {
-            view.store(
-                "AffectedAreaFrom",
-                BlockPos.CODEC,
-                new BlockPos(affectedArea.minX(), affectedArea.minY(), affectedArea.minZ())
-            );
-            view.store(
-                "AffectedAreaTo",
-                BlockPos.CODEC,
-                new BlockPos(affectedArea.maxX(), affectedArea.maxY(), affectedArea.maxZ())
-            );
+            view.put("AffectedAreaFrom", BlockPos.CODEC, new BlockPos(affectedArea.getMinX(), affectedArea.getMinY(), affectedArea.getMinZ()));
+            view.put("AffectedAreaTo", BlockPos.CODEC, new BlockPos(affectedArea.getMaxX(), affectedArea.getMaxY(), affectedArea.getMaxZ()));
         }
         super.write(view, clientPacket);
     }
 
     @Override
-    public void read(ValueInput view, boolean clientPacket) {
-        infinite = view.getBooleanOr("Infinite", false);
+    public void read(ReadView view, boolean clientPacket) {
+        infinite = view.getBoolean("Infinite", false);
         rootPos = view.read("LastPos", BlockPos.CODEC).orElse(null);
-        view.read("AffectedAreaFrom", BlockPos.CODEC)
-            .ifPresent(from -> view.read("AffectedAreaTo", BlockPos.CODEC).ifPresent(to -> {
-                affectedArea = BoundingBox.fromCorners(from, to);
-            }));
+        view.read("AffectedAreaFrom", BlockPos.CODEC).ifPresent(from -> view.read("AffectedAreaTo", BlockPos.CODEC).ifPresent(to -> {
+            affectedArea = BlockBox.create(from, to);
+        }));
         super.read(view, clientPacket);
     }
 
     @SuppressWarnings("deprecation")
     public enum BottomlessFluidMode implements Predicate<Fluid> {
-        ALLOW_ALL(Predicates.alwaysTrue()), DENY_ALL(Predicates.alwaysFalse()), ALLOW_BY_TAG(fluid -> fluid.is(
-            AllFluidTags.BOTTOMLESS_ALLOW)), DENY_BY_TAG(fluid -> !fluid.is(AllFluidTags.BOTTOMLESS_DENY));
+        ALLOW_ALL(Predicates.alwaysTrue()),
+        DENY_ALL(Predicates.alwaysFalse()),
+        ALLOW_BY_TAG(fluid -> fluid.isIn(AllFluidTags.BOTTOMLESS_ALLOW)),
+        DENY_BY_TAG(fluid -> !fluid.isIn(AllFluidTags.BOTTOMLESS_DENY));
 
         private final Predicate<Fluid> predicate;
 

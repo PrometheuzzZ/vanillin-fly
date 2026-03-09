@@ -2,20 +2,20 @@ package com.zurrtum.create.content.trains.signal;
 
 import com.mojang.serialization.*;
 import com.zurrtum.create.Create;
-import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.catnip.data.Couple;
 import com.zurrtum.create.content.trains.graph.*;
 import com.zurrtum.create.content.trains.track.TrackTargetingBehaviour;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.UUIDUtil;
-import net.minecraft.network.FriendlyByteBuf;
+import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.network.PacketByteBuf;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.util.ProblemReporter;
-import net.minecraft.world.level.LevelAccessor;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.storage.TagValueOutput;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.storage.NbtWriteView;
+import net.minecraft.storage.ReadView;
+import net.minecraft.storage.WriteView;
+import net.minecraft.util.ErrorReporter;
+import net.minecraft.util.Uuids;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.WorldAccess;
 
 import java.util.Iterator;
 import java.util.UUID;
@@ -49,26 +49,18 @@ public abstract class TrackEdgePoint {
         return false;
     }
 
-    public abstract void invalidate(LevelAccessor level);
+    public abstract void invalidate(WorldAccess level);
 
-    protected void invalidateAt(LevelAccessor level, BlockPos blockEntityPos) {
-        TrackTargetingBehaviour<?> behaviour = BlockEntityBehaviour.get(
-            level,
-            blockEntityPos,
-            TrackTargetingBehaviour.TYPE
-        );
-        if (behaviour == null) {
+    protected void invalidateAt(WorldAccess level, BlockPos blockEntityPos) {
+        TrackTargetingBehaviour<?> behaviour = BlockEntityBehaviour.get(level, blockEntityPos, TrackTargetingBehaviour.TYPE);
+        if (behaviour == null)
             return;
-        }
-        try (ProblemReporter.ScopedCollector logging = new ProblemReporter.ScopedCollector(
-            () -> "TrackEdgePoint",
-            Create.LOGGER
-        )) {
-            TagValueOutput view = TagValueOutput.createWithContext(logging, level.registryAccess());
+        try (ErrorReporter.Logging logging = new ErrorReporter.Logging(() -> "TrackEdgePoint", Create.LOGGER)) {
+            NbtWriteView view = NbtWriteView.create(logging, level.getRegistryManager());
             DimensionPalette dimensions = new DimensionPalette();
             write(view, dimensions);
-            view.store("DimensionPalette", DimensionPalette.CODEC, dimensions);
-            behaviour.invalidateEdgePoint(view.buildResult());
+            view.put("DimensionPalette", DimensionPalette.CODEC, dimensions);
+            behaviour.invalidateEdgePoint(view.getNbt());
         }
     }
 
@@ -96,27 +88,22 @@ public abstract class TrackEdgePoint {
         return edgeLocation.getSecond().equals(node1.getLocation());
     }
 
-    public void read(ValueInput view, boolean migration, DimensionPalette dimensions) {
-        if (migration) {
+    public void read(ReadView view, boolean migration, DimensionPalette dimensions) {
+        if (migration)
             return;
-        }
 
-        id = view.read("Id", UUIDUtil.CODEC).orElseThrow();
-        position = view.getDoubleOr("Position", 0);
-        Iterator<ValueInput> edge = view.childrenListOrEmpty("Edge").iterator();
-        edgeLocation = Couple.create(
-            TrackNodeLocation.read(edge.next(), dimensions),
-            TrackNodeLocation.read(edge.next(), dimensions)
-        );
+        id = view.read("Id", Uuids.INT_STREAM_CODEC).orElseThrow();
+        position = view.getDouble("Position", 0);
+        Iterator<ReadView> edge = view.getListReadView("Edge").iterator();
+        edgeLocation = Couple.create(TrackNodeLocation.read(edge.next(), dimensions), TrackNodeLocation.read(edge.next(), dimensions));
     }
 
     public <T> void decode(final DynamicOps<T> ops, T input, boolean migration, DimensionPalette dimensions) {
-        if (migration) {
+        if (migration)
             return;
-        }
 
         MapLike<T> map = ops.getMap(input).getOrThrow();
-        id = UUIDUtil.CODEC.decode(ops, map.get("Id")).getOrThrow().getFirst();
+        id = Uuids.INT_STREAM_CODEC.decode(ops, map.get("Id")).getOrThrow().getFirst();
         position = ops.getNumberValue(map.get("Position"), 0).doubleValue();
         edgeLocation = Couple.create(null, null);
         ops.getList(map.get("Edge")).getOrThrow().accept(item -> {
@@ -129,23 +116,23 @@ public abstract class TrackEdgePoint {
         });
     }
 
-    public void read(FriendlyByteBuf buffer, DimensionPalette dimensions) {
-        id = buffer.readUUID();
+    public void read(PacketByteBuf buffer, DimensionPalette dimensions) {
+        id = buffer.readUuid();
         edgeLocation = Couple.create(() -> TrackNodeLocation.receive(buffer, dimensions));
         position = buffer.readDouble();
     }
 
-    public void write(ValueOutput view, DimensionPalette dimensions) {
-        view.store("Id", UUIDUtil.CODEC, id);
+    public void write(WriteView view, DimensionPalette dimensions) {
+        view.put("Id", Uuids.INT_STREAM_CODEC, id);
         view.putDouble("Position", position);
-        ValueOutput.ValueOutputList edge = view.childrenList("Edge");
-        edgeLocation.getFirst().write(edge.addChild(), dimensions);
-        edgeLocation.getSecond().write(edge.addChild(), dimensions);
+        WriteView.ListView edge = view.getList("Edge");
+        edgeLocation.getFirst().write(edge.add(), dimensions);
+        edgeLocation.getSecond().write(edge.add(), dimensions);
     }
 
     public <T> DataResult<T> encode(final DynamicOps<T> ops, final T empty, DimensionPalette dimensions) {
         RecordBuilder<T> map = ops.mapBuilder();
-        map.add("Id", id, UUIDUtil.CODEC);
+        map.add("Id", id, Uuids.INT_STREAM_CODEC);
         map.add("Position", ops.createDouble(position));
         ListBuilder<T> edge = ops.listBuilder();
         edge.add(TrackNodeLocation.encode(edgeLocation.getFirst(), ops, empty, dimensions));
@@ -154,9 +141,9 @@ public abstract class TrackEdgePoint {
         return map.build(empty);
     }
 
-    public void write(FriendlyByteBuf buffer, DimensionPalette dimensions) {
+    public void write(PacketByteBuf buffer, DimensionPalette dimensions) {
         buffer.writeIdentifier(type.getId());
-        buffer.writeUUID(id);
+        buffer.writeUuid(id);
         edgeLocation.forEach(loc -> loc.send(buffer, dimensions));
         buffer.writeDouble(position);
     }
@@ -165,11 +152,9 @@ public abstract class TrackEdgePoint {
     }
 
     protected void removeFromAllGraphs(MinecraftServer server) {
-        for (TrackGraph trackGraph : Create.RAILWAYS.trackNetworks.values()) {
-            if (trackGraph.removePoint(server, getType(), id) != null) {
+        for (TrackGraph trackGraph : Create.RAILWAYS.trackNetworks.values())
+            if (trackGraph.removePoint(server, getType(), id) != null)
                 return;
-            }
-        }
     }
 
 }

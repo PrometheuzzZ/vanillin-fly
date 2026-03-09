@@ -1,8 +1,5 @@
 package com.zurrtum.create.client.content.kinetics.mechanicalArm;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
-import com.mojang.math.Axis;
 import com.zurrtum.create.catnip.theme.Color;
 import com.zurrtum.create.client.AllPartialModels;
 import com.zurrtum.create.client.catnip.animation.AnimationTickHolder;
@@ -13,31 +10,33 @@ import com.zurrtum.create.client.flywheel.lib.transform.TransformStack;
 import com.zurrtum.create.content.kinetics.mechanicalArm.ArmBlock;
 import com.zurrtum.create.content.kinetics.mechanicalArm.ArmBlockEntity;
 import com.zurrtum.create.content.kinetics.mechanicalArm.ArmBlockEntity.Phase;
-import net.minecraft.client.renderer.SubmitNodeCollector;
-import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
-import net.minecraft.client.renderer.blockentity.state.BlockEntityRenderState;
-import net.minecraft.client.renderer.feature.ModelFeatureRenderer;
-import net.minecraft.client.renderer.item.ItemModelResolver;
-import net.minecraft.client.renderer.item.ItemStackRenderState;
-import net.minecraft.client.renderer.rendertype.RenderType;
-import net.minecraft.client.renderer.rendertype.RenderTypes;
-import net.minecraft.client.renderer.state.CameraRenderState;
-import net.minecraft.client.renderer.texture.OverlayTexture;
-import net.minecraft.util.Mth;
-import net.minecraft.world.item.BlockItem;
-import net.minecraft.world.item.ItemDisplayContext;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.block.BlockState;
+import net.minecraft.client.item.ItemModelManager;
+import net.minecraft.client.render.OverlayTexture;
+import net.minecraft.client.render.RenderLayer;
+import net.minecraft.client.render.VertexConsumer;
+import net.minecraft.client.render.block.entity.BlockEntityRendererFactory;
+import net.minecraft.client.render.block.entity.state.BlockEntityRenderState;
+import net.minecraft.client.render.command.ModelCommandRenderer;
+import net.minecraft.client.render.command.OrderedRenderCommandQueue;
+import net.minecraft.client.render.item.ItemRenderState;
+import net.minecraft.client.render.state.CameraRenderState;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.item.BlockItem;
+import net.minecraft.item.ItemDisplayContext;
+import net.minecraft.item.ItemStack;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.RotationAxis;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
 public class ArmRenderer extends KineticBlockEntityRenderer<ArmBlockEntity, ArmRenderer.ArmRenderState> {
-    protected static ItemModelResolver itemModelManager;
+    protected static ItemModelManager itemModelManager;
 
-    public ArmRenderer(BlockEntityRendererProvider.Context context) {
+    public ArmRenderer(BlockEntityRendererFactory.Context context) {
         super(context);
-        itemModelManager = context.itemModelResolver();
+        itemModelManager = context.itemModelManager();
     }
 
     @Override
@@ -46,34 +45,34 @@ public class ArmRenderer extends KineticBlockEntityRenderer<ArmBlockEntity, ArmR
     }
 
     @Override
-    public void extractRenderState(
+    public void updateRenderState(
         ArmBlockEntity be,
         ArmRenderState state,
         float tickProgress,
-        Vec3 cameraPos,
-        @Nullable ModelFeatureRenderer.CrumblingOverlay crumblingOverlay
+        Vec3d cameraPos,
+        @Nullable ModelCommandRenderer.CrumblingOverlayCommand crumblingOverlay
     ) {
-        super.extractRenderState(be, state, tickProgress, cameraPos, crumblingOverlay);
+        super.updateRenderState(be, state, tickProgress, cameraPos, crumblingOverlay);
         ItemStack item = be.heldItem;
         boolean empty = item.isEmpty();
         if (state.support) {
             if (empty) {
                 return;
             }
-            BlockEntityRenderState.extractBase(be, state, crumblingOverlay);
+            BlockEntityRenderState.updateBlockEntityRenderState(be, state, crumblingOverlay);
         }
-        Level world = be.getLevel();
+        World world = be.getWorld();
         boolean isBlockItem;
         if (empty) {
             isBlockItem = false;
         } else {
             ArmItemData data = state.item = new ArmItemData();
-            ItemStackRenderState renderState = new ItemStackRenderState();
+            ItemRenderState renderState = new ItemRenderState();
             renderState.displayContext = ItemDisplayContext.FIXED;
-            itemModelManager.appendItemLayers(renderState, item, renderState.displayContext, world, null, 0);
-            isBlockItem = item.getItem() instanceof BlockItem && renderState.usesBlockLight();
+            itemModelManager.update(renderState, item, renderState.displayContext, world, null, 0);
+            isBlockItem = item.getItem() instanceof BlockItem && renderState.isSideLit();
             data.state = renderState;
-            data.xRot = Mth.DEG_TO_RAD * 90;
+            data.xRot = MathHelper.RADIANS_PER_DEGREE * 90;
             if (isBlockItem) {
                 data.offset = -9 / 16f;
                 data.scale = .5f;
@@ -82,22 +81,22 @@ public class ArmRenderer extends KineticBlockEntityRenderer<ArmBlockEntity, ArmR
                 data.scale = .625f;
             }
         }
-        boolean inverted = state.blockState.getValue(ArmBlock.CEILING);
+        boolean inverted = state.blockState.get(ArmBlock.CEILING);
         if (inverted) {
-            state.rotate = Mth.DEG_TO_RAD * 180;
+            state.rotate = MathHelper.RADIANS_PER_DEGREE * 180;
         }
         boolean rave = be.phase == Phase.DANCING && be.getSpeed() != 0;
         if (rave) {
             float renderTick = AnimationTickHolder.getRenderTime(world) + (be.hashCode() % 64);
-            state.baseAngle = Mth.DEG_TO_RAD * ((renderTick * 10) % 360);
-            state.lowerArmAngle = Mth.DEG_TO_RAD * (Mth.lerpInt((Mth.sin(renderTick / 4) + 1) / 2, -45, 15) - 135);
-            state.upperArmAngle = Mth.DEG_TO_RAD * (Mth.lerpInt((Mth.sin(renderTick / 8) + 1) / 4, -45, 95) - 90);
-            state.headAngle = Mth.DEG_TO_RAD * (-state.lowerArmAngle - 45);
+            state.baseAngle = MathHelper.RADIANS_PER_DEGREE * ((renderTick * 10) % 360);
+            state.lowerArmAngle = MathHelper.RADIANS_PER_DEGREE * (MathHelper.lerp((MathHelper.sin(renderTick / 4) + 1) / 2, -45, 15) - 135);
+            state.upperArmAngle = MathHelper.RADIANS_PER_DEGREE * (MathHelper.lerp((MathHelper.sin(renderTick / 8) + 1) / 4, -45, 95) - 90);
+            state.headAngle = MathHelper.RADIANS_PER_DEGREE * (-state.lowerArmAngle - 45);
         } else {
-            state.baseAngle = Mth.DEG_TO_RAD * be.baseAngle.getValue(tickProgress);
-            state.lowerArmAngle = Mth.DEG_TO_RAD * be.lowerArmAngle.getValue(tickProgress);
-            state.upperArmAngle = Mth.DEG_TO_RAD * (be.upperArmAngle.getValue(tickProgress) - 180);
-            state.headAngle = Mth.DEG_TO_RAD * (be.headAngle.getValue(tickProgress) - 45);
+            state.baseAngle = MathHelper.RADIANS_PER_DEGREE * be.baseAngle.getValue(tickProgress);
+            state.lowerArmAngle = MathHelper.RADIANS_PER_DEGREE * be.lowerArmAngle.getValue(tickProgress);
+            state.upperArmAngle = MathHelper.RADIANS_PER_DEGREE * (be.upperArmAngle.getValue(tickProgress) - 180);
+            state.headAngle = MathHelper.RADIANS_PER_DEGREE * (be.headAngle.getValue(tickProgress) - 45);
         }
         if (!state.support) {
             ArmRenderData data = state.arm = new ArmRenderData();
@@ -105,13 +104,10 @@ public class ArmRenderer extends KineticBlockEntityRenderer<ArmBlockEntity, ArmR
             data.base = CachedBuffers.partial(AllPartialModels.ARM_BASE, state.blockState);
             data.lower = CachedBuffers.partial(AllPartialModels.ARM_LOWER_BODY, state.blockState);
             data.upper = CachedBuffers.partial(AllPartialModels.ARM_UPPER_BODY, state.blockState);
-            data.claw = CachedBuffers.partial(
-                goggles ? AllPartialModels.ARM_CLAW_BASE_GOGGLES : AllPartialModels.ARM_CLAW_BASE,
-                state.blockState
-            );
+            data.claw = CachedBuffers.partial(goggles ? AllPartialModels.ARM_CLAW_BASE_GOGGLES : AllPartialModels.ARM_CLAW_BASE, state.blockState);
             data.clawUpper = CachedBuffers.partial(AllPartialModels.ARM_CLAW_GRIP_UPPER, state.blockState);
             data.clawLower = CachedBuffers.partial(AllPartialModels.ARM_CLAW_GRIP_LOWER, state.blockState);
-            data.light = state.lightCoords;
+            data.light = state.lightmapCoordinates;
             if (rave) {
                 data.color = Color.rainbowColor(AnimationTickHolder.getTicks() * 100).getRGB();
             } else {
@@ -123,61 +119,56 @@ public class ArmRenderer extends KineticBlockEntityRenderer<ArmBlockEntity, ArmR
     }
 
     @Override
-    public void submit(
-        ArmRenderState state,
-        PoseStack matrices,
-        SubmitNodeCollector queue,
-        CameraRenderState cameraState
-    ) {
-        super.submit(state, matrices, queue, cameraState);
+    public void render(ArmRenderState state, MatrixStack matrices, OrderedRenderCommandQueue queue, CameraRenderState cameraState) {
+        super.render(state, matrices, queue, cameraState);
         matrices.translate(0.5f, 0.5f, 0.5f);
         if (state.rotate != 0) {
-            matrices.mulPose(Axis.XP.rotation(state.rotate));
+            matrices.multiply(RotationAxis.POSITIVE_X.rotation(state.rotate));
         }
         matrices.translate(0, 0.25f, 0);
-        matrices.mulPose(Axis.YP.rotation(state.baseAngle));
+        matrices.multiply(RotationAxis.POSITIVE_Y.rotation(state.baseAngle));
         if (state.support) {
             matrices.translate(0, 0.125f, 0);
-            matrices.mulPose(Axis.XP.rotation(state.lowerArmAngle));
+            matrices.multiply(RotationAxis.POSITIVE_X.rotation(state.lowerArmAngle));
             matrices.translate(0, 0, -0.875f);
-            matrices.mulPose(Axis.XP.rotation(state.upperArmAngle));
+            matrices.multiply(RotationAxis.POSITIVE_X.rotation(state.upperArmAngle));
             matrices.translate(0, 0, -0.9375f);
-            matrices.mulPose(Axis.XP.rotation(state.headAngle));
-            state.item.render(matrices, queue, state.lightCoords);
+            matrices.multiply(RotationAxis.POSITIVE_X.rotation(state.headAngle));
+            state.item.render(matrices, queue, state.lightmapCoordinates);
         } else {
-            queue.submitCustomGeometry(matrices, state.layer, state.arm::renderBase);
+            queue.submitCustom(matrices, state.layer, state.arm::renderBase);
             matrices.translate(0, 0.125f, 0);
-            matrices.mulPose(Axis.XP.rotation(state.lowerArmAngle));
-            queue.submitCustomGeometry(matrices, state.layer, state.arm::renderLower);
+            matrices.multiply(RotationAxis.POSITIVE_X.rotation(state.lowerArmAngle));
+            queue.submitCustom(matrices, state.layer, state.arm::renderLower);
             matrices.translate(0, 0, -0.875f);
-            matrices.mulPose(Axis.XP.rotation(state.upperArmAngle));
-            queue.submitCustomGeometry(matrices, state.layer, state.arm::renderUpper);
+            matrices.multiply(RotationAxis.POSITIVE_X.rotation(state.upperArmAngle));
+            queue.submitCustom(matrices, state.layer, state.arm::renderUpper);
             matrices.translate(0, 0, -0.9375f);
-            matrices.mulPose(Axis.XP.rotation(state.headAngle));
+            matrices.multiply(RotationAxis.POSITIVE_X.rotation(state.headAngle));
             if (state.arm.inverted) {
-                matrices.mulPose(Axis.ZP.rotation(state.rotate));
-                queue.submitCustomGeometry(matrices, state.layer, state.arm::renderClaw);
-                matrices.mulPose(Axis.ZP.rotation(state.rotate));
+                matrices.multiply(RotationAxis.POSITIVE_Z.rotation(state.rotate));
+                queue.submitCustom(matrices, state.layer, state.arm::renderClaw);
+                matrices.multiply(RotationAxis.POSITIVE_Z.rotation(state.rotate));
             } else {
-                queue.submitCustomGeometry(matrices, state.layer, state.arm::renderClaw);
+                queue.submitCustom(matrices, state.layer, state.arm::renderClaw);
             }
-            matrices.pushPose();
+            matrices.push();
             matrices.translate(0, -state.arm.clawOffset, -0.375f);
-            queue.submitCustomGeometry(matrices, state.layer, state.arm::renderClawLower);
-            matrices.popPose();
-            matrices.pushPose();
+            queue.submitCustom(matrices, state.layer, state.arm::renderClawLower);
+            matrices.pop();
+            matrices.push();
             matrices.translate(0, state.arm.clawOffset, -0.375f);
-            queue.submitCustomGeometry(matrices, state.layer, state.arm::renderClawUpper);
-            matrices.popPose();
+            queue.submitCustom(matrices, state.layer, state.arm::renderClawUpper);
+            matrices.pop();
             if (state.item != null) {
-                state.item.render(matrices, queue, state.lightCoords);
+                state.item.render(matrices, queue, state.lightmapCoordinates);
             }
         }
     }
 
     @Override
-    protected RenderType getRenderType(ArmBlockEntity be, BlockState state) {
-        return be.goggles ? RenderTypes.cutoutMovingBlock() : RenderTypes.solidMovingBlock();
+    protected RenderLayer getRenderType(ArmBlockEntity be, BlockState state) {
+        return be.goggles ? RenderLayer.getCutout() : RenderLayer.getSolid();
     }
 
     @Override
@@ -210,7 +201,7 @@ public class ArmRenderer extends KineticBlockEntityRenderer<ArmBlockEntity, ArmR
     }
 
     @Override
-    public boolean shouldRenderOffScreen() {
+    public boolean rendersOutsideBoundingBox() {
         return true;
     }
 
@@ -225,16 +216,16 @@ public class ArmRenderer extends KineticBlockEntityRenderer<ArmBlockEntity, ArmR
     }
 
     public static class ArmItemData {
-        public ItemStackRenderState state;
+        public ItemRenderState state;
         public float xRot;
         public float offset;
         public float scale;
 
-        public void render(PoseStack matrices, SubmitNodeCollector queue, int light) {
-            matrices.mulPose(Axis.XP.rotation(xRot));
+        public void render(MatrixStack matrices, OrderedRenderCommandQueue queue, int light) {
+            matrices.multiply(RotationAxis.POSITIVE_X.rotation(xRot));
             matrices.translate(0, offset, 0);
             matrices.scale(scale, scale, scale);
-            state.submit(matrices, queue, light, OverlayTexture.NO_OVERLAY, 0);
+            state.render(matrices, queue, light, OverlayTexture.DEFAULT_UV, 0);
         }
     }
 
@@ -250,27 +241,27 @@ public class ArmRenderer extends KineticBlockEntityRenderer<ArmBlockEntity, ArmR
         public boolean inverted;
         public float clawOffset;
 
-        public void renderBase(PoseStack.Pose matricesEntry, VertexConsumer vertexConsumer) {
+        public void renderBase(MatrixStack.Entry matricesEntry, VertexConsumer vertexConsumer) {
             base.light(light).renderInto(matricesEntry, vertexConsumer);
         }
 
-        public void renderClaw(PoseStack.Pose matricesEntry, VertexConsumer vertexConsumer) {
+        public void renderClaw(MatrixStack.Entry matricesEntry, VertexConsumer vertexConsumer) {
             claw.light(light).renderInto(matricesEntry, vertexConsumer);
         }
 
-        public void renderClawLower(PoseStack.Pose matricesEntry, VertexConsumer vertexConsumer) {
+        public void renderClawLower(MatrixStack.Entry matricesEntry, VertexConsumer vertexConsumer) {
             clawLower.light(light).renderInto(matricesEntry, vertexConsumer);
         }
 
-        public void renderClawUpper(PoseStack.Pose matricesEntry, VertexConsumer vertexConsumer) {
+        public void renderClawUpper(MatrixStack.Entry matricesEntry, VertexConsumer vertexConsumer) {
             clawUpper.light(light).renderInto(matricesEntry, vertexConsumer);
         }
 
-        public void renderLower(PoseStack.Pose matricesEntry, VertexConsumer vertexConsumer) {
+        public void renderLower(MatrixStack.Entry matricesEntry, VertexConsumer vertexConsumer) {
             lower.light(light).color(color).renderInto(matricesEntry, vertexConsumer);
         }
 
-        public void renderUpper(PoseStack.Pose matricesEntry, VertexConsumer vertexConsumer) {
+        public void renderUpper(MatrixStack.Entry matricesEntry, VertexConsumer vertexConsumer) {
             upper.light(light).color(color).renderInto(matricesEntry, vertexConsumer);
         }
     }

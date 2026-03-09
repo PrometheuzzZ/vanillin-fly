@@ -10,40 +10,40 @@ import com.zurrtum.create.client.flywheel.lib.util.RendererReloadCache;
 import com.zurrtum.create.client.flywheel.lib.visual.AbstractVisual;
 import com.zurrtum.create.client.flywheel.lib.visual.SimpleDynamicVisual;
 import com.zurrtum.create.client.vanillin.item.ItemModels;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.LightTexture;
-import net.minecraft.client.renderer.block.model.BlockStateModel;
-import net.minecraft.client.resources.model.BlockStateDefinitions;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.util.Mth;
-import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.entity.decoration.ItemFrame;
-import net.minecraft.world.item.ItemDisplayContext;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
-import net.minecraft.world.level.LightLayer;
-import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.block.BlockState;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.render.LightmapTextureManager;
+import net.minecraft.client.render.model.BlockStateManagers;
+import net.minecraft.client.render.model.BlockStateModel;
+import net.minecraft.entity.EntityType;
+import net.minecraft.entity.decoration.ItemFrameEntity;
+import net.minecraft.item.ItemDisplayContext;
+import net.minecraft.item.ItemStack;
+import net.minecraft.item.Items;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.world.LightType;
 import org.joml.Matrix4f;
 
-public class ItemFrameVisual extends AbstractVisual implements EntityVisual<ItemFrame>, SimpleDynamicVisual {
-    public static final RendererReloadCache<BlockStateModel, Model> MODEL_RESOURCE_LOCATION = new RendererReloadCache<>(
-        model -> new BakedModelBuilder(model).build());
+public class ItemFrameVisual extends AbstractVisual implements EntityVisual<ItemFrameEntity>, SimpleDynamicVisual {
+    public static final RendererReloadCache<BlockStateModel, Model> MODEL_RESOURCE_LOCATION = new RendererReloadCache<>(model -> new BakedModelBuilder(
+        model).build());
 
     private final Matrix4f baseTransform = new Matrix4f();
 
     private final TransformedInstance frame;
     private final TransformedInstance item;
-    private final ItemFrame entity;
+    private final ItemFrameEntity entity;
     private BlockStateModel lastFrameModel;
     private ItemStack lastItemStack;
 
-    public ItemFrameVisual(VisualizationContext ctx, ItemFrame entity, float partialTick) {
-        super(ctx, entity.level(), partialTick);
+    public ItemFrameVisual(VisualizationContext ctx, ItemFrameEntity entity, float partialTick) {
+        super(ctx, entity.getEntityWorld(), partialTick);
 
         this.entity = entity;
 
-        lastItemStack = entity.getItem().copy();
+        lastItemStack = entity.getHeldItemStack().copy();
 
         lastFrameModel = getFrameModel();
         var frameModel = MODEL_RESOURCE_LOCATION.get(lastFrameModel);
@@ -52,19 +52,15 @@ public class ItemFrameVisual extends AbstractVisual implements EntityVisual<Item
 
         frame.setTransform(baseTransform);
 
-        item = ctx.instancerProvider()
-            .instancer(InstanceTypes.TRANSFORMED, ItemModels.get(level, lastItemStack, ItemDisplayContext.FIXED))
+        item = ctx.instancerProvider().instancer(InstanceTypes.TRANSFORMED, ItemModels.get(level, lastItemStack, ItemDisplayContext.FIXED))
             .createInstance();
 
         animate(partialTick);
     }
 
-    public static boolean shouldVisualize(ItemFrame entity) {
+    public static boolean shouldVisualize(ItemFrameEntity entity) {
         // We don't support map rendering, and we can't support exotic item models.
-        return !entity.getItem().is(Items.FILLED_MAP) && ItemModels.isSupported(
-            entity.getItem(),
-            ItemDisplayContext.FIXED
-        );
+        return !entity.getHeldItemStack().isOf(Items.FILLED_MAP) && ItemModels.isSupported(entity.getHeldItemStack(), ItemDisplayContext.FIXED);
     }
 
     @Override
@@ -73,31 +69,28 @@ public class ItemFrameVisual extends AbstractVisual implements EntityVisual<Item
     }
 
     public void animate(float partialTick) {
-        var light = LightTexture.pack(
-            getBlockLightLevel(entity.blockPosition()),
-            getSkyLightLevel(entity.blockPosition())
-        );
+        var light = LightmapTextureManager.pack(getBlockLightLevel(entity.getBlockPos()), getSkyLightLevel(entity.getBlockPos()));
 
         boolean invisible = entity.isInvisible();
 
-        Direction direction = entity.getDirection();
+        Direction direction = entity.getHorizontalFacing();
         var origin = visualizationContext.renderOrigin();
 
         float d = 0.46875f;
 
-        float x = (float) (entity.getX() - origin.getX() + direction.getStepX() * d);
-        float y = (float) (entity.getY() - origin.getY() + direction.getStepY() * d);
-        float z = (float) (entity.getZ() - origin.getZ() + direction.getStepZ() * d);
+        float x = (float) (entity.getX() - origin.getX() + direction.getOffsetX() * d);
+        float y = (float) (entity.getY() - origin.getY() + direction.getOffsetY() * d);
+        float z = (float) (entity.getZ() - origin.getZ() + direction.getOffsetZ() * d);
 
         baseTransform.translation(x, y, z);
-        baseTransform.rotateXYZ(Mth.DEG_TO_RAD * entity.getXRot(), Mth.DEG_TO_RAD * (180.0f - entity.getYRot()), 0.0f);
+        baseTransform.rotateXYZ(MathHelper.RADIANS_PER_DEGREE * entity.getPitch(), MathHelper.RADIANS_PER_DEGREE * (180.0f - entity.getYaw()), 0.0f);
 
-        var stack = entity.getItem();
+        var stack = entity.getHeldItemStack();
         var frameLocation = getFrameModel();
 
         if (frameLocation != lastFrameModel) {
-            visualizationContext.instancerProvider()
-                .instancer(InstanceTypes.TRANSFORMED, MODEL_RESOURCE_LOCATION.get(frameLocation)).stealInstance(frame);
+            visualizationContext.instancerProvider().instancer(InstanceTypes.TRANSFORMED, MODEL_RESOURCE_LOCATION.get(frameLocation))
+                .stealInstance(frame);
             lastFrameModel = frameLocation;
         }
 
@@ -105,11 +98,10 @@ public class ItemFrameVisual extends AbstractVisual implements EntityVisual<Item
 
         frame.setTransform(baseTransform).translate(-0.5f, -0.5f, -0.5f).light(light).setChanged();
 
-        if (!ItemStack.matches(lastItemStack, stack)) {
+        if (!ItemStack.areEqual(lastItemStack, stack)) {
             lastItemStack = stack.copy();
             visualizationContext.instancerProvider()
-                .instancer(InstanceTypes.TRANSFORMED, ItemModels.get(level, lastItemStack, ItemDisplayContext.FIXED))
-                .stealInstance(item);
+                .instancer(InstanceTypes.TRANSFORMED, ItemModels.get(level, lastItemStack, ItemDisplayContext.FIXED)).stealInstance(item);
         }
 
         item.setTransform(baseTransform);
@@ -120,7 +112,7 @@ public class ItemFrameVisual extends AbstractVisual implements EntityVisual<Item
             item.translate(0.0F, 0.0F, 0.4375F);
         }
 
-        int i = entity.hasFramedMap() ? entity.getRotation() % 4 * 2 : entity.getRotation();
+        int i = entity.containsMap() ? entity.getRotation() % 4 * 2 : entity.getRotation();
 
         item.rotateZDegrees(i * 360.0F / 8.0F);
 
@@ -145,23 +137,20 @@ public class ItemFrameVisual extends AbstractVisual implements EntityVisual<Item
     }
 
     protected int getSkyLightLevel(BlockPos pos) {
-        return level.getBrightness(LightLayer.SKY, pos);
+        return level.getLightLevel(LightType.SKY, pos);
     }
 
     protected int getBlockLightLevelBase(BlockPos pos) {
-        return entity.isOnFire() ? 15 : level.getBrightness(LightLayer.BLOCK, pos);
+        return entity.isOnFire() ? 15 : level.getLightLevel(LightType.BLOCK, pos);
     }
 
     protected int getBlockLightLevel(BlockPos pos) {
-        return entity.getType() == EntityType.GLOW_ITEM_FRAME ? Math.max(
-            5,
-            getBlockLightLevelBase(pos)
-        ) : getBlockLightLevelBase(pos);
+        return entity.getType() == EntityType.GLOW_ITEM_FRAME ? Math.max(5, getBlockLightLevelBase(pos)) : getBlockLightLevelBase(pos);
     }
 
     public BlockStateModel getFrameModel() {
         boolean bl = entity.getType() == EntityType.GLOW_ITEM_FRAME;
-        BlockState state = BlockStateDefinitions.getItemFrameFakeState(bl, false);
-        return Minecraft.getInstance().getBlockRenderer().getBlockModel(state);
+        BlockState state = BlockStateManagers.getStateForItemFrame(bl, false);
+        return MinecraftClient.getInstance().getBlockRenderManager().getModel(state);
     }
 }

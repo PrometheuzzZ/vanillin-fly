@@ -4,8 +4,8 @@ import com.zurrtum.create.infrastructure.packet.s2c.ClientboundChainConveyorRidi
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
+import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.world.entity.player.Player;
 
 import java.util.Map;
 import java.util.UUID;
@@ -17,19 +17,17 @@ public class ServerChainConveyorHandler {
 
     public static int ticks;
 
-    public static void handleTTLPacket(MinecraftServer server, Player player) {
+    public static void handleTTLPacket(MinecraftServer server, PlayerEntity player) {
         int count = hangingPlayers.size();
-        hangingPlayers.put(player.getUUID(), 20);
+        hangingPlayers.put(player.getUuid(), 20);
 
-        if (hangingPlayers.size() != count) {
+        if (hangingPlayers.size() != count)
             sync(server);
-        }
     }
 
-    public static void handleStopRidingPacket(MinecraftServer server, Player player) {
-        if (hangingPlayers.removeInt(player.getUUID()) != 0) {
+    public static void handleStopRidingPacket(MinecraftServer server, PlayerEntity player) {
+        if (hangingPlayers.removeInt(player.getUuid()) != 0)
             sync(server);
-        }
     }
 
     public static void tick(MinecraftServer server) {
@@ -50,16 +48,15 @@ public class ServerChainConveyorHandler {
 
         int after = hangingPlayers.size();
 
-        if (ticks % 10 != 0 && before == after) {
+        if (ticks % 10 != 0 && before == after)
             return;
-        }
 
         sync(server);
 
     }
 
     public static void sync(MinecraftServer server) {
-        server.getPlayerList().broadcastAll(new ClientboundChainConveyorRidingPacket(hangingPlayers.keySet()));
+        server.getPlayerManager().sendToAll(new ClientboundChainConveyorRidingPacket(hangingPlayers.keySet()));
     }
 
 }

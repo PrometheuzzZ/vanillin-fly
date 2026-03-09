@@ -4,20 +4,19 @@ import com.zurrtum.create.AllClientHandle;
 import com.zurrtum.create.AllPackets;
 import com.zurrtum.create.catnip.codecs.stream.CatnipStreamCodecs;
 import io.netty.buffer.ByteBuf;
-import net.minecraft.core.BlockPos;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.PacketType;
-import net.minecraft.network.protocol.game.ClientGamePacketListener;
-import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.block.BlockState;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.network.listener.ClientPlayPacketListener;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.PacketType;
+import net.minecraft.util.math.BlockPos;
 
-public record ContraptionBlockChangedPacket(int entityId, BlockPos localPos,
-                                            BlockState newState) implements Packet<ClientGamePacketListener> {
-    public static final StreamCodec<ByteBuf, ContraptionBlockChangedPacket> CODEC = StreamCodec.composite(
-        ByteBufCodecs.INT,
+public record ContraptionBlockChangedPacket(int entityId, BlockPos localPos, BlockState newState) implements Packet<ClientPlayPacketListener> {
+    public static final PacketCodec<ByteBuf, ContraptionBlockChangedPacket> CODEC = PacketCodec.tuple(
+        PacketCodecs.INTEGER,
         ContraptionBlockChangedPacket::entityId,
-        BlockPos.STREAM_CODEC,
+        BlockPos.PACKET_CODEC,
         ContraptionBlockChangedPacket::localPos,
         CatnipStreamCodecs.BLOCK_STATE,
         ContraptionBlockChangedPacket::newState,
@@ -25,12 +24,12 @@ public record ContraptionBlockChangedPacket(int entityId, BlockPos localPos,
     );
 
     @Override
-    public void handle(ClientGamePacketListener listener) {
+    public void apply(ClientPlayPacketListener listener) {
         AllClientHandle.INSTANCE.onContraptionBlockChanged(this);
     }
 
     @Override
-    public PacketType<ContraptionBlockChangedPacket> type() {
+    public PacketType<ContraptionBlockChangedPacket> getPacketType() {
         return AllPackets.CONTRAPTION_BLOCK_CHANGED;
     }
 }

@@ -1,7 +1,7 @@
 package com.zurrtum.create.content.trains.display;
 
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.storage.ReadView;
+import net.minecraft.storage.WriteView;
 import org.apache.commons.lang3.mutable.MutableInt;
 
 import java.util.ArrayList;
@@ -17,10 +17,7 @@ public class FlapDisplayLayout {
     }
 
     public void loadDefault(int maxCharCount) {
-        configure(
-            "Default",
-            Arrays.asList(new FlapDisplaySection(maxCharCount * FlapDisplaySection.MONOSPACE, "alphabet", false, false))
-        );
+        configure("Default", Arrays.asList(new FlapDisplaySection(maxCharCount * FlapDisplaySection.MONOSPACE, "alphabet", false, false)));
     }
 
     public boolean isLayout(String key) {
@@ -32,24 +29,24 @@ public class FlapDisplayLayout {
         this.sections = sections;
     }
 
-    public void write(ValueOutput view) {
+    public void write(WriteView view) {
         view.putString("Key", layoutKey);
-        ValueOutput.ValueOutputList list = view.childrenList("Sections");
-        sections.forEach(section -> section.write(list.addChild()));
+        WriteView.ListView list = view.getList("Sections");
+        sections.forEach(section -> section.write(list.add()));
     }
 
-    public void read(ValueInput view) {
+    public void read(ReadView view) {
         String prevKey = layoutKey;
-        layoutKey = view.getStringOr("Key", "");
+        layoutKey = view.getString("Key", "");
 
         if (!prevKey.equals(layoutKey)) {
             sections = new ArrayList<>();
-            view.childrenListOrEmpty("Sections").forEach(section -> sections.add(FlapDisplaySection.load(section)));
+            view.getListReadView("Sections").forEach(section -> sections.add(FlapDisplaySection.load(section)));
             return;
         }
 
         MutableInt index = new MutableInt(0);
-        view.childrenListOrEmpty("Sections").forEach(section -> sections.get(index.getAndIncrement()).update(section));
+        view.getListReadView("Sections").forEach(section -> sections.get(index.getAndIncrement()).update(section));
     }
 
     public List<FlapDisplaySection> getSections() {

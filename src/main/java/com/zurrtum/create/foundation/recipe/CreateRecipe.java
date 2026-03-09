@@ -2,26 +2,26 @@ package com.zurrtum.create.foundation.recipe;
 
 import com.zurrtum.create.AllDataComponents;
 import com.zurrtum.create.infrastructure.component.SequencedAssemblyJunk;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.crafting.PlacementInfo;
-import net.minecraft.world.item.crafting.Recipe;
-import net.minecraft.world.item.crafting.RecipeBookCategory;
-import net.minecraft.world.item.crafting.RecipeInput;
+import net.minecraft.item.ItemStack;
+import net.minecraft.recipe.IngredientPlacement;
+import net.minecraft.recipe.Recipe;
+import net.minecraft.recipe.book.RecipeBookCategory;
+import net.minecraft.recipe.input.RecipeInput;
 import org.jetbrains.annotations.Nullable;
 
 public interface CreateRecipe<T extends RecipeInput> extends Recipe<T> {
     @Override
-    default PlacementInfo placementInfo() {
-        return PlacementInfo.NOT_PLACEABLE;
+    default IngredientPlacement getIngredientPlacement() {
+        return IngredientPlacement.NONE;
     }
 
     @Override
-    default RecipeBookCategory recipeBookCategory() {
+    default RecipeBookCategory getRecipeBookCategory() {
         return null;
     }
 
     @Override
-    default boolean isSpecial() {
+    default boolean isIgnoredInRecipeBook() {
         return true;
     }
 

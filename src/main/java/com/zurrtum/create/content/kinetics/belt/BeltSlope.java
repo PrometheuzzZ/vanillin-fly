@@ -1,14 +1,18 @@
 package com.zurrtum.create.content.kinetics.belt;
 
-import net.minecraft.util.StringRepresentable;
+import net.minecraft.util.StringIdentifiable;
 
 import java.util.Locale;
 
-public enum BeltSlope implements StringRepresentable {
-    HORIZONTAL, UPWARD, DOWNWARD, VERTICAL, SIDEWAYS;
+public enum BeltSlope implements StringIdentifiable {
+    HORIZONTAL,
+    UPWARD,
+    DOWNWARD,
+    VERTICAL,
+    SIDEWAYS;
 
     @Override
-    public String getSerializedName() {
+    public String asString() {
         return name().toLowerCase(Locale.ROOT);
     }
 

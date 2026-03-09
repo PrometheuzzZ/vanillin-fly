@@ -8,7 +8,7 @@ import com.zurrtum.create.client.flywheel.backend.glsl.GlslVersion;
 import com.zurrtum.create.client.flywheel.backend.glsl.ShaderSources;
 import com.zurrtum.create.client.flywheel.backend.glsl.SourceComponent;
 import com.zurrtum.create.client.flywheel.lib.util.StringUtil;
-import net.minecraft.resources.Identifier;
+import net.minecraft.util.Identifier;
 
 import java.util.*;
 import java.util.function.BiConsumer;
@@ -75,8 +75,8 @@ public class Compile<K> {
             return with((key, loader) -> loader.get(sourceFetcher.apply(key)));
         }
 
-        public ShaderCompiler<K> withResource(Identifier Identifier) {
-            return withResource($ -> Identifier);
+        public ShaderCompiler<K> withResource(Identifier resourceLocation) {
+            return withResource($ -> resourceLocation);
         }
 
         public ShaderCompiler<K> onCompile(BiConsumer<K, Compilation> cb) {

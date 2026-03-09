@@ -4,7 +4,7 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import com.zurrtum.create.Create;
 import com.zurrtum.create.infrastructure.items.ItemStackHandler;
-import net.minecraft.world.Container;
+import net.minecraft.inventory.Inventory;
 
 public class GlobalPackagePort {
     public static final Codec<GlobalPackagePort> CODEC = RecordCodecBuilder.create(instance -> instance.group(
@@ -29,35 +29,33 @@ public class GlobalPackagePort {
         this.primed = primed;
     }
 
-    public void restoreOfflineBuffer(Container inventory) {
-        if (!primed) {
+    public void restoreOfflineBuffer(Inventory inventory) {
+        if (!primed)
             return;
-        }
 
         restoring = true;
 
-        for (int slot = 0, size = offlineBuffer.getContainerSize(); slot < size; slot++) {
-            inventory.setItem(slot, offlineBuffer.getItem(slot));
+        for (int slot = 0, size = offlineBuffer.size(); slot < size; slot++) {
+            inventory.setStack(slot, offlineBuffer.getStack(slot));
         }
 
         restoring = false;
         primed = false;
     }
 
-    public void saveOfflineBuffer(Container inventory) {
+    public void saveOfflineBuffer(Inventory inventory) {
         /*
          * Each time restoreOfflineBuffer changes a slot, the inventory
          * calls this method. We must filter out those calls to prevent
          * overwriting later slots which haven't been restored yet and
          * to avoid unnecessary work.
          */
-        if (restoring) {
+        if (restoring)
             return;
-        }
 
         // TODO: Call save method on individual slots rather than iterating
-        for (int slot = 0, size = inventory.getContainerSize(); slot < size; slot++) {
-            offlineBuffer.setItem(slot, inventory.getItem(slot));
+        for (int slot = 0, size = inventory.size(); slot < size; slot++) {
+            offlineBuffer.setStack(slot, inventory.getStack(slot));
         }
 
         Create.RAILWAYS.markTracksDirty();

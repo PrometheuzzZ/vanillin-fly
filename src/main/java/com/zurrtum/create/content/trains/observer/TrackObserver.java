@@ -5,7 +5,6 @@ import com.mojang.serialization.DynamicOps;
 import com.mojang.serialization.MapLike;
 import com.mojang.serialization.RecordBuilder;
 import com.zurrtum.create.Create;
-import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.content.logistics.filter.FilterItemStack;
 import com.zurrtum.create.content.trains.entity.Train;
 import com.zurrtum.create.content.trains.graph.DimensionPalette;
@@ -13,14 +12,15 @@ import com.zurrtum.create.content.trains.graph.TrackEdge;
 import com.zurrtum.create.content.trains.graph.TrackGraph;
 import com.zurrtum.create.content.trains.signal.SignalPropagator;
 import com.zurrtum.create.content.trains.signal.SingleBlockEntityEdgePoint;
+import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.foundation.blockEntity.behaviour.filtering.ServerFilteringBehaviour;
-import net.minecraft.core.UUIDUtil;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.item.ItemStack;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.storage.ReadView;
+import net.minecraft.storage.WriteView;
+import net.minecraft.util.Uuids;
+import net.minecraft.world.World;
 
 import java.util.UUID;
 
@@ -39,40 +39,32 @@ public class TrackObserver extends SingleBlockEntityEdgePoint {
     @Override
     public void blockEntityAdded(BlockEntity blockEntity, boolean front) {
         super.blockEntityAdded(blockEntity, front);
-        ServerFilteringBehaviour filteringBehaviour = BlockEntityBehaviour.get(
-            blockEntity,
-            ServerFilteringBehaviour.TYPE
-        );
-        if (filteringBehaviour != null) {
-            setFilterAndNotify(blockEntity.getLevel(), filteringBehaviour.getFilter());
-        }
+        ServerFilteringBehaviour filteringBehaviour = BlockEntityBehaviour.get(blockEntity, ServerFilteringBehaviour.TYPE);
+        if (filteringBehaviour != null)
+            setFilterAndNotify(blockEntity.getWorld(), filteringBehaviour.getFilter());
     }
 
     @Override
     public void tick(MinecraftServer server, TrackGraph graph, boolean preTrains) {
         super.tick(server, graph, preTrains);
-        if (isActivated()) {
+        if (isActivated())
             activated--;
-        }
-        if (!isActivated()) {
+        if (!isActivated())
             currentTrain = null;
-        }
     }
 
-    public void setFilterAndNotify(Level level, ItemStack filter) {
+    public void setFilterAndNotify(World level, ItemStack filter) {
         this.filter = FilterItemStack.of(filter.copy());
         notifyTrains(level);
     }
 
-    private void notifyTrains(Level level) {
+    private void notifyTrains(World level) {
         TrackGraph graph = Create.RAILWAYS.sided(level).getGraph(edgeLocation.getFirst());
-        if (graph == null) {
+        if (graph == null)
             return;
-        }
         TrackEdge edge = graph.getConnection(edgeLocation.map(graph::locateNode));
-        if (edge == null) {
+        if (edge == null)
             return;
-        }
         SignalPropagator.notifyTrains(graph, edge);
     }
 
@@ -94,11 +86,11 @@ public class TrackObserver extends SingleBlockEntityEdgePoint {
     }
 
     @Override
-    public void read(ValueInput view, boolean migration, DimensionPalette dimensions) {
+    public void read(ReadView view, boolean migration, DimensionPalette dimensions) {
         super.read(view, migration, dimensions);
-        activated = view.getIntOr("Activated", 0);
+        activated = view.getInt("Activated", 0);
         filter = view.read("Filter", FilterItemStack.CODEC).orElseGet(FilterItemStack::empty);
-        currentTrain = view.read("TrainId", UUIDUtil.CODEC).orElse(null);
+        currentTrain = view.read("TrainId", Uuids.INT_STREAM_CODEC).orElse(null);
     }
 
     @Override
@@ -107,17 +99,16 @@ public class TrackObserver extends SingleBlockEntityEdgePoint {
         MapLike<T> map = ops.getMap(input).getOrThrow();
         activated = ops.getNumberValue(map.get("Activated")).getOrThrow().intValue();
         filter = FilterItemStack.CODEC.parse(ops, map.get("Filter")).result().orElseGet(FilterItemStack::empty);
-        currentTrain = UUIDUtil.CODEC.parse(ops, map.get("TrainId")).result().orElse(null);
+        currentTrain = Uuids.INT_STREAM_CODEC.parse(ops, map.get("TrainId")).result().orElse(null);
     }
 
     @Override
-    public void write(ValueOutput view, DimensionPalette dimensions) {
+    public void write(WriteView view, DimensionPalette dimensions) {
         super.write(view, dimensions);
         view.putInt("Activated", activated);
-        view.store("Filter", FilterItemStack.CODEC, filter);
-        if (currentTrain != null) {
-            view.store("TrainId", UUIDUtil.CODEC, currentTrain);
-        }
+        view.put("Filter", FilterItemStack.CODEC, filter);
+        if (currentTrain != null)
+            view.put("TrainId", Uuids.INT_STREAM_CODEC, currentTrain);
     }
 
     @Override
@@ -126,9 +117,8 @@ public class TrackObserver extends SingleBlockEntityEdgePoint {
         RecordBuilder<T> map = ops.mapBuilder();
         map.add("Activated", ops.createInt(activated));
         map.add("Filter", filter, FilterItemStack.CODEC);
-        if (currentTrain != null) {
-            map.add("TrainId", currentTrain, UUIDUtil.CODEC);
-        }
+        if (currentTrain != null)
+            map.add("TrainId", currentTrain, Uuids.INT_STREAM_CODEC);
         return map.build(prefix);
     }
 }

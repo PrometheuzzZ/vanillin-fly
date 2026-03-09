@@ -5,23 +5,27 @@ import com.mojang.serialization.Codec;
 import com.zurrtum.create.AllDataComponents;
 import com.zurrtum.create.catnip.codecs.stream.CatnipStreamCodecBuilders;
 import io.netty.buffer.ByteBuf;
-import net.minecraft.core.BlockPos;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.util.RandomSource;
-import net.minecraft.util.StringRepresentable;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.item.ItemStack;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.util.StringIdentifiable;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.random.Random;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 import java.util.Locale;
 import java.util.function.Predicate;
 
-public enum PlacementPatterns implements StringRepresentable {
-    Solid, Checkered, InverseCheckered, Chance25, Chance50, Chance75;
+public enum PlacementPatterns implements StringIdentifiable {
+    Solid,
+    Checkered,
+    InverseCheckered,
+    Chance25,
+    Chance50,
+    Chance75;
 
-    public static final Codec<PlacementPatterns> CODEC = StringRepresentable.fromEnum(PlacementPatterns::values);
-    public static final StreamCodec<ByteBuf, PlacementPatterns> STREAM_CODEC = CatnipStreamCodecBuilders.ofEnum(
-        PlacementPatterns.class);
+    public static final Codec<PlacementPatterns> CODEC = StringIdentifiable.createCodec(PlacementPatterns::values);
+    public static final PacketCodec<ByteBuf, PlacementPatterns> STREAM_CODEC = CatnipStreamCodecBuilders.ofEnum(PlacementPatterns.class);
 
     public final String translationKey;
 
@@ -29,7 +33,7 @@ public enum PlacementPatterns implements StringRepresentable {
         this.translationKey = name().toLowerCase(Locale.ROOT);
     }
 
-    public static void applyPattern(List<BlockPos> blocksIn, ItemStack stack, RandomSource random) {
+    public static void applyPattern(List<BlockPos> blocksIn, ItemStack stack, Random random) {
         PlacementPatterns pattern = stack.getOrDefault(AllDataComponents.PLACEMENT_PATTERN, Solid);
         Predicate<BlockPos> filter = Predicates.alwaysFalse();
 
@@ -58,7 +62,7 @@ public enum PlacementPatterns implements StringRepresentable {
     }
 
     @Override
-    public @NotNull String getSerializedName() {
+    public @NotNull String asString() {
         return translationKey;
     }
 }

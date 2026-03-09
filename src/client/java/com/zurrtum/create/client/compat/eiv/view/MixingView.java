@@ -17,8 +17,8 @@ import de.crafty.eiv.common.recipe.inventory.RecipeViewMenu;
 import de.crafty.eiv.common.recipe.inventory.RecipeViewMenu.SlotDefinition;
 import de.crafty.eiv.common.recipe.inventory.RecipeViewScreen;
 import de.crafty.eiv.common.recipe.inventory.SlotContent;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.item.ItemStack;
 import org.joml.Matrix3x2f;
 
 import java.util.ArrayList;
@@ -123,33 +123,21 @@ public class MixingView extends CreateView {
     }
 
     @Override
-    public void renderRecipe(
-        RecipeViewScreen screen,
-        RecipePosition position,
-        GuiGraphics context,
-        int mouseX,
-        int mouseY,
-        float partialTicks
-    ) {
+    public void renderRecipe(RecipeViewScreen screen, RecipePosition position, DrawContext context, int mouseX, int mouseY, float partialTicks) {
         int size = results.size();
         AllGuiTextures.JEI_DOWN_ARROW.render(context, 132, (size <= 4 ? 32 : 41) - (size - 1) / 2 * 19);
-        Matrix3x2f pose = new Matrix3x2f(context.pose());
+        Matrix3x2f pose = new Matrix3x2f(context.getMatrices());
         if (heat == HeatCondition.NONE) {
             AllGuiTextures.JEI_NO_HEAT_BAR.render(context, 0, 80);
             AllGuiTextures.JEI_SHADOW.render(context, 77, 68);
         } else {
             AllGuiTextures.JEI_HEAT_BAR.render(context, 0, 80);
             AllGuiTextures.JEI_LIGHT.render(context, 77, 88);
-            context.guiRenderState.submitPicturesInPictureState(new BasinBlazeBurnerRenderState(
-                pose,
-                87,
-                69,
-                heat.visualizeAsBlazeBurner()
-            ));
+            context.state.addSpecialElement(new BasinBlazeBurnerRenderState(pose, 87, 69, heat.visualizeAsBlazeBurner()));
         }
-        context.guiRenderState.submitPicturesInPictureState(new MixingBasinRenderState(pose, 87, -5));
-        context.drawString(
-            context.minecraft.font,
+        context.state.addSpecialElement(new MixingBasinRenderState(pose, 87, -5));
+        context.drawText(
+            context.client.textRenderer,
             CreateLang.translateDirect(heat.getTranslationKey()),
             5,
             86,

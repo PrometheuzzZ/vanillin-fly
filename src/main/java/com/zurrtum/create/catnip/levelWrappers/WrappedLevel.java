@@ -1,41 +1,44 @@
 package com.zurrtum.create.catnip.levelWrappers;
 
-import net.minecraft.core.*;
-import net.minecraft.core.particles.ExplosionParticleInfo;
-import net.minecraft.core.particles.ParticleOptions;
-import net.minecraft.sounds.SoundEvent;
-import net.minecraft.sounds.SoundSource;
-import net.minecraft.util.RandomSource;
-import net.minecraft.util.random.WeightedList;
-import net.minecraft.world.TickRateManager;
-import net.minecraft.world.attribute.EnvironmentAttributeSystem;
-import net.minecraft.world.damagesource.DamageSource;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.boss.enderdragon.EnderDragonPart;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.flag.FeatureFlagSet;
-import net.minecraft.world.item.alchemy.PotionBrewing;
-import net.minecraft.world.item.crafting.RecipeAccess;
-import net.minecraft.world.level.ExplosionDamageCalculator;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.biome.Biome;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.entity.FuelValues;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.border.WorldBorder;
-import net.minecraft.world.level.chunk.ChunkSource;
-import net.minecraft.world.level.entity.LevelEntityGetter;
-import net.minecraft.world.level.gameevent.GameEvent;
-import net.minecraft.world.level.lighting.LevelLightEngine;
-import net.minecraft.world.level.material.Fluid;
-import net.minecraft.world.level.saveddata.maps.MapId;
-import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
-import net.minecraft.world.level.storage.LevelData;
-import net.minecraft.world.level.storage.WritableLevelData;
-import net.minecraft.world.phys.Vec3;
-import net.minecraft.world.scores.Scoreboard;
-import net.minecraft.world.ticks.LevelTickAccess;
+import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.component.type.MapIdComponent;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.boss.dragon.EnderDragonPart;
+import net.minecraft.entity.damage.DamageSource;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.fluid.Fluid;
+import net.minecraft.item.FuelRegistry;
+import net.minecraft.item.map.MapState;
+import net.minecraft.particle.BlockParticleEffect;
+import net.minecraft.particle.ParticleEffect;
+import net.minecraft.recipe.BrewingRecipeRegistry;
+import net.minecraft.recipe.RecipeManager;
+import net.minecraft.registry.DynamicRegistryManager;
+import net.minecraft.registry.entry.RegistryEntry;
+import net.minecraft.resource.featuretoggle.FeatureSet;
+import net.minecraft.scoreboard.Scoreboard;
+import net.minecraft.sound.SoundCategory;
+import net.minecraft.sound.SoundEvent;
+import net.minecraft.util.collection.Pool;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.ChunkSectionPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.util.math.random.Random;
+import net.minecraft.world.MutableWorldProperties;
+import net.minecraft.world.World;
+import net.minecraft.world.WorldProperties;
+import net.minecraft.world.biome.Biome;
+import net.minecraft.world.border.WorldBorder;
+import net.minecraft.world.chunk.ChunkManager;
+import net.minecraft.world.chunk.light.LightingProvider;
+import net.minecraft.world.entity.EntityLookup;
+import net.minecraft.world.event.GameEvent;
+import net.minecraft.world.explosion.ExplosionBehavior;
+import net.minecraft.world.tick.QueryableTickScheduler;
+import net.minecraft.world.tick.TickManager;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Collection;
@@ -43,19 +46,19 @@ import java.util.Collections;
 import java.util.List;
 import java.util.function.Predicate;
 
-public class WrappedLevel extends Level {
-    protected Level level;
-    protected ChunkSource chunkSource;
-    protected LevelEntityGetter<Entity> entityGetter = new DummyLevelEntityGetter<>();
+public class WrappedLevel extends World {
+    protected World level;
+    protected ChunkManager chunkSource;
+    protected EntityLookup<Entity> entityGetter = new DummyLevelEntityGetter<>();
 
-    public WrappedLevel(Level level) {
+    public WrappedLevel(World level) {
         super(
-            (WritableLevelData) level.getLevelData(),
-            level.dimension(),
-            level.registryAccess(),
-            level.dimensionTypeRegistration(),
-            level.isClientSide(),
-            level.isDebug(),
+            (MutableWorldProperties) level.getLevelProperties(),
+            level.getRegistryKey(),
+            level.getRegistryManager(),
+            level.getDimensionEntry(),
+            level.isClient(),
+            level.isDebugWorld(),
             0,
             0
         );
@@ -63,13 +66,8 @@ public class WrappedLevel extends Level {
     }
 
     @Override
-    public EnvironmentAttributeSystem environmentAttributes() {
-        return level.environmentAttributes();
-    }
-
-    @Override
-    public void setRespawnData(LevelData.RespawnData spawnPoint) {
-        level.setRespawnData(spawnPoint);
+    public void setSpawnPoint(WorldProperties.SpawnPoint spawnPoint) {
+        level.setSpawnPoint(spawnPoint);
     }
 
     @Override
@@ -78,27 +76,26 @@ public class WrappedLevel extends Level {
     }
 
     @Override
-    public LevelData.RespawnData getRespawnData() {
-        return level.getRespawnData();
+    public WorldProperties.SpawnPoint getSpawnPoint() {
+        return level.getSpawnPoint();
     }
 
-    @Override
-    public Collection<EnderDragonPart> dragonParts() {
-        return level.dragonParts();
+    public Collection<EnderDragonPart> getEnderDragonParts() {
+        return level.getEnderDragonParts();
     }
 
-    public Level getLevel() {
+    public World getLevel() {
         return level;
     }
 
     @Override
-    public RandomSource getRandom() {
+    public Random getRandom() {
         return level.getRandom();
     }
 
     @Override
-    public LevelLightEngine getLightEngine() {
-        return level.getLightEngine();
+    public LightingProvider getLightingProvider() {
+        return level.getLightingProvider();
     }
 
     @Override
@@ -107,8 +104,8 @@ public class WrappedLevel extends Level {
     }
 
     @Override
-    public boolean isStateAtPosition(BlockPos p_217375_1_, Predicate<BlockState> p_217375_2_) {
-        return level.isStateAtPosition(p_217375_1_, p_217375_2_);
+    public boolean testBlockState(BlockPos p_217375_1_, Predicate<BlockState> p_217375_2_) {
+        return level.testBlockState(p_217375_1_, p_217375_2_);
     }
 
     @Override
@@ -118,56 +115,56 @@ public class WrappedLevel extends Level {
     }
 
     @Override
-    public boolean setBlock(BlockPos pos, BlockState newState, int flags) {
-        return level.setBlock(pos, newState, flags);
+    public boolean setBlockState(BlockPos pos, BlockState newState, int flags) {
+        return level.setBlockState(pos, newState, flags);
     }
 
     @Override
-    public int getMaxLocalRawBrightness(BlockPos pos) {
+    public int getLightLevel(BlockPos pos) {
         return 15;
     }
 
     @Override
-    public void sendBlockUpdated(BlockPos pos, BlockState oldState, BlockState newState, int flags) {
-        level.sendBlockUpdated(pos, oldState, newState, flags);
+    public void updateListeners(BlockPos pos, BlockState oldState, BlockState newState, int flags) {
+        level.updateListeners(pos, oldState, newState, flags);
     }
 
     @Override
-    public LevelTickAccess<Block> getBlockTicks() {
-        return level.getBlockTicks();
+    public QueryableTickScheduler<Block> getBlockTickScheduler() {
+        return level.getBlockTickScheduler();
     }
 
     @Override
-    public LevelTickAccess<Fluid> getFluidTicks() {
-        return level.getFluidTicks();
+    public QueryableTickScheduler<Fluid> getFluidTickScheduler() {
+        return level.getFluidTickScheduler();
     }
 
     @Override
-    public ChunkSource getChunkSource() {
-        return chunkSource != null ? chunkSource : level.getChunkSource();
+    public ChunkManager getChunkManager() {
+        return chunkSource != null ? chunkSource : level.getChunkManager();
     }
 
-    public void setChunkSource(ChunkSource source) {
+    public void setChunkSource(ChunkManager source) {
         this.chunkSource = source;
     }
 
     @Override
-    public void levelEvent(@Nullable Entity player, int type, BlockPos pos, int data) {
+    public void syncWorldEvent(@Nullable Entity player, int type, BlockPos pos, int data) {
     }
 
     @Override
-    public List<? extends Player> players() {
+    public List<? extends PlayerEntity> getPlayers() {
         return Collections.emptyList();
     }
 
     @Override
-    public void playSeededSound(
+    public void playSound(
         Entity pPlayer,
         double pX,
         double pY,
         double pZ,
-        Holder<SoundEvent> pSound,
-        SoundSource pSource,
+        RegistryEntry<SoundEvent> pSound,
+        SoundCategory pSource,
         float pVolume,
         float pPitch,
         long pSeed
@@ -175,11 +172,11 @@ public class WrappedLevel extends Level {
     }
 
     @Override
-    public void playSeededSound(
+    public void playSoundFromEntity(
         Entity pPlayer,
         Entity pEntity,
-        Holder<SoundEvent> pSound,
-        SoundSource pCategory,
+        RegistryEntry<SoundEvent> pSound,
+        SoundCategory pCategory,
         float pVolume,
         float pPitch,
         long pSeed
@@ -193,40 +190,40 @@ public class WrappedLevel extends Level {
         double y,
         double z,
         SoundEvent soundIn,
-        SoundSource category,
+        SoundCategory category,
         float volume,
         float pitch
     ) {
     }
 
     @Override
-    public void playSound(
+    public void playSoundFromEntity(
         @Nullable Entity p_217384_1_,
         Entity p_217384_2_,
         SoundEvent p_217384_3_,
-        SoundSource p_217384_4_,
+        SoundCategory p_217384_4_,
         float p_217384_5_,
         float p_217384_6_
     ) {
     }
 
     @Override
-    public void explode(
+    public void createExplosion(
         @Nullable Entity entity,
         @Nullable DamageSource damageSource,
-        @Nullable ExplosionDamageCalculator behavior,
+        @Nullable ExplosionBehavior behavior,
         double x,
         double y,
         double z,
         float power,
         boolean createFire,
-        ExplosionInteraction explosionSourceType,
-        ParticleOptions smallParticle,
-        ParticleOptions largeParticle,
-        WeightedList<ExplosionParticleInfo> blockParticles,
-        Holder<SoundEvent> soundEvent
+        ExplosionSourceType explosionSourceType,
+        ParticleEffect smallParticle,
+        ParticleEffect largeParticle,
+        Pool<BlockParticleEffect> blockParticles,
+        RegistryEntry<SoundEvent> soundEvent
     ) {
-        level.explode(
+        level.createExplosion(
             entity,
             damageSource,
             behavior,
@@ -244,29 +241,29 @@ public class WrappedLevel extends Level {
     }
 
     @Override
-    public Entity getEntity(int id) {
+    public Entity getEntityById(int id) {
         return null;
     }
 
     @Override
-    public TickRateManager tickRateManager() {
-        return level.tickRateManager();
+    public TickManager getTickManager() {
+        return level.getTickManager();
     }
 
     @Nullable
     @Override
-    public MapItemSavedData getMapData(MapId mapId) {
+    public MapState getMapState(MapIdComponent mapId) {
         return null;
     }
 
     @Override
-    public boolean addFreshEntity(Entity entityIn) {
-        entityIn.setLevel(level);
-        return level.addFreshEntity(entityIn);
+    public boolean spawnEntity(Entity entityIn) {
+        entityIn.setWorld(level);
+        return level.spawnEntity(entityIn);
     }
 
     @Override
-    public void destroyBlockProgress(int breakerId, BlockPos pos, int progress) {
+    public void setBlockBreakingInfo(int breakerId, BlockPos pos, int progress) {
     }
 
     @Override
@@ -275,13 +272,13 @@ public class WrappedLevel extends Level {
     }
 
     @Override
-    public RecipeAccess recipeAccess() {
-        return level.recipeAccess();
+    public RecipeManager getRecipeManager() {
+        return level.getRecipeManager();
     }
 
     @Override
-    public Holder<Biome> getUncachedNoiseBiome(int p_225604_1_, int p_225604_2_, int p_225604_3_) {
-        return level.getUncachedNoiseBiome(p_225604_1_, p_225604_2_, p_225604_3_);
+    public RegistryEntry<Biome> getGeneratorStoredBiome(int p_225604_1_, int p_225604_2_, int p_225604_3_) {
+        return level.getGeneratorStoredBiome(p_225604_1_, p_225604_2_, p_225604_3_);
     }
 
     @Override
@@ -290,44 +287,44 @@ public class WrappedLevel extends Level {
     }
 
     @Override
-    public RegistryAccess registryAccess() {
-        return level.registryAccess();
+    public DynamicRegistryManager getRegistryManager() {
+        return level.getRegistryManager();
     }
 
     @Override
-    public PotionBrewing potionBrewing() {
-        return level.potionBrewing();
+    public BrewingRecipeRegistry getBrewingRecipeRegistry() {
+        return level.getBrewingRecipeRegistry();
     }
 
     @Override
-    public FuelValues fuelValues() {
-        return level.fuelValues();
+    public FuelRegistry getFuelRegistry() {
+        return level.getFuelRegistry();
     }
 
     @Override
-    public float getShade(Direction p_230487_1_, boolean p_230487_2_) {
-        return level.getShade(p_230487_1_, p_230487_2_);
+    public float getBrightness(Direction p_230487_1_, boolean p_230487_2_) {
+        return level.getBrightness(p_230487_1_, p_230487_2_);
     }
 
     @Override
-    public void updateNeighbourForOutputSignal(BlockPos p_175666_1_, Block p_175666_2_) {
+    public void updateComparators(BlockPos p_175666_1_, Block p_175666_2_) {
     }
 
     @Override
-    public void gameEvent(@Nullable Entity entity, Holder<GameEvent> gameEvent, Vec3 pos) {
+    public void emitGameEvent(@Nullable Entity entity, RegistryEntry<GameEvent> gameEvent, Vec3d pos) {
     }
 
     @Override
-    public void gameEvent(Holder<GameEvent> holder, Vec3 vec3, GameEvent.Context context) {
+    public void emitGameEvent(RegistryEntry<GameEvent> holder, Vec3d vec3, GameEvent.Emitter context) {
     }
 
     @Override
-    public String gatherChunkSourceStats() {
-        return level.gatherChunkSourceStats();
+    public String asString() {
+        return level.asString();
     }
 
     @Override
-    public LevelEntityGetter<Entity> getEntities() {
+    public EntityLookup<Entity> getEntityLookup() {
         return entityGetter;
     }
 
@@ -340,58 +337,58 @@ public class WrappedLevel extends Level {
     // from the defaults for their dimension.
 
     @Override
-    public int getMaxY() {
-        return this.getMinY() + this.getHeight() - 1;
+    public int getTopYInclusive() {
+        return this.getBottomY() + this.getHeight() - 1;
     }
 
     @Override
-    public int getSectionsCount() {
-        return this.getMaxSectionY() - this.getMinSectionY() + 1;
+    public int countVerticalSections() {
+        return this.getTopSectionCoord() - this.getBottomSectionCoord() + 1;
     }
 
     @Override
-    public int getMinSectionY() {
-        return SectionPos.blockToSectionCoord(this.getMinY());
+    public int getBottomSectionCoord() {
+        return ChunkSectionPos.getSectionCoord(this.getBottomY());
     }
 
     @Override
-    public int getMaxSectionY() {
-        return SectionPos.blockToSectionCoord(this.getMaxY());
+    public int getTopSectionCoord() {
+        return ChunkSectionPos.getSectionCoord(this.getTopYInclusive());
     }
 
     @Override
-    public boolean isInsideBuildHeight(int y) {
-        return y >= this.getMinY() && y <= this.getMaxY();
+    public boolean isInHeightLimit(int y) {
+        return y >= this.getBottomY() && y <= this.getTopYInclusive();
     }
 
     @Override
-    public boolean isOutsideBuildHeight(BlockPos pos) {
-        return this.isOutsideBuildHeight(pos.getY());
+    public boolean isOutOfHeightLimit(BlockPos pos) {
+        return this.isOutOfHeightLimit(pos.getY());
     }
 
     @Override
-    public boolean isOutsideBuildHeight(int y) {
-        return y < this.getMinY() || y > this.getMaxY();
+    public boolean isOutOfHeightLimit(int y) {
+        return y < this.getBottomY() || y > this.getTopYInclusive();
     }
 
     @Override
     public int getSectionIndex(int y) {
-        return this.getSectionIndexFromSectionY(SectionPos.blockToSectionCoord(y));
+        return this.sectionCoordToIndex(ChunkSectionPos.getSectionCoord(y));
     }
 
     @Override
-    public int getSectionIndexFromSectionY(int coord) {
-        return coord - this.getMinSectionY();
+    public int sectionCoordToIndex(int coord) {
+        return coord - this.getBottomSectionCoord();
     }
 
     @Override
-    public int getSectionYFromSectionIndex(int index) {
-        return index + this.getMinSectionY();
+    public int sectionIndexToCoord(int index) {
+        return index + this.getBottomSectionCoord();
     }
 
     @Override
-    public FeatureFlagSet enabledFeatures() {
-        return level.enabledFeatures();
+    public FeatureSet getEnabledFeatures() {
+        return level.getEnabledFeatures();
     }
 
     public float getDayTimeFraction() {

@@ -1,28 +1,20 @@
 package com.zurrtum.create.client.catnip.gui.render;
 
 import com.mojang.blaze3d.pipeline.RenderPipeline;
-import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.zurrtum.create.catnip.theme.Color;
-import net.minecraft.client.gui.navigation.ScreenRectangle;
-import net.minecraft.client.gui.render.TextureSetup;
-import net.minecraft.client.gui.render.state.GuiElementRenderState;
-import net.minecraft.client.renderer.RenderPipelines;
+import net.minecraft.client.gl.RenderPipelines;
+import net.minecraft.client.gui.ScreenRect;
+import net.minecraft.client.gui.render.state.SimpleGuiElementRenderState;
+import net.minecraft.client.render.VertexConsumer;
+import net.minecraft.client.texture.TextureSetup;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix3x2f;
 
-public record GradientRectRenderState(Matrix3x2f pose, float left, float top, float right, float bottom, int startRed,
-                                      int startGreen, int startBlue, int startAlpha, int endRed, int endGreen,
-                                      int endBlue, int endAlpha,
-                                      ScreenRectangle bounds) implements GuiElementRenderState {
-    public GradientRectRenderState(
-        Matrix3x2f pose,
-        float left,
-        float top,
-        float right,
-        float bottom,
-        Color startColor,
-        Color endColor
-    ) {
+public record GradientRectRenderState(
+    Matrix3x2f pose, float left, float top, float right, float bottom, int startRed, int startGreen, int startBlue, int startAlpha, int endRed,
+    int endGreen, int endBlue, int endAlpha, ScreenRect bounds
+) implements SimpleGuiElementRenderState {
+    public GradientRectRenderState(Matrix3x2f pose, float left, float top, float right, float bottom, Color startColor, Color endColor) {
         this(
             pose,
             left,
@@ -37,8 +29,7 @@ public record GradientRectRenderState(Matrix3x2f pose, float left, float top, fl
             endColor.getGreen(),
             endColor.getBlue(),
             endColor.getAlpha(),
-            new ScreenRectangle((int) left, (int) top, (int) (right - left), (int) (bottom - top)).transformMaxBounds(
-                pose)
+            new ScreenRect((int) left, (int) top, (int) (right - left), (int) (bottom - top)).transformEachVertex(pose)
         );
     }
 
@@ -48,20 +39,20 @@ public record GradientRectRenderState(Matrix3x2f pose, float left, float top, fl
     }
 
     @Override
-    public void buildVertices(VertexConsumer vertexConsumer) {
-        vertexConsumer.addVertexWith2DPose(pose, right, top).setColor(startRed, startGreen, startBlue, startAlpha);
-        vertexConsumer.addVertexWith2DPose(pose, left, top).setColor(startRed, startGreen, startBlue, startAlpha);
-        vertexConsumer.addVertexWith2DPose(pose, left, bottom).setColor(endRed, endGreen, endBlue, endAlpha);
-        vertexConsumer.addVertexWith2DPose(pose, right, bottom).setColor(endRed, endGreen, endBlue, endAlpha);
+    public void setupVertices(VertexConsumer vertexConsumer) {
+        vertexConsumer.vertex(pose, right, top).color(startRed, startGreen, startBlue, startAlpha);
+        vertexConsumer.vertex(pose, left, top).color(startRed, startGreen, startBlue, startAlpha);
+        vertexConsumer.vertex(pose, left, bottom).color(endRed, endGreen, endBlue, endAlpha);
+        vertexConsumer.vertex(pose, right, bottom).color(endRed, endGreen, endBlue, endAlpha);
     }
 
     @Override
     public TextureSetup textureSetup() {
-        return TextureSetup.noTexture();
+        return TextureSetup.empty();
     }
 
     @Override
-    public @Nullable ScreenRectangle scissorArea() {
+    public @Nullable ScreenRect scissorArea() {
         return null;
     }
 }

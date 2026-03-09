@@ -9,21 +9,16 @@ import com.zurrtum.create.content.trains.graph.TrackGraph;
 import com.zurrtum.create.content.trains.signal.SignalBoundary;
 import com.zurrtum.create.content.trains.signal.SignalEdgeGroup;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.world.level.saveddata.SavedData;
-import net.minecraft.world.level.saveddata.SavedDataType;
+import net.minecraft.world.PersistentState;
+import net.minecraft.world.PersistentStateType;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
-public class RailwaySavedData extends SavedData {
+public class RailwaySavedData extends PersistentState {
     public static final Codec<RailwaySavedData> CODEC = Codec.of(RailwaySavedData::save, RailwaySavedData::load);
-    private static final SavedDataType<RailwaySavedData> TYPE = new SavedDataType<>(
-        "create_tracks",
-        RailwaySavedData::new,
-        CODEC,
-        null
-    );
+    private static final PersistentStateType<RailwaySavedData> TYPE = new PersistentStateType<>("create_tracks", RailwaySavedData::new, CODEC, null);
 
     private Map<UUID, TrackGraph> trackNetworks = new HashMap<>();
     private Map<UUID, SignalEdgeGroup> signalEdgeGroups = new HashMap<>();
@@ -61,8 +56,7 @@ public class RailwaySavedData extends SavedData {
         sd.signalEdgeGroups = new HashMap<>();
         sd.trains = new HashMap<>();
         MapLike<T> map = ops.getMap(input).getOrThrow();
-        DimensionPalette dimensions = DimensionPalette.CODEC.decode(ops, map.get("DimensionPalette")).getOrThrow()
-            .getFirst();
+        DimensionPalette dimensions = DimensionPalette.CODEC.decode(ops, map.get("DimensionPalette")).getOrThrow().getFirst();
         ops.getList(map.get("RailGraphs")).getOrThrow().accept(item -> {
             TrackGraph graph = TrackGraph.decode(ops, item, dimensions);
             sd.trackNetworks.put(graph.id, graph);
@@ -80,14 +74,12 @@ public class RailwaySavedData extends SavedData {
             for (SignalBoundary signal : graph.getPoints(EdgePointType.SIGNAL)) {
                 UUID groupId = signal.groups.getFirst();
                 UUID otherGroupId = signal.groups.getSecond();
-                if (groupId == null || otherGroupId == null) {
+                if (groupId == null || otherGroupId == null)
                     continue;
-                }
                 SignalEdgeGroup group = sd.signalEdgeGroups.get(groupId);
                 SignalEdgeGroup otherGroup = sd.signalEdgeGroups.get(otherGroupId);
-                if (group == null || otherGroup == null) {
+                if (group == null || otherGroup == null)
                     continue;
-                }
                 group.putAdjacent(otherGroupId);
                 otherGroup.putAdjacent(groupId);
             }
@@ -112,7 +104,7 @@ public class RailwaySavedData extends SavedData {
     }
 
     public static RailwaySavedData load(MinecraftServer server) {
-        return server.overworld().getDataStorage().computeIfAbsent(TYPE);
+        return server.getOverworld().getPersistentStateManager().getOrCreate(TYPE);
     }
 
 }

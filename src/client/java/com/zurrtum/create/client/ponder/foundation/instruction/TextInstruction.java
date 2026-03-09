@@ -23,9 +23,8 @@ public class TextInstruction extends FadeInOutInstruction {
     @Override
     public void tick(PonderScene scene) {
         super.tick(scene);
-        if (outline != null) {
+        if (outline != null)
             outline.setColor(element.getPalette().getColor());
-        }
     }
 
     @Override

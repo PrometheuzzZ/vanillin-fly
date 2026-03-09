@@ -1,7 +1,7 @@
 package com.zurrtum.create.foundation.collision;
 
-import net.minecraft.world.phys.shapes.Shapes.DoubleLineConsumer;
-import net.minecraft.world.phys.shapes.VoxelShape;
+import net.minecraft.util.shape.VoxelShape;
+import net.minecraft.util.shape.VoxelShapes.BoxConsumer;
 
 /**
  * Plaid ol' structure of arrays containing dense bounding box data for collision checks.
@@ -20,9 +20,9 @@ public class CollisionList {
     public int size = 0;
 
     /**
-     * Helper to populate a CollisionList. Feed this into {@link VoxelShape#forAllBoxes}.
+     * Helper to populate a CollisionList. Feed this into {@link VoxelShape#forEachBox}.
      */
-    public static class Populate implements DoubleLineConsumer {
+    public static class Populate implements BoxConsumer {
         private final CollisionList collisionList;
 
         public int offsetX = 0;
@@ -46,14 +46,7 @@ public class CollisionList {
             );
         }
 
-        public void append(
-            double centerX,
-            double centerY,
-            double centerZ,
-            double extentsX,
-            double extentsY,
-            double extentsZ
-        ) {
+        public void append(double centerX, double centerY, double centerZ, double extentsX, double extentsY, double extentsZ) {
             // Out of space, must reallocate.
             if (collisionList.size == collisionList.centerX.length) {
                 int newCapacity = collisionList.centerX.length * 2;

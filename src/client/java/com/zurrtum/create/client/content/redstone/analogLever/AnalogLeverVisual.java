@@ -15,8 +15,8 @@ import com.zurrtum.create.client.flywheel.lib.visual.AbstractBlockEntityVisual;
 import com.zurrtum.create.client.flywheel.lib.visual.SimpleDynamicVisual;
 import com.zurrtum.create.content.redstone.analogLever.AnalogLeverBlock;
 import com.zurrtum.create.content.redstone.analogLever.AnalogLeverBlockEntity;
-import net.minecraft.core.Direction;
-import net.minecraft.world.level.block.state.properties.AttachFace;
+import net.minecraft.block.enums.BlockFace;
+import net.minecraft.util.math.Direction;
 
 import java.util.function.Consumer;
 
@@ -31,18 +31,13 @@ public class AnalogLeverVisual extends AbstractBlockEntityVisual<AnalogLeverBloc
     public AnalogLeverVisual(VisualizationContext context, AnalogLeverBlockEntity blockEntity, float partialTick) {
         super(context, blockEntity, partialTick);
 
-        handle = instancerProvider().instancer(
-            InstanceTypes.TRANSFORMED,
-            Models.partial(AllPartialModels.ANALOG_LEVER_HANDLE)
-        ).createInstance();
-        indicator = instancerProvider().instancer(
-            InstanceTypes.TRANSFORMED,
-            Models.partial(AllPartialModels.ANALOG_LEVER_INDICATOR)
-        ).createInstance();
+        handle = instancerProvider().instancer(InstanceTypes.TRANSFORMED, Models.partial(AllPartialModels.ANALOG_LEVER_HANDLE)).createInstance();
+        indicator = instancerProvider().instancer(InstanceTypes.TRANSFORMED, Models.partial(AllPartialModels.ANALOG_LEVER_INDICATOR))
+            .createInstance();
 
-        AttachFace face = blockState.getValue(AnalogLeverBlock.FACE);
-        rX = face == AttachFace.FLOOR ? 0 : face == AttachFace.WALL ? 90 : 180;
-        rY = AngleHelper.horizontalAngle(blockState.getValue(AnalogLeverBlock.FACING));
+        BlockFace face = blockState.get(AnalogLeverBlock.FACE);
+        rX = face == BlockFace.FLOOR ? 0 : face == BlockFace.WALL ? 90 : 180;
+        rY = AngleHelper.horizontalAngle(blockState.get(AnalogLeverBlock.FACING));
 
         transform(indicator.setIdentityTransform());
 
@@ -51,9 +46,8 @@ public class AnalogLeverVisual extends AbstractBlockEntityVisual<AnalogLeverBloc
 
     @Override
     public void beginFrame(DynamicVisual.Context ctx) {
-        if (!blockEntity.clientState.settled()) {
+        if (!blockEntity.clientState.settled())
             animateLever(ctx.partialTick());
-        }
     }
 
     protected void animateLever(float pt) {

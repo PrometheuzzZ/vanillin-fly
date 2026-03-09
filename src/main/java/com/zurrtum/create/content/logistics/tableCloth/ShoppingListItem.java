@@ -6,24 +6,24 @@ import com.zurrtum.create.content.logistics.BigItemStack;
 import com.zurrtum.create.content.logistics.packager.InventorySummary;
 import com.zurrtum.create.foundation.item.TooltipWorldContext;
 import com.zurrtum.create.infrastructure.component.ShoppingList;
-import net.minecraft.ChatFormatting;
-import net.minecraft.network.chat.Component;
-import net.minecraft.sounds.SoundEvents;
-import net.minecraft.world.InteractionHand;
-import net.minecraft.world.InteractionResult;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.TooltipFlag;
-import net.minecraft.world.item.component.TooltipDisplay;
-import net.minecraft.world.item.context.UseOnContext;
-import net.minecraft.world.level.Level;
+import net.minecraft.component.type.TooltipDisplayComponent;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
+import net.minecraft.item.ItemUsageContext;
+import net.minecraft.item.tooltip.TooltipType;
+import net.minecraft.sound.SoundEvents;
+import net.minecraft.text.Text;
+import net.minecraft.util.ActionResult;
+import net.minecraft.util.Formatting;
+import net.minecraft.util.Hand;
+import net.minecraft.world.World;
 
 import java.util.List;
 import java.util.function.Consumer;
 
 public class ShoppingListItem extends Item {
-    public ShoppingListItem(Properties pProperties) {
+    public ShoppingListItem(Settings pProperties) {
         super(pProperties);
     }
 
@@ -42,12 +42,12 @@ public class ShoppingListItem extends Item {
     }
 
     @Override
-    public void appendHoverText(
+    public void appendTooltip(
         ItemStack stack,
         TooltipContext context,
-        TooltipDisplay displayComponent,
-        Consumer<Component> textConsumer,
-        TooltipFlag type
+        TooltipDisplayComponent displayComponent,
+        Consumer<Text> textConsumer,
+        TooltipType type
     ) {
         ShoppingList list = getList(stack);
 
@@ -58,60 +58,51 @@ public class ShoppingListItem extends Item {
                 List<BigItemStack> entries = items.getStacksByCount();
                 boolean cost = items == lists.getSecond();
 
-                if (cost) {
-                    textConsumer.accept(Component.empty());
-                }
+                if (cost)
+                    textConsumer.accept(Text.empty());
 
                 if (entries.size() == 1) {
                     BigItemStack entry = entries.getFirst();
-                    textConsumer.accept((cost ? Component.translatable("create.table_cloth.total_cost") : Component.literal(
-                        "")).withStyle(ChatFormatting.GOLD)
-                        .append(entry.stack.getHoverName().plainCopy().append(" x").append(String.valueOf(entry.count))
-                            .withStyle(cost ? ChatFormatting.YELLOW : ChatFormatting.GRAY)));
+                    textConsumer.accept((cost ? Text.translatable("create.table_cloth.total_cost") : Text.literal("")).formatted(Formatting.GOLD)
+                        .append(entry.stack.getName().copyContentOnly().append(" x").append(String.valueOf(entry.count))
+                            .formatted(cost ? Formatting.YELLOW : Formatting.GRAY)));
 
                 } else {
-                    if (cost) {
-                        textConsumer.accept(Component.translatable("create.table_cloth.total_cost")
-                            .withStyle(ChatFormatting.GOLD));
-                    }
+                    if (cost)
+                        textConsumer.accept(Text.translatable("create.table_cloth.total_cost").formatted(Formatting.GOLD));
                     for (BigItemStack entry : entries) {
-                        textConsumer.accept(entry.stack.getHoverName().plainCopy().append(" x")
-                            .append(String.valueOf(entry.count))
-                            .withStyle(cost ? ChatFormatting.YELLOW : ChatFormatting.GRAY));
+                        textConsumer.accept(entry.stack.getName().copyContentOnly().append(" x").append(String.valueOf(entry.count))
+                            .formatted(cost ? Formatting.YELLOW : Formatting.GRAY));
                     }
                 }
             }
         }
 
-        textConsumer.accept(Component.translatable("create.table_cloth.hand_to_shop_keeper")
-            .withStyle(ChatFormatting.GRAY));
+        textConsumer.accept(Text.translatable("create.table_cloth.hand_to_shop_keeper").formatted(Formatting.GRAY));
 
-        textConsumer.accept(Component.translatable("create.table_cloth.sneak_click_discard")
-            .withStyle(ChatFormatting.DARK_GRAY));
+        textConsumer.accept(Text.translatable("create.table_cloth.sneak_click_discard").formatted(Formatting.DARK_GRAY));
     }
 
     @Override
-    public InteractionResult use(Level pLevel, Player pPlayer, InteractionHand pUsedHand) {
-        if (pUsedHand == InteractionHand.OFF_HAND || pPlayer == null || !pPlayer.isShiftKeyDown()) {
-            return InteractionResult.PASS;
-        }
+    public ActionResult use(World pLevel, PlayerEntity pPlayer, Hand pUsedHand) {
+        if (pUsedHand == Hand.OFF_HAND || pPlayer == null || !pPlayer.isSneaking())
+            return ActionResult.PASS;
 
-        pPlayer.displayClientMessage(Component.translatable("create.table_cloth.shopping_list_discarded"), true);
-        pPlayer.makeSound(SoundEvents.BOOK_PAGE_TURN);
-        return InteractionResult.SUCCESS.heldItemTransformedTo(ItemStack.EMPTY);
+        pPlayer.sendMessage(Text.translatable("create.table_cloth.shopping_list_discarded"), true);
+        pPlayer.playSound(SoundEvents.ITEM_BOOK_PAGE_TURN);
+        return ActionResult.SUCCESS.withNewHandStack(ItemStack.EMPTY);
     }
 
     @Override
-    public InteractionResult useOn(UseOnContext pContext) {
-        InteractionHand pUsedHand = pContext.getHand();
-        Player pPlayer = pContext.getPlayer();
-        if (pUsedHand == InteractionHand.OFF_HAND || pPlayer == null || !pPlayer.isShiftKeyDown()) {
-            return InteractionResult.PASS;
-        }
-        pPlayer.setItemInHand(pUsedHand, ItemStack.EMPTY);
+    public ActionResult useOnBlock(ItemUsageContext pContext) {
+        Hand pUsedHand = pContext.getHand();
+        PlayerEntity pPlayer = pContext.getPlayer();
+        if (pUsedHand == Hand.OFF_HAND || pPlayer == null || !pPlayer.isSneaking())
+            return ActionResult.PASS;
+        pPlayer.setStackInHand(pUsedHand, ItemStack.EMPTY);
 
-        pPlayer.displayClientMessage(Component.translatable("create.table_cloth.shopping_list_discarded"), true);
-        pPlayer.makeSound(SoundEvents.BOOK_PAGE_TURN);
-        return InteractionResult.SUCCESS;
+        pPlayer.sendMessage(Text.translatable("create.table_cloth.shopping_list_discarded"), true);
+        pPlayer.playSound(SoundEvents.ITEM_BOOK_PAGE_TURN);
+        return ActionResult.SUCCESS;
     }
 }

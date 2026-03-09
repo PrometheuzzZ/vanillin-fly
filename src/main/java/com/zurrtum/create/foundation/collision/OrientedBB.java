@@ -1,23 +1,23 @@
 package com.zurrtum.create.foundation.collision;
 
-import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.util.math.Box;
+import net.minecraft.util.math.Vec3d;
 
 public class OrientedBB {
 
-    Vec3 center;
-    Vec3 extents;
+    Vec3d center;
+    Vec3d extents;
     Matrix3d rotation;
 
-    public OrientedBB(AABB bb) {
+    public OrientedBB(Box bb) {
         this(bb.getCenter(), extentsFromBB(bb), new Matrix3d().asIdentity());
     }
 
     public OrientedBB() {
-        this(Vec3.ZERO, Vec3.ZERO, new Matrix3d().asIdentity());
+        this(Vec3d.ZERO, Vec3d.ZERO, new Matrix3d().asIdentity());
     }
 
-    public OrientedBB(Vec3 center, Vec3 extents, Matrix3d rotation) {
+    public OrientedBB(Vec3d center, Vec3d extents, Matrix3d rotation) {
         this.setCenter(center);
         this.extents = extents;
         this.setRotation(rotation);
@@ -27,8 +27,8 @@ public class OrientedBB {
         return new OrientedBB(center, extents, rotation);
     }
 
-    private static Vec3 extentsFromBB(AABB bb) {
-        return new Vec3(bb.getXsize() / 2, bb.getYsize() / 2, bb.getZsize() / 2);
+    private static Vec3d extentsFromBB(Box bb) {
+        return new Vec3d(bb.getLengthX() / 2, bb.getLengthY() / 2, bb.getLengthZ() / 2);
     }
 
     public Matrix3d getRotation() {
@@ -39,20 +39,20 @@ public class OrientedBB {
         this.rotation = rotation;
     }
 
-    public Vec3 getCenter() {
+    public Vec3d getCenter() {
         return center;
     }
 
-    public void setCenter(Vec3 center) {
+    public void setCenter(Vec3d center) {
         this.center = center;
     }
 
-    public void move(Vec3 offset) {
+    public void move(Vec3d offset) {
         setCenter(getCenter().add(offset));
     }
 
-    public AABB getAsAABB() {
-        return new AABB(0, 0, 0, 0, 0, 0).move(center).inflate(extents.x, extents.y, extents.z);
+    public Box getAsAABB() {
+        return new Box(0, 0, 0, 0, 0, 0).offset(center).expand(extents.x, extents.y, extents.z);
     }
 
     /*

@@ -11,46 +11,40 @@ import me.shedaniel.rei.api.common.display.Display;
 import me.shedaniel.rei.api.common.display.DisplaySerializer;
 import me.shedaniel.rei.api.common.entry.EntryIngredient;
 import me.shedaniel.rei.api.common.util.EntryIngredients;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.resources.Identifier;
-import net.minecraft.world.item.crafting.RecipeHolder;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.recipe.RecipeEntry;
+import net.minecraft.util.Identifier;
 
 import java.util.List;
 import java.util.Optional;
 
-public record PotionDisplay(EntryIngredient input, FluidIngredient fluid, FluidStack output,
-                            Optional<Identifier> location) implements Display {
+public record PotionDisplay(EntryIngredient input, FluidIngredient fluid, FluidStack output, Optional<Identifier> location) implements Display {
     public static final DisplaySerializer<PotionDisplay> SERIALIZER = DisplaySerializer.of(
         RecordCodecBuilder.mapCodec(instance -> instance.group(
             EntryIngredient.codec().fieldOf("input").forGetter(PotionDisplay::input),
             FluidIngredient.CODEC.fieldOf("fluid").forGetter(PotionDisplay::fluid),
             FluidStack.CODEC.fieldOf("output").forGetter(PotionDisplay::output),
             Identifier.CODEC.optionalFieldOf("location").forGetter(PotionDisplay::location)
-        ).apply(instance, PotionDisplay::new)), StreamCodec.composite(
+        ).apply(instance, PotionDisplay::new)), PacketCodec.tuple(
             EntryIngredient.streamCodec(),
             PotionDisplay::input,
             FluidIngredient.PACKET_CODEC,
             PotionDisplay::fluid,
             FluidStack.PACKET_CODEC,
             PotionDisplay::output,
-            ByteBufCodecs.optional(Identifier.STREAM_CODEC),
+            PacketCodecs.optional(Identifier.PACKET_CODEC),
             PotionDisplay::location,
             PotionDisplay::new
         )
     );
 
-    public PotionDisplay(RecipeHolder<PotionRecipe> entry) {
-        this(entry.id().identifier(), entry.value());
+    public PotionDisplay(RecipeEntry<PotionRecipe> entry) {
+        this(entry.id().getValue(), entry.value());
     }
 
     public PotionDisplay(Identifier id, PotionRecipe recipe) {
-        this(
-            EntryIngredients.ofIngredient(recipe.ingredient()),
-            recipe.fluidIngredient(),
-            recipe.result(),
-            Optional.of(id)
-        );
+        this(EntryIngredients.ofIngredient(recipe.ingredient()), recipe.fluidIngredient(), recipe.result(), Optional.of(id));
     }
 
     @Override

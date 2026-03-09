@@ -2,15 +2,15 @@ package com.zurrtum.create.client.ponder.foundation.instruction;
 
 import com.zurrtum.create.client.ponder.api.PonderPalette;
 import com.zurrtum.create.client.ponder.foundation.PonderScene;
-import net.minecraft.world.phys.AABB;
+import net.minecraft.util.math.Box;
 
 public class ChaseAABBInstruction extends TickingInstruction {
 
-    private final AABB bb;
+    private final Box bb;
     private final Object slot;
     private final PonderPalette color;
 
-    public ChaseAABBInstruction(PonderPalette color, Object slot, AABB bb, int ticks) {
+    public ChaseAABBInstruction(PonderPalette color, Object slot, Box bb, int ticks) {
         super(false, ticks);
         this.color = color;
         this.slot = slot;

@@ -10,7 +10,7 @@
     "illystray"
   ],
   "contact": {
-    "homepage": "https://modrinth.com/project/vanillin-fly",
+    "homepage": "https://www.curseforge.com/minecraft/mc-mods/vanillin-fly",
     "sources": "https://github.com/PrometheuzzZ/vanillin-fly"
   },
   "license": "MIT",
@@ -23,10 +23,10 @@
   },
   "custom": {
     "loom:injected_interfaces": {
-      "net/minecraft/world/Container": [
+      "net/minecraft/class_1263": [
         "com/zurrtum/create/infrastructure/items/BaseInventory"
       ],
-      "net/minecraft/world/WorldlyContainer": [
+      "net/minecraft/class_1278": [
         "com/zurrtum/create/infrastructure/items/BaseSidedInventory"
       ]
     }
@@ -40,7 +40,7 @@
   ],
   "depends": {
     "fabricloader": "*",
-    "minecraft": ">=1.21.1- <1.21.12-",
+    "minecraft": ">=1.21.10- <1.21.11-",
     "java": ">=21"
   }
 }

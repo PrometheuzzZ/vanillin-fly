@@ -3,8 +3,8 @@ package com.zurrtum.create.content.contraptions.behaviour.dispenser;
 import com.zurrtum.create.api.contraption.dispenser.DefaultMountedDispenseBehavior;
 import com.zurrtum.create.api.contraption.dispenser.MountedDispenseBehavior;
 import com.zurrtum.create.content.contraptions.behaviour.MovementContext;
-import net.minecraft.core.BlockPos;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.item.ItemStack;
+import net.minecraft.util.math.BlockPos;
 
 public class DispenserMovementBehaviour extends DropperMovementBehaviour {
     @Override

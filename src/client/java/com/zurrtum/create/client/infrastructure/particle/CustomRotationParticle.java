@@ -1,56 +1,49 @@
 package com.zurrtum.create.client.infrastructure.particle;
 
-import com.mojang.math.Axis;
 import com.zurrtum.create.client.flywheel.lib.util.ShadersModHelper;
-import net.minecraft.client.Camera;
-import net.minecraft.client.multiplayer.ClientLevel;
-import net.minecraft.client.particle.SimpleAnimatedParticle;
-import net.minecraft.client.particle.SpriteSet;
-import net.minecraft.client.renderer.LightTexture;
-import net.minecraft.client.renderer.state.QuadParticleRenderState;
-import net.minecraft.util.ARGB;
-import net.minecraft.util.Mth;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.client.particle.AnimatedParticle;
+import net.minecraft.client.particle.BillboardParticleSubmittable;
+import net.minecraft.client.particle.SpriteProvider;
+import net.minecraft.client.render.Camera;
+import net.minecraft.client.render.LightmapTextureManager;
+import net.minecraft.client.world.ClientWorld;
+import net.minecraft.util.math.ColorHelper;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.RotationAxis;
+import net.minecraft.util.math.Vec3d;
 import org.joml.Quaternionf;
 
-public class CustomRotationParticle extends SimpleAnimatedParticle {
+public class CustomRotationParticle extends AnimatedParticle {
     protected boolean mirror;
     protected int loopLength;
 
-    public CustomRotationParticle(
-        ClientLevel worldIn,
-        double x,
-        double y,
-        double z,
-        SpriteSet spriteSet,
-        float yAccel
-    ) {
+    public CustomRotationParticle(ClientWorld worldIn, double x, double y, double z, SpriteProvider spriteSet, float yAccel) {
         super(worldIn, x, y, z, spriteSet, yAccel);
     }
 
-    public void selectSpriteLoopingWithAge(SpriteSet sprite) {
+    public void selectSpriteLoopingWithAge(SpriteProvider sprite) {
         int loopFrame = age % loopLength;
-        this.setSprite(sprite.get(loopFrame, loopLength));
+        this.setSprite(sprite.getSprite(loopFrame, loopLength));
     }
 
     public Quaternionf getCustomRotation(Camera camera, float partialTicks) {
-        Quaternionf quaternion = new Quaternionf(camera.rotation());
-        if (roll != 0.0F) {
-            float angle = Mth.lerp(partialTicks, oRoll, roll);
-            quaternion.mul(Axis.ZP.rotation(angle));
+        Quaternionf quaternion = new Quaternionf(camera.getRotation());
+        if (zRotation != 0.0F) {
+            float angle = MathHelper.lerp(partialTicks, lastZRotation, zRotation);
+            quaternion.mul(RotationAxis.POSITIVE_Z.rotation(angle));
         }
         return quaternion;
     }
 
     @Override
-    public void extract(QuadParticleRenderState submittable, Camera camera, float partialTicks) {
-        Vec3 cameraPos = camera.position();
-        float originX = (float) (Mth.lerp(partialTicks, xo, x) - cameraPos.x());
-        float originY = (float) (Mth.lerp(partialTicks, yo, y) - cameraPos.y());
-        float originZ = (float) (Mth.lerp(partialTicks, zo, z) - cameraPos.z());
+    public void render(BillboardParticleSubmittable submittable, Camera camera, float partialTicks) {
+        Vec3d cameraPos = camera.getPos();
+        float originX = (float) (MathHelper.lerp(partialTicks, lastX, x) - cameraPos.getX());
+        float originY = (float) (MathHelper.lerp(partialTicks, lastY, y) - cameraPos.getY());
+        float originZ = (float) (MathHelper.lerp(partialTicks, lastZ, z) - cameraPos.getZ());
         Quaternionf rotation = getCustomRotation(camera, partialTicks);
-        submittable.add(
-            getLayer(),
+        submittable.render(
+            getRenderType(),
             originX,
             originY,
             originZ,
@@ -58,13 +51,13 @@ public class CustomRotationParticle extends SimpleAnimatedParticle {
             rotation.y,
             rotation.z,
             rotation.w,
-            getQuadSize(partialTicks),
-            mirror ? getU1() : getU0(),
-            mirror ? getU0() : getU1(),
-            getV0(),
-            getV1(),
-            ARGB.colorFromFloat(alpha, rCol, gCol, bCol),
-            ShadersModHelper.isShaderPackInUse() ? LightTexture.pack(12, 15) : getLightColor(partialTicks)
+            getSize(partialTicks),
+            mirror ? getMaxU() : getMinU(),
+            mirror ? getMinU() : getMaxU(),
+            getMinV(),
+            getMaxV(),
+            ColorHelper.fromFloats(alpha, red, green, blue),
+            ShadersModHelper.isShaderPackInUse() ? LightmapTextureManager.pack(12, 15) : getBrightness(partialTicks)
         );
     }
 }

@@ -4,9 +4,9 @@ import com.zurrtum.create.client.flywheel.api.visual.BlockEntityVisual;
 import com.zurrtum.create.client.flywheel.api.visualization.BlockEntityVisualizer;
 import com.zurrtum.create.client.flywheel.api.visualization.VisualizationContext;
 import com.zurrtum.create.client.flywheel.api.visualization.VisualizerRegistry;
-import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.block.entity.BlockEntityType;
+import net.minecraft.client.render.block.entity.BlockEntityRenderer;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Objects;
@@ -106,10 +106,7 @@ public final class SimpleBlockEntityVisualizer<T extends BlockEntity> implements
                 skipVanillaRender = blockEntity -> true;
             }
 
-            SimpleBlockEntityVisualizer<T> visualizer = new SimpleBlockEntityVisualizer<>(
-                visualFactory,
-                skipVanillaRender
-            );
+            SimpleBlockEntityVisualizer<T> visualizer = new SimpleBlockEntityVisualizer<>(visualFactory, skipVanillaRender);
             VisualizerRegistry.setVisualizer(type, visualizer);
             return visualizer;
         }

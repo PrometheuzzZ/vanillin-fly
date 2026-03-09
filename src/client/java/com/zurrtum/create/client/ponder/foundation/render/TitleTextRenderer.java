@@ -1,33 +1,33 @@
 package com.zurrtum.create.client.ponder.foundation.render;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.math.Axis;
 import com.zurrtum.create.client.catnip.gui.UIRenderHelper;
 import com.zurrtum.create.client.catnip.lang.ClientFontHelper;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.render.pip.PictureInPictureRenderer;
-import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.font.TextRenderer;
+import net.minecraft.client.gui.render.SpecialGuiElementRenderer;
+import net.minecraft.client.render.VertexConsumerProvider;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.util.math.RotationAxis;
 
-public class TitleTextRenderer extends PictureInPictureRenderer<TitleTextRenderState> {
-    public TitleTextRenderer(MultiBufferSource.BufferSource vertexConsumers) {
+public class TitleTextRenderer extends SpecialGuiElementRenderer<TitleTextRenderState> {
+    public TitleTextRenderer(VertexConsumerProvider.Immediate vertexConsumers) {
         super(vertexConsumers);
     }
 
     @Override
-    protected void renderToTexture(TitleTextRenderState state, PoseStack matrices) {
+    protected void render(TitleTextRenderState state, MatrixStack matrices) {
         matrices.scale(1, 1, -1);
         matrices.translate(-90, -20, 0);
-        Font font = Minecraft.getInstance().font;
+        TextRenderer font = MinecraftClient.getInstance().textRenderer;
         float indexDiff = state.diff();
         float absoluteIndexDiff = Math.abs(indexDiff);
         float angle = indexDiff * -90;
         matrices.translate(0, 6, 0);
-        matrices.pushPose();
-        matrices.mulPose(Axis.XN.rotationDegrees(angle + Math.signum(indexDiff) * 90));
+        matrices.push();
+        matrices.multiply(RotationAxis.NEGATIVE_X.rotationDegrees(angle + Math.signum(indexDiff) * 90));
         matrices.translate(0, -6, 5);
         ClientFontHelper.drawSplitString(
-            bufferSource,
+            vertexConsumers,
             matrices,
             font,
             state.otherTitle(),
@@ -36,12 +36,12 @@ public class TitleTextRenderer extends PictureInPictureRenderer<TitleTextRenderS
             180,
             UIRenderHelper.COLOR_TEXT.getFirst().scaleAlphaForText(absoluteIndexDiff).getRGB()
         );
-        matrices.popPose();
+        matrices.pop();
 
-        matrices.mulPose(Axis.XN.rotationDegrees(angle));
+        matrices.multiply(RotationAxis.NEGATIVE_X.rotationDegrees(angle));
         matrices.translate(0, -6, 5);
         ClientFontHelper.drawSplitString(
-            bufferSource,
+            vertexConsumers,
             matrices,
             font,
             state.title(),
@@ -53,12 +53,12 @@ public class TitleTextRenderer extends PictureInPictureRenderer<TitleTextRenderS
     }
 
     @Override
-    protected String getTextureLabel() {
+    protected String getName() {
         return "Title Text";
     }
 
     @Override
-    public Class<TitleTextRenderState> getRenderStateClass() {
+    public Class<TitleTextRenderState> getElementClass() {
         return TitleTextRenderState.class;
     }
 }

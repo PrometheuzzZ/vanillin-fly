@@ -15,14 +15,14 @@ import me.shedaniel.rei.api.common.entry.EntryIngredient;
 import me.shedaniel.rei.api.common.entry.EntryStack;
 import me.shedaniel.rei.api.common.registry.display.DisplayConsumer;
 import me.shedaniel.rei.api.common.util.EntryIngredients;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.resources.Identifier;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
-import net.minecraft.world.item.crafting.RecipeHolder;
+import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
+import net.minecraft.item.Items;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.recipe.RecipeEntry;
+import net.minecraft.registry.Registries;
+import net.minecraft.util.Identifier;
 
 import java.util.List;
 import java.util.Optional;
@@ -30,30 +30,31 @@ import java.util.stream.Stream;
 
 import static com.zurrtum.create.Create.MOD_ID;
 
-public record SpoutFillingDisplay(EntryIngredient input, EntryIngredient fluid, EntryIngredient output,
-                                  Optional<Identifier> location) implements Display {
-    public static final Identifier POTIONS = Identifier.fromNamespaceAndPath(MOD_ID, "potions");
+public record SpoutFillingDisplay(
+    EntryIngredient input, EntryIngredient fluid, EntryIngredient output, Optional<Identifier> location
+) implements Display {
+    public static final Identifier POTIONS = Identifier.of(MOD_ID, "potions");
     public static final DisplaySerializer<SpoutFillingDisplay> SERIALIZER = DisplaySerializer.of(
         RecordCodecBuilder.mapCodec(instance -> instance.group(
             EntryIngredient.codec().fieldOf("input").forGetter(SpoutFillingDisplay::input),
             EntryIngredient.codec().fieldOf("fluid").forGetter(SpoutFillingDisplay::fluid),
             EntryIngredient.codec().fieldOf("output").forGetter(SpoutFillingDisplay::output),
             Identifier.CODEC.optionalFieldOf("location").forGetter(SpoutFillingDisplay::location)
-        ).apply(instance, SpoutFillingDisplay::new)), StreamCodec.composite(
+        ).apply(instance, SpoutFillingDisplay::new)), PacketCodec.tuple(
             EntryIngredient.streamCodec(),
             SpoutFillingDisplay::input,
             EntryIngredient.streamCodec(),
             SpoutFillingDisplay::fluid,
             EntryIngredient.streamCodec(),
             SpoutFillingDisplay::output,
-            ByteBufCodecs.optional(Identifier.STREAM_CODEC),
+            PacketCodecs.optional(Identifier.PACKET_CODEC),
             SpoutFillingDisplay::location,
             SpoutFillingDisplay::new
         )
     );
 
-    public SpoutFillingDisplay(RecipeHolder<FillingRecipe> entry) {
-        this(entry.id().identifier(), entry.value());
+    public SpoutFillingDisplay(RecipeEntry<FillingRecipe> entry) {
+        this(entry.id().getValue(), entry.value());
     }
 
     public SpoutFillingDisplay(Identifier id, FillingRecipe recipe) {
@@ -65,14 +66,10 @@ public record SpoutFillingDisplay(EntryIngredient input, EntryIngredient fluid, 
         );
     }
 
-    public static void register(
-        Stream<EntryStack<?>> itemStream,
-        Stream<EntryStack<?>> fluidStream,
-        DisplayConsumer registry
-    ) {
+    public static void register(Stream<EntryStack<?>> itemStream, Stream<EntryStack<?>> fluidStream, DisplayConsumer registry) {
         List<FluidStack> fluids = fluidStream.map(entry -> {
             dev.architectury.fluid.FluidStack stack = entry.castValue();
-            return new FluidStack(stack.getFluid(), stack.getAmount(), stack.getComponents().asPatch());
+            return new FluidStack(stack.getFluid(), stack.getAmount(), stack.getComponents().getChanges());
         }).toList();
         itemStream.forEach(entry -> {
             ItemStack stack = entry.castValue();
@@ -92,10 +89,7 @@ public record SpoutFillingDisplay(EntryIngredient input, EntryIngredient fluid, 
                 int size = capability.size();
                 FluidStack existingFluid = size == 1 ? capability.getStack(0) : FluidStack.EMPTY;
                 for (FluidStack fluid : fluids) {
-                    if (size == 1 && !existingFluid.isEmpty() && !FluidStack.areFluidsAndComponentsEqual(
-                        existingFluid,
-                        fluid
-                    )) {
+                    if (size == 1 && !existingFluid.isEmpty() && !FluidStack.areFluidsAndComponentsEqual(existingFluid, fluid)) {
                         continue;
                     }
                     int insert = capability.insert(fluid, 81000);
@@ -105,20 +99,16 @@ public record SpoutFillingDisplay(EntryIngredient input, EntryIngredient fluid, 
                     ItemStack result = capability.getContainer();
                     if (!result.isEmpty()) {
                         Item item = stack.getItem();
-                        if (!result.is(item)) {
-                            Identifier itemName = BuiltInRegistries.ITEM.getKey(item);
-                            Identifier fluidName = BuiltInRegistries.FLUID.getKey(fluid.getFluid());
-                            Identifier id = Identifier.fromNamespaceAndPath(
+                        if (!result.isOf(item)) {
+                            Identifier itemName = Registries.ITEM.getId(item);
+                            Identifier fluidName = Registries.FLUID.getId(fluid.getFluid());
+                            Identifier id = Identifier.of(
                                 MOD_ID,
                                 "fill_" + itemName.getNamespace() + "_" + itemName.getPath() + "_with_" + fluidName.getNamespace() + "_" + fluidName.getPath()
                             );
                             registry.add(new SpoutFillingDisplay(
                                 EntryIngredients.of(stack),
-                                EntryIngredients.of(dev.architectury.fluid.FluidStack.create(
-                                    fluid.getFluid(),
-                                    insert,
-                                    fluid.getComponentChanges()
-                                )),
+                                EntryIngredients.of(dev.architectury.fluid.FluidStack.create(fluid.getFluid(), insert, fluid.getComponentChanges())),
                                 EntryIngredients.of(result),
                                 Optional.of(id)
                             ));

@@ -1,17 +1,17 @@
 package com.zurrtum.create.client.infrastructure.particle;
 
 import com.zurrtum.create.infrastructure.particle.CubeParticleData;
-import net.minecraft.client.Camera;
-import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.particle.Particle;
-import net.minecraft.client.particle.ParticleProvider;
-import net.minecraft.client.particle.ParticleRenderType;
-import net.minecraft.client.renderer.culling.Frustum;
-import net.minecraft.core.BlockPos;
-import net.minecraft.util.ARGB;
-import net.minecraft.util.Mth;
-import net.minecraft.util.RandomSource;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.client.particle.ParticleFactory;
+import net.minecraft.client.particle.ParticleTextureSheet;
+import net.minecraft.client.render.Camera;
+import net.minecraft.client.render.Frustum;
+import net.minecraft.client.world.ClientWorld;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.ColorHelper;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.util.math.random.Random;
 
 public class CubeParticle extends Particle {
     protected float scale;
@@ -21,20 +21,11 @@ public class CubeParticle extends Particle {
     protected float blue = 1.0F;
     protected float alpha = 1.0F;
 
-    public CubeParticle(
-        ClientLevel world,
-        CubeParticleData data,
-        double x,
-        double y,
-        double z,
-        double motionX,
-        double motionY,
-        double motionZ
-    ) {
+    public CubeParticle(ClientWorld world, CubeParticleData data, double x, double y, double z, double motionX, double motionY, double motionZ) {
         super(world, x, y, z);
-        this.xd = motionX;
-        this.yd = motionY;
-        this.zd = motionZ;
+        this.velocityX = motionX;
+        this.velocityY = motionY;
+        this.velocityZ = motionZ;
 
         setColor(data.red(), data.green(), data.blue());
         setScale(data.scale());
@@ -50,11 +41,11 @@ public class CubeParticle extends Particle {
 
     public void setScale(float scale) {
         this.scale = scale;
-        this.setSize(scale * 0.5f, scale * 0.5f);
+        this.setBoundingBoxSpacing(scale * 0.5f, scale * 0.5f);
     }
 
     public void averageAge(int age) {
-        this.lifetime = (int) (age + (random.nextDouble() * 2D - 1D) * 8);
+        this.maxAge = (int) (age + (random.nextDouble() * 2D - 1D) * 8);
     }
 
     public void setHot(boolean hot) {
@@ -66,57 +57,57 @@ public class CubeParticle extends Particle {
     @Override
     public void tick() {
         if (this.hot && this.age > 0) {
-            if (this.yo == this.y) {
+            if (this.lastY == this.y) {
                 billowing = true;
-                stoppedByCollision = false; // Prevent motion being ignored due to vertical collision
-                if (this.xd == 0 && this.zd == 0) {
-                    Vec3 diff = Vec3.atLowerCornerOf(BlockPos.containing(x, y, z)).add(0.5, 0.5, 0.5).subtract(x, y, z);
-                    this.xd = -diff.x * 0.1;
-                    this.zd = -diff.z * 0.1;
+                stopped = false; // Prevent motion being ignored due to vertical collision
+                if (this.velocityX == 0 && this.velocityZ == 0) {
+                    Vec3d diff = Vec3d.of(BlockPos.ofFloored(x, y, z)).add(0.5, 0.5, 0.5).subtract(x, y, z);
+                    this.velocityX = -diff.x * 0.1;
+                    this.velocityZ = -diff.z * 0.1;
                 }
-                this.xd *= 1.1;
-                this.yd *= 0.9;
-                this.zd *= 1.1;
+                this.velocityX *= 1.1;
+                this.velocityY *= 0.9;
+                this.velocityZ *= 1.1;
             } else if (billowing) {
-                this.yd *= 1.2;
+                this.velocityY *= 1.2;
             }
         }
         super.tick();
     }
 
     public void render(CubeParticleSubmittable submittable, Camera camera, float tickProgress) {
-        Vec3 projectedView = camera.position();
-        float lerpedX = (float) (Mth.lerp(tickProgress, this.xo, this.x) - projectedView.x());
-        float lerpedY = (float) (Mth.lerp(tickProgress, this.yo, this.y) - projectedView.y());
-        float lerpedZ = (float) (Mth.lerp(tickProgress, this.zo, this.z) - projectedView.z());
-        double ageMultiplier = 1 - Math.pow(Mth.clamp(age + tickProgress, 0, lifetime), 3) / Math.pow(lifetime, 3);
+        Vec3d projectedView = camera.getPos();
+        float lerpedX = (float) (MathHelper.lerp(tickProgress, this.lastX, this.x) - projectedView.getX());
+        float lerpedY = (float) (MathHelper.lerp(tickProgress, this.lastY, this.y) - projectedView.getY());
+        float lerpedZ = (float) (MathHelper.lerp(tickProgress, this.lastZ, this.z) - projectedView.getZ());
+        double ageMultiplier = 1 - Math.pow(MathHelper.clamp(age + tickProgress, 0, maxAge), 3) / Math.pow(maxAge, 3);
         float scale = (float) (this.scale * ageMultiplier);
-        int color = ARGB.colorFromFloat(alpha, red, green, blue);
+        int color = ColorHelper.fromFloats(alpha, red, green, blue);
         submittable.render(lerpedX, lerpedY, lerpedZ, scale, color);
     }
 
     @Override
-    public ParticleRenderType getGroup() {
+    public ParticleTextureSheet textureSheet() {
         return CubeParticleRenderer.SHEET;
     }
 
     public boolean shouldRender(Frustum frustum) {
-        return frustum.pointInFrustum(x, y, z);
+        return frustum.intersectPoint(x, y, z);
     }
 
-    public static class Factory implements ParticleProvider<CubeParticleData> {
+    public static class Factory implements ParticleFactory<CubeParticleData> {
 
         @Override
         public Particle createParticle(
             CubeParticleData data,
-            ClientLevel world,
+            ClientWorld world,
             double x,
             double y,
             double z,
             double motionX,
             double motionY,
             double motionZ,
-            RandomSource random
+            Random random
         ) {
             return new CubeParticle(world, data, x, y, z, motionX, motionY, motionZ);
         }

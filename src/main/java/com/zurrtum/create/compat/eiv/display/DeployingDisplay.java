@@ -8,14 +8,14 @@ import com.zurrtum.create.content.kinetics.deployer.ItemApplicationRecipe;
 import com.zurrtum.create.content.processing.recipe.ProcessingOutput;
 import de.crafty.eiv.common.api.recipe.EivRecipeType;
 import de.crafty.eiv.common.api.recipe.IEivServerRecipe;
-import net.minecraft.core.Holder;
-import net.minecraft.core.HolderSet;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.crafting.Ingredient;
-import net.minecraft.world.item.crafting.Recipe;
-import net.minecraft.world.item.crafting.RecipeHolder;
+import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
+import net.minecraft.recipe.Ingredient;
+import net.minecraft.recipe.Recipe;
+import net.minecraft.recipe.RecipeEntry;
+import net.minecraft.registry.Registries;
+import net.minecraft.registry.entry.RegistryEntry;
+import net.minecraft.registry.entry.RegistryEntryList;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -25,12 +25,7 @@ public class DeployingDisplay extends ManualApplicationDisplay {
     public DeployingDisplay() {
     }
 
-    public DeployingDisplay(
-        List<ProcessingOutput> outputs,
-        Ingredient target,
-        Ingredient ingredient,
-        boolean keepHeldItem
-    ) {
+    public DeployingDisplay(List<ProcessingOutput> outputs, Ingredient target, Ingredient ingredient, boolean keepHeldItem) {
         int size = outputs.size();
         results = new ArrayList<>(size);
         chances = new ArrayList<>(size);
@@ -44,7 +39,7 @@ public class DeployingDisplay extends ManualApplicationDisplay {
     }
 
     @Nullable
-    public static DeployingDisplay of(RecipeHolder<?> entry) {
+    public static DeployingDisplay of(RecipeEntry<?> entry) {
         if (!AllRecipeTypes.CAN_BE_AUTOMATED.test(entry)) {
             return null;
         }
@@ -52,11 +47,11 @@ public class DeployingDisplay extends ManualApplicationDisplay {
         if (recipe instanceof ItemApplicationRecipe r) {
             return new DeployingDisplay(r.results(), r.target(), r.ingredient(), r.keepHeldItem());
         } else if (recipe instanceof SandPaperPolishingRecipe(ItemStack result, Ingredient target)) {
-            List<Holder<Item>> sandpaperList = new ArrayList<>();
-            for (Holder<Item> item : BuiltInRegistries.ITEM.getTagOrEmpty(AllItemTags.SANDPAPER)) {
+            List<RegistryEntry<Item>> sandpaperList = new ArrayList<>();
+            for (RegistryEntry<Item> item : Registries.ITEM.iterateEntries(AllItemTags.SANDPAPER)) {
                 sandpaperList.add(item);
             }
-            Ingredient ingredient = Ingredient.of(HolderSet.direct(sandpaperList));
+            Ingredient ingredient = Ingredient.ofTag(RegistryEntryList.of(sandpaperList));
             return new DeployingDisplay(List.of(new ProcessingOutput(result)), target, ingredient, false);
         }
         return null;

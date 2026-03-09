@@ -4,38 +4,38 @@ import com.zurrtum.create.AllMenuTypes;
 import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.foundation.blockEntity.behaviour.animatedContainer.AnimatedContainerBehaviour;
 import com.zurrtum.create.foundation.gui.menu.MenuBase;
-import net.minecraft.world.entity.player.Inventory;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.inventory.ClickType;
-import net.minecraft.world.inventory.Slot;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.entity.player.PlayerInventory;
+import net.minecraft.item.ItemStack;
+import net.minecraft.screen.slot.Slot;
+import net.minecraft.screen.slot.SlotActionType;
 
 import static com.zurrtum.create.content.equipment.toolbox.ToolboxInventory.STACKS_PER_COMPARTMENT;
 
 public class ToolboxMenu extends MenuBase<ToolboxBlockEntity> {
-    public ToolboxMenu(int id, Inventory inv, ToolboxBlockEntity be) {
+    public ToolboxMenu(int id, PlayerInventory inv, ToolboxBlockEntity be) {
         super(AllMenuTypes.TOOLBOX, id, inv, be);
         BlockEntityBehaviour.get(be, AnimatedContainerBehaviour.TYPE).startOpen(player);
     }
 
     @Override
-    public ItemStack quickMoveStack(Player player, int index) {
+    public ItemStack quickMove(PlayerEntity player, int index) {
         Slot clickedSlot = getSlot(index);
-        ItemStack stack = clickedSlot.getItem();
-        int size = contentHolder.inventory.getContainerSize();
+        ItemStack stack = clickedSlot.getStack();
+        int size = contentHolder.inventory.size();
         boolean success;
         if (index < size) {
             stack = settle(stack, index);
             if (stack.isEmpty()) {
                 return stack;
             }
-            success = !moveItemStackTo(stack, size, slots.size(), true);
-            contentHolder.inventory.setChanged();
+            success = !insertItem(stack, size, slots.size(), true);
+            contentHolder.inventory.markDirty();
         } else {
             if (stack.isEmpty()) {
                 return stack;
             }
-            success = !moveItemStackTo(stack, 0, size, false);
+            success = !insertItem(stack, 0, size, false);
         }
 
         return success ? ItemStack.EMPTY : stack;
@@ -49,20 +49,16 @@ public class ToolboxMenu extends MenuBase<ToolboxBlockEntity> {
             if (filter.isEmpty()) {
                 return stack;
             }
-            space = filter.getMaxStackSize();
+            space = filter.getMaxCount();
         } else {
-            space = stack.getMaxStackSize() - count;
+            space = stack.getMaxCount() - count;
         }
         if (space != 0) {
-            ItemStack extract = contentHolder.inventory.takeFromCompartment(
-                space,
-                index + 1,
-                index + STACKS_PER_COMPARTMENT - 1
-            );
+            ItemStack extract = contentHolder.inventory.takeFromCompartment(space, index + 1, index + STACKS_PER_COMPARTMENT - 1);
             if (!extract.isEmpty()) {
                 if (count == 0) {
                     stack = extract;
-                    contentHolder.inventory.setItem(index, stack);
+                    contentHolder.inventory.setStack(index, stack);
                 } else {
                     stack.setCount(count + extract.getCount());
                 }
@@ -76,36 +72,34 @@ public class ToolboxMenu extends MenuBase<ToolboxBlockEntity> {
     }
 
     @Override
-    public void clicked(int index, int flags, ClickType type, Player player) {
-        if (index >= 0 && index < contentHolder.inventory.getContainerSize()) {
-            ItemStack itemInClickedSlot = getSlot(index).getItem();
-            ItemStack carried = getCarried();
+    public void onSlotClick(int index, int flags, SlotActionType type, PlayerEntity player) {
+        if (index >= 0 && index < contentHolder.inventory.size()) {
+            ItemStack itemInClickedSlot = getSlot(index).getStack();
+            ItemStack carried = getCursorStack();
 
-            if (type == ClickType.PICKUP && !carried.isEmpty() && !itemInClickedSlot.isEmpty() && ToolboxInventory.canItemsShareCompartment(itemInClickedSlot,
+            if (type == SlotActionType.PICKUP && !carried.isEmpty() && !itemInClickedSlot.isEmpty() && ToolboxInventory.canItemsShareCompartment(itemInClickedSlot,
                 carried
             )) {
                 int subIndex = index % STACKS_PER_COMPARTMENT;
                 if (subIndex != STACKS_PER_COMPARTMENT - 1) {
-                    clicked(index - subIndex + STACKS_PER_COMPARTMENT - 1, flags, type, player);
+                    onSlotClick(index - subIndex + STACKS_PER_COMPARTMENT - 1, flags, type, player);
                     return;
                 }
             }
 
-            if (type == ClickType.PICKUP && carried.isEmpty() && settle(
-                itemInClickedSlot,
-                index
-            ).isEmpty() && !player.level().isClientSide()) {
+            if (type == SlotActionType.PICKUP && carried.isEmpty() && settle(itemInClickedSlot, index).isEmpty() && !player.getEntityWorld()
+                .isClient()) {
                 contentHolder.inventory.filters.set(index / STACKS_PER_COMPARTMENT, ItemStack.EMPTY);
                 contentHolder.sendData();
             }
 
         }
-        super.clicked(index, flags, type, player);
+        super.onSlotClick(index, flags, type, player);
     }
 
     @Override
-    public boolean canDragTo(Slot slot) {
-        return slot.index > contentHolder.inventory.getContainerSize();
+    public boolean canInsertIntoSlot(Slot slot) {
+        return slot.id > contentHolder.inventory.size();
     }
 
     public ItemStack getFilter(int compartment) {
@@ -115,9 +109,8 @@ public class ToolboxMenu extends MenuBase<ToolboxBlockEntity> {
     public int totalCountInCompartment(int compartment) {
         int count = 0;
         int baseSlot = compartment * STACKS_PER_COMPARTMENT;
-        for (int i = 0; i < STACKS_PER_COMPARTMENT; i++) {
-            count += getSlot(baseSlot + i).getItem().getCount();
-        }
+        for (int i = 0; i < STACKS_PER_COMPARTMENT; i++)
+            count += getSlot(baseSlot + i).getStack().getCount();
         return count;
     }
 
@@ -140,9 +133,8 @@ public class ToolboxMenu extends MenuBase<ToolboxBlockEntity> {
             addSlot(new ToolboxSlot(this, inventory, baseIndex, xOffsets[compartment], yOffsets[compartment], true));
 
             // Hidden Slots
-            for (int i = 1; i < STACKS_PER_COMPARTMENT; i++) {
+            for (int i = 1; i < STACKS_PER_COMPARTMENT; i++)
                 addSlot(new ToolboxSlot(this, inventory, baseIndex + i, -10000, -10000, false));
-            }
         }
 
         addPlayerSlots(8, 165);
@@ -154,11 +146,10 @@ public class ToolboxMenu extends MenuBase<ToolboxBlockEntity> {
     }
 
     @Override
-    public void removed(Player playerIn) {
-        super.removed(playerIn);
-        if (!playerIn.level().isClientSide()) {
+    public void onClosed(PlayerEntity playerIn) {
+        super.onClosed(playerIn);
+        if (!playerIn.getEntityWorld().isClient())
             BlockEntityBehaviour.get(contentHolder, AnimatedContainerBehaviour.TYPE).stopOpen(playerIn);
-        }
     }
 
 }

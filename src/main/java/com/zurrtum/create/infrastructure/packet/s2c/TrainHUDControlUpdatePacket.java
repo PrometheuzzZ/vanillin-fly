@@ -4,26 +4,25 @@ import com.zurrtum.create.AllClientHandle;
 import com.zurrtum.create.AllPackets;
 import com.zurrtum.create.catnip.codecs.stream.CatnipStreamCodecBuilders;
 import com.zurrtum.create.content.trains.entity.Train;
-import net.minecraft.core.UUIDUtil;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.PacketType;
-import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.network.listener.ClientPlayPacketListener;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.PacketType;
+import net.minecraft.util.Uuids;
 
 import java.util.UUID;
 
-public record TrainHUDControlUpdatePacket(UUID trainId, Double throttle, double speed,
-                                          int fuelTicks) implements Packet<ClientGamePacketListener> {
-    public static final StreamCodec<RegistryFriendlyByteBuf, TrainHUDControlUpdatePacket> CODEC = StreamCodec.composite(
-        UUIDUtil.STREAM_CODEC,
+public record TrainHUDControlUpdatePacket(UUID trainId, Double throttle, double speed, int fuelTicks) implements Packet<ClientPlayPacketListener> {
+    public static final PacketCodec<RegistryByteBuf, TrainHUDControlUpdatePacket> CODEC = PacketCodec.tuple(
+        Uuids.PACKET_CODEC,
         TrainHUDControlUpdatePacket::trainId,
-        CatnipStreamCodecBuilders.nullable(ByteBufCodecs.DOUBLE),
+        CatnipStreamCodecBuilders.nullable(PacketCodecs.DOUBLE),
         TrainHUDControlUpdatePacket::throttle,
-        ByteBufCodecs.DOUBLE,
+        PacketCodecs.DOUBLE,
         TrainHUDControlUpdatePacket::speed,
-        ByteBufCodecs.VAR_INT,
+        PacketCodecs.VAR_INT,
         TrainHUDControlUpdatePacket::fuelTicks,
         TrainHUDControlUpdatePacket::new
     );
@@ -37,12 +36,12 @@ public record TrainHUDControlUpdatePacket(UUID trainId, Double throttle, double 
     }
 
     @Override
-    public void handle(ClientGamePacketListener listener) {
+    public void apply(ClientPlayPacketListener listener) {
         AllClientHandle.INSTANCE.onTrainHUDControlUpdate(this);
     }
 
     @Override
-    public PacketType<TrainHUDControlUpdatePacket> type() {
+    public PacketType<TrainHUDControlUpdatePacket> getPacketType() {
         return AllPackets.S_TRAIN_HUD;
     }
 }

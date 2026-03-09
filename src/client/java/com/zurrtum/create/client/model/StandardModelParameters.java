@@ -7,13 +7,14 @@ package com.zurrtum.create.client.model;
 
 import com.google.gson.JsonDeserializationContext;
 import com.google.gson.JsonObject;
-import com.mojang.math.Transformation;
-import net.minecraft.client.renderer.block.model.ItemTransforms;
-import net.minecraft.client.renderer.block.model.TextureSlots;
-import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
-import net.minecraft.client.resources.model.UnbakedModel;
-import net.minecraft.resources.Identifier;
-import net.minecraft.util.GsonHelper;
+import net.minecraft.client.render.BlockRenderLayer;
+import net.minecraft.client.render.model.ModelTextures;
+import net.minecraft.client.render.model.UnbakedModel;
+import net.minecraft.client.render.model.json.ModelTransformation;
+import net.minecraft.client.texture.SpriteAtlasTexture;
+import net.minecraft.util.Identifier;
+import net.minecraft.util.JsonHelper;
+import net.minecraft.util.math.AffineTransformation;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Map;
@@ -24,49 +25,42 @@ import java.util.Map;
  * For use in custom model loaders which want to respect these properties but create the quads from
  * something other than the vanilla elements spec.
  */
-public record StandardModelParameters(@Nullable Identifier parent, TextureSlots.Data textures,
-                                      @Nullable ItemTransforms itemTransforms, @Nullable Boolean ambientOcclusion,
-                                      @Nullable UnbakedModel.GuiLight guiLight, @Nullable Transformation rootTransform,
-                                      @Nullable ChunkSectionLayer layer, Map<String, Boolean> partVisibility) {
+@SuppressWarnings("deprecation")
+public record StandardModelParameters(
+    @Nullable Identifier parent, ModelTextures.Textures textures, @Nullable ModelTransformation itemTransforms, @Nullable Boolean ambientOcclusion,
+    @Nullable UnbakedModel.GuiLight guiLight, @Nullable AffineTransformation rootTransform, @Nullable BlockRenderLayer layer,
+    Map<String, Boolean> partVisibility
+) {
     public static StandardModelParameters parse(JsonObject jsonObject, JsonDeserializationContext context) {
-        String parentName = GsonHelper.getAsString(jsonObject, "parent", "");
-        Identifier parent = parentName.isEmpty() ? null : Identifier.parse(parentName);
+        String parentName = JsonHelper.getString(jsonObject, "parent", "");
+        Identifier parent = parentName.isEmpty() ? null : Identifier.of(parentName);
 
-        TextureSlots.Data textures = TextureSlots.Data.EMPTY;
+        ModelTextures.Textures textures = ModelTextures.Textures.EMPTY;
         if (jsonObject.has("textures")) {
-            JsonObject jsonobject = GsonHelper.getAsJsonObject(jsonObject, "textures");
-            textures = TextureSlots.parseTextureMap(jsonobject);
+            JsonObject jsonobject = JsonHelper.getObject(jsonObject, "textures");
+            textures = ModelTextures.fromJson(jsonobject, SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE);
         }
 
-        ItemTransforms itemTransforms = null;
+        ModelTransformation itemTransforms = null;
         if (jsonObject.has("display")) {
-            JsonObject jsonobject1 = GsonHelper.getAsJsonObject(jsonObject, "display");
-            itemTransforms = context.deserialize(jsonobject1, ItemTransforms.class);
+            JsonObject jsonobject1 = JsonHelper.getObject(jsonObject, "display");
+            itemTransforms = context.deserialize(jsonobject1, ModelTransformation.class);
         }
 
         Boolean ambientOcclusion = null;
         if (jsonObject.has("ambientocclusion")) {
-            ambientOcclusion = GsonHelper.getAsBoolean(jsonObject, "ambientocclusion");
+            ambientOcclusion = JsonHelper.getBoolean(jsonObject, "ambientocclusion");
         }
 
         UnbakedModel.GuiLight guiLight = null;
         if (jsonObject.has("gui_light")) {
-            guiLight = UnbakedModel.GuiLight.getByName(GsonHelper.getAsString(jsonObject, "gui_light"));
+            guiLight = UnbakedModel.GuiLight.byName(JsonHelper.getString(jsonObject, "gui_light"));
         }
 
-        Transformation rootTransform = NeoForgeModelProperties.deserializeRootTransform(jsonObject, context);
-        ChunkSectionLayer layer = NeoForgeModelProperties.deserializeRenderType(jsonObject);
+        AffineTransformation rootTransform = NeoForgeModelProperties.deserializeRootTransform(jsonObject, context);
+        BlockRenderLayer layer = NeoForgeModelProperties.deserializeRenderType(jsonObject);
         Map<String, Boolean> partVisibility = NeoForgeModelProperties.deserializePartVisibility(jsonObject);
 
-        return new StandardModelParameters(
-            parent,
-            textures,
-            itemTransforms,
-            ambientOcclusion,
-            guiLight,
-            rootTransform,
-            layer,
-            partVisibility
-        );
+        return new StandardModelParameters(parent, textures, itemTransforms, ambientOcclusion, guiLight, rootTransform, layer, partVisibility);
     }
 }

@@ -2,12 +2,12 @@ package com.zurrtum.create.client.flywheel.lib.model.baked;
 
 import com.google.common.collect.ImmutableList;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
-import com.mojang.blaze3d.vertex.BufferBuilder;
-import com.mojang.blaze3d.vertex.ByteBufferBuilder;
 import com.zurrtum.create.client.flywheel.api.material.Material;
 import com.zurrtum.create.client.flywheel.api.model.Mesh;
 import com.zurrtum.create.client.flywheel.api.model.Model;
-import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
+import net.minecraft.client.render.BlockRenderLayer;
+import net.minecraft.client.render.BufferBuilder;
+import net.minecraft.client.util.BufferAllocator;
 import org.jetbrains.annotations.UnknownNullability;
 
 import java.util.Arrays;
@@ -17,7 +17,7 @@ class MeshEmitter {
 
     private final MeshEmitterManager<?> manager;
     private final ByteBufferBuilderStack byteBufferBuilderStack;
-    private final ChunkSectionLayer renderType;
+    private final BlockRenderLayer renderType;
 
     private Material @UnknownNullability [] materials = new Material[INITIAL_CAPACITY];
     private BufferBuilder @UnknownNullability [] bufferBuilders = new BufferBuilder[INITIAL_CAPACITY];
@@ -27,11 +27,7 @@ class MeshEmitter {
 
     private int currentIndex = 0;
 
-    MeshEmitter(
-        MeshEmitterManager<?> manager,
-        ByteBufferBuilderStack byteBufferBuilderStack,
-        ChunkSectionLayer renderType
-    ) {
+    MeshEmitter(MeshEmitterManager<?> manager, ByteBufferBuilderStack byteBufferBuilderStack, BlockRenderLayer renderType) {
         this.manager = manager;
         this.byteBufferBuilderStack = byteBufferBuilderStack;
         this.renderType = renderType;
@@ -47,14 +43,11 @@ class MeshEmitter {
 
     public void end(ImmutableList.Builder<Model.ConfiguredMesh> out) {
         for (int index = 0; index < numBufferBuildersPopulated; index++) {
-            var renderedBuffer = bufferBuilders[index].build();
+            var renderedBuffer = bufferBuilders[index].endNullable();
 
             if (renderedBuffer != null) {
                 Material material = materials[index];
-                Mesh mesh = MeshHelper.blockVerticesToMesh(
-                    renderedBuffer,
-                    "source=ModelBuilder" + ",material=" + material
-                );
+                Mesh mesh = MeshHelper.blockVerticesToMesh(renderedBuffer, "source=ModelBuilder" + ",material=" + material);
                 out.add(new Model.ConfiguredMesh(material, mesh));
                 renderedBuffer.close();
             }
@@ -92,15 +85,11 @@ class MeshEmitter {
             resize(materials.length * 2);
         }
 
-        ByteBufferBuilder byteBufferBuilder = byteBufferBuilderStack.nextOrCreate();
+        BufferAllocator byteBufferBuilder = byteBufferBuilderStack.nextOrCreate();
 
         // Trust that the RenderType mode/format don't change out from underneath us.
-        RenderPipeline pipeline = renderType.pipeline();
-        BufferBuilder bufferBuilder = new BufferBuilder(
-            byteBufferBuilder,
-            pipeline.getVertexFormatMode(),
-            pipeline.getVertexFormat()
-        );
+        RenderPipeline pipeline = renderType.getPipeline();
+        BufferBuilder bufferBuilder = new BufferBuilder(byteBufferBuilder, pipeline.getVertexFormatMode(), pipeline.getVertexFormat());
 
         // currentIndex == numBufferBuildersPopulated here.
         materials[currentIndex] = material;

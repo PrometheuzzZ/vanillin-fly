@@ -4,40 +4,37 @@ import com.zurrtum.create.content.kinetics.clock.CuckooClockBlockEntity;
 import com.zurrtum.create.content.redstone.displayLink.DisplayLinkContext;
 import com.zurrtum.create.content.redstone.displayLink.target.DisplayTargetStats;
 import com.zurrtum.create.content.trains.display.FlapDisplaySection;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.text.MutableText;
+import net.minecraft.text.Text;
 
 public class StopWatchDisplaySource extends SingleLineDisplaySource {
 
     @Override
-    protected MutableComponent provideLine(DisplayLinkContext context, DisplayTargetStats stats) {
-        if (!(context.getSourceBlockEntity() instanceof CuckooClockBlockEntity ccbe)) {
+    protected MutableText provideLine(DisplayLinkContext context, DisplayTargetStats stats) {
+        if (!(context.getSourceBlockEntity() instanceof CuckooClockBlockEntity ccbe))
             return TimeOfDayDisplaySource.EMPTY_TIME;
-        }
-        if (ccbe.getSpeed() == 0) {
+        if (ccbe.getSpeed() == 0)
             return TimeOfDayDisplaySource.EMPTY_TIME;
-        }
 
-        if (!context.sourceConfig().contains("StartTime")) {
+        if (!context.sourceConfig().contains("StartTime"))
             onSignalReset(context);
-        }
 
-        long started = context.sourceConfig().getLongOr("StartTime", 0);
-        long current = context.blockEntity().getLevel().getGameTime();
+        long started = context.sourceConfig().getLong("StartTime", 0);
+        long current = context.blockEntity().getWorld().getTime();
 
         int diff = (int) (current - started);
         int hours = (diff / 60 / 60 / 20);
         int minutes = (diff / 60 / 20) % 60;
         int seconds = (diff / 20) % 60;
 
-        MutableComponent component = Component.literal((hours == 0 ? "" : (hours < 10 ? " " : "") + hours + ":") + (minutes < 10 ? hours == 0 ? " " : "0" : "") + minutes + ":" + (seconds < 10 ? "0" : "") + seconds);
+        MutableText component = Text.literal((hours == 0 ? "" : (hours < 10 ? " " : "") + hours + ":") + (minutes < 10 ? hours == 0 ? " " : "0" : "") + minutes + ":" + (seconds < 10 ? "0" : "") + seconds);
 
         return component;
     }
 
     @Override
     public void onSignalReset(DisplayLinkContext context) {
-        context.sourceConfig().putLong("StartTime", context.blockEntity().getLevel().getGameTime());
+        context.sourceConfig().putLong("StartTime", context.blockEntity().getWorld().getTime());
     }
 
     @Override

@@ -3,31 +3,31 @@ package com.zurrtum.create.infrastructure.packet.s2c;
 import com.zurrtum.create.AllClientHandle;
 import com.zurrtum.create.AllPackets;
 import io.netty.buffer.ByteBuf;
-import net.minecraft.core.UUIDUtil;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.PacketType;
-import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.network.listener.ClientPlayPacketListener;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.PacketType;
+import net.minecraft.util.Uuids;
 
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.UUID;
 
-public record ClientboundChainConveyorRidingPacket(Collection<UUID> uuids) implements Packet<ClientGamePacketListener> {
-    public static final StreamCodec<ByteBuf, ClientboundChainConveyorRidingPacket> CODEC = StreamCodec.composite(
-        ByteBufCodecs.collection(HashSet::new, UUIDUtil.STREAM_CODEC),
+public record ClientboundChainConveyorRidingPacket(Collection<UUID> uuids) implements Packet<ClientPlayPacketListener> {
+    public static final PacketCodec<ByteBuf, ClientboundChainConveyorRidingPacket> CODEC = PacketCodec.tuple(
+        PacketCodecs.collection(HashSet::new, Uuids.PACKET_CODEC),
         ClientboundChainConveyorRidingPacket::uuids,
         ClientboundChainConveyorRidingPacket::new
     );
 
     @Override
-    public void handle(ClientGamePacketListener listener) {
+    public void apply(ClientPlayPacketListener listener) {
         AllClientHandle.INSTANCE.onClientboundChainConveyorRiding(this);
     }
 
     @Override
-    public PacketType<ClientboundChainConveyorRidingPacket> type() {
+    public PacketType<ClientboundChainConveyorRidingPacket> getPacketType() {
         return AllPackets.CLIENTBOUND_CHAIN_CONVEYOR;
     }
 }

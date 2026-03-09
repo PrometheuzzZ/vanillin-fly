@@ -3,25 +3,26 @@ package com.zurrtum.create.infrastructure.packet.c2s;
 import com.zurrtum.create.AllHandle;
 import com.zurrtum.create.AllPackets;
 import io.netty.buffer.ByteBuf;
-import net.minecraft.core.BlockPos;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.PacketType;
-import net.minecraft.network.protocol.game.ServerGamePacketListener;
-import net.minecraft.server.network.ServerGamePacketListenerImpl;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.listener.ServerPlayPacketListener;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.PacketType;
+import net.minecraft.server.network.ServerPlayNetworkHandler;
+import net.minecraft.util.math.BlockPos;
 
-public record LinkedControllerStopLecternPacket(BlockPos lecternPos) implements Packet<ServerGamePacketListener> {
-    public static final StreamCodec<ByteBuf, LinkedControllerStopLecternPacket> CODEC = BlockPos.STREAM_CODEC.map(LinkedControllerStopLecternPacket::new,
+public record LinkedControllerStopLecternPacket(BlockPos lecternPos) implements Packet<ServerPlayPacketListener> {
+    public static final PacketCodec<ByteBuf, LinkedControllerStopLecternPacket> CODEC = BlockPos.PACKET_CODEC.xmap(
+        LinkedControllerStopLecternPacket::new,
         LinkedControllerStopLecternPacket::lecternPos
     );
 
     @Override
-    public void handle(ServerGamePacketListener listener) {
-        AllHandle.onLinkedControllerStopLectern((ServerGamePacketListenerImpl) listener, this);
+    public void apply(ServerPlayPacketListener listener) {
+        AllHandle.onLinkedControllerStopLectern((ServerPlayNetworkHandler) listener, this);
     }
 
     @Override
-    public PacketType<LinkedControllerStopLecternPacket> type() {
+    public PacketType<LinkedControllerStopLecternPacket> getPacketType() {
         return AllPackets.LINKED_CONTROLLER_USE_LECTERN;
     }
 }

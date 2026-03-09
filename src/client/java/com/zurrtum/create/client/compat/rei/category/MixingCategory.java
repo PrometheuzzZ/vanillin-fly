@@ -20,9 +20,8 @@ import me.shedaniel.rei.api.client.gui.widgets.Widgets;
 import me.shedaniel.rei.api.common.category.CategoryIdentifier;
 import me.shedaniel.rei.api.common.entry.EntryIngredient;
 import me.shedaniel.rei.api.common.util.EntryIngredients;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.network.chat.Component;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.text.Text;
 import org.joml.Matrix3x2f;
 
 import java.util.ArrayList;
@@ -35,7 +34,7 @@ public class MixingCategory extends CreateCategory<MixingDisplay> {
     }
 
     @Override
-    public Component getTitle() {
+    public Text getTitle() {
         return CreateLang.translateDirect("recipe.mixing");
     }
 
@@ -82,37 +81,29 @@ public class MixingCategory extends CreateCategory<MixingDisplay> {
             fluids.add(new Point(xPosition, yPosition));
         }
         HeatCondition requiredHeat = display.heat();
-        widgets.add(Widgets.createDrawableWidget((GuiGraphics graphics, int mouseX, int mouseY, float delta) -> {
+        widgets.add(Widgets.createDrawableWidget((DrawContext graphics, int mouseX, int mouseY, float delta) -> {
             drawSlotBackground(graphics, points);
             drawSlotBackground(graphics, outputs);
             drawSlotBackground(graphics, fluids);
             drawChanceSlotBackground(graphics, chances);
-            AllGuiTextures.JEI_DOWN_ARROW.render(
-                graphics,
-                bounds.x + 141,
-                bounds.y + (allSize <= 4 ? 37 : 46) - (allSize - 1) / 2 * 19
-            );
-            Matrix3x2f pose = new Matrix3x2f(graphics.pose());
+            AllGuiTextures.JEI_DOWN_ARROW.render(graphics, bounds.x + 141, bounds.y + (allSize <= 4 ? 37 : 46) - (allSize - 1) / 2 * 19);
+            Matrix3x2f pose = new Matrix3x2f(graphics.getMatrices());
             if (requiredHeat == HeatCondition.NONE) {
                 AllGuiTextures.JEI_NO_HEAT_BAR.render(graphics, bounds.x + 9, bounds.y + 85);
                 AllGuiTextures.JEI_SHADOW.render(graphics, bounds.x + 86, bounds.y + 73);
             } else {
                 AllGuiTextures.JEI_HEAT_BAR.render(graphics, bounds.x + 9, bounds.y + 85);
                 AllGuiTextures.JEI_LIGHT.render(graphics, bounds.x + 86, bounds.y + 93);
-                graphics.guiRenderState.submitPicturesInPictureState(new BasinBlazeBurnerRenderState(
+                graphics.state.addSpecialElement(new BasinBlazeBurnerRenderState(
                     pose,
                     bounds.x + 96,
                     bounds.y + 74,
                     requiredHeat.visualizeAsBlazeBurner()
                 ));
             }
-            graphics.guiRenderState.submitPicturesInPictureState(new MixingBasinRenderState(
-                pose,
-                bounds.x + 96,
-                bounds.y
-            ));
-            graphics.drawString(
-                Minecraft.getInstance().font,
+            graphics.state.addSpecialElement(new MixingBasinRenderState(pose, bounds.x + 96, bounds.y));
+            graphics.drawText(
+                graphics.client.textRenderer,
                 CreateLang.translateDirect(requiredHeat.getTranslationKey()),
                 bounds.x + 14,
                 bounds.y + 91,
@@ -133,16 +124,10 @@ public class MixingCategory extends CreateCategory<MixingDisplay> {
             widgets.add(createOutputSlot(fluids.get(i)).entries(getRenderEntryStack(fluidResults.get(i))));
         }
         if (!requiredHeat.testBlazeBurner(HeatLevel.NONE)) {
-            widgets.add(createSlot(new Point(
-                bounds.x + 139,
-                bounds.y + 86
-            )).entries(EntryIngredients.of(AllItems.BLAZE_BURNER)));
+            widgets.add(createSlot(new Point(bounds.x + 139, bounds.y + 86)).entries(EntryIngredients.of(AllItems.BLAZE_BURNER)));
         }
         if (!requiredHeat.testBlazeBurner(HeatLevel.KINDLED)) {
-            widgets.add(createSlot(new Point(
-                bounds.x + 158,
-                bounds.y + 86
-            )).entries(EntryIngredients.of(AllItems.BLAZE_CAKE)));
+            widgets.add(createSlot(new Point(bounds.x + 158, bounds.y + 86)).entries(EntryIngredients.of(AllItems.BLAZE_CAKE)));
         }
     }
 

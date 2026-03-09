@@ -14,12 +14,12 @@ import com.zurrtum.create.content.logistics.tableCloth.TableClothBlock;
 import com.zurrtum.create.content.logistics.tableCloth.TableClothBlockEntity;
 import com.zurrtum.create.infrastructure.component.AutoRequestData;
 import com.zurrtum.create.infrastructure.component.PackageOrderWithCrafts;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
-import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.item.ItemStack;
+import net.minecraft.item.Items;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Box;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Vec3d;
 
 import java.util.List;
 
@@ -60,15 +60,11 @@ public class TableClothScenes {
         scene.idle(7);
         scene.effects().indicateSuccess(util.grid().at(3, 2, 3));
         scene.world().cycleBlockProperty(util.grid().at(3, 2, 3), TableClothBlock.HAS_BE);
-        scene.world().modifyBlockEntity(
-            util.grid().at(3, 2, 3),
-            TableClothBlockEntity.class,
-            be -> be.manuallyAddedItems.add(grass)
-        );
+        scene.world().modifyBlockEntity(util.grid().at(3, 2, 3), TableClothBlockEntity.class, be -> be.manuallyAddedItems.add(grass));
         scene.idle(10);
 
-        scene.overlay().showText(60).text("Table cloths can be used to display items").attachKeyFrame()
-            .pointAt(util.vector().topOf(3, 1, 3)).placeNearTarget();
+        scene.overlay().showText(60).text("Table cloths can be used to display items").attachKeyFrame().pointAt(util.vector().topOf(3, 1, 3))
+            .placeNearTarget();
         scene.idle(70);
 
         scene.effects().indicateSuccess(util.grid().at(3, 2, 3));
@@ -84,8 +80,8 @@ public class TableClothScenes {
             }
         );
 
-        scene.overlay().showText(100).text("With the help of a logistics system, they can also be used to sell items")
-            .attachKeyFrame().pointAt(util.vector().of(3, 1.75, 3)).placeNearTarget();
+        scene.overlay().showText(100).text("With the help of a logistics system, they can also be used to sell items").attachKeyFrame()
+            .pointAt(util.vector().of(3, 1.75, 3)).placeNearTarget();
         scene.idle(110);
 
         scene.world().hideSection(initialCloth, Direction.UP);
@@ -98,24 +94,23 @@ public class TableClothScenes {
         scene.world().showSection(linkS, Direction.DOWN);
 
         scene.overlay().showOutlineWithText(util.select().fromTo(3, 2, 4, 4, 3, 5), 100)
-            .text("Start with the shop's inventory, a Packager and Stock link").attachKeyFrame()
-            .colored(PonderPalette.BLUE).pointAt(util.vector().of(2, 3, 4)).placeNearTarget();
+            .text("Start with the shop's inventory, a Packager and Stock link").attachKeyFrame().colored(PonderPalette.BLUE)
+            .pointAt(util.vector().of(2, 3, 4)).placeNearTarget();
         scene.idle(110);
 
-        ItemStack tickerItem = AllItems.STOCK_TICKER.getDefaultInstance();
-        scene.overlay().showControls(util.vector().centerOf(2, 3, 4), Pointing.DOWN, 80).rightClick()
-            .withItem(tickerItem);
+        ItemStack tickerItem = AllItems.STOCK_TICKER.getDefaultStack();
+        scene.overlay().showControls(util.vector().centerOf(2, 3, 4), Pointing.DOWN, 80).rightClick().withItem(tickerItem);
         scene.idle(5);
 
-        AABB bb1 = new AABB(link);
-        scene.overlay().chaseBoundingBoxOutline(PonderPalette.BLUE, link, bb1.deflate(0.45), 10);
+        Box bb1 = new Box(link);
+        scene.overlay().chaseBoundingBoxOutline(PonderPalette.BLUE, link, bb1.contract(0.45), 10);
         scene.idle(1);
-        bb1 = bb1.deflate(1 / 16f).contract(0, 8 / 16f, 0);
+        bb1 = bb1.contract(1 / 16f).shrink(0, 8 / 16f, 0);
         scene.overlay().chaseBoundingBoxOutline(PonderPalette.BLUE, link, bb1, 50);
         scene.idle(26);
 
-        scene.overlay().showText(80).text("Bind a Stock ticker to the link and place it in the shop").attachKeyFrame()
-            .colored(PonderPalette.BLUE).pointAt(util.vector().centerOf(link)).placeNearTarget();
+        scene.overlay().showText(80).text("Bind a Stock ticker to the link and place it in the shop").attachKeyFrame().colored(PonderPalette.BLUE)
+            .pointAt(util.vector().centerOf(link)).placeNearTarget();
         scene.idle(70);
 
         scene.world().showSection(ticker, Direction.DOWN);
@@ -135,16 +130,15 @@ public class TableClothScenes {
         scene.overlay().showControls(util.vector().of(5, 2, 4), Pointing.RIGHT, 80).withItem(logItem2);
         scene.idle(10);
 
-        scene.overlay().showText(70).text("Fill the shop inventory with items to be sold").attachKeyFrame()
-            .pointAt(util.vector().of(4, 3, 4)).placeNearTarget();
+        scene.overlay().showText(70).text("Fill the shop inventory with items to be sold").attachKeyFrame().pointAt(util.vector().of(4, 3, 4))
+            .placeNearTarget();
         scene.idle(80);
 
-        ItemStack clothItem = AllItems.LIGHT_GRAY_TABLE_CLOTH.getDefaultInstance();
+        ItemStack clothItem = AllItems.LIGHT_GRAY_TABLE_CLOTH.getDefaultStack();
         scene.overlay().showControls(util.vector().of(3, 3, 1.75), Pointing.DOWN, 120).rightClick().withItem(clothItem);
         scene.idle(30);
 
-        scene.overlay().showText(100)
-            .text("To create a new trade, interact with the shop keeper while holding a table cloth").attachKeyFrame()
+        scene.overlay().showText(100).text("To create a new trade, interact with the shop keeper while holding a table cloth").attachKeyFrame()
             .pointAt(util.vector().of(2.5, 2.75, 1.5)).placeNearTarget();
         scene.idle(100);
 
@@ -165,24 +159,24 @@ public class TableClothScenes {
         scene.idle(20);
 
         ItemStack diamondItem = new ItemStack(Items.DIAMOND);
-        Vec3 filterSlot = util.vector().of(5.25, 1.825, 1);
+        Vec3d filterSlot = util.vector().of(5.25, 1.825, 1);
         scene.overlay().showControls(filterSlot, Pointing.DOWN, 120).rightClick().withItem(diamondItem);
         scene.idle(5);
         scene.world().setFilterData(util.select().position(5, 2, 1), TableClothBlockEntity.class, diamondItem);
         scene.idle(15);
 
-        scene.overlay().showText(90).text("Once placed, set a price in the item slot on the side").attachKeyFrame()
-            .pointAt(filterSlot).placeNearTarget();
+        scene.overlay().showText(90).text("Once placed, set a price in the item slot on the side").attachKeyFrame().pointAt(filterSlot)
+            .placeNearTarget();
         scene.idle(120);
 
         scene.overlay().showControls(util.vector().centerOf(util.grid().at(5, 2, 1)), Pointing.DOWN, 90).rightClick();
         scene.idle(10);
 
-        scene.overlay().showText(90).text("Other players can now interact with the shop").attachKeyFrame()
-            .pointAt(util.vector().of(5, 2, 1.5)).placeNearTarget();
+        scene.overlay().showText(90).text("Other players can now interact with the shop").attachKeyFrame().pointAt(util.vector().of(5, 2, 1.5))
+            .placeNearTarget();
         scene.idle(100);
 
-        ItemStack listItem = AllItems.SHOPPING_LIST.getDefaultInstance();
+        ItemStack listItem = AllItems.SHOPPING_LIST.getDefaultStack();
         scene.overlay().showControls(util.vector().of(3, 3, 1.75), Pointing.DOWN, 90).rightClick().withItem(listItem);
         scene.idle(5);
         scene.effects().indicateSuccess(util.grid().at(3, 1, 1));
@@ -191,8 +185,7 @@ public class TableClothScenes {
         PonderHilo.packagerCreate(scene, pack, box);
         scene.idle(30);
 
-        scene.overlay().showText(120)
-            .text("When checking out at the cashier, the bought items will be placed into a package").attachKeyFrame()
+        scene.overlay().showText(120).text("When checking out at the cashier, the bought items will be placed into a package").attachKeyFrame()
             .pointAt(util.vector().of(2.5, 2.5, 4)).placeNearTarget();
         scene.idle(100);
 
@@ -212,8 +205,7 @@ public class TableClothScenes {
             .pointAt(util.vector().of(1, 2.5, 1.5)).placeNearTarget();
         scene.idle(100);
 
-        scene.overlay().showControls(util.vector().topOf(util.grid().at(3, 1, 1)), Pointing.DOWN, 100).rightClick()
-            .withItem(diamondItem);
+        scene.overlay().showControls(util.vector().topOf(util.grid().at(3, 1, 1)), Pointing.DOWN, 100).rightClick().withItem(diamondItem);
         scene.idle(10);
 
         scene.overlay().showText(90).text("The payments will be stored inside the stock ticker block").attachKeyFrame()

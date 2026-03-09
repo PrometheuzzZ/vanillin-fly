@@ -6,39 +6,39 @@ import com.zurrtum.create.AllPackets;
 import com.zurrtum.create.catnip.codecs.stream.CatnipStreamCodecs;
 import com.zurrtum.create.content.kinetics.mechanicalArm.ArmBlockEntity;
 import com.zurrtum.create.content.kinetics.mechanicalArm.ArmInteractionPoint;
-import net.minecraft.core.BlockPos;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.PacketType;
-import net.minecraft.network.protocol.game.ServerGamePacketListener;
-import net.minecraft.server.network.ServerGamePacketListenerImpl;
+import net.minecraft.nbt.NbtList;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.listener.ServerPlayPacketListener;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.PacketType;
+import net.minecraft.server.network.ServerPlayNetworkHandler;
+import net.minecraft.util.math.BlockPos;
 
 import java.util.List;
 
-public record ArmPlacementPacket(ListTag tag, BlockPos pos) implements Packet<ServerGamePacketListener> {
-    public static final StreamCodec<RegistryFriendlyByteBuf, ArmPlacementPacket> CODEC = StreamCodec.composite(
+public record ArmPlacementPacket(NbtList tag, BlockPos pos) implements Packet<ServerPlayPacketListener> {
+    public static final PacketCodec<RegistryByteBuf, ArmPlacementPacket> CODEC = PacketCodec.tuple(
         CatnipStreamCodecs.COMPOUND_LIST_TAG,
         ArmPlacementPacket::tag,
-        BlockPos.STREAM_CODEC,
+        BlockPos.PACKET_CODEC,
         ArmPlacementPacket::pos,
         ArmPlacementPacket::new
     );
 
     public ArmPlacementPacket(List<ArmInteractionPoint> points, BlockPos pos) {
-        this(new ListTag(), pos);
+        this(new NbtList(), pos);
         Codec<ArmInteractionPoint> codec = ArmInteractionPoint.getCodec(null, pos);
         ArmBlockEntity.appendEncodedPoints(points, codec, this.tag);
     }
 
     @Override
-    public void handle(ServerGamePacketListener listener) {
-        AllHandle.onArmPlacement((ServerGamePacketListenerImpl) listener, this);
+    public void apply(ServerPlayPacketListener listener) {
+        AllHandle.onArmPlacement((ServerPlayNetworkHandler) listener, this);
     }
 
     @Override
-    public PacketType<ArmPlacementPacket> type() {
+    public PacketType<ArmPlacementPacket> getPacketType() {
         return AllPackets.PLACE_ARM;
     }
 }

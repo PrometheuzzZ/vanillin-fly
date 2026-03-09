@@ -10,17 +10,19 @@ import me.shedaniel.rei.api.common.display.Display;
 import me.shedaniel.rei.api.common.display.DisplaySerializer;
 import me.shedaniel.rei.api.common.entry.EntryIngredient;
 import me.shedaniel.rei.api.common.util.EntryIngredients;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.resources.Identifier;
-import net.minecraft.world.item.crafting.RecipeHolder;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.recipe.RecipeEntry;
+import net.minecraft.util.Identifier;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-public record ManualApplicationDisplay(EntryIngredient input, EntryIngredient target, List<ProcessingOutput> outputs,
-                                       boolean keepHeldItem, Optional<Identifier> location) implements Display {
+public record ManualApplicationDisplay(
+    EntryIngredient input, EntryIngredient target, List<ProcessingOutput> outputs, boolean keepHeldItem,
+    Optional<Identifier> location
+) implements Display {
     public static final DisplaySerializer<ManualApplicationDisplay> SERIALIZER = DisplaySerializer.of(
         RecordCodecBuilder.mapCodec(instance -> instance.group(
             EntryIngredient.codec().fieldOf("input").forGetter(ManualApplicationDisplay::input),
@@ -28,23 +30,23 @@ public record ManualApplicationDisplay(EntryIngredient input, EntryIngredient ta
             ProcessingOutput.CODEC.listOf().fieldOf("outputs").forGetter(ManualApplicationDisplay::outputs),
             Codec.BOOL.optionalFieldOf("keep_held_item", false).forGetter(ManualApplicationDisplay::keepHeldItem),
             Identifier.CODEC.optionalFieldOf("location").forGetter(ManualApplicationDisplay::location)
-        ).apply(instance, ManualApplicationDisplay::new)), StreamCodec.composite(
+        ).apply(instance, ManualApplicationDisplay::new)), PacketCodec.tuple(
             EntryIngredient.streamCodec(),
             ManualApplicationDisplay::input,
             EntryIngredient.streamCodec(),
             ManualApplicationDisplay::target,
-            ProcessingOutput.STREAM_CODEC.apply(ByteBufCodecs.list()),
+            ProcessingOutput.STREAM_CODEC.collect(PacketCodecs.toList()),
             ManualApplicationDisplay::outputs,
-            ByteBufCodecs.BOOL,
+            PacketCodecs.BOOLEAN,
             ManualApplicationDisplay::keepHeldItem,
-            ByteBufCodecs.optional(Identifier.STREAM_CODEC),
+            PacketCodecs.optional(Identifier.PACKET_CODEC),
             ManualApplicationDisplay::location,
             ManualApplicationDisplay::new
         )
     );
 
-    public ManualApplicationDisplay(RecipeHolder<ManualApplicationRecipe> entry) {
-        this(entry.id().identifier(), entry.value());
+    public ManualApplicationDisplay(RecipeEntry<ManualApplicationRecipe> entry) {
+        this(entry.id().getValue(), entry.value());
     }
 
     public ManualApplicationDisplay(Identifier id, ManualApplicationRecipe recipe) {

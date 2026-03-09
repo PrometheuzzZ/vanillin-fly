@@ -4,15 +4,16 @@ import com.zurrtum.create.AllHandle;
 import com.zurrtum.create.AllPackets;
 import com.zurrtum.create.content.contraptions.AbstractContraptionEntity;
 import io.netty.buffer.ByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.PacketType;
-import net.minecraft.network.protocol.game.ServerGamePacketListener;
-import net.minecraft.server.network.ServerGamePacketListenerImpl;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.network.listener.ServerPlayPacketListener;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.PacketType;
+import net.minecraft.server.network.ServerPlayNetworkHandler;
 
-public record RequestFloorListPacket(int entityId) implements Packet<ServerGamePacketListener> {
-    public static final StreamCodec<ByteBuf, RequestFloorListPacket> CODEC = ByteBufCodecs.INT.map(RequestFloorListPacket::new,
+public record RequestFloorListPacket(int entityId) implements Packet<ServerPlayPacketListener> {
+    public static final PacketCodec<ByteBuf, RequestFloorListPacket> CODEC = PacketCodecs.INTEGER.xmap(
+        RequestFloorListPacket::new,
         RequestFloorListPacket::entityId
     );
 
@@ -21,12 +22,12 @@ public record RequestFloorListPacket(int entityId) implements Packet<ServerGameP
     }
 
     @Override
-    public void handle(ServerGamePacketListener listener) {
-        AllHandle.onElevatorRequestFloorList((ServerGamePacketListenerImpl) listener, this);
+    public void apply(ServerPlayPacketListener listener) {
+        AllHandle.onElevatorRequestFloorList((ServerPlayNetworkHandler) listener, this);
     }
 
     @Override
-    public PacketType<RequestFloorListPacket> type() {
+    public PacketType<RequestFloorListPacket> getPacketType() {
         return AllPackets.REQUEST_FLOOR_LIST;
     }
 }

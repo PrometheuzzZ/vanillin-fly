@@ -1,12 +1,12 @@
 package com.zurrtum.create.client.catnip.gui.element;
 
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.DrawContext;
 
 public abstract class AbstractRenderElement implements RenderElement {
 
     public static RenderElement EMPTY = new AbstractRenderElement() {
         @Override
-        public void render(GuiGraphics graphics) {
+        public void render(DrawContext graphics) {
         }
     };
 
@@ -80,7 +80,7 @@ public abstract class AbstractRenderElement implements RenderElement {
         }
 
         @Override
-        public void render(GuiGraphics graphics) {
+        public void render(DrawContext graphics) {
             renderable.render(graphics, (int) x, (int) y);
         }
     }

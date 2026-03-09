@@ -14,47 +14,45 @@ import com.zurrtum.create.infrastructure.fluids.BucketFluidInventory;
 import com.zurrtum.create.infrastructure.fluids.FluidInventory;
 import com.zurrtum.create.infrastructure.fluids.FluidStack;
 import com.zurrtum.create.infrastructure.fluids.SidedFluidInventory;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.server.level.ServerLevel;
-import net.minecraft.sounds.SoundEvents;
-import net.minecraft.sounds.SoundSource;
-import net.minecraft.tags.FluidTags;
+import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.FluidBlock;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.fluid.FlowableFluid;
+import net.minecraft.fluid.Fluid;
+import net.minecraft.fluid.FluidState;
+import net.minecraft.fluid.Fluids;
+import net.minecraft.registry.tag.FluidTags;
+import net.minecraft.server.world.ServerWorld;
+import net.minecraft.sound.SoundCategory;
+import net.minecraft.sound.SoundEvents;
+import net.minecraft.state.property.Properties;
 import net.minecraft.util.Util;
-import net.minecraft.world.attribute.EnvironmentAttributes;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.LiquidBlock;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.properties.BlockStateProperties;
-import net.minecraft.world.level.material.FlowingFluid;
-import net.minecraft.world.level.material.Fluid;
-import net.minecraft.world.level.material.FluidState;
-import net.minecraft.world.level.material.Fluids;
-import net.minecraft.world.phys.AABB;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Box;
+import net.minecraft.util.math.Direction;
+import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Optional;
 import java.util.function.Function;
 
-import static net.minecraft.world.level.block.state.properties.BlockStateProperties.WATERLOGGED;
+import static net.minecraft.state.property.Properties.WATERLOGGED;
 
 public class OpenEndedPipe extends FlowSource {
-    private static final Function<BlockPos, Codec<OpenEndedPipe>> CODEC = Util.memoize(pos -> RecordCodecBuilder.create(
-        instance -> instance.group(
-            FluidStack.OPTIONAL_CODEC.fieldOf("Fluid").forGetter(i -> i.fluidHandler.stack),
-            Codec.BOOL.fieldOf("Pulling").forGetter(i -> i.wasPulling),
-            Direction.CODEC.fieldOf("Direction").forGetter(i -> i.location.getFace())
-        ).apply(instance, (stack, wasPulling, direction) -> new OpenEndedPipe(stack, wasPulling, pos, direction))));
+    private static final Function<BlockPos, Codec<OpenEndedPipe>> CODEC = Util.memoize(pos -> RecordCodecBuilder.create(instance -> instance.group(
+        FluidStack.OPTIONAL_CODEC.fieldOf("Fluid").forGetter(i -> i.fluidHandler.stack),
+        Codec.BOOL.fieldOf("Pulling").forGetter(i -> i.wasPulling),
+        Direction.CODEC.fieldOf("Direction").forGetter(i -> i.location.getFace())
+    ).apply(instance, (stack, wasPulling, direction) -> new OpenEndedPipe(stack, wasPulling, pos, direction))));
 
     public static Codec<OpenEndedPipe> codec(BlockPos pos) {
         return CODEC.apply(pos);
     }
 
-    private Level world;
+    private World world;
     private final BlockPos pos;
-    private AABB aoe;
+    private Box aoe;
 
     private final OpenEndFluidHandler fluidHandler;
     private final BlockPos outputPos;
@@ -65,10 +63,9 @@ public class OpenEndedPipe extends FlowSource {
         fluidHandler = new OpenEndFluidHandler();
         outputPos = face.getConnectedPos();
         pos = face.getPos();
-        aoe = new AABB(outputPos).expandTowards(0, -1, 0);
-        if (face.getFace() == Direction.DOWN) {
-            aoe = aoe.expandTowards(0, -1, 0);
-        }
+        aoe = new Box(outputPos).stretch(0, -1, 0);
+        if (face.getFace() == Direction.DOWN)
+            aoe = aoe.stretch(0, -1, 0);
     }
 
     private OpenEndedPipe(FluidStack stack, boolean wasPulling, BlockPos pos, Direction direction) {
@@ -77,7 +74,7 @@ public class OpenEndedPipe extends FlowSource {
         this.wasPulling = wasPulling;
     }
 
-    public Level getWorld() {
+    public World getWorld() {
         return world;
     }
 
@@ -89,12 +86,12 @@ public class OpenEndedPipe extends FlowSource {
         return outputPos;
     }
 
-    public AABB getAOE() {
+    public Box getAOE() {
         return aoe;
     }
 
     @Override
-    public void manageSource(Level world, BlockEntity networkBE) {
+    public void manageSource(World world, BlockEntity networkBE) {
         this.world = world;
     }
 
@@ -110,52 +107,45 @@ public class OpenEndedPipe extends FlowSource {
     }
 
     private FluidStack removeFluidFromSpace(boolean simulate) {
-        if (world == null) {
+        if (world == null)
             return FluidStack.EMPTY;
-        }
-        if (!world.isLoaded(outputPos)) {
+        if (!world.isPosLoaded(outputPos))
             return FluidStack.EMPTY;
-        }
 
         BlockState state = world.getBlockState(outputPos);
         FluidState fluidState = state.getFluidState();
-        boolean waterlog = state.hasProperty(WATERLOGGED);
+        boolean waterlog = state.contains(WATERLOGGED);
 
         FluidStack drainBlock = VanillaFluidTargets.drainBlock(world, outputPos, state, simulate);
         if (!drainBlock.isEmpty()) {
-            if (!simulate && state.hasProperty(BlockStateProperties.LEVEL_HONEY) && drainBlock.getFluid() == AllFluids.HONEY) {
+            if (!simulate && state.contains(Properties.HONEY_LEVEL) && drainBlock.getFluid() == AllFluids.HONEY)
                 AdvancementBehaviour.tryAward(world, pos, AllAdvancements.HONEY_DRAIN);
-            }
             return drainBlock;
         }
 
-        if (!waterlog && !state.canBeReplaced()) {
+        if (!waterlog && !state.isReplaceable())
             return FluidStack.EMPTY;
-        }
-        if (fluidState.isEmpty() || !fluidState.isSource()) {
+        if (fluidState.isEmpty() || !fluidState.isStill())
             return FluidStack.EMPTY;
-        }
 
-        FluidStack stack = new FluidStack(fluidState.getType(), BucketFluidInventory.CAPACITY);
+        FluidStack stack = new FluidStack(fluidState.getFluid(), BucketFluidInventory.CAPACITY);
 
-        if (simulate) {
+        if (simulate)
             return stack;
-        }
 
-        if (FluidHelper.isWater(stack.getFluid())) {
+        if (FluidHelper.isWater(stack.getFluid()))
             AdvancementBehaviour.tryAward(world, pos, AllAdvancements.WATER_SUPPLY);
-        }
 
         if (waterlog) {
-            world.setBlock(outputPos, state.setValue(WATERLOGGED, false), Block.UPDATE_ALL);
-            world.scheduleTick(outputPos, Fluids.WATER, 1);
+            world.setBlockState(outputPos, state.with(WATERLOGGED, false), Block.NOTIFY_ALL);
+            world.scheduleFluidTick(outputPos, Fluids.WATER, 1);
         } else {
-            var newState = fluidState.createLegacyBlock().setValue(LiquidBlock.LEVEL, 14);
+            var newState = fluidState.getBlockState().with(FluidBlock.LEVEL, 14);
 
             var newFluidState = newState.getFluidState();
 
-            if (newFluidState.getType() instanceof FlowingFluid flowing && world instanceof ServerLevel serverWorld) {
-                var potentiallyFilled = flowing.getNewLiquid(serverWorld, outputPos, newState);
+            if (newFluidState.getFluid() instanceof FlowableFluid flowing && world instanceof ServerWorld serverWorld) {
+                var potentiallyFilled = flowing.getUpdatedState(serverWorld, outputPos, newState);
 
                 // Check if we'd immediately become the same fluid again.
                 if (potentiallyFilled.equals(fluidState)) {
@@ -164,58 +154,47 @@ public class OpenEndedPipe extends FlowSource {
                 }
             }
 
-            world.setBlock(outputPos, newState, Block.UPDATE_ALL);
+            world.setBlockState(outputPos, newState, Block.NOTIFY_ALL);
         }
 
         return stack;
     }
 
     private boolean provideFluidToSpace(FluidStack fluid, boolean simulate) {
-        if (world == null) {
+        if (world == null)
             return false;
-        }
-        if (!world.isLoaded(outputPos)) {
+        if (!world.isPosLoaded(outputPos))
             return false;
-        }
 
         BlockState state = world.getBlockState(outputPos);
         FluidState fluidState = state.getFluidState();
-        boolean waterlog = state.hasProperty(WATERLOGGED);
+        boolean waterlog = state.contains(WATERLOGGED);
 
-        if (!waterlog && !state.canBeReplaced()) {
+        if (!waterlog && !state.isReplaceable())
             return false;
-        }
-        if (fluid.isEmpty()) {
+        if (fluid.isEmpty())
             return false;
-        }
-        if (!(fluid.getFluid() instanceof FlowingFluid)) {
+        if (!(fluid.getFluid() instanceof FlowableFluid))
             return false;
-        }
-        if (!FluidHelper.hasBlockState(fluid.getFluid())) {
+        if (!FluidHelper.hasBlockState(fluid.getFluid()))
             return true;
-        }
 
-        if (!fluidState.isEmpty() && FluidHelper.convertToStill(fluidState.getType()) != fluid.getFluid()) {
+        if (!fluidState.isEmpty() && FluidHelper.convertToStill(fluidState.getFluid()) != fluid.getFluid()) {
             FluidReactions.handlePipeSpillCollision(world, outputPos, fluid.getFluid(), fluidState);
             return false;
         }
 
-        if (fluidState.isSource()) {
+        if (fluidState.isStill())
             return false;
-        }
-        if (waterlog && fluid.getFluid() != Fluids.WATER) {
+        if (waterlog && fluid.getFluid() != Fluids.WATER)
             return false;
-        }
-        if (simulate) {
+        if (simulate)
             return true;
-        }
 
-        if (!AllConfigs.server().fluids.pipesPlaceFluidSourceBlocks.get()) {
+        if (!AllConfigs.server().fluids.pipesPlaceFluidSourceBlocks.get())
             return true;
-        }
 
-        if (world.environmentAttributes()
-            .getValue(EnvironmentAttributes.WATER_EVAPORATES, outputPos) && FluidHelper.isTag(fluid, FluidTags.WATER)) {
+        if (world.getDimension().ultrawarm() && FluidHelper.isTag(fluid, FluidTags.WATER)) {
             int i = outputPos.getX();
             int j = outputPos.getY();
             int k = outputPos.getZ();
@@ -224,8 +203,8 @@ public class OpenEndedPipe extends FlowSource {
                 i,
                 j,
                 k,
-                SoundEvents.FIRE_EXTINGUISH,
-                SoundSource.BLOCKS,
+                SoundEvents.BLOCK_FIRE_EXTINGUISH,
+                SoundCategory.BLOCKS,
                 0.5F,
                 2.6F + (world.random.nextFloat() - world.random.nextFloat()) * 0.8F
             );
@@ -233,12 +212,12 @@ public class OpenEndedPipe extends FlowSource {
         }
 
         if (waterlog) {
-            world.setBlock(outputPos, state.setValue(WATERLOGGED, true), Block.UPDATE_ALL);
-            world.scheduleTick(outputPos, Fluids.WATER, 1);
+            world.setBlockState(outputPos, state.with(WATERLOGGED, true), Block.NOTIFY_ALL);
+            world.scheduleFluidTick(outputPos, Fluids.WATER, 1);
             return true;
         }
 
-        world.setBlock(outputPos, fluid.getFluid().defaultFluidState().createLegacyBlock(), Block.UPDATE_ALL);
+        world.setBlockState(outputPos, fluid.getFluid().getDefaultState().getBlockState(), Block.NOTIFY_ALL);
         return true;
     }
 
@@ -314,18 +293,16 @@ public class OpenEndedPipe extends FlowSource {
 
         @Override
         public boolean canInsert(int slot, FluidStack resource, @Nullable Direction dir) {
-            if (slot != 0 || !provideFluidToSpace(resource, true)) {
+            if (slot != 0 || !provideFluidToSpace(resource, true))
                 return false;
-            }
-            if (!stack.isEmpty() && !matches(stack, resource)) {
+            if (!stack.isEmpty() && !matches(stack, resource))
                 stack = FluidStack.EMPTY;
-            }
             return true;
         }
 
         @Override
         public boolean canExtract(int slot, FluidStack stack, Direction dir) {
-            return world != null && world.isLoaded(outputPos);
+            return world != null && world.isPosLoaded(outputPos);
         }
 
         @Override

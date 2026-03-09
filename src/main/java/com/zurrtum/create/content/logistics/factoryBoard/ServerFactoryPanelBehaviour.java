@@ -4,7 +4,6 @@ import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
 import com.mojang.serialization.Codec;
 import com.zurrtum.create.*;
-import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.catnip.animation.LerpedFloat;
 import com.zurrtum.create.catnip.animation.LerpedFloat.Chaser;
 import com.zurrtum.create.catnip.codecs.CatnipCodecs;
@@ -24,6 +23,7 @@ import com.zurrtum.create.content.logistics.stockTicker.PackageOrder;
 import com.zurrtum.create.content.schematics.requirement.ItemRequirement;
 import com.zurrtum.create.foundation.blockEntity.SmartBlockEntity;
 import com.zurrtum.create.foundation.blockEntity.behaviour.BehaviourType;
+import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.foundation.blockEntity.behaviour.ValueSettings;
 import com.zurrtum.create.foundation.blockEntity.behaviour.filtering.ServerFilteringBehaviour;
 import com.zurrtum.create.foundation.codec.CreateCodecs;
@@ -32,29 +32,34 @@ import com.zurrtum.create.infrastructure.component.PackageOrderWithCrafts;
 import com.zurrtum.create.infrastructure.config.AllConfigs;
 import com.zurrtum.create.infrastructure.packet.s2c.FactoryPanelEffectPacket;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenCustomHashMap;
-import net.minecraft.ChatFormatting;
-import net.minecraft.core.*;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.chat.Component;
-import net.minecraft.server.level.ServerLevel;
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.sounds.SoundEvents;
-import net.minecraft.sounds.SoundSource;
-import net.minecraft.world.InteractionHand;
-import net.minecraft.world.entity.player.Inventory;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.ItemStackLinkedSet;
-import net.minecraft.world.item.crafting.*;
-import net.minecraft.world.level.BlockAndTintGetter;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
-import net.minecraft.world.level.storage.ValueOutput.TypedOutputList;
-import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.entity.player.PlayerInventory;
+import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
+import net.minecraft.item.ItemStackSet;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.recipe.*;
+import net.minecraft.recipe.input.CraftingRecipeInput;
+import net.minecraft.registry.DynamicRegistryManager;
+import net.minecraft.registry.RegistryWrapper;
+import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.world.ServerWorld;
+import net.minecraft.sound.SoundCategory;
+import net.minecraft.sound.SoundEvents;
+import net.minecraft.storage.ReadView;
+import net.minecraft.storage.WriteView;
+import net.minecraft.storage.WriteView.ListAppender;
+import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
+import net.minecraft.util.Hand;
+import net.minecraft.util.Uuids;
+import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.world.BlockRenderView;
+import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Math;
 
@@ -117,7 +122,7 @@ public class ServerFactoryPanelBehaviour extends ServerFilteringBehaviour implem
         this.redstonePowered = false;
         this.promiseClearingInterval = -1;
         this.bulb = LerpedFloat.linear().startWithValue(0).chase(0, 0.175, Chaser.EXP);
-        this.restockerPromises = new RequestPromiseQueue(be::setChanged);
+        this.restockerPromises = new RequestPromiseQueue(be::markDirty);
         this.promisePrimedForMarkDirty = true;
         this.network = UUID.randomUUID();
         setLazyTickRate(40);
@@ -128,91 +133,74 @@ public class ServerFactoryPanelBehaviour extends ServerFilteringBehaviour implem
     }
 
     @Nullable
-    public static ServerFactoryPanelBehaviour at(BlockAndTintGetter world, FactoryPanelConnection connection) {
+    public static ServerFactoryPanelBehaviour at(BlockRenderView world, FactoryPanelConnection connection) {
         Object cached = connection.cachedSource.get();
-        if (cached instanceof ServerFactoryPanelBehaviour fbe && !fbe.blockEntity.isRemoved()) {
+        if (cached instanceof ServerFactoryPanelBehaviour fbe && !fbe.blockEntity.isRemoved())
             return fbe;
-        }
         ServerFactoryPanelBehaviour result = at(world, connection.from);
         connection.cachedSource = new WeakReference<>(result);
         return result;
     }
 
     @Nullable
-    public static ServerFactoryPanelBehaviour at(BlockAndTintGetter world, FactoryPanelPosition pos) {
-        if (world instanceof Level l && !l.isLoaded(pos.pos())) {
+    public static ServerFactoryPanelBehaviour at(BlockRenderView world, FactoryPanelPosition pos) {
+        if (world instanceof World l && !l.isPosLoaded(pos.pos()))
             return null;
-        }
-        if (!(world.getBlockEntity(pos.pos()) instanceof FactoryPanelBlockEntity fpbe)) {
+        if (!(world.getBlockEntity(pos.pos()) instanceof FactoryPanelBlockEntity fpbe))
             return null;
-        }
         ServerFactoryPanelBehaviour behaviour = fpbe.panels.get(pos.slot());
-        if (!behaviour.active) {
+        if (!behaviour.active)
             return null;
-        }
         return behaviour;
     }
 
     @Nullable
-    public static FactoryPanelSupportBehaviour linkAt(BlockAndTintGetter world, FactoryPanelConnection connection) {
+    public static FactoryPanelSupportBehaviour linkAt(BlockRenderView world, FactoryPanelConnection connection) {
         Object cached = connection.cachedSource.get();
-        if (cached instanceof FactoryPanelSupportBehaviour fpsb && !fpsb.blockEntity.isRemoved()) {
+        if (cached instanceof FactoryPanelSupportBehaviour fpsb && !fpsb.blockEntity.isRemoved())
             return fpsb;
-        }
         FactoryPanelSupportBehaviour result = linkAt(world, connection.from);
         connection.cachedSource = new WeakReference<>(result);
         return result;
     }
 
     @Nullable
-    public static FactoryPanelSupportBehaviour linkAt(BlockAndTintGetter world, FactoryPanelPosition pos) {
-        if (world instanceof Level l && !l.isLoaded(pos.pos())) {
+    public static FactoryPanelSupportBehaviour linkAt(BlockRenderView world, FactoryPanelPosition pos) {
+        if (world instanceof World l && !l.isPosLoaded(pos.pos()))
             return null;
-        }
         return BlockEntityBehaviour.get(world, pos.pos(), FactoryPanelSupportBehaviour.TYPE);
     }
 
-    public void moveTo(FactoryPanelPosition newPos, ServerPlayer player) {
-        Level level = getLevel();
+    public void moveTo(FactoryPanelPosition newPos, ServerPlayerEntity player) {
+        World level = getWorld();
         BlockState existingState = level.getBlockState(newPos.pos());
 
         // Check if target pos is valid
-        if (ServerFactoryPanelBehaviour.at(level, newPos) != null) {
+        if (ServerFactoryPanelBehaviour.at(level, newPos) != null)
             return;
-        }
-        boolean isAddedToOtherGauge = existingState.is(AllBlocks.FACTORY_GAUGE);
-        if (!existingState.isAir() && !isAddedToOtherGauge) {
+        boolean isAddedToOtherGauge = existingState.isOf(AllBlocks.FACTORY_GAUGE);
+        if (!existingState.isAir() && !isAddedToOtherGauge)
             return;
-        }
-        if (isAddedToOtherGauge && existingState != blockEntity.getBlockState()) {
+        if (isAddedToOtherGauge && existingState != blockEntity.getCachedState())
             return;
-        }
-        if (!isAddedToOtherGauge) {
-            level.setBlock(newPos.pos(), blockEntity.getBlockState(), Block.UPDATE_ALL);
-        }
+        if (!isAddedToOtherGauge)
+            level.setBlockState(newPos.pos(), blockEntity.getCachedState(), Block.NOTIFY_ALL);
 
-        for (BlockPos blockPos : targetedByLinks.keySet()) {
-            if (!blockPos.closerThan(newPos.pos(), 24)) {
+        for (BlockPos blockPos : targetedByLinks.keySet())
+            if (!blockPos.isWithinDistance(newPos.pos(), 24))
                 return;
-            }
-        }
-        for (FactoryPanelPosition blockPos : targetedBy.keySet()) {
-            if (!blockPos.pos().closerThan(newPos.pos(), 24)) {
+        for (FactoryPanelPosition blockPos : targetedBy.keySet())
+            if (!blockPos.pos().isWithinDistance(newPos.pos(), 24))
                 return;
-            }
-        }
-        for (FactoryPanelPosition blockPos : targeting) {
-            if (!blockPos.pos().closerThan(newPos.pos(), 24)) {
+        for (FactoryPanelPosition blockPos : targeting)
+            if (!blockPos.pos().isWithinDistance(newPos.pos(), 24))
                 return;
-            }
-        }
 
         // Disconnect links
         for (BlockPos pos : targetedByLinks.keySet()) {
             FactoryPanelSupportBehaviour at = linkAt(level, new FactoryPanelPosition(pos, slot));
-            if (at != null) {
+            if (at != null)
                 at.disconnect(this);
-            }
         }
 
         SmartBlockEntity oldBE = blockEntity;
@@ -260,20 +248,18 @@ public class ServerFactoryPanelBehaviour extends ServerFilteringBehaviour implem
         // Reconnect links
         for (BlockPos pos : targetedByLinks.keySet()) {
             FactoryPanelSupportBehaviour at = linkAt(level, new FactoryPanelPosition(pos, slot));
-            if (at != null) {
+            if (at != null)
                 at.connect(this);
-            }
         }
 
         // Tell player
-        player.displayClientMessage(
-            Component.translatable("create.factory_panel.relocated").withStyle(ChatFormatting.GREEN), true);
-        player.level().playSound(null, newPos.pos(), SoundEvents.COPPER_BREAK, SoundSource.BLOCKS, 1.0f, 1.0f);
+        player.sendMessage(Text.translatable("create.factory_panel.relocated").formatted(Formatting.GREEN), true);
+        player.getEntityWorld().playSound(null, newPos.pos(), SoundEvents.BLOCK_COPPER_BREAK, SoundCategory.BLOCKS, 1.0f, 1.0f);
     }
 
     private void moveToSlot(PanelSlot slot) {
         this.slot = slot;
-        if (getLevel().isClientSide()) {
+        if (getWorld().isClient()) {
             AllClientHandle.INSTANCE.factoryPanelMoveToSlot(blockEntity, slot);
         }
     }
@@ -287,17 +273,16 @@ public class ServerFactoryPanelBehaviour extends ServerFilteringBehaviour implem
     @Override
     public void tick() {
         super.tick();
-        if (getLevel().isClientSide()) {
-            if (blockEntity.isVirtual()) {
+        if (getWorld().isClient()) {
+            if (blockEntity.isVirtual())
                 tickStorageMonitor();
-            }
             bulb.updateChaseTarget(redstonePowered || satisfied ? 1 : 0);
             bulb.tickChaser();
             return;
         }
 
         if (!promisePrimedForMarkDirty) {
-            restockerPromises.setOnChanged(blockEntity::setChanged);
+            restockerPromises.setOnChanged(blockEntity::markDirty);
             promisePrimedForMarkDirty = true;
         }
 
@@ -308,32 +293,27 @@ public class ServerFactoryPanelBehaviour extends ServerFilteringBehaviour implem
     @Override
     public void lazyTick() {
         super.lazyTick();
-        if (getLevel().isClientSide()) {
+        if (getWorld().isClient())
             return;
-        }
         checkForRedstoneInput();
     }
 
     public void checkForRedstoneInput() {
-        if (!active) {
+        if (!active)
             return;
-        }
 
         boolean shouldPower = false;
         for (FactoryPanelConnection connection : targetedByLinks.values()) {
-            if (!getLevel().isLoaded(connection.from.pos())) {
+            if (!getWorld().isPosLoaded(connection.from.pos()))
                 return;
-            }
-            FactoryPanelSupportBehaviour linkAt = linkAt(getLevel(), connection);
-            if (linkAt == null) {
+            FactoryPanelSupportBehaviour linkAt = linkAt(getWorld(), connection);
+            if (linkAt == null)
                 return;
-            }
             shouldPower |= linkAt.shouldPanelBePowered();
         }
 
-        if (shouldPower == redstonePowered) {
+        if (shouldPower == redstonePowered)
             return;
-        }
 
         redstonePowered = shouldPower;
         blockEntity.notifyUpdate();
@@ -342,13 +322,11 @@ public class ServerFactoryPanelBehaviour extends ServerFilteringBehaviour implem
 
     private void notifyRedstoneOutputs() {
         for (FactoryPanelConnection connection : targetedByLinks.values()) {
-            if (!getLevel().isLoaded(connection.from.pos())) {
+            if (!getWorld().isPosLoaded(connection.from.pos()))
                 return;
-            }
-            FactoryPanelSupportBehaviour linkAt = linkAt(getLevel(), connection);
-            if (linkAt == null || linkAt.isOutput()) {
+            FactoryPanelSupportBehaviour linkAt = linkAt(getWorld(), connection);
+            if (linkAt == null || linkAt.isOutput())
                 return;
-            }
             linkAt.notifyLink();
         }
     }
@@ -364,18 +342,17 @@ public class ServerFactoryPanelBehaviour extends ServerFilteringBehaviour implem
         }
         int inStorage = getLevelInStorage();
         int promised = getPromised();
-        int demand = getAmount() * (upTo ? 1 : filter.getMaxStackSize());
+        int demand = getAmount() * (upTo ? 1 : filter.getMaxCount());
         boolean shouldSatisfy = filter.isEmpty() || inStorage >= demand;
         boolean shouldPromiseSatisfy = filter.isEmpty() || inStorage + promised >= demand;
         boolean shouldWait = unloadedLinkCount > 0;
 
-        if (lastReportedLevelInStorage == inStorage && lastReportedPromises == promised && lastReportedUnloadedLinks == unloadedLinkCount && satisfied == shouldSatisfy && promisedSatisfied == shouldPromiseSatisfy && waitingForNetwork == shouldWait) {
+        if (lastReportedLevelInStorage == inStorage && lastReportedPromises == promised && lastReportedUnloadedLinks == unloadedLinkCount && satisfied == shouldSatisfy && promisedSatisfied == shouldPromiseSatisfy && waitingForNetwork == shouldWait)
             return;
-        }
 
         if (!satisfied && shouldSatisfy && demand > 0) {
-            AllSoundEvents.CONFIRM.playOnServer(getLevel(), getPos(), 0.075f, 1f);
-            AllSoundEvents.CONFIRM_2.playOnServer(getLevel(), getPos(), 0.125f, 0.575f);
+            AllSoundEvents.CONFIRM.playOnServer(getWorld(), getPos(), 0.075f, 1f);
+            AllSoundEvents.CONFIRM_2.playOnServer(getWorld(), getPos(), 0.125f, 0.575f);
         }
 
         boolean notifyOutputs = satisfied != shouldSatisfy;
@@ -385,12 +362,10 @@ public class ServerFactoryPanelBehaviour extends ServerFilteringBehaviour implem
         promisedSatisfied = shouldPromiseSatisfy;
         lastReportedUnloadedLinks = unloadedLinkCount;
         waitingForNetwork = shouldWait;
-        if (!getLevel().isClientSide()) {
+        if (!getWorld().isClient())
             blockEntity.sendData();
-        }
-        if (notifyOutputs) {
+        if (notifyOutputs)
             notifyRedstoneOutputs();
-        }
     }
 
     public static class ItemStackConnections extends ArrayList<FactoryPanelConnection> {
@@ -404,15 +379,12 @@ public class ServerFactoryPanelBehaviour extends ServerFilteringBehaviour implem
 
     private void tickRequests() {
         FactoryPanelBlockEntity panelBE = panelBE();
-        if (targetedBy.isEmpty() && !panelBE.restocker) {
+        if (targetedBy.isEmpty() && !panelBE.restocker)
             return;
-        }
-        if (panelBE.restocker) {
+        if (panelBE.restocker)
             restockerPromises.tick();
-        }
-        if (satisfied || promisedSatisfied || waitingForNetwork || redstonePowered) {
+        if (satisfied || promisedSatisfied || waitingForNetwork || redstonePowered)
             return;
-        }
         if (timer > 0) {
             timer = Math.min(timer, getConfigRequestIntervalInTicks());
             timer--;
@@ -421,9 +393,8 @@ public class ServerFactoryPanelBehaviour extends ServerFilteringBehaviour implem
 
         resetTimer();
 
-        if (recipeAddress.isBlank()) {
+        if (recipeAddress.isBlank())
             return;
-        }
 
         if (panelBE.restocker) {
             tryRestock();
@@ -435,16 +406,15 @@ public class ServerFactoryPanelBehaviour extends ServerFilteringBehaviour implem
         Map<UUID, Map<ItemStack, ItemStackConnections>> consolidated = new HashMap<>();
 
         for (FactoryPanelConnection connection : targetedBy.values()) {
-            ServerFactoryPanelBehaviour source = at(getLevel(), connection);
-            if (source == null) {
+            ServerFactoryPanelBehaviour source = at(getWorld(), connection);
+            if (source == null)
                 return;
-            }
 
             ItemStack item = source.getFilter();
 
             Map<ItemStack, ItemStackConnections> networkItemCounts = consolidated.computeIfAbsent(
                 source.network,
-                $ -> new Object2ObjectOpenCustomHashMap<>(ItemStackLinkedSet.TYPE_AND_TAG)
+                $ -> new Object2ObjectOpenCustomHashMap<>(ItemStackSet.HASH_STRATEGY)
             );
             networkItemCounts.computeIfAbsent(item, $ -> new ItemStackConnections(item));
             ItemStackConnections existingConnections = networkItemCounts.get(item);
@@ -460,24 +430,21 @@ public class ServerFactoryPanelBehaviour extends ServerFilteringBehaviour implem
 
             for (ItemStackConnections connections : entry.getValue().values()) {
                 if (connections.totalAmount == 0 || connections.item.isEmpty() || summary.getCountOf(connections.item) < connections.totalAmount) {
-                    for (FactoryPanelConnection connection : connections) {
+                    for (FactoryPanelConnection connection : connections)
                         sendEffect(connection.from, false);
-                    }
                     failed = true;
                     continue;
                 }
 
                 BigItemStack stack = new BigItemStack(connections.item, connections.totalAmount);
                 toRequest.put(network, stack);
-                for (FactoryPanelConnection connection : connections) {
+                for (FactoryPanelConnection connection : connections)
                     sendEffect(connection.from, true);
-                }
             }
         }
 
-        if (failed) {
+        if (failed)
             return;
-        }
 
         // Input items may come from differing networks
         Map<UUID, Collection<BigItemStack>> asMap = toRequest.asMap();
@@ -485,10 +452,9 @@ public class ServerFactoryPanelBehaviour extends ServerFilteringBehaviour implem
         List<Multimap<PackagerBlockEntity, PackagingRequest>> requests = new ArrayList<>();
 
         // Panel may enforce item arrangement
-        if (!activeCraftingArrangement.isEmpty()) {
+        if (!activeCraftingArrangement.isEmpty())
             craftingContext = PackageOrderWithCrafts.singleRecipe(activeCraftingArrangement.stream()
                 .map(stack -> new BigItemStack(stack.copyWithCount(1))).toList());
-        }
 
         // Collect request distributions
         for (Map.Entry<UUID, Collection<BigItemStack>> entry : asMap.entrySet()) {
@@ -506,45 +472,34 @@ public class ServerFactoryPanelBehaviour extends ServerFilteringBehaviour implem
         }
 
         // Check if any packager is busy - cancel all
-        for (Multimap<PackagerBlockEntity, PackagingRequest> entry : requests) {
-            for (PackagerBlockEntity packager : entry.keySet()) {
-                if (packager.isTooBusyFor(RequestType.RESTOCK)) {
+        for (Multimap<PackagerBlockEntity, PackagingRequest> entry : requests)
+            for (PackagerBlockEntity packager : entry.keySet())
+                if (packager.isTooBusyFor(RequestType.RESTOCK))
                     return;
-                }
-            }
-        }
 
         // Send it
-        for (Multimap<PackagerBlockEntity, PackagingRequest> entry : requests) {
+        for (Multimap<PackagerBlockEntity, PackagingRequest> entry : requests)
             LogisticsManager.performPackageRequests(entry);
-        }
 
         // Keep the output promise
         RequestPromiseQueue promises = Create.LOGISTICS.getQueuedPromises(network);
-        if (promises != null) {
+        if (promises != null)
             promises.add(new RequestPromise(new BigItemStack(getFilter(), recipeOutput)));
-        }
 
         panelBE.award(AllAdvancements.FACTORY_GAUGE);
     }
 
     private void tryRestock() {
         ItemStack item = getFilter();
-        if (item.isEmpty()) {
+        if (item.isEmpty())
             return;
-        }
 
         FactoryPanelBlockEntity panelBE = panelBE();
         PackagerBlockEntity packager = panelBE.getRestockedPackager();
-        if (packager == null || !packager.targetInventory.hasInventory()) {
+        if (packager == null || !packager.targetInventory.hasInventory())
             return;
-        }
 
-        int availableOnNetwork = LogisticsManager.getStockOf(
-            network,
-            item,
-            packager.targetInventory.getIdentifiedInventory()
-        );
+        int availableOnNetwork = LogisticsManager.getStockOf(network, item, packager.targetInventory.getIdentifiedInventory());
         if (availableOnNetwork == 0) {
             sendEffect(getPanelPosition(), false);
             return;
@@ -552,7 +507,7 @@ public class ServerFactoryPanelBehaviour extends ServerFilteringBehaviour implem
 
         int inStorage = getLevelInStorage();
         int promised = getPromised();
-        int maxStackSize = item.getMaxStackSize();
+        int maxStackSize = item.getMaxCount();
         int demand = getAmount() * (upTo ? 1 : maxStackSize);
         int amountToOrder = Math.clamp(demand - promised - inStorage, 0, maxStackSize * 9);
 
@@ -567,30 +522,29 @@ public class ServerFactoryPanelBehaviour extends ServerFilteringBehaviour implem
             order,
             packager.targetInventory.getIdentifiedInventory(),
             recipeAddress
-        )) {
+        ))
             return;
-        }
 
         restockerPromises.add(new RequestPromise(orderedItem));
     }
 
     private void sendEffect(FactoryPanelPosition fromPos, boolean success) {
-        if (getLevel() instanceof ServerLevel serverLevel) {
+        if (getWorld() instanceof ServerWorld serverLevel) {
             BlockPos pos = getPos();
-            serverLevel.getServer().getPlayerList().broadcast(
+            serverLevel.getServer().getPlayerManager().sendToAround(
                 null,
                 pos.getX(),
                 pos.getY(),
                 pos.getZ(),
                 64,
-                serverLevel.dimension(),
+                serverLevel.getRegistryKey(),
                 new FactoryPanelEffectPacket(fromPos, getPanelPosition(), success)
             );
         }
     }
 
     public void addConnection(FactoryPanelPosition fromPos) {
-        FactoryPanelSupportBehaviour link = linkAt(getLevel(), fromPos);
+        FactoryPanelSupportBehaviour link = linkAt(getWorld(), fromPos);
         if (link != null) {
             targetedByLinks.put(fromPos.pos(), new FactoryPanelConnection(fromPos, 1));
             link.connect(this);
@@ -598,17 +552,14 @@ public class ServerFactoryPanelBehaviour extends ServerFilteringBehaviour implem
             return;
         }
 
-        if (panelBE().restocker) {
+        if (panelBE().restocker)
             return;
-        }
-        if (targetedBy.size() >= 9) {
+        if (targetedBy.size() >= 9)
             return;
-        }
 
-        ServerFactoryPanelBehaviour source = at(getLevel(), fromPos);
-        if (source == null) {
+        ServerFactoryPanelBehaviour source = at(getWorld(), fromPos);
+        if (source == null)
             return;
-        }
 
         source.targeting.add(getPanelPosition());
         targetedBy.put(fromPos, new FactoryPanelConnection(fromPos, 1));
@@ -625,82 +576,65 @@ public class ServerFactoryPanelBehaviour extends ServerFilteringBehaviour implem
     }
 
     @Override
-    public void onShortInteract(Player player, InteractionHand hand, Direction side, BlockHitResult hitResult) {
+    public void onShortInteract(PlayerEntity player, Hand hand, Direction side, BlockHitResult hitResult) {
         // Network is protected
         if (!Create.LOGISTICS.mayInteract(network, player)) {
-            player.displayClientMessage(
-                Component.translatable("create.logistically_linked.protected").withStyle(ChatFormatting.RED), true);
+            player.sendMessage(Text.translatable("create.logistically_linked.protected").formatted(Formatting.RED), true);
             return;
         }
 
-        boolean isClientSide = player.level().isClientSide();
+        boolean isClientSide = player.getEntityWorld().isClient();
 
         // Wrench cycles through arrow bending
-        ItemStack heldItem = player.getItemInHand(hand);
-        if (targeting.size() + targetedByLinks.size() > 0 && heldItem.is(AllItemTags.TOOLS_WRENCH)) {
+        ItemStack heldItem = player.getStackInHand(hand);
+        if (targeting.size() + targetedByLinks.size() > 0 && heldItem.isIn(AllItemTags.TOOLS_WRENCH)) {
             int sharedMode = -1;
             boolean notifySelf = false;
 
             for (FactoryPanelPosition target : targeting) {
-                ServerFactoryPanelBehaviour at = at(getLevel(), target);
-                if (at == null) {
+                ServerFactoryPanelBehaviour at = at(getWorld(), target);
+                if (at == null)
                     continue;
-                }
                 FactoryPanelConnection connection = at.targetedBy.get(getPanelPosition());
-                if (connection == null) {
+                if (connection == null)
                     continue;
-                }
-                if (sharedMode == -1) {
+                if (sharedMode == -1)
                     sharedMode = (connection.arrowBendMode + 1) % 4;
-                }
                 connection.arrowBendMode = sharedMode;
-                if (!isClientSide) {
+                if (!isClientSide)
                     at.blockEntity.notifyUpdate();
-                }
             }
 
             for (FactoryPanelConnection connection : targetedByLinks.values()) {
-                if (sharedMode == -1) {
+                if (sharedMode == -1)
                     sharedMode = (connection.arrowBendMode + 1) % 4;
-                }
                 connection.arrowBendMode = sharedMode;
-                if (!isClientSide) {
+                if (!isClientSide)
                     notifySelf = true;
-                }
             }
 
-            if (sharedMode == -1) {
+            if (sharedMode == -1)
                 return;
-            }
 
             char[] boxes = "□□□□".toCharArray();
             boxes[sharedMode] = '■';
-            player.displayClientMessage(
-                Component.translatable(
-                    "create.factory_panel.cycled_arrow_path",
-                    new String(boxes)
-                ), true
-            );
-            if (notifySelf) {
+            player.sendMessage(Text.translatable("create.factory_panel.cycled_arrow_path", new String(boxes)), true);
+            if (notifySelf)
                 blockEntity.notifyUpdate();
-            }
 
             return;
         }
 
         // Client might be in the process of connecting a panel
-        if (isClientSide) {
-            if (AllClientHandle.INSTANCE.factoryPanelClicked(getLevel(), player, this)) {
+        if (isClientSide)
+            if (AllClientHandle.INSTANCE.factoryPanelClicked(getWorld(), player, this))
                 return;
-            }
-        }
 
         if (getFilter().isEmpty()) {
             // Open screen for setting an item through JEI
             if (heldItem.isEmpty()) {
-                if (!isClientSide && player instanceof ServerPlayer sp) {
+                if (!isClientSide && player instanceof ServerPlayerEntity sp)
                     openHandledScreen(sp);
-                }
                 return;
             }
 
@@ -711,16 +645,14 @@ public class ServerFactoryPanelBehaviour extends ServerFilteringBehaviour implem
 
         // Bind logistics items to this panels' frequency
         if (heldItem.getItem() instanceof LogisticallyLinkedBlockItem) {
-            if (!isClientSide) {
+            if (!isClientSide)
                 LogisticallyLinkedBlockItem.assignFrequency(heldItem, player, network);
-            }
             return;
         }
 
         // Open configuration screen
-        if (isClientSide) {
+        if (isClientSide)
             AllClientHandle.INSTANCE.openFactoryPanelScreen(this, player);
-        }
     }
 
     public void enable() {
@@ -761,14 +693,14 @@ public class ServerFactoryPanelBehaviour extends ServerFilteringBehaviour implem
         FactoryPanelPosition panelPosition = getPanelPosition();
         disconnectAllLinks();
         for (FactoryPanelConnection connection : targetedBy.values()) {
-            ServerFactoryPanelBehaviour source = at(getLevel(), connection);
+            ServerFactoryPanelBehaviour source = at(getWorld(), connection);
             if (source != null) {
                 source.targeting.remove(panelPosition);
                 source.blockEntity.sendData();
             }
         }
         for (FactoryPanelPosition position : targeting) {
-            ServerFactoryPanelBehaviour target = at(getLevel(), position);
+            ServerFactoryPanelBehaviour target = at(getWorld(), position);
             if (target != null) {
                 target.targetedBy.remove(panelPosition);
                 target.searchForCraftingRecipe();
@@ -781,34 +713,28 @@ public class ServerFactoryPanelBehaviour extends ServerFilteringBehaviour implem
 
     public void disconnectAllLinks() {
         for (FactoryPanelConnection connection : targetedByLinks.values()) {
-            FactoryPanelSupportBehaviour source = linkAt(getLevel(), connection);
-            if (source != null) {
+            FactoryPanelSupportBehaviour source = linkAt(getWorld(), connection);
+            if (source != null)
                 source.disconnect(this);
-            }
         }
         targetedByLinks.clear();
     }
 
     public int getUnloadedLinks() {
-        if (getLevel().isClientSide()) {
+        if (getWorld().isClient())
             return lastReportedUnloadedLinks;
-        }
-        if (panelBE().restocker) {
+        if (panelBE().restocker)
             return panelBE().getRestockedPackager() == null ? 1 : 0;
-        }
         return Create.LOGISTICS.getUnloadedLinkCount(network);
     }
 
     public int getLevelInStorage() {
-        if (blockEntity.isVirtual()) {
+        if (blockEntity.isVirtual())
             return 1;
-        }
-        if (getLevel().isClientSide()) {
+        if (getWorld().isClient())
             return lastReportedLevelInStorage;
-        }
-        if (getFilter().isEmpty()) {
+        if (getFilter().isEmpty())
             return 0;
-        }
 
         InventorySummary summary = getRelevantSummary();
         return summary.getCountOf(getFilter());
@@ -816,24 +742,20 @@ public class ServerFactoryPanelBehaviour extends ServerFilteringBehaviour implem
 
     private InventorySummary getRelevantSummary() {
         FactoryPanelBlockEntity panelBE = panelBE();
-        if (!panelBE.restocker) {
+        if (!panelBE.restocker)
             return LogisticsManager.getSummaryOfNetwork(network, false);
-        }
         PackagerBlockEntity packager = panelBE.getRestockedPackager();
-        if (packager == null) {
+        if (packager == null)
             return InventorySummary.EMPTY;
-        }
         return packager.getAvailableItems();
     }
 
     public int getPromised() {
-        if (getLevel().isClientSide()) {
+        if (getWorld().isClient())
             return lastReportedPromises;
-        }
         ItemStack item = getFilter();
-        if (item.isEmpty()) {
+        if (item.isEmpty())
             return 0;
-        }
 
         if (panelBE().restocker) {
             if (forceClearPromises) {
@@ -845,9 +767,8 @@ public class ServerFactoryPanelBehaviour extends ServerFilteringBehaviour implem
         }
 
         RequestPromiseQueue promises = Create.LOGISTICS.getQueuedPromises(network);
-        if (promises == null) {
+        if (promises == null)
             return 0;
-        }
 
         if (forceClearPromises) {
             promises.forceClear(item);
@@ -871,43 +792,38 @@ public class ServerFactoryPanelBehaviour extends ServerFilteringBehaviour implem
     }
 
     private int getPromiseExpiryTimeInTicks() {
-        if (promiseClearingInterval == -1) {
+        if (promiseClearingInterval == -1)
             return -1;
-        }
-        if (promiseClearingInterval == 0) {
+        if (promiseClearingInterval == 0)
             return 20 * 30;
-        }
 
         return promiseClearingInterval * 20 * 60;
     }
 
     @Override
-    public void writeSafe(ValueOutput view) {
-        if (!active) {
+    public void writeSafe(WriteView view) {
+        if (!active)
             return;
-        }
 
-        ValueOutput panelTag = view.child(slot.name().toLowerCase(Locale.ROOT));
-        panelTag.store("Filter", FilterItemStack.CODEC, filter);
+        WriteView panelTag = view.get(slot.name().toLowerCase(Locale.ROOT));
+        panelTag.put("Filter", FilterItemStack.CODEC, filter);
         panelTag.putBoolean("UpTo", upTo);
         panelTag.putInt("FilterAmount", count);
-        panelTag.store("Freq", UUIDUtil.CODEC, network);
+        panelTag.put("Freq", Uuids.INT_STREAM_CODEC, network);
         panelTag.putString("RecipeAddress", recipeAddress);
         panelTag.putInt("PromiseClearingInterval", -1);
         panelTag.putInt("RecipeOutput", 1);
 
-        if (panelBE().restocker) {
-            panelTag.store("Promises", RequestPromiseQueue.CODEC, restockerPromises);
-        }
+        if (panelBE().restocker)
+            panelTag.put("Promises", RequestPromiseQueue.CODEC, restockerPromises);
     }
 
     @Override
-    public void write(ValueOutput view, boolean clientPacket) {
-        if (!active) {
+    public void write(WriteView view, boolean clientPacket) {
+        if (!active)
             return;
-        }
 
-        ValueOutput panelTag = view.child(slot.name().toLowerCase(Locale.ROOT));
+        WriteView panelTag = view.get(slot.name().toLowerCase(Locale.ROOT));
         super.write(panelTag, clientPacket);
 
         panelTag.putInt("Timer", timer);
@@ -918,70 +834,62 @@ public class ServerFactoryPanelBehaviour extends ServerFilteringBehaviour implem
         panelTag.putBoolean("PromisedSatisfied", promisedSatisfied);
         panelTag.putBoolean("Waiting", waitingForNetwork);
         panelTag.putBoolean("RedstonePowered", redstonePowered);
-        panelTag.store("Targeting", TARGET_CODEC, targeting);
-        TypedOutputList<FactoryPanelConnection> targetedByList = panelTag.list(
-            "TargetedBy",
-            FactoryPanelConnection.CODEC
-        );
+        panelTag.put("Targeting", TARGET_CODEC, targeting);
+        ListAppender<FactoryPanelConnection> targetedByList = panelTag.getListAppender("TargetedBy", FactoryPanelConnection.CODEC);
         targetedBy.values().forEach(targetedByList::add);
-        TypedOutputList<FactoryPanelConnection> targetedByLinkList = panelTag.list(
-            "TargetedByLinks",
-            FactoryPanelConnection.CODEC
-        );
+        ListAppender<FactoryPanelConnection> targetedByLinkList = panelTag.getListAppender("TargetedByLinks", FactoryPanelConnection.CODEC);
         targetedByLinks.values().forEach(targetedByLinkList::add);
         panelTag.putString("RecipeAddress", recipeAddress);
         panelTag.putInt("RecipeOutput", recipeOutput);
         panelTag.putInt("PromiseClearingInterval", promiseClearingInterval);
-        panelTag.store("Freq", UUIDUtil.CODEC, network);
-        panelTag.store("Craft", CreateCodecs.ITEM_LIST_CODEC, activeCraftingArrangement);
+        panelTag.put("Freq", Uuids.INT_STREAM_CODEC, network);
+        panelTag.put("Craft", CreateCodecs.ITEM_LIST_CODEC, activeCraftingArrangement);
         if (craftingList != null) {
-            panelTag.store("CraftingList", CRAFTING_LIST_CODEC, craftingList);
+            panelTag.put("CraftingList", CRAFTING_LIST_CODEC, craftingList);
         }
 
-        if (panelBE().restocker && !clientPacket) {
-            panelTag.store("Promises", RequestPromiseQueue.CODEC, restockerPromises);
-        }
+        if (panelBE().restocker && !clientPacket)
+            panelTag.put("Promises", RequestPromiseQueue.CODEC, restockerPromises);
     }
 
     @Override
-    public void read(ValueInput view, boolean clientPacket) {
-        Optional<ValueInput> slotView = view.child(slot.name().toLowerCase(Locale.ROOT));
+    public void read(ReadView view, boolean clientPacket) {
+        Optional<ReadView> slotView = view.getOptionalReadView(slot.name().toLowerCase(Locale.ROOT));
         if (slotView.isEmpty()) {
             active = false;
             return;
         }
-        ValueInput panelTag = slotView.get();
+        ReadView panelTag = slotView.get();
 
         active = true;
         filter = panelTag.read("Filter", FilterItemStack.CODEC).orElseGet(FilterItemStack::empty);
-        count = panelTag.getIntOr("FilterAmount", 0);
-        upTo = panelTag.getBooleanOr("UpTo", false);
-        timer = panelTag.getIntOr("Timer", 0);
-        lastReportedLevelInStorage = panelTag.getIntOr("LastLevel", 0);
-        lastReportedPromises = panelTag.getIntOr("LastPromised", 0);
-        lastReportedUnloadedLinks = panelTag.getIntOr("LastUnloadedLinks", 0);
-        satisfied = panelTag.getBooleanOr("Satisfied", false);
-        promisedSatisfied = panelTag.getBooleanOr("PromisedSatisfied", false);
-        waitingForNetwork = panelTag.getBooleanOr("Waiting", false);
-        redstonePowered = panelTag.getBooleanOr("RedstonePowered", false);
-        promiseClearingInterval = panelTag.getIntOr("PromiseClearingInterval", 0);
-        panelTag.read("Freq", UUIDUtil.CODEC).ifPresent(uuid -> network = uuid);
+        count = panelTag.getInt("FilterAmount", 0);
+        upTo = panelTag.getBoolean("UpTo", false);
+        timer = panelTag.getInt("Timer", 0);
+        lastReportedLevelInStorage = panelTag.getInt("LastLevel", 0);
+        lastReportedPromises = panelTag.getInt("LastPromised", 0);
+        lastReportedUnloadedLinks = panelTag.getInt("LastUnloadedLinks", 0);
+        satisfied = panelTag.getBoolean("Satisfied", false);
+        promisedSatisfied = panelTag.getBoolean("PromisedSatisfied", false);
+        waitingForNetwork = panelTag.getBoolean("Waiting", false);
+        redstonePowered = panelTag.getBoolean("RedstonePowered", false);
+        promiseClearingInterval = panelTag.getInt("PromiseClearingInterval", 0);
+        panelTag.read("Freq", Uuids.INT_STREAM_CODEC).ifPresent(uuid -> network = uuid);
 
         targeting.clear();
         panelTag.read("Targeting", TARGET_CODEC).ifPresent(targeting::addAll);
 
         targetedBy.clear();
-        panelTag.listOrEmpty("TargetedBy", FactoryPanelConnection.CODEC).forEach(c -> targetedBy.put(c.from, c));
+        panelTag.getTypedListView("TargetedBy", FactoryPanelConnection.CODEC).forEach(c -> targetedBy.put(c.from, c));
 
         targetedByLinks.clear();
-        panelTag.listOrEmpty("TargetedByLinks", FactoryPanelConnection.CODEC)
-            .forEach(c -> targetedByLinks.put(c.from.pos(), c));
+        panelTag.getTypedListView("TargetedByLinks", FactoryPanelConnection.CODEC).forEach(c -> targetedByLinks.put(c.from.pos(), c));
 
         activeCraftingArrangement = panelTag.read("Craft", CreateCodecs.ITEM_LIST_CODEC).orElseGet(List::of);
-        recipeAddress = panelTag.getStringOr("RecipeAddress", "");
-        recipeOutput = panelTag.getIntOr("RecipeOutput", 0);
+        recipeAddress = panelTag.getString("RecipeAddress", "");
+        recipeOutput = panelTag.getInt("RecipeOutput", 0);
 
-        if (view.getBooleanOr("Restocker", false) && !clientPacket) {
+        if (view.getBoolean("Restocker", false) && !clientPacket) {
             Optional<RequestPromiseQueue> queue = panelTag.read("Promises", RequestPromiseQueue.CODEC);
             if (queue.isPresent()) {
                 restockerPromises = queue.get();
@@ -1000,18 +908,17 @@ public class ServerFactoryPanelBehaviour extends ServerFilteringBehaviour implem
     @Override
     public boolean setFilter(ItemStack stack) {
         ItemStack filter = stack.copy();
-        if (stack.getItem() instanceof FilterItem) {
+        if (stack.getItem() instanceof FilterItem)
             return false;
-        }
         this.filter = FilterItemStack.of(filter);
         searchForCraftingRecipe();
-        blockEntity.setChanged();
+        blockEntity.markDirty();
         blockEntity.sendData();
         return true;
     }
 
     public void searchForCraftingRecipe() {
-        if (!(getLevel() instanceof ServerLevel serverWorld)) {
+        if (!(getWorld() instanceof ServerWorld serverWorld)) {
             return;
         }
         ItemStack output = filter.item();
@@ -1024,19 +931,18 @@ public class ServerFactoryPanelBehaviour extends ServerFilteringBehaviour implem
             return b == null ? new BigItemStack(ItemStack.EMPTY, 0) : new BigItemStack(b.getFilter(), c.amount);
         }).toList();
 
-        Set<Item> itemsToUse = inputConfig.stream().map(b -> b.stack).filter(i -> !i.isEmpty()).map(ItemStack::getItem)
-            .collect(Collectors.toSet());
+        Set<Item> itemsToUse = inputConfig.stream().map(b -> b.stack).filter(i -> !i.isEmpty()).map(ItemStack::getItem).collect(Collectors.toSet());
 
         Item item = output.getItem();
-        RegistryAccess registryManager = serverWorld.registryAccess();
-        CraftingRecipe availableCraftingRecipe = serverWorld.recipeAccess().recipes.byType(RecipeType.CRAFTING)
-            .parallelStream().filter(entry -> {
+        DynamicRegistryManager registryManager = serverWorld.getRegistryManager();
+        CraftingRecipe availableCraftingRecipe = serverWorld.getRecipeManager().preparedRecipes.getAll(RecipeType.CRAFTING).parallelStream()
+            .filter(entry -> {
                 CraftingRecipe recipe = entry.value();
                 List<Ingredient> ingredients;
                 if (recipe instanceof ShapedRecipe shapedRecipe) {
                     ItemStack result;
                     try {
-                        result = recipe.assemble(CraftingInput.EMPTY, registryManager);
+                        result = recipe.craft(CraftingRecipeInput.EMPTY, registryManager);
                     } catch (Exception ignore) {
                         result = ItemStack.EMPTY;
                     }
@@ -1053,7 +959,7 @@ public class ServerFactoryPanelBehaviour extends ServerFilteringBehaviour implem
                 } else if (recipe instanceof ShapelessRecipe shapelessRecipe) {
                     ItemStack result;
                     try {
-                        result = recipe.assemble(CraftingInput.EMPTY, registryManager);
+                        result = recipe.craft(CraftingRecipeInput.EMPTY, registryManager);
                     } catch (Exception ignore) {
                         result = ItemStack.EMPTY;
                     }
@@ -1070,15 +976,13 @@ public class ServerFactoryPanelBehaviour extends ServerFilteringBehaviour implem
                 } else {
                     return false;
                 }
-                if (AllRecipeTypes.shouldIgnoreInAutomation(entry)) {
+                if (AllRecipeTypes.shouldIgnoreInAutomation(entry))
                     return false;
-                }
 
                 Set<Item> itemsUsed = new HashSet<>();
                 for (Ingredient ingredient : ingredients) {
-                    if (ingredient.isEmpty()) {
+                    if (ingredient.isEmpty())
                         continue;
-                    }
                     boolean available = false;
                     for (BigItemStack bis : inputConfig) {
                         if (!bis.stack.isEmpty() && ingredient.test(bis.stack)) {
@@ -1087,13 +991,12 @@ public class ServerFactoryPanelBehaviour extends ServerFilteringBehaviour implem
                             break;
                         }
                     }
-                    if (!available) {
+                    if (!available)
                         return false;
-                    }
                 }
 
                 return itemsUsed.size() >= itemsToUse.size();
-            }).findAny().map(RecipeHolder::value).orElse(null);
+            }).findAny().map(RecipeEntry::value).orElse(null);
         if (availableCraftingRecipe == null) {
             craftingList = null;
             return;
@@ -1104,7 +1007,7 @@ public class ServerFactoryPanelBehaviour extends ServerFilteringBehaviour implem
     @Nullable
     public static List<BigItemStack> convertRecipeToPackageOrderContext(
         CraftingRecipe availableCraftingRecipe,
-        RegistryAccess registryManager,
+        DynamicRegistryManager registryManager,
         List<BigItemStack> inputs,
         boolean respectAmounts
     ) {
@@ -1118,7 +1021,7 @@ public class ServerFactoryPanelBehaviour extends ServerFilteringBehaviour implem
         }
 
         List<BigItemStack> craftingList = new ArrayList<>();
-        ItemStack output = availableCraftingRecipe.assemble(CraftingInput.EMPTY, registryManager);
+        ItemStack output = availableCraftingRecipe.craft(CraftingRecipeInput.EMPTY, registryManager);
         int count = output.getCount();
         output.setCount(1);
         craftingList.add(new BigItemStack(output, count));
@@ -1134,64 +1037,52 @@ public class ServerFactoryPanelBehaviour extends ServerFilteringBehaviour implem
             height = shaped.getHeight();
         }
 
-        if (height == 1) {
-            for (int i = 0; i < 3; i++) {
+        if (height == 1)
+            for (int i = 0; i < 3; i++)
                 craftingList.add(emptyIngredient);
-            }
-        }
-        if (width == 1) {
+        if (width == 1)
             craftingList.add(emptyIngredient);
-        }
 
         for (int i = 0; i < ingredients.size(); i++) {
             Ingredient ingredient = ingredients.get(i);
             BigItemStack craftingIngredient = emptyIngredient;
 
-            if (ingredient != null && !ingredient.isEmpty()) {
-                for (BigItemStack bigItemStack : mutableInputs) {
+            if (ingredient != null && !ingredient.isEmpty())
+                for (BigItemStack bigItemStack : mutableInputs)
                     if (bigItemStack.count > 0 && ingredient.test(bigItemStack.stack)) {
                         craftingIngredient = new BigItemStack(bigItemStack.stack, 1);
-                        if (respectAmounts) {
+                        if (respectAmounts)
                             bigItemStack.count -= 1;
-                        }
                         break;
                     }
-                }
-            }
 
             craftingList.add(craftingIngredient);
 
-            if (width < 3 && (i + 1) % width == 0) {
-                for (int j = 0; j < 3 - width; j++) {
-                    if (craftingList.size() < 10) {
+            if (width < 3 && (i + 1) % width == 0)
+                for (int j = 0; j < 3 - width; j++)
+                    if (craftingList.size() < 10)
                         craftingList.add(emptyIngredient);
-                    }
-                }
-            }
         }
 
-        while (craftingList.size() < 10) {
+        while (craftingList.size() < 10)
             craftingList.add(emptyIngredient);
-        }
 
         return craftingList;
     }
 
     @Override
-    public void setValueSettings(Player player, ValueSettings settings, boolean ctrlDown) {
-        if (getValueSettings().equals(settings)) {
+    public void setValueSettings(PlayerEntity player, ValueSettings settings, boolean ctrlDown) {
+        if (getValueSettings().equals(settings))
             return;
-        }
         count = Math.max(0, settings.value());
         upTo = settings.row() == 0;
         panelBE().redraw = true;
-        blockEntity.setChanged();
+        blockEntity.markDirty();
         blockEntity.sendData();
         playFeedbackSound(this);
         resetTimerSlightly();
-        if (!getLevel().isClientSide()) {
+        if (!getWorld().isClient())
             notifyRedstoneOutputs();
-        }
     }
 
     @Override
@@ -1229,10 +1120,7 @@ public class ServerFactoryPanelBehaviour extends ServerFilteringBehaviour implem
 
     @Override
     public ItemRequirement getRequiredItems() {
-        return isActive() ? new ItemRequirement(
-            ItemRequirement.ItemUseType.CONSUME,
-            AllBlocks.FACTORY_GAUGE.asItem()
-        ) : ItemRequirement.NONE;
+        return isActive() ? new ItemRequirement(ItemRequirement.ItemUseType.CONSUME, AllBlocks.FACTORY_GAUGE.asItem()) : ItemRequirement.NONE;
     }
 
     @Override
@@ -1241,46 +1129,38 @@ public class ServerFactoryPanelBehaviour extends ServerFilteringBehaviour implem
     }
 
     @Override
-    public boolean readFromClipboard(ValueInput view, Player player, Direction side, boolean simulate) {
+    public boolean readFromClipboard(ReadView view, PlayerEntity player, Direction side, boolean simulate) {
         return false;
     }
 
     @Override
-    public boolean canWrite(HolderLookup.Provider registries, Direction side) {
+    public boolean canWrite(RegistryWrapper.WrapperLookup registries, Direction side) {
         return false;
     }
 
     @Override
-    public boolean writeToClipboard(ValueOutput view, Direction side) {
+    public boolean writeToClipboard(WriteView view, Direction side) {
         return false;
     }
 
     @Override
-    public FactoryPanelSetItemMenu createMenu(
-        int containerId,
-        Inventory playerInventory,
-        Player player,
-        RegistryFriendlyByteBuf extraData
-    ) {
+    public FactoryPanelSetItemMenu createMenu(int containerId, PlayerInventory playerInventory, PlayerEntity player, RegistryByteBuf extraData) {
         FactoryPanelPosition.PACKET_CODEC.encode(extraData, getPanelPosition());
         return new FactoryPanelSetItemMenu(containerId, playerInventory, this);
     }
 
     @Override
-    public Component getDisplayName() {
-        return blockEntity.getBlockState().getBlock().getName();
+    public Text getDisplayName() {
+        return blockEntity.getCachedState().getBlock().getName();
     }
 
     public String getFrogAddress() {
         PackagerBlockEntity packager = panelBE().getRestockedPackager();
-        if (packager == null) {
+        if (packager == null)
             return null;
-        }
-        if (packager.getLevel().getBlockEntity(packager.getBlockPos().above()) instanceof FrogportBlockEntity fpbe) {
-            if (fpbe.addressFilter != null && !fpbe.addressFilter.isBlank()) {
+        if (packager.getWorld().getBlockEntity(packager.getPos().up()) instanceof FrogportBlockEntity fpbe)
+            if (fpbe.addressFilter != null && !fpbe.addressFilter.isBlank())
                 return fpbe.addressFilter + "";
-            }
-        }
         return null;
     }
 

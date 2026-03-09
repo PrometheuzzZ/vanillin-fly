@@ -6,15 +6,15 @@ import com.zurrtum.create.content.logistics.item.filter.attribute.ItemAttribute;
 import com.zurrtum.create.infrastructure.component.AttributeFilterWhitelistMode;
 import com.zurrtum.create.infrastructure.component.ItemAttributeEntry;
 import com.zurrtum.create.infrastructure.items.ItemStackHandler;
-import net.minecraft.ChatFormatting;
-import net.minecraft.core.component.DataComponents;
-import net.minecraft.network.chat.Component;
-import net.minecraft.world.entity.player.Inventory;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.inventory.ClickType;
-import net.minecraft.world.inventory.Slot;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
+import net.minecraft.component.DataComponentTypes;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.entity.player.PlayerInventory;
+import net.minecraft.item.ItemStack;
+import net.minecraft.item.Items;
+import net.minecraft.screen.slot.Slot;
+import net.minecraft.screen.slot.SlotActionType;
+import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -24,7 +24,7 @@ public class AttributeFilterMenu extends AbstractFilterMenu {
     public AttributeFilterWhitelistMode whitelistMode;
     public List<ItemAttributeEntry> selectedAttributes;
 
-    public AttributeFilterMenu(int id, Inventory inv, ItemStack stack) {
+    public AttributeFilterMenu(int id, PlayerInventory inv, ItemStack stack) {
         super(AllMenuTypes.ATTRIBUTE_FILTER, id, inv, stack);
     }
 
@@ -33,14 +33,11 @@ public class AttributeFilterMenu extends AbstractFilterMenu {
     }
 
     @Override
-    protected void init(Inventory inv, ItemStack contentHolder) {
+    protected void init(PlayerInventory inv, ItemStack contentHolder) {
         super.init(inv, contentHolder);
         ItemStack stack = new ItemStack(Items.NAME_TAG);
-        stack.set(
-            DataComponents.CUSTOM_NAME,
-            Component.literal("Selected Tags").withStyle(ChatFormatting.RESET, ChatFormatting.BLUE)
-        );
-        ghostInventory.setItem(1, stack);
+        stack.set(DataComponentTypes.CUSTOM_NAME, Text.literal("Selected Tags").formatted(Formatting.RESET, Formatting.BLUE));
+        ghostInventory.setStack(1, stack);
     }
 
     @Override
@@ -58,7 +55,7 @@ public class AttributeFilterMenu extends AbstractFilterMenu {
         this.addSlot(new Slot(ghostInventory, 0, 16, 27));
         this.addSlot(new Slot(ghostInventory, 1, 16, 62) {
             @Override
-            public boolean mayPickup(Player playerIn) {
+            public boolean canTakeItems(PlayerEntity playerIn) {
                 return false;
             }
         });
@@ -75,36 +72,33 @@ public class AttributeFilterMenu extends AbstractFilterMenu {
     }
 
     @Override
-    public void clicked(int slotId, int dragType, ClickType clickTypeIn, Player player) {
-        if (slotId == 37) {
+    public void onSlotClick(int slotId, int dragType, SlotActionType clickTypeIn, PlayerEntity player) {
+        if (slotId == 37)
             return;
-        }
-        super.clicked(slotId, dragType, clickTypeIn, player);
+        super.onSlotClick(slotId, dragType, clickTypeIn, player);
     }
 
     @Override
-    public boolean canDragTo(Slot slotIn) {
-        if (slotIn.index == 37) {
+    public boolean canInsertIntoSlot(Slot slotIn) {
+        if (slotIn.id == 37)
             return false;
-        }
-        return super.canDragTo(slotIn);
+        return super.canInsertIntoSlot(slotIn);
     }
 
     @Override
-    public boolean canTakeItemForPickAll(ItemStack stack, Slot slotIn) {
-        if (slotIn.index == 37) {
+    public boolean canInsertIntoSlot(ItemStack stack, Slot slotIn) {
+        if (slotIn.id == 37)
             return false;
-        }
-        return super.canTakeItemForPickAll(stack, slotIn);
+        return super.canInsertIntoSlot(stack, slotIn);
     }
 
     @Override
-    public ItemStack quickMoveStack(Player playerIn, int index) {
+    public ItemStack quickMove(PlayerEntity playerIn, int index) {
         Slot slot = slots.get(index);
-        ItemStack stackToInsert = slot.getItem();
+        ItemStack stackToInsert = slot.getStack();
         ItemStack copy = stackToInsert.copy();
         copy.setCount(1);
-        ghostInventory.setItem(0, copy);
+        ghostInventory.setStack(0, copy);
         return ItemStack.EMPTY;
     }
 
@@ -112,14 +106,8 @@ public class AttributeFilterMenu extends AbstractFilterMenu {
     protected void initAndReadInventory(ItemStack filterItem) {
         super.initAndReadInventory(filterItem);
         selectedAttributes = new ArrayList<>();
-        whitelistMode = filterItem.getOrDefault(
-            AllDataComponents.ATTRIBUTE_FILTER_WHITELIST_MODE,
-            AttributeFilterWhitelistMode.WHITELIST_DISJ
-        );
-        List<ItemAttributeEntry> attributes = filterItem.getOrDefault(
-            AllDataComponents.ATTRIBUTE_FILTER_MATCHED_ATTRIBUTES,
-            List.of()
-        );
+        whitelistMode = filterItem.getOrDefault(AllDataComponents.ATTRIBUTE_FILTER_WHITELIST_MODE, AttributeFilterWhitelistMode.WHITELIST_DISJ);
+        List<ItemAttributeEntry> attributes = filterItem.getOrDefault(AllDataComponents.ATTRIBUTE_FILTER_MATCHED_ATTRIBUTES, List.of());
         selectedAttributes.addAll(attributes);
     }
 
@@ -128,9 +116,8 @@ public class AttributeFilterMenu extends AbstractFilterMenu {
         filterItem.set(AllDataComponents.ATTRIBUTE_FILTER_WHITELIST_MODE, whitelistMode);
         List<ItemAttributeEntry> attributes = new ArrayList<>();
         selectedAttributes.forEach(at -> {
-            if (at == null) {
+            if (at == null)
                 return;
-            }
             attributes.add(new ItemAttributeEntry(at.attribute(), at.inverted()));
         });
         filterItem.set(AllDataComponents.ATTRIBUTE_FILTER_MATCHED_ATTRIBUTES, attributes);

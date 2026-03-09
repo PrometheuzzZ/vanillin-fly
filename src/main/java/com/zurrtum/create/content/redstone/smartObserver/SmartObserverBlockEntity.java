@@ -17,14 +17,14 @@ import com.zurrtum.create.foundation.blockEntity.behaviour.inventory.CapManipula
 import com.zurrtum.create.foundation.blockEntity.behaviour.inventory.InvManipulationBehaviour;
 import com.zurrtum.create.foundation.blockEntity.behaviour.inventory.TankManipulationBehaviour;
 import com.zurrtum.create.foundation.blockEntity.behaviour.inventory.VersionedInventoryTrackerBehaviour;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.world.Clearable;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
+import net.minecraft.item.ItemStack;
+import net.minecraft.storage.ReadView;
+import net.minecraft.storage.WriteView;
+import net.minecraft.util.Clearable;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
 
 import java.util.List;
 
@@ -50,10 +50,7 @@ public class SmartObserverBlockEntity extends SmartBlockEntity implements Cleara
         behaviours.add(filtering = new ServerFilteringBehaviour(this).withCallback($ -> invVersionTracker.reset()));
         behaviours.add(invVersionTracker = new VersionedInventoryTrackerBehaviour(this));
 
-        InterfaceProvider towardBlockFacing = (w, p, s) -> new BlockFace(
-            p,
-            DirectedDirectionalBlock.getTargetDirection(s)
-        );
+        InterfaceProvider towardBlockFacing = (w, p, s) -> new BlockFace(p, DirectedDirectionalBlock.getTargetDirection(s));
 
         behaviours.add(observedInventory = new InvManipulationBehaviour(this, towardBlockFacing).bypassSidedness());
         behaviours.add(observedTank = new TankManipulationBehaviour(this, towardBlockFacing).bypassSidedness());
@@ -63,24 +60,21 @@ public class SmartObserverBlockEntity extends SmartBlockEntity implements Cleara
     public void tick() {
         super.tick();
 
-        if (level.isClientSide()) {
+        if (world.isClient())
             return;
-        }
 
-        BlockState state = getBlockState();
+        BlockState state = getCachedState();
         if (turnOffTicks > 0) {
             turnOffTicks--;
-            if (turnOffTicks == 0) {
-                level.scheduleTick(worldPosition, state.getBlock(), 1);
-            }
+            if (turnOffTicks == 0)
+                world.scheduleBlockTick(pos, state.getBlock(), 1);
         }
 
-        if (!isActive()) {
+        if (!isActive())
             return;
-        }
 
-        BlockPos targetPos = worldPosition.relative(SmartObserverBlock.getTargetDirection(state));
-        Block block = level.getBlockState(targetPos).getBlock();
+        BlockPos targetPos = pos.offset(SmartObserverBlock.getTargetDirection(state));
+        Block block = world.getBlockState(targetPos).getBlock();
 
         if (!filtering.getFilter().isEmpty() && block.asItem() != null && filtering.test(new ItemStack(block))) {
             activate(3);
@@ -88,17 +82,12 @@ public class SmartObserverBlockEntity extends SmartBlockEntity implements Cleara
         }
 
         // Detect items on belt
-        TransportedItemStackHandlerBehaviour behaviour = BlockEntityBehaviour.get(
-            level,
-            targetPos,
-            TransportedItemStackHandlerBehaviour.TYPE
-        );
+        TransportedItemStackHandlerBehaviour behaviour = BlockEntityBehaviour.get(world, targetPos, TransportedItemStackHandlerBehaviour.TYPE);
         if (behaviour != null) {
             behaviour.handleCenteredProcessingOnAllItems(
                 .45f, stack -> {
-                    if (!filtering.test(stack.stack) || turnOffTicks == 6) {
+                    if (!filtering.test(stack.stack) || turnOffTicks == 6)
                         return TransportedResult.doNothing();
-                    }
                     activate();
                     return TransportedResult.doNothing();
                 }
@@ -107,20 +96,14 @@ public class SmartObserverBlockEntity extends SmartBlockEntity implements Cleara
         }
 
         // Detect fluids in pipe
-        FluidTransportBehaviour fluidBehaviour = BlockEntityBehaviour.get(
-            level,
-            targetPos,
-            FluidTransportBehaviour.TYPE
-        );
+        FluidTransportBehaviour fluidBehaviour = BlockEntityBehaviour.get(world, targetPos, FluidTransportBehaviour.TYPE);
         if (fluidBehaviour != null) {
             for (Direction side : Iterate.directions) {
                 Flow flow = fluidBehaviour.getFlow(side);
-                if (flow == null || !flow.inbound || !flow.complete) {
+                if (flow == null || !flow.inbound || !flow.complete)
                     continue;
-                }
-                if (!filtering.test(flow.fluid)) {
+                if (!filtering.test(flow.fluid))
                     continue;
-                }
                 activate();
                 return;
             }
@@ -128,13 +111,12 @@ public class SmartObserverBlockEntity extends SmartBlockEntity implements Cleara
         }
 
         // Detect packages looping on a chain conveyor
-        if (level.getBlockEntity(targetPos) instanceof ChainConveyorBlockEntity ccbe) {
-            for (ChainConveyorPackage box : ccbe.getLoopingPackages()) {
+        if (world.getBlockEntity(targetPos) instanceof ChainConveyorBlockEntity ccbe) {
+            for (ChainConveyorPackage box : ccbe.getLoopingPackages())
                 if (filtering.test(box.item)) {
                     activate();
                     return;
                 }
-            }
             return;
         }
 
@@ -142,9 +124,8 @@ public class SmartObserverBlockEntity extends SmartBlockEntity implements Cleara
             boolean skipInv = invVersionTracker.stillWaiting(observedInventory);
             invVersionTracker.awaitNewVersion(observedInventory);
 
-            if (skipInv && sustainSignal) {
+            if (skipInv && sustainSignal)
                 turnOffTicks = DEFAULT_DELAY;
-            }
 
             if (!skipInv) {
                 sustainSignal = false;
@@ -166,13 +147,12 @@ public class SmartObserverBlockEntity extends SmartBlockEntity implements Cleara
     }
 
     public void activate(int ticks) {
-        BlockState state = getBlockState();
+        BlockState state = getCachedState();
         turnOffTicks = ticks;
-        if (state.getValue(SmartObserverBlock.POWERED)) {
+        if (state.get(SmartObserverBlock.POWERED))
             return;
-        }
-        level.setBlockAndUpdate(worldPosition, state.setValue(SmartObserverBlock.POWERED, true));
-        level.updateNeighborsAt(worldPosition, state.getBlock(), null);
+        world.setBlockState(pos, state.with(SmartObserverBlock.POWERED, true));
+        world.updateNeighborsAlways(pos, state.getBlock(), null);
     }
 
     private boolean isActive() {
@@ -180,19 +160,19 @@ public class SmartObserverBlockEntity extends SmartBlockEntity implements Cleara
     }
 
     @Override
-    public void write(ValueOutput view, boolean clientPacket) {
+    public void write(WriteView view, boolean clientPacket) {
         view.putInt("TurnOff", turnOffTicks);
         super.write(view, clientPacket);
     }
 
     @Override
-    protected void read(ValueInput view, boolean clientPacket) {
+    protected void read(ReadView view, boolean clientPacket) {
         super.read(view, clientPacket);
-        turnOffTicks = view.getIntOr("TurnOff", 0);
+        turnOffTicks = view.getInt("TurnOff", 0);
     }
 
     @Override
-    public void clearContent() {
+    public void clear() {
         filtering.setFilter(ItemStack.EMPTY);
     }
 }

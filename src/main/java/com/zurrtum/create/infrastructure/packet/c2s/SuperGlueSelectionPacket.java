@@ -3,29 +3,29 @@ package com.zurrtum.create.infrastructure.packet.c2s;
 import com.zurrtum.create.AllHandle;
 import com.zurrtum.create.AllPackets;
 import io.netty.buffer.ByteBuf;
-import net.minecraft.core.BlockPos;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.PacketType;
-import net.minecraft.network.protocol.game.ServerGamePacketListener;
-import net.minecraft.server.network.ServerGamePacketListenerImpl;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.listener.ServerPlayPacketListener;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.PacketType;
+import net.minecraft.server.network.ServerPlayNetworkHandler;
+import net.minecraft.util.math.BlockPos;
 
-public record SuperGlueSelectionPacket(BlockPos from, BlockPos to) implements Packet<ServerGamePacketListener> {
-    public static final StreamCodec<ByteBuf, SuperGlueSelectionPacket> CODEC = StreamCodec.composite(
-        BlockPos.STREAM_CODEC,
+public record SuperGlueSelectionPacket(BlockPos from, BlockPos to) implements Packet<ServerPlayPacketListener> {
+    public static final PacketCodec<ByteBuf, SuperGlueSelectionPacket> CODEC = PacketCodec.tuple(
+        BlockPos.PACKET_CODEC,
         SuperGlueSelectionPacket::from,
-        BlockPos.STREAM_CODEC,
+        BlockPos.PACKET_CODEC,
         SuperGlueSelectionPacket::to,
         SuperGlueSelectionPacket::new
     );
 
     @Override
-    public void handle(ServerGamePacketListener listener) {
-        AllHandle.onSuperGlueSelection((ServerGamePacketListenerImpl) listener, this);
+    public void apply(ServerPlayPacketListener listener) {
+        AllHandle.onSuperGlueSelection((ServerPlayNetworkHandler) listener, this);
     }
 
     @Override
-    public PacketType<SuperGlueSelectionPacket> type() {
+    public PacketType<SuperGlueSelectionPacket> getPacketType() {
         return AllPackets.GLUE_IN_AREA;
     }
 }

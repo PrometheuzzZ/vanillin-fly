@@ -1,35 +1,25 @@
 package com.zurrtum.create.client.infrastructure.model;
 
-import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.content.decoration.bracket.BracketedBlockEntityBehaviour;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.block.model.BlockModelPart;
-import net.minecraft.client.renderer.block.model.BlockStateModel;
-import net.minecraft.core.BlockPos;
-import net.minecraft.util.RandomSource;
-import net.minecraft.world.level.BlockAndTintGetter;
-import net.minecraft.world.level.block.state.BlockState;
+import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
+import net.minecraft.block.BlockState;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.render.model.BlockModelPart;
+import net.minecraft.client.render.model.BlockStateModel;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.random.Random;
+import net.minecraft.world.BlockRenderView;
 
 import java.util.List;
 
 public class BracketedKineticBlockModel extends WrapperBlockStateModel {
-    public BracketedKineticBlockModel(BlockState state, UnbakedRoot unbaked) {
+    public BracketedKineticBlockModel(BlockState state, UnbakedGrouped unbaked) {
         super(state, unbaked);
     }
 
     @Override
-    public void addPartsWithInfo(
-        BlockAndTintGetter world,
-        BlockPos pos,
-        BlockState state,
-        RandomSource random,
-        List<BlockModelPart> parts
-    ) {
-        BracketedBlockEntityBehaviour attachmentBehaviour = BlockEntityBehaviour.get(
-            world,
-            pos,
-            BracketedBlockEntityBehaviour.TYPE
-        );
+    public void addPartsWithInfo(BlockRenderView world, BlockPos pos, BlockState state, Random random, List<BlockModelPart> parts) {
+        BracketedBlockEntityBehaviour attachmentBehaviour = BlockEntityBehaviour.get(world, pos, BracketedBlockEntityBehaviour.TYPE);
         if (attachmentBehaviour == null) {
             return;
         }
@@ -37,11 +27,11 @@ public class BracketedKineticBlockModel extends WrapperBlockStateModel {
         if (bracket == null) {
             return;
         }
-        BlockStateModel model = Minecraft.getInstance().getBlockRenderer().getBlockModel(bracket);
+        BlockStateModel model = MinecraftClient.getInstance().getBlockRenderManager().getModel(bracket);
         if (WrapperBlockStateModel.unwrapCompat(model) instanceof WrapperBlockStateModel wrapper) {
             wrapper.addPartsWithInfo(world, pos, state, random, parts);
         } else {
-            model.collectParts(random, parts);
+            model.addParts(random, parts);
         }
     }
 }

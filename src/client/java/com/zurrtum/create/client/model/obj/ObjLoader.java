@@ -12,11 +12,12 @@ import com.google.gson.JsonParseException;
 import com.zurrtum.create.client.model.StandardModelParameters;
 import com.zurrtum.create.client.model.UnbakedModelLoader;
 import com.zurrtum.create.foundation.utility.CreateResourceReloader;
-import net.minecraft.client.Minecraft;
-import net.minecraft.resources.Identifier;
-import net.minecraft.server.packs.resources.Resource;
-import net.minecraft.server.packs.resources.ResourceManager;
-import net.minecraft.util.GsonHelper;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.resource.Resource;
+import net.minecraft.resource.ResourceManager;
+import net.minecraft.resource.SynchronousResourceReloader;
+import net.minecraft.util.Identifier;
+import net.minecraft.util.JsonHelper;
 
 import java.io.FileNotFoundException;
 import java.util.Map;
@@ -27,44 +28,40 @@ import java.util.Map;
  * Allows the user to enable automatic face culling, toggle quad shading, flip UVs, render emissively and specify a
  * {@link ObjMaterialLibrary material library} override.
  */
-public class ObjLoader extends CreateResourceReloader implements UnbakedModelLoader<ObjModel> {
+public class ObjLoader extends CreateResourceReloader implements UnbakedModelLoader<ObjModel>, SynchronousResourceReloader {
     public static ObjLoader INSTANCE = new ObjLoader();
 
     private final Map<ObjGeometry.Settings, ObjGeometry> geometryCache = Maps.newConcurrentMap();
     private final Map<Identifier, ObjMaterialLibrary> materialCache = Maps.newConcurrentMap();
 
-    private final ResourceManager manager = Minecraft.getInstance().getResourceManager();
+    private final ResourceManager manager = MinecraftClient.getInstance().getResourceManager();
 
     public ObjLoader() {
         super("model");
     }
 
     @Override
-    public void onResourceManagerReload(ResourceManager resourceManager) {
+    public void reload(ResourceManager resourceManager) {
         geometryCache.clear();
         materialCache.clear();
     }
 
     @Override
-    public ObjModel read(
-        JsonObject jsonObject,
-        JsonDeserializationContext jsonDeserializationContext
-    ) throws JsonParseException {
-        if (!jsonObject.has("model")) {
+    public ObjModel read(JsonObject jsonObject, JsonDeserializationContext jsonDeserializationContext) throws JsonParseException {
+        if (!jsonObject.has("model"))
             throw new JsonParseException("OBJ Loader requires a 'model' key that points to a valid .OBJ model.");
-        }
 
         String modelLocation = jsonObject.get("model").getAsString();
 
-        boolean automaticCulling = GsonHelper.getAsBoolean(jsonObject, "automatic_culling", true);
-        boolean shadeQuads = GsonHelper.getAsBoolean(jsonObject, "shade_quads", true);
-        boolean flipV = GsonHelper.getAsBoolean(jsonObject, "flip_v", false);
-        boolean emissiveAmbient = GsonHelper.getAsBoolean(jsonObject, "emissive_ambient", true);
-        String mtlOverride = GsonHelper.getAsString(jsonObject, "mtl_override", null);
+        boolean automaticCulling = JsonHelper.getBoolean(jsonObject, "automatic_culling", true);
+        boolean shadeQuads = JsonHelper.getBoolean(jsonObject, "shade_quads", true);
+        boolean flipV = JsonHelper.getBoolean(jsonObject, "flip_v", false);
+        boolean emissiveAmbient = JsonHelper.getBoolean(jsonObject, "emissive_ambient", true);
+        String mtlOverride = JsonHelper.getString(jsonObject, "mtl_override", null);
         StandardModelParameters parameters = StandardModelParameters.parse(jsonObject, jsonDeserializationContext);
 
         var geometry = loadGeometry(new ObjGeometry.Settings(
-            Identifier.parse(modelLocation),
+            Identifier.of(modelLocation),
             automaticCulling,
             shadeQuads,
             flipV,
@@ -79,7 +76,7 @@ public class ObjLoader extends CreateResourceReloader implements UnbakedModelLoa
         return geometryCache.computeIfAbsent(
             settings, (data) -> {
                 Resource resource = manager.getResource(settings.modelLocation()).orElseThrow();
-                try (ObjTokenizer tokenizer = new ObjTokenizer(resource.open())) {
+                try (ObjTokenizer tokenizer = new ObjTokenizer(resource.getInputStream())) {
                     return ObjGeometry.parse(tokenizer, data);
                 } catch (FileNotFoundException e) {
                     throw new RuntimeException("Could not find OBJ model", e);
@@ -94,7 +91,7 @@ public class ObjLoader extends CreateResourceReloader implements UnbakedModelLoa
         return materialCache.computeIfAbsent(
             materialLocation, (location) -> {
                 Resource resource = manager.getResource(location).orElseThrow();
-                try (ObjTokenizer rdr = new ObjTokenizer(resource.open())) {
+                try (ObjTokenizer rdr = new ObjTokenizer(resource.getInputStream())) {
                     return new ObjMaterialLibrary(rdr);
                 } catch (FileNotFoundException e) {
                     throw new RuntimeException("Could not find OBJ material library", e);

@@ -67,17 +67,15 @@ public class Builder {
     }
 
     public Builder comment(String... value) {
-        if (ignoreComments) {
+        if (ignoreComments)
             return this;
-        }
         comments.addAll(Arrays.asList(value));
         return this;
     }
 
     public void addComments(JsonObject object) {
-        if (ignoreComments) {
+        if (ignoreComments)
             return;
-        }
         switch (comments.size()) {
             case 0:
                 return;

@@ -1,24 +1,23 @@
 package com.zurrtum.create.client.content.kinetics.press;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.zurrtum.create.client.AllPartialModels;
 import com.zurrtum.create.client.catnip.render.CachedBuffers;
 import com.zurrtum.create.client.catnip.render.SuperByteBuffer;
 import com.zurrtum.create.client.content.kinetics.base.KineticBlockEntityRenderer;
 import com.zurrtum.create.content.kinetics.press.MechanicalPressBlockEntity;
 import com.zurrtum.create.content.kinetics.press.PressingBehaviour;
-import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
-import net.minecraft.client.renderer.feature.ModelFeatureRenderer;
-import net.minecraft.client.renderer.rendertype.RenderType;
-import net.minecraft.client.renderer.rendertype.RenderTypes;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.properties.BlockStateProperties;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.block.BlockState;
+import net.minecraft.client.render.RenderLayer;
+import net.minecraft.client.render.VertexConsumer;
+import net.minecraft.client.render.block.entity.BlockEntityRendererFactory;
+import net.minecraft.client.render.command.ModelCommandRenderer;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.state.property.Properties;
+import net.minecraft.util.math.Vec3d;
 import org.jetbrains.annotations.Nullable;
 
 public class MechanicalPressRenderer extends KineticBlockEntityRenderer<MechanicalPressBlockEntity, MechanicalPressRenderer.MechanicalPressRenderState> {
-    public MechanicalPressRenderer(BlockEntityRendererProvider.Context context) {
+    public MechanicalPressRenderer(BlockEntityRendererFactory.Context context) {
         super(context);
     }
 
@@ -28,31 +27,27 @@ public class MechanicalPressRenderer extends KineticBlockEntityRenderer<Mechanic
     }
 
     @Override
-    public void extractRenderState(
+    public void updateRenderState(
         MechanicalPressBlockEntity be,
         MechanicalPressRenderState state,
         float tickProgress,
-        Vec3 cameraPos,
-        @Nullable ModelFeatureRenderer.CrumblingOverlay crumblingOverlay
+        Vec3d cameraPos,
+        @Nullable ModelCommandRenderer.CrumblingOverlayCommand crumblingOverlay
     ) {
-        super.extractRenderState(be, state, tickProgress, cameraPos, crumblingOverlay);
-        BlockState blockState = be.getBlockState();
+        super.updateRenderState(be, state, tickProgress, cameraPos, crumblingOverlay);
+        BlockState blockState = be.getCachedState();
         PressingBehaviour pressingBehaviour = be.getPressingBehaviour();
-        state.head = CachedBuffers.partialFacing(
-            AllPartialModels.MECHANICAL_PRESS_HEAD,
-            blockState,
-            blockState.getValue(BlockStateProperties.HORIZONTAL_FACING)
-        );
+        state.head = CachedBuffers.partialFacing(AllPartialModels.MECHANICAL_PRESS_HEAD, blockState, blockState.get(Properties.HORIZONTAL_FACING));
         state.offset = -(pressingBehaviour.getRenderedHeadOffset(tickProgress) * pressingBehaviour.mode.headOffset);
     }
 
     @Override
-    protected RenderType getRenderType(MechanicalPressBlockEntity be, BlockState state) {
-        return RenderTypes.solidMovingBlock();
+    protected RenderLayer getRenderType(MechanicalPressBlockEntity be, BlockState state) {
+        return RenderLayer.getSolid();
     }
 
     @Override
-    public boolean shouldRenderOffScreen() {
+    public boolean rendersOutsideBoundingBox() {
         return true;
     }
 
@@ -66,10 +61,10 @@ public class MechanicalPressRenderer extends KineticBlockEntityRenderer<Mechanic
         public float offset;
 
         @Override
-        public void render(PoseStack.Pose matricesEntry, VertexConsumer vertexConsumer) {
+        public void render(MatrixStack.Entry matricesEntry, VertexConsumer vertexConsumer) {
             super.render(matricesEntry, vertexConsumer);
             head.translate(0, offset, 0);
-            head.light(lightCoords);
+            head.light(lightmapCoordinates);
             head.renderInto(matricesEntry, vertexConsumer);
         }
     }

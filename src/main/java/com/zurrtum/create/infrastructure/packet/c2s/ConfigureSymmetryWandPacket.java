@@ -4,17 +4,16 @@ import com.zurrtum.create.AllHandle;
 import com.zurrtum.create.AllPackets;
 import com.zurrtum.create.catnip.codecs.stream.CatnipStreamCodecs;
 import com.zurrtum.create.infrastructure.component.SymmetryMirror;
-import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.PacketType;
-import net.minecraft.network.protocol.game.ServerGamePacketListener;
-import net.minecraft.server.network.ServerGamePacketListenerImpl;
-import net.minecraft.world.InteractionHand;
+import net.minecraft.network.PacketByteBuf;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.listener.ServerPlayPacketListener;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.PacketType;
+import net.minecraft.server.network.ServerPlayNetworkHandler;
+import net.minecraft.util.Hand;
 
-public record ConfigureSymmetryWandPacket(InteractionHand hand,
-                                          SymmetryMirror mirror) implements Packet<ServerGamePacketListener> {
-    public static final StreamCodec<FriendlyByteBuf, ConfigureSymmetryWandPacket> CODEC = StreamCodec.composite(
+public record ConfigureSymmetryWandPacket(Hand hand, SymmetryMirror mirror) implements Packet<ServerPlayPacketListener> {
+    public static final PacketCodec<PacketByteBuf, ConfigureSymmetryWandPacket> CODEC = PacketCodec.tuple(
         CatnipStreamCodecs.HAND,
         ConfigureSymmetryWandPacket::hand,
         SymmetryMirror.STREAM_CODEC,
@@ -23,12 +22,12 @@ public record ConfigureSymmetryWandPacket(InteractionHand hand,
     );
 
     @Override
-    public void handle(ServerGamePacketListener listener) {
-        AllHandle.onConfigureSymmetryWand((ServerGamePacketListenerImpl) listener, this);
+    public void apply(ServerPlayPacketListener listener) {
+        AllHandle.onConfigureSymmetryWand((ServerPlayNetworkHandler) listener, this);
     }
 
     @Override
-    public PacketType<ConfigureSymmetryWandPacket> type() {
+    public PacketType<ConfigureSymmetryWandPacket> getPacketType() {
         return AllPackets.CONFIGURE_SYMMETRY_WAND;
     }
 }

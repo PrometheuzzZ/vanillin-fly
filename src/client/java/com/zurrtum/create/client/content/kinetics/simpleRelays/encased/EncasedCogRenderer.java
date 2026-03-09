@@ -1,7 +1,5 @@
 package com.zurrtum.create.client.content.kinetics.simpleRelays.encased;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.zurrtum.create.client.AllPartialModels;
 import com.zurrtum.create.client.catnip.render.CachedBuffers;
 import com.zurrtum.create.client.catnip.render.SuperByteBuffer;
@@ -9,27 +7,28 @@ import com.zurrtum.create.client.content.kinetics.base.KineticBlockEntityRendere
 import com.zurrtum.create.client.content.kinetics.simpleRelays.BracketedKineticBlockEntityRenderer;
 import com.zurrtum.create.content.kinetics.simpleRelays.SimpleKineticBlockEntity;
 import com.zurrtum.create.content.kinetics.simpleRelays.encased.EncasedCogwheelBlock;
-import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
-import net.minecraft.client.renderer.feature.ModelFeatureRenderer;
-import net.minecraft.client.renderer.rendertype.RenderType;
-import net.minecraft.client.renderer.rendertype.RenderTypes;
-import net.minecraft.core.Direction;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.block.BlockState;
+import net.minecraft.client.render.RenderLayer;
+import net.minecraft.client.render.VertexConsumer;
+import net.minecraft.client.render.block.entity.BlockEntityRendererFactory;
+import net.minecraft.client.render.command.ModelCommandRenderer;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Vec3d;
 import org.jetbrains.annotations.Nullable;
 
 public class EncasedCogRenderer extends KineticBlockEntityRenderer<SimpleKineticBlockEntity, EncasedCogRenderer.EncasedCogRenderState> {
     private final boolean large;
 
-    public static EncasedCogRenderer small(BlockEntityRendererProvider.Context context) {
+    public static EncasedCogRenderer small(BlockEntityRendererFactory.Context context) {
         return new EncasedCogRenderer(context, false);
     }
 
-    public static EncasedCogRenderer large(BlockEntityRendererProvider.Context context) {
+    public static EncasedCogRenderer large(BlockEntityRendererFactory.Context context) {
         return new EncasedCogRenderer(context, true);
     }
 
-    public EncasedCogRenderer(BlockEntityRendererProvider.Context context, boolean large) {
+    public EncasedCogRenderer(BlockEntityRendererFactory.Context context, boolean large) {
         super(context);
         this.large = large;
     }
@@ -40,19 +39,16 @@ public class EncasedCogRenderer extends KineticBlockEntityRenderer<SimpleKinetic
     }
 
     @Override
-    public void extractRenderState(
+    public void updateRenderState(
         SimpleKineticBlockEntity be,
         EncasedCogRenderState state,
         float tickProgress,
-        Vec3 cameraPos,
-        @Nullable ModelFeatureRenderer.CrumblingOverlay crumblingOverlay
+        Vec3d cameraPos,
+        @Nullable ModelCommandRenderer.CrumblingOverlayCommand crumblingOverlay
     ) {
-        super.extractRenderState(be, state, tickProgress, cameraPos, crumblingOverlay);
-        state.shaftAngle = large ? BracketedKineticBlockEntityRenderer.getAngleForLargeCogShaft(
-            be,
-            state.axis
-        ) : state.angle;
-        if (state.blockState.getValueOrElse(EncasedCogwheelBlock.TOP_SHAFT, false)) {
+        super.updateRenderState(be, state, tickProgress, cameraPos, crumblingOverlay);
+        state.shaftAngle = large ? BracketedKineticBlockEntityRenderer.getAngleForLargeCogShaft(be, state.axis) : state.angle;
+        if (state.blockState.get(EncasedCogwheelBlock.TOP_SHAFT, false)) {
             state.top = CachedBuffers.partialFacing(
                 AllPartialModels.SHAFT_HALF, state.blockState, switch (state.axis) {
                     case Y -> Direction.UP;
@@ -61,7 +57,7 @@ public class EncasedCogRenderer extends KineticBlockEntityRenderer<SimpleKinetic
                 }
             );
         }
-        if (state.blockState.getValueOrElse(EncasedCogwheelBlock.BOTTOM_SHAFT, false)) {
+        if (state.blockState.get(EncasedCogwheelBlock.BOTTOM_SHAFT, false)) {
             state.bottom = CachedBuffers.partialFacing(
                 AllPartialModels.SHAFT_HALF, state.blockState, switch (state.axis) {
                     case Y -> Direction.DOWN;
@@ -73,8 +69,8 @@ public class EncasedCogRenderer extends KineticBlockEntityRenderer<SimpleKinetic
     }
 
     @Override
-    protected RenderType getRenderType(SimpleKineticBlockEntity be, BlockState state) {
-        return RenderTypes.solidMovingBlock();
+    protected RenderLayer getRenderType(SimpleKineticBlockEntity be, BlockState state) {
+        return RenderLayer.getSolid();
     }
 
     @Override
@@ -92,16 +88,16 @@ public class EncasedCogRenderer extends KineticBlockEntityRenderer<SimpleKinetic
         public SuperByteBuffer bottom;
 
         @Override
-        public void render(PoseStack.Pose matricesEntry, VertexConsumer vertexConsumer) {
+        public void render(MatrixStack.Entry matricesEntry, VertexConsumer vertexConsumer) {
             super.render(matricesEntry, vertexConsumer);
             if (top != null) {
-                top.light(lightCoords);
+                top.light(lightmapCoordinates);
                 top.rotateCentered(shaftAngle, direction);
                 top.color(color);
                 top.renderInto(matricesEntry, vertexConsumer);
             }
             if (bottom != null) {
-                bottom.light(lightCoords);
+                bottom.light(lightmapCoordinates);
                 bottom.rotateCentered(shaftAngle, direction);
                 bottom.color(color);
                 bottom.renderInto(matricesEntry, vertexConsumer);

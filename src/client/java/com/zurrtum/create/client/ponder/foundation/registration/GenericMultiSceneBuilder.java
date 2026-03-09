@@ -4,7 +4,7 @@ import com.zurrtum.create.client.ponder.api.registration.MultiSceneBuilder;
 import com.zurrtum.create.client.ponder.api.registration.PonderSceneRegistrationHelper;
 import com.zurrtum.create.client.ponder.api.registration.StoryBoardEntry;
 import com.zurrtum.create.client.ponder.api.scene.PonderStoryBoard;
-import net.minecraft.resources.Identifier;
+import net.minecraft.util.Identifier;
 
 import java.util.function.Consumer;
 
@@ -27,20 +27,12 @@ public class GenericMultiSceneBuilder<T> implements MultiSceneBuilder {
     }
 
     @Override
-    public MultiSceneBuilder addStoryBoard(
-        Identifier schematicLocation,
-        PonderStoryBoard storyBoard,
-        Identifier... tags
-    ) {
+    public MultiSceneBuilder addStoryBoard(Identifier schematicLocation, PonderStoryBoard storyBoard, Identifier... tags) {
         return addStoryBoard(schematicLocation, storyBoard, sb -> sb.highlightTags(tags));
     }
 
     @Override
-    public MultiSceneBuilder addStoryBoard(
-        Identifier schematicLocation,
-        PonderStoryBoard storyBoard,
-        Consumer<StoryBoardEntry> extras
-    ) {
+    public MultiSceneBuilder addStoryBoard(Identifier schematicLocation, PonderStoryBoard storyBoard, Consumer<StoryBoardEntry> extras) {
         components.forEach(c -> extras.accept(helper.addStoryBoard(c, schematicLocation, storyBoard)));
         return this;
     }
@@ -56,11 +48,7 @@ public class GenericMultiSceneBuilder<T> implements MultiSceneBuilder {
     }
 
     @Override
-    public MultiSceneBuilder addStoryBoard(
-        String schematicPath,
-        PonderStoryBoard storyBoard,
-        Consumer<StoryBoardEntry> extras
-    ) {
+    public MultiSceneBuilder addStoryBoard(String schematicPath, PonderStoryBoard storyBoard, Consumer<StoryBoardEntry> extras) {
         return addStoryBoard(helper.asLocation(schematicPath), storyBoard, extras);
     }
 

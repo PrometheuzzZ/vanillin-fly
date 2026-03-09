@@ -10,14 +10,14 @@ import com.zurrtum.create.foundation.utility.FilesHelper;
 import com.zurrtum.create.infrastructure.config.AllConfigs;
 import com.zurrtum.create.infrastructure.config.CSchematics;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
-import net.minecraft.ChatFormatting;
-import net.minecraft.core.BlockPos;
-import net.minecraft.network.chat.Component;
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.InteractionHand;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
+import net.minecraft.util.Hand;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.World;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -31,14 +31,14 @@ public class ServerSchematicLoader {
     private final Map<String, SchematicUploadEntry> activeUploads;
 
     public static class SchematicUploadEntry {
-        public Level world;
+        public World world;
         public BlockPos tablePos;
         public OutputStream stream;
         public long bytesUploaded;
         public long totalBytes;
         public int idleTime;
 
-        public SchematicUploadEntry(OutputStream stream, long totalBytes, Level world, BlockPos tablePos) {
+        public SchematicUploadEntry(OutputStream stream, long totalBytes, World world, BlockPos tablePos) {
             this.stream = stream;
             this.totalBytes = totalBytes;
             this.tablePos = tablePos;
@@ -78,7 +78,7 @@ public class ServerSchematicLoader {
         new HashSet<>(activeUploads.keySet()).forEach(this::cancelUpload);
     }
 
-    public void handleNewUpload(ServerPlayer player, String schematic, long size, BlockPos pos) {
+    public void handleNewUpload(ServerPlayerEntity player, String schematic, long size, BlockPos pos) {
         String playerName = player.getGameProfile().name();
 
         Path baseDir = CreatePaths.UPLOADED_SCHEMATICS_DIR;
@@ -100,21 +100,18 @@ public class ServerSchematicLoader {
         }
 
         // Too big
-        if (!validateSchematicSizeOnServer(player, size)) {
+        if (!validateSchematicSizeOnServer(player, size))
             return;
-        }
 
         // Skip existing Uploads
-        if (activeUploads.containsKey(playerSchematicId)) {
+        if (activeUploads.containsKey(playerSchematicId))
             return;
-        }
 
         try {
             // Validate Referenced Block
-            SchematicTableBlockEntity table = getTable(player.level(), pos);
-            if (table == null) {
+            SchematicTableBlockEntity table = getTable(player.getEntityWorld(), pos);
+            if (table == null)
                 return;
-            }
 
             // Delete schematic with same name
             Files.deleteIfExists(uploadPath);
@@ -127,8 +124,7 @@ public class ServerSchematicLoader {
 
             if (count >= getConfig().maxSchematics.get()) {
                 Stream<Path> list2 = Files.list(playerPath);
-                Optional<Path> lastFilePath = list2.filter(f -> !Files.isDirectory(f))
-                    .min(Comparator.comparingLong(f -> f.toFile().lastModified()));
+                Optional<Path> lastFilePath = list2.filter(f -> !Files.isDirectory(f)).min(Comparator.comparingLong(f -> f.toFile().lastModified()));
                 list2.close();
                 if (lastFilePath.isPresent()) {
                     Files.deleteIfExists(lastFilePath.get());
@@ -137,7 +133,7 @@ public class ServerSchematicLoader {
 
             // Open Stream
             OutputStream writer = Files.newOutputStream(uploadPath);
-            activeUploads.put(playerSchematicId, new SchematicUploadEntry(writer, size, player.level(), pos));
+            activeUploads.put(playerSchematicId, new SchematicUploadEntry(writer, size, player.getEntityWorld(), pos));
 
             // Notify Block Entity
             table.startUpload(schematic);
@@ -146,13 +142,11 @@ public class ServerSchematicLoader {
         }
     }
 
-    protected boolean validateSchematicSizeOnServer(ServerPlayer player, long size) {
+    protected boolean validateSchematicSizeOnServer(ServerPlayerEntity player, long size) {
         long maxFileSize = getConfig().maxTotalSchematicSize.get();
         if (size > maxFileSize * 1000) {
-            player.sendSystemMessage(Component.translatable("create.schematics.uploadTooLarge")
-                .append(Component.literal(" (" + size / 1000 + " KB).")));
-            player.sendSystemMessage(Component.translatable("create.schematics.maxAllowedSize")
-                .append(Component.literal(" " + maxFileSize + " KB")));
+            player.sendMessage(Text.translatable("create.schematics.uploadTooLarge").append(Text.literal(" (" + size / 1000 + " KB).")));
+            player.sendMessage(Text.translatable("create.schematics.maxAllowedSize").append(Text.literal(" " + maxFileSize + " KB")));
             return false;
         }
         return true;
@@ -162,7 +156,7 @@ public class ServerSchematicLoader {
         return AllConfigs.server().schematics;
     }
 
-    public void handleWriteRequest(ServerPlayer player, String schematic, byte[] data) {
+    public void handleWriteRequest(ServerPlayerEntity player, String schematic, byte[] data) {
         String playerSchematicId = player.getGameProfile().name() + "/" + schematic;
 
         if (activeUploads.containsKey(playerSchematicId)) {
@@ -187,9 +181,8 @@ public class ServerSchematicLoader {
                 entry.idleTime = 0;
 
                 SchematicTableBlockEntity table = getTable(entry.world, entry.tablePos);
-                if (table == null) {
+                if (table == null)
                     return;
-                }
                 table.uploadingProgress = (float) ((double) entry.bytesUploaded / entry.totalBytes);
                 table.sendUpdate = true;
 
@@ -201,9 +194,8 @@ public class ServerSchematicLoader {
     }
 
     protected void cancelUpload(String playerSchematicId) {
-        if (!activeUploads.containsKey(playerSchematicId)) {
+        if (!activeUploads.containsKey(playerSchematicId))
             return;
-        }
 
         SchematicUploadEntry entry = activeUploads.remove(playerSchematicId);
         try {
@@ -215,50 +207,44 @@ public class ServerSchematicLoader {
         }
 
         BlockPos pos = entry.tablePos;
-        if (pos == null) {
+        if (pos == null)
             return;
-        }
 
         SchematicTableBlockEntity table = getTable(entry.world, pos);
-        if (table != null) {
+        if (table != null)
             table.finishUpload();
-        }
     }
 
-    public SchematicTableBlockEntity getTable(Level world, BlockPos pos) {
+    public SchematicTableBlockEntity getTable(World world, BlockPos pos) {
         BlockEntity be = world.getBlockEntity(pos);
-        if (!(be instanceof SchematicTableBlockEntity table)) {
+        if (!(be instanceof SchematicTableBlockEntity table))
             return null;
-        }
         return table;
     }
 
-    public void handleFinishedUpload(ServerPlayer player, String schematic) {
+    public void handleFinishedUpload(ServerPlayerEntity player, String schematic) {
         String playerSchematicId = player.getGameProfile().name() + "/" + schematic;
 
         if (activeUploads.containsKey(playerSchematicId)) {
             try {
                 activeUploads.get(playerSchematicId).stream.close();
                 SchematicUploadEntry removed = activeUploads.remove(playerSchematicId);
-                Level world = removed.world;
+                World world = removed.world;
                 BlockPos pos = removed.tablePos;
 
                 Create.LOGGER.info("New Schematic Uploaded: " + playerSchematicId);
-                if (pos == null) {
+                if (pos == null)
                     return;
-                }
 
                 BlockState blockState = world.getBlockState(pos);
-                if (blockState.getBlock() != AllBlocks.SCHEMATIC_TABLE) {
+                if (blockState.getBlock() != AllBlocks.SCHEMATIC_TABLE)
                     return;
-                }
 
                 SchematicTableBlockEntity table = getTable(world, pos);
-                if (table == null) {
+                if (table == null)
                     return;
-                }
                 table.finishUpload();
-                table.inventory.setItem(1, SchematicItem.create(world, schematic, player.getGameProfile().name()));
+                table.inventory.setStack(1, SchematicItem.create(world, schematic, player.getGameProfile().name()));
 
             } catch (IOException e) {
                 Create.LOGGER.error("Exception Thrown when finishing Upload: {}", playerSchematicId, e);
@@ -266,13 +252,7 @@ public class ServerSchematicLoader {
         }
     }
 
-    public void handleInstantSchematic(
-        ServerPlayer player,
-        String schematic,
-        Level world,
-        BlockPos pos,
-        BlockPos bounds
-    ) {
+    public void handleInstantSchematic(ServerPlayerEntity player, String schematic, World world, BlockPos pos, BlockPos bounds) {
         String playerName = player.getGameProfile().name();
 
         Path baseDir = CreatePaths.UPLOADED_SCHEMATICS_DIR;
@@ -294,37 +274,25 @@ public class ServerSchematicLoader {
         }
 
         // Not holding S&Q
-        if (!player.getMainHandItem().is(AllItems.SCHEMATIC_AND_QUILL)) {
+        if (!player.getMainHandStack().isOf(AllItems.SCHEMATIC_AND_QUILL))
             return;
-        }
 
         // if there's too many schematics, delete oldest
-        if (!tryDeleteOldestSchematic(playerPath)) {
+        if (!tryDeleteOldestSchematic(playerPath))
             return;
-        }
 
-        SchematicExportResult result = SchematicExport.saveSchematic(
-            playerPath,
-            schematic,
-            true,
-            world,
-            pos,
-            pos.offset(bounds).offset(-1, -1, -1)
-        );
-        if (result != null) {
-            player.setItemInHand(InteractionHand.MAIN_HAND, SchematicItem.create(world, schematic, playerName));
-        } else {
-            player.sendSystemMessage(Component.translatable("create.schematicAndQuill.instant_failed")
-                .withStyle(ChatFormatting.RED));
-        }
+        SchematicExportResult result = SchematicExport.saveSchematic(playerPath, schematic, true, world, pos, pos.add(bounds).add(-1, -1, -1));
+        if (result != null)
+            player.setStackInHand(Hand.MAIN_HAND, SchematicItem.create(world, schematic, playerName));
+        else
+            player.sendMessage(Text.translatable("create.schematicAndQuill.instant_failed").formatted(Formatting.RED));
     }
 
     private boolean tryDeleteOldestSchematic(Path dir) {
         try (Stream<Path> stream = Files.list(dir)) {
             List<Path> files = stream.toList();
-            if (files.size() < getConfig().maxSchematics.get()) {
+            if (files.size() < getConfig().maxSchematics.get())
                 return true;
-            }
             Optional<Path> oldest = files.stream().min(Comparator.comparingLong(this::getLastModifiedTime));
             Files.delete(oldest.orElseThrow());
             return true;

@@ -1,32 +1,32 @@
 package com.zurrtum.create.client.content.fluids.pipes;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
-import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.catnip.animation.LerpedFloat;
 import com.zurrtum.create.catnip.data.Iterate;
+import com.zurrtum.create.client.catnip.render.PonderRenderTypes;
 import com.zurrtum.create.client.foundation.fluid.FluidRenderer;
 import com.zurrtum.create.content.fluids.FluidTransportBehaviour;
 import com.zurrtum.create.content.fluids.PipeConnection.Flow;
 import com.zurrtum.create.content.fluids.pipes.StraightPipeBlockEntity;
+import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.infrastructure.fluids.FluidStack;
-import net.minecraft.client.renderer.SubmitNodeCollector;
-import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
-import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
-import net.minecraft.client.renderer.blockentity.state.BlockEntityRenderState;
-import net.minecraft.client.renderer.feature.ModelFeatureRenderer;
-import net.minecraft.client.renderer.rendertype.RenderType;
-import net.minecraft.client.renderer.rendertype.RenderTypes;
-import net.minecraft.client.renderer.state.CameraRenderState;
-import net.minecraft.core.Direction;
-import net.minecraft.core.component.DataComponentPatch;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.material.Fluid;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.client.render.RenderLayer;
+import net.minecraft.client.render.VertexConsumer;
+import net.minecraft.client.render.block.entity.BlockEntityRenderer;
+import net.minecraft.client.render.block.entity.BlockEntityRendererFactory;
+import net.minecraft.client.render.block.entity.state.BlockEntityRenderState;
+import net.minecraft.client.render.command.ModelCommandRenderer;
+import net.minecraft.client.render.command.OrderedRenderCommandQueue;
+import net.minecraft.client.render.state.CameraRenderState;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.component.ComponentChanges;
+import net.minecraft.fluid.Fluid;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
 public class TransparentStraightPipeRenderer implements BlockEntityRenderer<StraightPipeBlockEntity, TransparentStraightPipeRenderer.TransparentStraightPipeRenderState> {
-    public TransparentStraightPipeRenderer(BlockEntityRendererProvider.Context context) {
+    public TransparentStraightPipeRenderer(BlockEntityRendererFactory.Context context) {
     }
 
     @Override
@@ -35,24 +35,23 @@ public class TransparentStraightPipeRenderer implements BlockEntityRenderer<Stra
     }
 
     @Override
-    public void extractRenderState(
+    public void updateRenderState(
         StraightPipeBlockEntity be,
         TransparentStraightPipeRenderState state,
         float tickProgress,
-        Vec3 cameraPos,
-        @Nullable ModelFeatureRenderer.CrumblingOverlay crumblingOverlay
+        Vec3d cameraPos,
+        @Nullable ModelCommandRenderer.CrumblingOverlayCommand crumblingOverlay
     ) {
         FluidTransportBehaviour pipe = be.getBehaviour(FluidTransportBehaviour.TYPE);
-        if (pipe == null) {
+        if (pipe == null)
             return;
-        }
-        BlockEntityRenderState.extractBase(be, state, crumblingOverlay);
-        state.layer = RenderTypes.translucentMovingBlock();
+        BlockEntityRenderState.updateBlockEntityRenderState(be, state, crumblingOverlay);
+        state.layer = PonderRenderTypes.fluid();
         Direction[] directions = Iterate.directions;
         int size = directions.length;
         state.radius = 3 / 16f;
         state.data = new FluidRenderData[size];
-        Level world = be.getLevel();
+        World world = be.getWorld();
         for (int i = 0; i < size; i++) {
             Direction side = directions[i];
             Flow flow = pipe.getFlow(side);
@@ -72,54 +71,42 @@ public class TransparentStraightPipeRenderer implements BlockEntityRenderer<Stra
             if (value == 1) {
                 if (inbound) {
                     Flow opposite = pipe.getFlow(side.getOpposite());
-                    if (opposite == null) {
+                    if (opposite == null)
                         value -= 1e-6f;
-                    }
                 } else {
-                    FluidTransportBehaviour adjacent = BlockEntityBehaviour.get(
-                        world,
-                        state.blockPos.relative(side),
-                        FluidTransportBehaviour.TYPE
-                    );
-                    if (adjacent == null) {
+                    FluidTransportBehaviour adjacent = BlockEntityBehaviour.get(world, state.pos.offset(side), FluidTransportBehaviour.TYPE);
+                    if (adjacent == null)
                         value -= 1e-6f;
-                    } else {
+                    else {
                         Flow other = adjacent.getFlow(side.getOpposite());
-                        if (other == null || !other.inbound && !other.complete) {
+                        if (other == null || !other.inbound && !other.complete)
                             value -= 1e-6f;
-                        }
                     }
                 }
             }
-            state.data[i] = new FluidRenderData(
-                fluidStack.getFluid(),
-                fluidStack.getComponentChanges(),
-                side,
-                value,
-                inbound
-            );
+            state.data[i] = new FluidRenderData(fluidStack.getFluid(), fluidStack.getComponentChanges(), side, value, inbound);
         }
     }
 
     @Override
-    public void submit(
+    public void render(
         TransparentStraightPipeRenderState state,
-        PoseStack matrices,
-        SubmitNodeCollector queue,
+        MatrixStack matrices,
+        OrderedRenderCommandQueue queue,
         CameraRenderState cameraState
     ) {
         if (state.data != null) {
-            queue.submitCustomGeometry(matrices, state.layer, state);
+            queue.submitCustom(matrices, state.layer, state);
         }
     }
 
-    public static class TransparentStraightPipeRenderState extends BlockEntityRenderState implements SubmitNodeCollector.CustomGeometryRenderer {
-        public RenderType layer;
+    public static class TransparentStraightPipeRenderState extends BlockEntityRenderState implements OrderedRenderCommandQueue.Custom {
+        public RenderLayer layer;
         public float radius;
         public FluidRenderData[] data;
 
         @Override
-        public void render(PoseStack.Pose matricesEntry, VertexConsumer vertexConsumer) {
+        public void render(MatrixStack.Entry matricesEntry, VertexConsumer vertexConsumer) {
             for (FluidRenderData renderData : data) {
                 if (renderData == null) {
                     continue;
@@ -133,13 +120,14 @@ public class TransparentStraightPipeRenderer implements BlockEntityRenderer<Stra
                     renderData.inbound,
                     vertexConsumer,
                     matricesEntry,
-                    lightCoords
+                    lightmapCoordinates
                 );
             }
         }
     }
 
-    public record FluidRenderData(Fluid fluid, DataComponentPatch changes, Direction side, float value,
-                                  boolean inbound) {
+    public record FluidRenderData(
+        Fluid fluid, ComponentChanges changes, Direction side, float value, boolean inbound
+    ) {
     }
 }

@@ -8,7 +8,7 @@ import com.zurrtum.create.client.flywheel.backend.glsl.GlslVersion;
 import com.zurrtum.create.client.flywheel.backend.glsl.SourceComponent;
 import com.zurrtum.create.client.flywheel.backend.glsl.SourceFile;
 import com.zurrtum.create.client.flywheel.lib.util.StringUtil;
-import net.minecraft.client.Minecraft;
+import net.minecraft.client.MinecraftClient;
 import org.lwjgl.opengl.GL20;
 
 import java.io.File;
@@ -47,13 +47,7 @@ public class Compilation {
         }
 
         GL20.glDeleteShader(handle);
-        return ShaderResult.failure(new FailedCompilation(
-            shaderName,
-            files,
-            generatedSource.toString(),
-            source,
-            infoLog
-        ));
+        return ShaderResult.failure(new FailedCompilation(shaderName, files, generatedSource.toString(), source, infoLog));
     }
 
     public void version(GlslVersion version) {
@@ -95,8 +89,7 @@ public class Compilation {
             // Add extra newline to keep line numbers consistent
             generatedSource.append(source).append('\n');
 
-            fullSource.append("\n#line ").append(generatedLines)
-                .append(" 0 // (generated) ") // all generated code is put in file 0
+            fullSource.append("\n#line ").append(generatedLines).append(" 0 // (generated) ") // all generated code is put in file 0
                 .append(component.name()).append('\n');
 
             generatedLines += StringUtil.countLines(source);
@@ -108,7 +101,7 @@ public class Compilation {
             return;
         }
 
-        File file = new File(new File(Minecraft.getInstance().gameDirectory, "flywheel_sources"), fileName);
+        File file = new File(new File(MinecraftClient.getInstance().runDirectory, "flywheel_sources"), fileName);
         // mkdirs of the parent so we don't create a directory named by the leaf file we want to write
         file.getParentFile().mkdirs();
         try (FileWriter writer = new FileWriter(file)) {

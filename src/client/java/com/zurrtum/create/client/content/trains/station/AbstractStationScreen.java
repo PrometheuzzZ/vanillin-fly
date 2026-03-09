@@ -1,6 +1,5 @@
 package com.zurrtum.create.client.content.trains.station;
 
-import com.mojang.blaze3d.vertex.PoseStack;
 import com.zurrtum.create.client.AllTrainIcons;
 import com.zurrtum.create.client.Create;
 import com.zurrtum.create.client.catnip.gui.AbstractSimiScreen;
@@ -21,11 +20,12 @@ import com.zurrtum.create.content.trains.entity.Carriage;
 import com.zurrtum.create.content.trains.entity.Train;
 import com.zurrtum.create.content.trains.station.GlobalStation;
 import com.zurrtum.create.content.trains.station.StationBlockEntity;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.network.chat.Component;
-import net.minecraft.util.Mth;
-import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.state.property.Properties;
+import net.minecraft.text.Text;
+import net.minecraft.util.math.MathHelper;
 
 import java.lang.ref.WeakReference;
 import java.util.List;
@@ -43,7 +43,7 @@ public abstract class AbstractStationScreen extends AbstractSimiScreen implement
     private IconButton confirmButton;
 
     public AbstractStationScreen(StationBlockEntity be, GlobalStation station) {
-        super(be.getBlockState().getBlock().getName());
+        super(be.getCachedState().getBlock().getName());
         this.blockEntity = be;
         this.station = station;
         displayedTrain = new WeakReference<>(null);
@@ -52,46 +52,28 @@ public abstract class AbstractStationScreen extends AbstractSimiScreen implement
     @Override
     protected void init() {
         renderedFlag = GuiGameElement.partial().scale(2.5F).transform(this::transform).padding(13);
-        renderedItem = GuiGameElement.of(blockEntity.getBlockState().setValue(BlockStateProperties.WATERLOGGED, false))
-            .rotate(-22, 63, 0).scale(2.5F).padding(17);
+        renderedItem = GuiGameElement.of(blockEntity.getCachedState().with(Properties.WATERLOGGED, false)).rotate(-22, 63, 0).scale(2.5F).padding(17);
         AbstractComputerBehaviour computer = blockEntity.getBehaviour(AbstractComputerBehaviour.TYPE);
         if (computer != null && computer.hasAttachedComputer()) {
-            minecraft.setScreen(new ComputerScreen(
-                title,
-                () -> Component.literal(station.name),
-                this,
-                this,
-                computer::hasAttachedComputer
-            ));
+            client.setScreen(new ComputerScreen(title, () -> Text.literal(station.name), this, this, computer::hasAttachedComputer));
         }
-
         setWindowSize(background.getWidth(), background.getHeight());
         super.init();
-        clearWidgets();
+        clearChildren();
 
         int x = guiLeft;
         int y = guiTop;
 
-        confirmButton = new IconButton(
-            x + background.getWidth() - 33,
-            y + background.getHeight() - 24,
-            AllIcons.I_CONFIRM
-        );
-        confirmButton.withCallback(this::onClose);
-        addRenderableWidget(confirmButton);
+        confirmButton = new IconButton(x + background.getWidth() - 33, y + background.getHeight() - 24, AllIcons.I_CONFIRM);
+        confirmButton.withCallback(this::close);
+        addDrawableChild(confirmButton);
         addAdditional(this, x, y, background);
     }
 
     @Override
     public void addAdditional(Screen screen, int x, int y, AllGuiTextures background) {
-        screen.addRenderableWidget(new ElementWidget(
-            x + background.getWidth() + 25,
-            y + background.getHeight() - 62
-        ).showingElement(renderedFlag));
-        screen.addRenderableWidget(new ElementWidget(
-            x + background.getWidth() + 3,
-            y + background.getHeight() - 46
-        ).showingElement(renderedItem));
+        screen.addDrawableChild(new ElementWidget(x + background.getWidth() + 25, y + background.getHeight() - 62).showingElement(renderedFlag));
+        screen.addDrawableChild(new ElementWidget(x + background.getWidth() + 3, y + background.getHeight() - 46).showingElement(renderedItem));
     }
 
     @Override
@@ -104,7 +86,8 @@ public abstract class AbstractStationScreen extends AbstractSimiScreen implement
     }
 
     @Override
-    public void removed() {
+    public void close() {
+        super.close();
         renderedFlag.clear();
         renderedItem.clear();
     }
@@ -114,9 +97,8 @@ public abstract class AbstractStationScreen extends AbstractSimiScreen implement
         List<Carriage> carriages = train.carriages;
 
         int w = icon.getIconWidth(TrainIcon.ENGINE);
-        if (carriages.size() == 1) {
+        if (carriages.size() == 1)
             return w;
-        }
 
         for (int i = 1; i < carriages.size(); i++) {
             if (i == carriages.size() - 1 && train.doubleEnded) {
@@ -135,18 +117,12 @@ public abstract class AbstractStationScreen extends AbstractSimiScreen implement
         super.tick();
         AbstractComputerBehaviour computer = blockEntity.getBehaviour(AbstractComputerBehaviour.TYPE);
         if (computer != null && computer.hasAttachedComputer()) {
-            minecraft.setScreen(new ComputerScreen(
-                title,
-                () -> Component.literal(station.name),
-                this,
-                this,
-                computer::hasAttachedComputer
-            ));
+            client.setScreen(new ComputerScreen(title, () -> Text.literal(station.name), this, this, computer::hasAttachedComputer));
         }
     }
 
     @Override
-    protected void renderWindow(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
+    protected void renderWindow(DrawContext graphics, int mouseX, int mouseY, float partialTicks) {
         int x = guiLeft;
         int y = guiTop;
 
@@ -154,13 +130,13 @@ public abstract class AbstractStationScreen extends AbstractSimiScreen implement
         updateAdditional(partialTicks);
     }
 
-    private void transform(PoseStack ms, float partialTicks) {
+    private void transform(MatrixStack ms, float partialTicks) {
         ms.scale(1, -1, 1);
         float value = blockEntity.flag.getValue(partialTicks);
         float progress = (float) (Math.pow(Math.min(value * 5, 1), 2));
         if (blockEntity.flag.getChaseTarget() > 0 && !blockEntity.flag.settled() && progress == 1) {
             float wiggleProgress = (value - .2f) / .8f;
-            progress += (Math.sin(wiggleProgress * (2 * Mth.PI) * 4) / 8f) / Math.max(1, 8f * wiggleProgress);
+            progress += (Math.sin(wiggleProgress * (2 * MathHelper.PI) * 4) / 8f) / Math.max(1, 8f * wiggleProgress);
         }
 
         TransformStack.of(ms).rotateXDegrees(24).rotateYDegrees(-210).translate(-0.12F, -0.81F, 0).rotateYDegrees(90)

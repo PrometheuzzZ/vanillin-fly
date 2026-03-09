@@ -12,8 +12,8 @@ import de.crafty.eiv.common.recipe.inventory.RecipeViewScreen;
 import de.crafty.eiv.common.recipe.inventory.SlotContent;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.DrawContext;
 import org.joml.Matrix3x2f;
 
 import java.util.List;
@@ -85,22 +85,11 @@ public class MechanicalCraftingView extends CreateView {
     }
 
     @Override
-    public void renderRecipe(
-        RecipeViewScreen screen,
-        RecipePosition position,
-        GuiGraphics context,
-        int mouseX,
-        int mouseY,
-        float partialTicks
-    ) {
+    public void renderRecipe(RecipeViewScreen screen, RecipePosition position, DrawContext context, int mouseX, int mouseY, float partialTicks) {
         AllGuiTextures.JEI_DOWN_ARROW.render(context, 128, 53);
         AllGuiTextures.JEI_SHADOW.render(context, 113, 32);
-        context.guiRenderState.submitPicturesInPictureState(new CrafterRenderState(
-            new Matrix3x2f(context.pose()),
-            124,
-            12
-        ));
+        context.state.addSpecialElement(new CrafterRenderState(new Matrix3x2f(context.getMatrices()), 124, 12));
         String size = String.valueOf(ingredients.size());
-        context.drawString(Minecraft.getInstance().font, size, 142, 33, 0xFFFFFFFF, true);
+        context.drawText(MinecraftClient.getInstance().textRenderer, size, 142, 33, 0xFFFFFFFF, true);
     }
 }

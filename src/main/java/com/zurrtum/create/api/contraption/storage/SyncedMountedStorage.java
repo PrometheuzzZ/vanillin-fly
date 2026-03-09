@@ -1,7 +1,7 @@
 package com.zurrtum.create.api.contraption.storage;
 
 import com.zurrtum.create.content.contraptions.Contraption;
-import net.minecraft.core.BlockPos;
+import net.minecraft.util.math.BlockPos;
 
 /**
  * Optional interface for mounted storage that is synced with the client.

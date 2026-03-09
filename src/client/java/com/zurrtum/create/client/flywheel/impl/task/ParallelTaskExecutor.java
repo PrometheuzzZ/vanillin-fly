@@ -1,7 +1,7 @@
 package com.zurrtum.create.client.flywheel.impl.task;
 
 import com.zurrtum.create.client.flywheel.impl.FlwImpl;
-import net.minecraft.util.Mth;
+import net.minecraft.util.math.MathHelper;
 
 import java.util.ArrayList;
 import java.util.Deque;
@@ -55,7 +55,7 @@ public class ParallelTaskExecutor implements TaskExecutorImpl {
 
         for (int i = 0; i < threadCount; i++) {
             WorkerThread thread = new WorkerThread(name + " Task Executor #" + i);
-            thread.setPriority(Mth.clamp(Thread.NORM_PRIORITY - 2, Thread.MIN_PRIORITY, Thread.MAX_PRIORITY));
+            thread.setPriority(MathHelper.clamp(Thread.NORM_PRIORITY - 2, Thread.MIN_PRIORITY, Thread.MAX_PRIORITY));
             thread.start();
 
             threads.add(thread);

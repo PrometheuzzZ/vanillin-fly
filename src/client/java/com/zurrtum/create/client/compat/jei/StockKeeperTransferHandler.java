@@ -17,12 +17,12 @@ import mezz.jei.api.recipe.transfer.IUniversalRecipeTransferHandler;
 import mezz.jei.common.transfer.RecipeTransferErrorInternal;
 import mezz.jei.library.transfer.RecipeTransferErrorMissingSlots;
 import mezz.jei.library.transfer.RecipeTransferErrorTooltip;
-import net.minecraft.resources.Identifier;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.inventory.MenuType;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.crafting.CraftingRecipe;
-import net.minecraft.world.item.crafting.RecipeHolder;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.item.ItemStack;
+import net.minecraft.recipe.CraftingRecipe;
+import net.minecraft.recipe.RecipeEntry;
+import net.minecraft.screen.ScreenHandlerType;
+import net.minecraft.util.Identifier;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -36,7 +36,7 @@ public class StockKeeperTransferHandler implements IUniversalRecipeTransferHandl
     }
 
     @Override
-    public Optional<MenuType<StockKeeperRequestMenu>> getMenuType() {
+    public Optional<ScreenHandlerType<StockKeeperRequestMenu>> getMenuType() {
         return Optional.empty();
     }
 
@@ -45,21 +45,20 @@ public class StockKeeperTransferHandler implements IUniversalRecipeTransferHandl
         StockKeeperRequestMenu container,
         Object object,
         IRecipeSlotsView recipeSlots,
-        Player player,
+        PlayerEntity player,
         boolean maxTransfer,
         boolean doTransfer
     ) {
-        if (!(object instanceof RecipeHolder<?> entry)) {
+        if (!(object instanceof RecipeEntry<?> entry)) {
             return null;
         }
         if (!(container.screenReference instanceof StockKeeperRequestScreen screen)) {
             return RecipeTransferErrorInternal.INSTANCE;
         }
-        Identifier id = entry.id().identifier();
+        Identifier id = entry.id().getValue();
         for (CraftableBigItemStack cbis : screen.recipesToOrder) {
             if (cbis.id.equals(id)) {
-                return new RecipeTransferErrorTooltip(CreateLang.translateDirect(
-                    "gui.stock_keeper.already_ordering_recipe"));
+                return new RecipeTransferErrorTooltip(CreateLang.translateDirect("gui.stock_keeper.already_ordering_recipe"));
             }
         }
         if (screen.itemsToOrder.size() >= 9) {
@@ -106,12 +105,9 @@ public class StockKeeperTransferHandler implements IUniversalRecipeTransferHandl
             }
         }
         if (output == null) {
-            return new RecipeTransferErrorMissingSlots(
-                CreateLang.translateDirect("gui.stock_keeper.recipe_result_empty"),
-                outputViews
-            );
+            return new RecipeTransferErrorMissingSlots(CreateLang.translateDirect("gui.stock_keeper.recipe_result_empty"), outputViews);
         }
-        InventorySummary summary = screen.getMenu().contentHolder.getLastClientsideStockSnapshotAsSummary();
+        InventorySummary summary = screen.getScreenHandler().contentHolder.getLastClientsideStockSnapshotAsSummary();
         if (summary == null) {
             return RecipeTransferErrorInternal.INSTANCE;
         }
@@ -119,17 +115,14 @@ public class StockKeeperTransferHandler implements IUniversalRecipeTransferHandl
         if (!missingIndices.isEmpty()) {
             List<IRecipeSlotView> missingViews = new ArrayList<>();
             missingIndices.forEach(index -> missingViews.add(inputViews.get(index)));
-            return new RecipeTransferErrorMissingSlots(
-                CreateLang.translateDirect("gui.stock_keeper.not_in_stock"),
-                missingViews
-            );
+            return new RecipeTransferErrorMissingSlots(CreateLang.translateDirect("gui.stock_keeper.not_in_stock"), missingViews);
         }
         if (doTransfer) {
             CraftableBigItemStack cbis = new CraftableBigItemStack(id, inputs, output);
             screen.recipesToOrder.add(cbis);
-            screen.searchBox.setValue("");
+            screen.searchBox.setText("");
             screen.refreshSearchNextTick = true;
-            screen.requestCraftable(cbis, maxTransfer ? cbis.stack.getMaxStackSize() : 1);
+            screen.requestCraftable(cbis, maxTransfer ? cbis.stack.getMaxCount() : 1);
         }
         return null;
     }

@@ -2,34 +2,33 @@ package com.zurrtum.create.infrastructure.packet.c2s;
 
 import com.zurrtum.create.AllHandle;
 import com.zurrtum.create.AllPackets;
-import net.minecraft.core.BlockPos;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.PacketType;
-import net.minecraft.network.protocol.game.ServerGamePacketListener;
-import net.minecraft.server.network.ServerGamePacketListenerImpl;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.item.ItemStack;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.listener.ServerPlayPacketListener;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.PacketType;
+import net.minecraft.server.network.ServerPlayNetworkHandler;
+import net.minecraft.util.math.BlockPos;
 
 import java.util.List;
 
-public record StockKeeperCategoryEditPacket(BlockPos pos,
-                                            List<ItemStack> schedule) implements Packet<ServerGamePacketListener> {
-    public static final StreamCodec<RegistryFriendlyByteBuf, StockKeeperCategoryEditPacket> CODEC = StreamCodec.composite(
-        BlockPos.STREAM_CODEC,
+public record StockKeeperCategoryEditPacket(BlockPos pos, List<ItemStack> schedule) implements Packet<ServerPlayPacketListener> {
+    public static final PacketCodec<RegistryByteBuf, StockKeeperCategoryEditPacket> CODEC = PacketCodec.tuple(
+        BlockPos.PACKET_CODEC,
         StockKeeperCategoryEditPacket::pos,
-        ItemStack.OPTIONAL_LIST_STREAM_CODEC,
+        ItemStack.OPTIONAL_LIST_PACKET_CODEC,
         StockKeeperCategoryEditPacket::schedule,
         StockKeeperCategoryEditPacket::new
     );
 
     @Override
-    public void handle(ServerGamePacketListener listener) {
-        AllHandle.onStockKeeperCategoryEdit((ServerGamePacketListenerImpl) listener, this);
+    public void apply(ServerPlayPacketListener listener) {
+        AllHandle.onStockKeeperCategoryEdit((ServerPlayNetworkHandler) listener, this);
     }
 
     @Override
-    public PacketType<StockKeeperCategoryEditPacket> type() {
+    public PacketType<StockKeeperCategoryEditPacket> getPacketType() {
         return AllPackets.CONFIGURE_STOCK_KEEPER_CATEGORIES;
     }
 }

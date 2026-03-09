@@ -1,18 +1,23 @@
 package com.zurrtum.create.client.infrastructure.fluid;
 
-import net.minecraft.client.renderer.texture.TextureAtlasSprite;
-import net.minecraft.core.component.DataComponentPatch;
+import net.minecraft.client.texture.Sprite;
+import net.minecraft.component.ComponentChanges;
 
+import java.util.IdentityHashMap;
+import java.util.Map;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
-public record FluidConfig(Supplier<TextureAtlasSprite> still, Supplier<TextureAtlasSprite> flowing,
-                          Function<DataComponentPatch, Integer> tint, Supplier<Float> fogDistance, int fogColor) {
-    public FluidConfig(
-        Supplier<TextureAtlasSprite> still,
-        Supplier<TextureAtlasSprite> flowing,
-        Function<DataComponentPatch, Integer> tint
-    ) {
+public record FluidConfig(
+    Supplier<Sprite> still, Supplier<Sprite> flowing, Function<ComponentChanges, Integer> tint, Supplier<Float> fogDistance, int fogColor
+) {
+    private static final Map<FluidConfig, Sprite[]> CACHE = new IdentityHashMap<>();
+
+    public FluidConfig(Supplier<Sprite> still, Supplier<Sprite> flowing, Function<ComponentChanges, Integer> tint) {
         this(still, flowing, tint, () -> 0f, -1);
+    }
+
+    public Sprite[] toSprite() {
+        return CACHE.computeIfAbsent(this, config -> new Sprite[]{config.still.get(), config.flowing.get()});
     }
 }

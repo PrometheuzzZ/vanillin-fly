@@ -16,24 +16,24 @@ import com.zurrtum.create.client.foundation.gui.widget.TooltipArea;
 import com.zurrtum.create.client.foundation.utility.CreateLang;
 import com.zurrtum.create.content.decoration.slidingDoor.DoorControl;
 import com.zurrtum.create.infrastructure.packet.c2s.ElevatorContactEditPacket;
-import net.minecraft.ChatFormatting;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.client.input.KeyEvent;
-import net.minecraft.client.input.MouseButtonEvent;
-import net.minecraft.client.input.MouseButtonInfo;
-import net.minecraft.core.BlockPos;
-import net.minecraft.network.chat.CommonComponents;
-import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.util.FormattedCharSequence;
+import net.minecraft.client.gui.Click;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.widget.TextFieldWidget;
+import net.minecraft.client.input.KeyInput;
+import net.minecraft.client.input.MouseInput;
+import net.minecraft.screen.ScreenTexts;
+import net.minecraft.text.MutableText;
+import net.minecraft.text.OrderedText;
+import net.minecraft.util.Formatting;
+import net.minecraft.util.math.BlockPos;
 import org.lwjgl.glfw.GLFW;
 
 public class ElevatorContactScreen extends AbstractSimiScreen {
 
     private AllGuiTextures background;
 
-    private EditBox shortNameInput;
-    private EditBox longNameInput;
+    private TextFieldWidget shortNameInput;
+    private TextFieldWidget longNameInput;
     private IconButton confirm;
     private ElementWidget renderedItem;
 
@@ -62,109 +62,108 @@ public class ElevatorContactScreen extends AbstractSimiScreen {
 
         confirm = new IconButton(x + 200, y + 58, AllIcons.I_CONFIRM);
         confirm.withCallback(this::confirm);
-        addRenderableWidget(confirm);
+        addDrawableChild(confirm);
 
         shortNameInput = editBox(33, 30, 4);
-        shortNameInput.setValue(shortName);
+        shortNameInput.setText(shortName);
         centerInput(x);
-        shortNameInput.setResponder(s -> {
+        shortNameInput.setChangedListener(s -> {
             shortName = s;
             centerInput(x);
         });
         shortNameInput.setFocused(true);
         setFocused(shortNameInput);
-        shortNameInput.setHighlightPos(0);
+        shortNameInput.setSelectionEnd(0);
 
         longNameInput = editBox(63, 140, 30);
-        longNameInput.setValue(longName);
-        longNameInput.setResponder(s -> longName = s);
+        longNameInput.setText(longName);
+        longNameInput.setChangedListener(s -> longName = s);
 
-        MutableComponent rmbToEdit = CreateLang.translate("gui.schedule.lmb_edit").style(ChatFormatting.DARK_GRAY)
-            .style(ChatFormatting.ITALIC).component();
+        MutableText rmbToEdit = CreateLang.translate("gui.schedule.lmb_edit").style(Formatting.DARK_GRAY).style(Formatting.ITALIC).component();
 
-        addRenderableOnly(new TooltipArea(x + 21, y + 23, 30, 18).withTooltip(ImmutableList.of(
-            CreateLang.translate(
-                "elevator_contact.floor_identifier").color(0x5391E1).component(), rmbToEdit
+        addDrawable(new TooltipArea(x + 21, y + 23, 30, 18).withTooltip(ImmutableList.of(
+            CreateLang.translate("elevator_contact.floor_identifier")
+                .color(0x5391E1).component(), rmbToEdit
         )));
 
-        addRenderableOnly(new TooltipArea(x + 57, y + 23, 147, 18).withTooltip(ImmutableList.of(
+        addDrawable(new TooltipArea(x + 57, y + 23, 147, 18).withTooltip(ImmutableList.of(
             CreateLang.translate("elevator_contact.floor_description").color(0x5391E1).component(),
-            CreateLang.translate("crafting_blueprint.optional").style(ChatFormatting.GRAY).component(),
+            CreateLang.translate("crafting_blueprint.optional").style(Formatting.GRAY).component(),
             rmbToEdit
         )));
         Pair<ScrollInput, Label> doorControlWidgets = SlidingDoorRenderer.createWidget(
-            minecraft,
+            client,
             x + 58,
             y + 57,
             mode -> doorControl = mode,
             doorControl
         );
-        addRenderableWidget(doorControlWidgets.getFirst());
-        addRenderableWidget(doorControlWidgets.getSecond());
+        addDrawableChild(doorControlWidgets.getFirst());
+        addDrawableChild(doorControlWidgets.getSecond());
 
         renderedItem = new ElementWidget(
             x + background.getWidth() + 6,
             y + background.getHeight() - 56
-        ).showingElement(GuiGameElement.of(AllItems.ELEVATOR_CONTACT.getDefaultInstance()).scale(5));
-        addRenderableWidget(renderedItem);
+        ).showingElement(GuiGameElement.of(AllItems.ELEVATOR_CONTACT.getDefaultStack()).scale(5));
+        addDrawableChild(renderedItem);
     }
 
     @Override
-    public void removed() {
+    public void close() {
+        super.close();
         renderedItem.getRenderElement().clear();
     }
 
     private int centerInput(int x) {
-        int centeredX = x + (shortName.isEmpty() ? 34 : 36 - font.width(shortName) / 2);
+        int centeredX = x + (shortName.isEmpty() ? 34 : 36 - textRenderer.getWidth(shortName) / 2);
         shortNameInput.setX(centeredX);
         return centeredX;
     }
 
-    private EditBox editBox(int x, int width, int chars) {
-        EditBox editBox = new EditBox(font, guiLeft + x, guiTop + 30, width, 10, CommonComponents.EMPTY);
-        editBox.setTextColor(-1);
-        editBox.setTextColorUneditable(-1);
-        editBox.setBordered(false);
+    private TextFieldWidget editBox(int x, int width, int chars) {
+        TextFieldWidget editBox = new TextFieldWidget(textRenderer, guiLeft + x, guiTop + 30, width, 10, ScreenTexts.EMPTY);
+        editBox.setEditableColor(-1);
+        editBox.setUneditableColor(-1);
+        editBox.setDrawsBackground(false);
         editBox.setMaxLength(chars);
         editBox.setFocused(false);
-        editBox.mouseClicked(new MouseButtonEvent(0, 0, new MouseButtonInfo(0, 0)), false);
-        addRenderableWidget(editBox);
+        editBox.mouseClicked(new Click(0, 0, new MouseInput(0, 0)), false);
+        addDrawableChild(editBox);
         return editBox;
     }
 
     @Override
-    protected void renderWindow(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
+    protected void renderWindow(DrawContext graphics, int mouseX, int mouseY, float partialTicks) {
         int x = guiLeft;
         int y = guiTop;
 
         background.render(graphics, x, y);
 
-        FormattedCharSequence formattedcharsequence = title.getVisualOrderText();
-        graphics.drawString(
-            font,
+        OrderedText formattedcharsequence = title.asOrderedText();
+        graphics.drawText(
+            textRenderer,
             formattedcharsequence,
-            x + (background.getWidth() - 8) / 2 - font.width(formattedcharsequence) / 2,
+            x + (background.getWidth() - 8) / 2 - textRenderer.getWidth(formattedcharsequence) / 2,
             y + 6,
             0xFF2F3738,
             false
         );
 
-        graphics.renderItem(AllItems.TRAIN_DOOR.getDefaultInstance(), x + 37, y + 58);
+        graphics.drawItem(AllItems.TRAIN_DOOR.getDefaultStack(), x + 37, y + 58);
     }
 
     @Override
-    public boolean mouseClicked(MouseButtonEvent click, boolean doubled) {
+    public boolean mouseClicked(Click click, boolean doubled) {
         boolean consumed = super.mouseClicked(click, doubled);
 
         if (!shortNameInput.isFocused()) {
-            int length = shortNameInput.getValue().length();
-            shortNameInput.setHighlightPos(length);
-            shortNameInput.setCursorPosition(length);
+            int length = shortNameInput.getText().length();
+            shortNameInput.setSelectionEnd(length);
+            shortNameInput.setSelectionStart(length);
         }
 
-        if (shortNameInput.isHoveredOrFocused()) {
-            longNameInput.mouseClicked(new MouseButtonEvent(0, 0, new MouseButtonInfo(0, 0)), false);
-        }
+        if (shortNameInput.isSelected())
+            longNameInput.mouseClicked(new Click(0, 0, new MouseInput(0, 0)), false);
 
         if (!consumed && click.x() > guiLeft + 22 && click.y() > guiTop + 24 && click.x() < guiLeft + 50 && click.y() < guiTop + 40) {
             setFocused(shortNameInput);
@@ -176,25 +175,24 @@ public class ElevatorContactScreen extends AbstractSimiScreen {
     }
 
     @Override
-    public boolean keyPressed(KeyEvent input) {
-        if (super.keyPressed(input)) {
+    public boolean keyPressed(KeyInput input) {
+        if (super.keyPressed(input))
             return true;
-        }
         int keyCode = input.key();
         if (keyCode == GLFW.GLFW_KEY_ENTER) {
             confirm();
             return true;
         }
         if (keyCode == 256 && this.shouldCloseOnEsc()) {
-            onClose();
+            close();
             return true;
         }
         return false;
     }
 
     private void confirm() {
-        minecraft.player.connection.send(new ElevatorContactEditPacket(pos, shortName, longName, doorControl));
-        onClose();
+        client.player.networkHandler.sendPacket(new ElevatorContactEditPacket(pos, shortName, longName, doorControl));
+        close();
     }
 
 }

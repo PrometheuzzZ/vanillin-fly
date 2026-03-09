@@ -1,7 +1,5 @@
 package com.zurrtum.create.client.content.kinetics.crank;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.zurrtum.create.catnip.math.AngleHelper;
 import com.zurrtum.create.client.AllPartialModels;
 import com.zurrtum.create.client.catnip.render.CachedBuffers;
@@ -10,18 +8,19 @@ import com.zurrtum.create.client.content.kinetics.base.KineticBlockEntityRendere
 import com.zurrtum.create.client.flywheel.api.visualization.VisualizationManager;
 import com.zurrtum.create.content.kinetics.crank.HandCrankBlock;
 import com.zurrtum.create.content.kinetics.crank.HandCrankBlockEntity;
-import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
-import net.minecraft.client.renderer.feature.ModelFeatureRenderer;
-import net.minecraft.client.renderer.rendertype.RenderType;
-import net.minecraft.client.renderer.rendertype.RenderTypes;
-import net.minecraft.core.Direction;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.block.BlockState;
+import net.minecraft.client.render.RenderLayer;
+import net.minecraft.client.render.VertexConsumer;
+import net.minecraft.client.render.block.entity.BlockEntityRendererFactory;
+import net.minecraft.client.render.command.ModelCommandRenderer;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
 public class HandCrankRenderer extends KineticBlockEntityRenderer<HandCrankBlockEntity, HandCrankRenderer.HandCrankRenderState> {
-    public HandCrankRenderer(BlockEntityRendererProvider.Context context) {
+    public HandCrankRenderer(BlockEntityRendererFactory.Context context) {
         super(context);
     }
 
@@ -31,20 +30,20 @@ public class HandCrankRenderer extends KineticBlockEntityRenderer<HandCrankBlock
     }
 
     @Override
-    public void extractRenderState(
+    public void updateRenderState(
         HandCrankBlockEntity be,
         HandCrankRenderState state,
         float tickProgress,
-        Vec3 cameraPos,
-        @Nullable ModelFeatureRenderer.CrumblingOverlay crumblingOverlay
+        Vec3d cameraPos,
+        @Nullable ModelCommandRenderer.CrumblingOverlayCommand crumblingOverlay
     ) {
         if (shouldRenderShaft()) {
-            super.extractRenderState(be, state, tickProgress, cameraPos, crumblingOverlay);
+            super.updateRenderState(be, state, tickProgress, cameraPos, crumblingOverlay);
             if (state.support) {
                 return;
             }
         } else {
-            Level world = be.getLevel();
+            World world = be.getWorld();
             state.support = VisualizationManager.supportsVisualization(world);
             if (state.support) {
                 return;
@@ -56,23 +55,23 @@ public class HandCrankRenderer extends KineticBlockEntityRenderer<HandCrankBlock
     }
 
     @Override
-    protected RenderType getRenderType(HandCrankBlockEntity be, BlockState state) {
-        return RenderTypes.solidMovingBlock();
+    protected RenderLayer getRenderType(HandCrankBlockEntity be, BlockState state) {
+        return RenderLayer.getSolid();
+    }
+
+    public float getIndependentAngle(HandCrankBlockEntity be, float partialTicks) {
+        return getHandCrankIndependentAngle(be, partialTicks);
     }
 
     /**
      * In degrees
      */
-    public float getIndependentAngle(HandCrankBlockEntity be, float partialTicks) {
-        return getHandCrankIndependentAngle(be, partialTicks);
-    }
-
     public static float getHandCrankIndependentAngle(HandCrankBlockEntity be, float partialTicks) {
         return be.independentAngle + partialTicks * be.chasingAngularVelocity;
     }
 
     public SuperByteBuffer getRenderedHandle(BlockState blockState) {
-        Direction facing = blockState.getOptionalValue(HandCrankBlock.FACING).orElse(Direction.UP);
+        Direction facing = blockState.getOrEmpty(HandCrankBlock.FACING).orElse(Direction.UP);
         return CachedBuffers.partialFacing(AllPartialModels.HAND_CRANK_HANDLE, blockState, facing.getOpposite());
     }
 
@@ -85,11 +84,11 @@ public class HandCrankRenderer extends KineticBlockEntityRenderer<HandCrankBlock
         public float handleAngle;
 
         @Override
-        public void render(PoseStack.Pose matricesEntry, VertexConsumer vertexConsumer) {
+        public void render(MatrixStack.Entry matricesEntry, VertexConsumer vertexConsumer) {
             if (model != null) {
                 super.render(matricesEntry, vertexConsumer);
             }
-            handle.light(lightCoords);
+            handle.light(lightmapCoordinates);
             handle.rotateCentered(handleAngle, direction);
             handle.color(color);
             handle.renderInto(matricesEntry, vertexConsumer);

@@ -11,29 +11,30 @@ import com.zurrtum.create.infrastructure.component.PlacementPatterns;
 import com.zurrtum.create.infrastructure.component.TerrainBrushes;
 import com.zurrtum.create.infrastructure.component.TerrainTools;
 import io.netty.buffer.ByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.PacketType;
-import net.minecraft.network.protocol.game.ServerGamePacketListener;
-import net.minecraft.server.network.ServerGamePacketListenerImpl;
-import net.minecraft.world.InteractionHand;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.item.ItemStack;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.network.listener.ServerPlayPacketListener;
+import net.minecraft.network.packet.PacketType;
+import net.minecraft.server.network.ServerPlayNetworkHandler;
+import net.minecraft.util.Hand;
 
-public record ConfigureWorldshaperPacket(InteractionHand hand, PlacementPatterns pattern, TerrainBrushes brush,
-                                         int brushParamX, int brushParamY, int brushParamZ, TerrainTools tool,
-                                         PlacementOptions placement) implements ConfigureZapperPacket {
-    public static final StreamCodec<ByteBuf, ConfigureWorldshaperPacket> CODEC = CatnipLargerStreamCodecs.composite(
+public record ConfigureWorldshaperPacket(
+    Hand hand, PlacementPatterns pattern, TerrainBrushes brush, int brushParamX, int brushParamY, int brushParamZ, TerrainTools tool,
+    PlacementOptions placement
+) implements ConfigureZapperPacket {
+    public static final PacketCodec<ByteBuf, ConfigureWorldshaperPacket> CODEC = CatnipLargerStreamCodecs.composite(
         CatnipStreamCodecs.HAND,
         packet -> packet.hand,
         PlacementPatterns.STREAM_CODEC,
         packet -> packet.pattern,
         TerrainBrushes.STREAM_CODEC,
         packet -> packet.brush,
-        ByteBufCodecs.VAR_INT,
+        PacketCodecs.VAR_INT,
         packet -> packet.brushParamX,
-        ByteBufCodecs.VAR_INT,
+        PacketCodecs.VAR_INT,
         packet -> packet.brushParamY,
-        ByteBufCodecs.VAR_INT,
+        PacketCodecs.VAR_INT,
         packet -> packet.brushParamZ,
         TerrainTools.STREAM_CODEC,
         packet -> packet.tool,
@@ -44,25 +45,16 @@ public record ConfigureWorldshaperPacket(InteractionHand hand, PlacementPatterns
 
     @Override
     public void configureZapper(ItemStack stack) {
-        WorldshaperItem.configureSettings(
-            stack,
-            pattern,
-            brush,
-            brushParamX,
-            brushParamY,
-            brushParamZ,
-            tool,
-            placement
-        );
+        WorldshaperItem.configureSettings(stack, pattern, brush, brushParamX, brushParamY, brushParamZ, tool, placement);
     }
 
     @Override
-    public void handle(ServerGamePacketListener listener) {
-        AllHandle.onConfigureWorldshaper((ServerGamePacketListenerImpl) listener, this);
+    public void apply(ServerPlayPacketListener listener) {
+        AllHandle.onConfigureWorldshaper((ServerPlayNetworkHandler) listener, this);
     }
 
     @Override
-    public PacketType<ConfigureWorldshaperPacket> type() {
+    public PacketType<ConfigureWorldshaperPacket> getPacketType() {
         return AllPackets.CONFIGURE_WORLDSHAPER;
     }
 }

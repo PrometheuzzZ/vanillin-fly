@@ -1,27 +1,30 @@
 package com.zurrtum.create.content.redstone.nixieTube;
 
 import com.mojang.serialization.MapCodec;
-import net.minecraft.core.Direction;
-import net.minecraft.util.StringRepresentable;
-import net.minecraft.world.item.context.BlockPlaceContext;
-import net.minecraft.world.level.block.HorizontalDirectionalBlock;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.properties.EnumProperty;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.HorizontalFacingBlock;
+import net.minecraft.item.ItemPlacementContext;
+import net.minecraft.state.property.EnumProperty;
+import net.minecraft.util.StringIdentifiable;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Vec3d;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Locale;
 
-public class DoubleFaceAttachedBlock extends HorizontalDirectionalBlock {
+public class DoubleFaceAttachedBlock extends HorizontalFacingBlock {
 
-    public static final MapCodec<DoubleFaceAttachedBlock> CODEC = simpleCodec(DoubleFaceAttachedBlock::new);
+    public static final MapCodec<DoubleFaceAttachedBlock> CODEC = createCodec(DoubleFaceAttachedBlock::new);
 
-    public enum DoubleAttachFace implements StringRepresentable {
-        FLOOR, WALL, WALL_REVERSED, CEILING;
+    public enum DoubleAttachFace implements StringIdentifiable {
+        FLOOR,
+        WALL,
+        WALL_REVERSED,
+        CEILING;
 
         @Override
-        public String getSerializedName() {
+        public String asString() {
             return name().toLowerCase(Locale.ROOT);
         }
 
@@ -30,37 +33,33 @@ public class DoubleFaceAttachedBlock extends HorizontalDirectionalBlock {
         }
     }
 
-    public static final EnumProperty<NixieTubeBlock.DoubleAttachFace> FACE = EnumProperty.create(
-        "double_face",
-        NixieTubeBlock.DoubleAttachFace.class
-    );
+    public static final EnumProperty<NixieTubeBlock.DoubleAttachFace> FACE = EnumProperty.of("double_face", NixieTubeBlock.DoubleAttachFace.class);
 
-    public DoubleFaceAttachedBlock(Properties p_53182_) {
+    public DoubleFaceAttachedBlock(Settings p_53182_) {
         super(p_53182_);
     }
 
     @Nullable
-    public BlockState getStateForPlacement(BlockPlaceContext pContext) {
-        for (Direction direction : pContext.getNearestLookingDirections()) {
+    public BlockState getPlacementState(ItemPlacementContext pContext) {
+        for (Direction direction : pContext.getPlacementDirections()) {
             BlockState blockstate;
             if (direction.getAxis() == Direction.Axis.Y) {
-                blockstate = defaultBlockState().setValue(
+                blockstate = getDefaultState().with(
                     FACE,
                     direction == Direction.UP ? NixieTubeBlock.DoubleAttachFace.CEILING : NixieTubeBlock.DoubleAttachFace.FLOOR
-                ).setValue(FACING, pContext.getHorizontalDirection());
+                ).with(FACING, pContext.getHorizontalPlayerFacing());
             } else {
-                Vec3 n = Vec3.atLowerCornerOf(direction.getClockWise().getUnitVec3i());
+                Vec3d n = Vec3d.of(direction.rotateYClockwise().getVector());
                 NixieTubeBlock.DoubleAttachFace face = NixieTubeBlock.DoubleAttachFace.WALL;
                 if (pContext.getPlayer() != null) {
-                    Vec3 lookAngle = pContext.getPlayer().getLookAngle();
-                    if (lookAngle.dot(n) < 0) {
+                    Vec3d lookAngle = pContext.getPlayer().getRotationVector();
+                    if (lookAngle.dotProduct(n) < 0)
                         face = NixieTubeBlock.DoubleAttachFace.WALL_REVERSED;
-                    }
                 }
-                blockstate = defaultBlockState().setValue(FACE, face).setValue(FACING, direction.getOpposite());
+                blockstate = getDefaultState().with(FACE, face).with(FACING, direction.getOpposite());
             }
 
-            if (blockstate.canSurvive(pContext.getLevel(), pContext.getClickedPos())) {
+            if (blockstate.canPlaceAt(pContext.getWorld(), pContext.getBlockPos())) {
                 return blockstate;
             }
         }
@@ -69,18 +68,18 @@ public class DoubleFaceAttachedBlock extends HorizontalDirectionalBlock {
     }
 
     protected static Direction getConnectedDirection(BlockState pState) {
-        switch ((DoubleAttachFace) pState.getValue(FACE)) {
+        switch ((DoubleAttachFace) pState.get(FACE)) {
             case CEILING:
                 return Direction.DOWN;
             case FLOOR:
                 return Direction.UP;
             default:
-                return pState.getValue(FACING);
+                return pState.get(FACING);
         }
     }
 
     @Override
-    protected @NotNull MapCodec<? extends HorizontalDirectionalBlock> codec() {
+    protected @NotNull MapCodec<? extends HorizontalFacingBlock> getCodec() {
         return CODEC;
     }
 }

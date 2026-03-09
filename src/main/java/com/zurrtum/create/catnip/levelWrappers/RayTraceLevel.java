@@ -1,20 +1,20 @@
 package com.zurrtum.create.catnip.levelWrappers;
 
-import net.minecraft.core.BlockPos;
-import net.minecraft.world.level.BlockGetter;
-import net.minecraft.world.level.LevelAccessor;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.material.FluidState;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.fluid.FluidState;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.BlockView;
+import net.minecraft.world.WorldAccess;
 
 import java.util.function.BiFunction;
 
-public class RayTraceLevel implements BlockGetter {
+public class RayTraceLevel implements BlockView {
 
-    private final LevelAccessor template;
+    private final WorldAccess template;
     private final BiFunction<BlockPos, BlockState, BlockState> stateGetter;
 
-    public RayTraceLevel(LevelAccessor template, BiFunction<BlockPos, BlockState, BlockState> stateGetter) {
+    public RayTraceLevel(WorldAccess template, BiFunction<BlockPos, BlockState, BlockState> stateGetter) {
         this.template = template;
         this.stateGetter = stateGetter;
     }
@@ -40,8 +40,8 @@ public class RayTraceLevel implements BlockGetter {
     }
 
     @Override
-    public int getMinY() {
-        return template.getMinY();
+    public int getBottomY() {
+        return template.getBottomY();
     }
 
 }

@@ -1,38 +1,38 @@
 package com.zurrtum.create.client.foundation.utility;
 
-import com.mojang.blaze3d.platform.InputConstants;
 import com.zurrtum.create.client.AllKeys;
-import net.minecraft.client.KeyMapping;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.Options;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.option.GameOptions;
+import net.minecraft.client.option.KeyBinding;
+import net.minecraft.client.util.InputUtil;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public class ControlsUtil {
 
-    private static List<KeyMapping> standardControls;
+    private static List<KeyBinding> standardControls;
 
-    public static List<KeyMapping> getControls() {
+    public static List<KeyBinding> getControls() {
         if (standardControls == null) {
-            Options gameSettings = Minecraft.getInstance().options;
+            GameOptions gameSettings = MinecraftClient.getInstance().options;
             standardControls = new ArrayList<>(6);
-            standardControls.add(gameSettings.keyUp);
-            standardControls.add(gameSettings.keyDown);
-            standardControls.add(gameSettings.keyLeft);
-            standardControls.add(gameSettings.keyRight);
-            standardControls.add(gameSettings.keyJump);
-            standardControls.add(gameSettings.keyShift);
+            standardControls.add(gameSettings.forwardKey);
+            standardControls.add(gameSettings.backKey);
+            standardControls.add(gameSettings.leftKey);
+            standardControls.add(gameSettings.rightKey);
+            standardControls.add(gameSettings.jumpKey);
+            standardControls.add(gameSettings.sneakKey);
         }
         return standardControls;
     }
 
-    public static boolean isActuallyPressed(KeyMapping kb) {
-        InputConstants.Key key = kb.key;
-        if (key.getType() == InputConstants.Type.MOUSE) {
-            return AllKeys.isMouseButtonDown(key.getValue());
+    public static boolean isActuallyPressed(KeyBinding kb) {
+        InputUtil.Key key = kb.boundKey;
+        if (key.getCategory() == InputUtil.Type.MOUSE) {
+            return AllKeys.isMouseButtonDown(key.getCode());
         } else {
-            return AllKeys.isKeyDown(key.getValue());
+            return AllKeys.isKeyDown(key.getCode());
         }
     }
 

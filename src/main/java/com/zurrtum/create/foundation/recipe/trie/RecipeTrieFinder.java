@@ -4,11 +4,11 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.zurrtum.create.foundation.recipe.RecipeFinder;
 import com.zurrtum.create.foundation.utility.CreateResourceReloader;
-import net.minecraft.server.level.ServerLevel;
-import net.minecraft.server.packs.resources.ResourceManager;
-import net.minecraft.server.packs.resources.ResourceManagerReloadListener;
-import net.minecraft.world.item.crafting.Recipe;
-import net.minecraft.world.item.crafting.RecipeHolder;
+import net.minecraft.recipe.Recipe;
+import net.minecraft.recipe.RecipeEntry;
+import net.minecraft.resource.ResourceManager;
+import net.minecraft.resource.SynchronousResourceReloader;
+import net.minecraft.server.world.ServerWorld;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
@@ -20,15 +20,15 @@ public class RecipeTrieFinder {
 
     public static RecipeTrie<Recipe<?>> get(
         @NotNull Object cacheKey,
-        ServerLevel world,
-        Predicate<RecipeHolder<? extends Recipe<?>>> conditions
+        ServerWorld world,
+        Predicate<RecipeEntry<?>> conditions
     ) throws ExecutionException {
         return CACHED_TRIES.get(
             cacheKey, () -> {
-                List<RecipeHolder<? extends Recipe<?>>> list = RecipeFinder.get(cacheKey, world, conditions);
+                List<RecipeEntry<?>> list = RecipeFinder.get(cacheKey, world, conditions);
 
                 RecipeTrie.Builder<Recipe<?>> builder = RecipeTrie.builder();
-                for (RecipeHolder<? extends Recipe<?>> recipe : list) {
+                for (RecipeEntry<? extends Recipe<?>> recipe : list) {
                     builder.insert(recipe.value());
                 }
 
@@ -37,7 +37,7 @@ public class RecipeTrieFinder {
         );
     }
 
-    public static final ResourceManagerReloadListener LISTENER = new ReloadListener();
+    public static final SynchronousResourceReloader LISTENER = new ReloadListener();
 
     private static class ReloadListener extends CreateResourceReloader {
         public ReloadListener() {
@@ -45,7 +45,7 @@ public class RecipeTrieFinder {
         }
 
         @Override
-        public void onResourceManagerReload(ResourceManager resourceManager) {
+        public void reload(ResourceManager resourceManager) {
             CACHED_TRIES.invalidateAll();
         }
     }

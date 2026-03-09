@@ -9,73 +9,66 @@ import me.shedaniel.rei.api.common.display.Display;
 import me.shedaniel.rei.api.common.display.DisplaySerializer;
 import me.shedaniel.rei.api.common.entry.EntryIngredient;
 import me.shedaniel.rei.api.common.util.EntryIngredients;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.resources.Identifier;
+import net.minecraft.item.ItemStack;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.recipe.*;
+import net.minecraft.recipe.input.SingleStackRecipeInput;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.crafting.*;
-import net.minecraft.world.level.Level;
+import net.minecraft.server.world.ServerWorld;
+import net.minecraft.util.Identifier;
+import net.minecraft.world.World;
 
 import java.util.List;
 import java.util.Optional;
 
-public record FanBlastingDisplay(EntryIngredient input, EntryIngredient output,
-                                 Optional<Identifier> location) implements Display {
+public record FanBlastingDisplay(EntryIngredient input, EntryIngredient output, Optional<Identifier> location) implements Display {
     public static final DisplaySerializer<FanBlastingDisplay> SERIALIZER = DisplaySerializer.of(
         RecordCodecBuilder.mapCodec(instance -> instance.group(
             EntryIngredient.codec().fieldOf("input").forGetter(FanBlastingDisplay::input),
             EntryIngredient.codec().fieldOf("output").forGetter(FanBlastingDisplay::output),
             Identifier.CODEC.optionalFieldOf("location").forGetter(FanBlastingDisplay::location)
-        ).apply(instance, FanBlastingDisplay::new)), StreamCodec.composite(
+        ).apply(instance, FanBlastingDisplay::new)), PacketCodec.tuple(
             EntryIngredient.streamCodec(),
             FanBlastingDisplay::input,
             EntryIngredient.streamCodec(),
             FanBlastingDisplay::output,
-            ByteBufCodecs.optional(Identifier.STREAM_CODEC),
+            PacketCodecs.optional(Identifier.PACKET_CODEC),
             FanBlastingDisplay::location,
             FanBlastingDisplay::new
         )
     );
 
-    public static Display of(RecipeHolder<?> entry) {
+    public static Display of(RecipeEntry<?> entry) {
         if (!AllRecipeTypes.CAN_BE_AUTOMATED.test(entry)) {
             return null;
         }
-        SingleItemRecipe recipe = (SingleItemRecipe) entry.value();
-        Ingredient ingredient = recipe.input();
-        Optional<ItemStack> firstInput = ingredient.values.stream().findFirst()
-            .map(item -> item.value().getDefaultInstance());
+        SingleStackRecipe recipe = (SingleStackRecipe) entry.value();
+        Ingredient ingredient = recipe.ingredient();
+        Optional<ItemStack> firstInput = ingredient.entries.stream().findFirst().map(item -> item.value().getDefaultStack());
         if (firstInput.isEmpty()) {
             return null;
         }
-        SingleRecipeInput input = new SingleRecipeInput(firstInput.get());
+        SingleStackRecipeInput input = new SingleStackRecipeInput(firstInput.get());
         MinecraftServer server = Create.SERVER;
-        ServerLevel world = server.getLevel(Level.OVERWORLD);
-        RecipeManager recipeManager = server.getRecipeManager();
+        ServerWorld world = server.getWorld(World.OVERWORLD);
+        ServerRecipeManager recipeManager = server.getRecipeManager();
         if (recipe instanceof SmeltingRecipe) {
-            Optional<RecipeHolder<BlastingRecipe>> blastingRecipe = recipeManager.getRecipeFor(
-                RecipeType.BLASTING,
-                input,
-                world
-            ).filter(AllRecipeTypes.CAN_BE_AUTOMATED);
+            Optional<RecipeEntry<BlastingRecipe>> blastingRecipe = recipeManager.getFirstMatch(RecipeType.BLASTING, input, world)
+                .filter(AllRecipeTypes.CAN_BE_AUTOMATED);
             if (blastingRecipe.isPresent()) {
                 return null;
             }
         }
-        Optional<RecipeHolder<SmokingRecipe>> smokingRecipe = recipeManager.getRecipeFor(
-            RecipeType.SMOKING,
-            input,
-            world
-        ).filter(AllRecipeTypes.CAN_BE_AUTOMATED);
+        Optional<RecipeEntry<SmokingRecipe>> smokingRecipe = recipeManager.getFirstMatch(RecipeType.SMOKING, input, world)
+            .filter(AllRecipeTypes.CAN_BE_AUTOMATED);
         if (smokingRecipe.isPresent()) {
             return null;
         }
         return new FanBlastingDisplay(
             EntryIngredients.ofIngredient(ingredient),
             EntryIngredients.of(recipe.result()),
-            Optional.of(entry.id().identifier())
+            Optional.of(entry.id().getValue())
         );
     }
 

@@ -2,18 +2,14 @@ package com.zurrtum.create.client.ponder.foundation.instruction;
 
 import com.zurrtum.create.client.ponder.api.element.ElementLink;
 import com.zurrtum.create.client.ponder.api.element.WorldSectionElement;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.util.math.Vec3d;
 
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 
 public class AnimateWorldSectionInstruction extends AnimateElementInstruction<WorldSectionElement> {
 
-    public static AnimateWorldSectionInstruction rotate(
-        ElementLink<WorldSectionElement> link,
-        Vec3 rotation,
-        int ticks
-    ) {
+    public static AnimateWorldSectionInstruction rotate(ElementLink<WorldSectionElement> link, Vec3d rotation, int ticks) {
         return new AnimateWorldSectionInstruction(
             link,
             rotation,
@@ -23,7 +19,7 @@ public class AnimateWorldSectionInstruction extends AnimateElementInstruction<Wo
         );
     }
 
-    public static AnimateWorldSectionInstruction move(ElementLink<WorldSectionElement> link, Vec3 offset, int ticks) {
+    public static AnimateWorldSectionInstruction move(ElementLink<WorldSectionElement> link, Vec3d offset, int ticks) {
         return new AnimateWorldSectionInstruction(
             link,
             offset,
@@ -35,10 +31,10 @@ public class AnimateWorldSectionInstruction extends AnimateElementInstruction<Wo
 
     protected AnimateWorldSectionInstruction(
         ElementLink<WorldSectionElement> link,
-        Vec3 totalDelta,
+        Vec3d totalDelta,
         int ticks,
-        BiConsumer<WorldSectionElement, Vec3> setter,
-        Function<WorldSectionElement, Vec3> getter
+        BiConsumer<WorldSectionElement, Vec3d> setter,
+        Function<WorldSectionElement, Vec3d> getter
     ) {
         super(link, totalDelta, ticks, setter, getter);
     }

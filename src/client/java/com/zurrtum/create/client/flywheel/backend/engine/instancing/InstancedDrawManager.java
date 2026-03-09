@@ -16,8 +16,8 @@ import com.zurrtum.create.client.flywheel.backend.gl.TextureBuffer;
 import com.zurrtum.create.client.flywheel.backend.gl.array.GlVertexArray;
 import com.zurrtum.create.client.flywheel.backend.gl.shader.GlProgram;
 import com.zurrtum.create.client.flywheel.lib.material.SimpleMaterial;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.resources.model.ModelBakery;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.render.model.ModelBaker;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -25,8 +25,7 @@ import java.util.List;
 
 public class InstancedDrawManager extends DrawManager<InstancedInstancer<?>> {
     private static final Comparator<InstancedDraw> DRAW_COMPARATOR = Comparator.comparingInt(InstancedDraw::bias)
-        .thenComparingInt(InstancedDraw::indexOfMeshInModel)
-        .thenComparing(InstancedDraw::material, MaterialRenderState.COMPARATOR);
+        .thenComparingInt(InstancedDraw::indexOfMeshInModel).thenComparing(InstancedDraw::material, MaterialRenderState.COMPARATOR);
 
     private final List<InstancedDraw> allDraws = new ArrayList<>();
     private boolean needSort = false;
@@ -143,12 +142,7 @@ public class InstancedDrawManager extends DrawManager<InstancedInstancer<?>> {
             var groupKey = drawCall.groupKey;
             var environment = groupKey.environment();
 
-            var program = programs.get(
-                groupKey.instanceType(),
-                environment.contextShader(),
-                material,
-                PipelineCompiler.OitMode.OFF
-            );
+            var program = programs.get(groupKey.instanceType(), environment.contextShader(), material, PipelineCompiler.OitMode.OFF);
             program.bind();
 
             environment.setupDraw(program);
@@ -265,7 +259,7 @@ public class InstancedDrawManager extends DrawManager<InstancedInstancer<?>> {
             GroupKey<?> shader = groupEntry.getKey();
 
             for (var progressEntry : byProgress.int2ObjectEntrySet()) {
-                TextureBinder.bindCrumbling(ModelBakery.BREAKING_LOCATIONS.get(progressEntry.getIntKey()));
+                TextureBinder.bindCrumbling(ModelBaker.BLOCK_DESTRUCTION_STAGE_TEXTURES.get(progressEntry.getIntKey()));
 
                 for (var instanceHandlePair : progressEntry.getValue()) {
                     InstancedInstancer<?> instancer = instanceHandlePair.getFirst();
@@ -273,12 +267,7 @@ public class InstancedDrawManager extends DrawManager<InstancedInstancer<?>> {
 
                     for (InstancedDraw draw : instancer.draws()) {
                         CommonCrumbling.applyCrumblingProperties(crumblingMaterial, draw.material());
-                        var program = programs.get(
-                            shader.instanceType(),
-                            ContextShader.CRUMBLING,
-                            crumblingMaterial,
-                            PipelineCompiler.OitMode.OFF
-                        );
+                        var program = programs.get(shader.instanceType(), ContextShader.CRUMBLING, crumblingMaterial, PipelineCompiler.OitMode.OFF);
                         program.bind();
                         program.setInt("_flw_baseInstance", index);
                         uploadMaterialUniform(program, crumblingMaterial);
@@ -300,7 +289,7 @@ public class InstancedDrawManager extends DrawManager<InstancedInstancer<?>> {
     @Override
     public void triggerFallback() {
         InstancingPrograms.kill();
-        Minecraft.getInstance().levelRenderer.allChanged();
+        MinecraftClient.getInstance().worldRenderer.reload();
     }
 
     @Override

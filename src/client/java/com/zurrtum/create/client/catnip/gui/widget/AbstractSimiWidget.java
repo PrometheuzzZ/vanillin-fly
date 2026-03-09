@@ -3,50 +3,36 @@ package com.zurrtum.create.client.catnip.gui.widget;
 import com.zurrtum.create.catnip.data.Couple;
 import com.zurrtum.create.catnip.theme.Color;
 import com.zurrtum.create.client.catnip.gui.TickableGuiEventListener;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.AbstractWidget;
-import net.minecraft.client.gui.narration.NarrationElementOutput;
-import net.minecraft.client.input.MouseButtonEvent;
-import net.minecraft.network.chat.CommonComponents;
-import net.minecraft.network.chat.Component;
+import net.minecraft.client.gui.Click;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.screen.narration.NarrationMessageBuilder;
+import net.minecraft.client.gui.widget.ClickableWidget;
+import net.minecraft.screen.ScreenTexts;
+import net.minecraft.text.Text;
 
 import java.util.LinkedList;
 import java.util.List;
 import java.util.function.BiConsumer;
 
-public abstract class AbstractSimiWidget extends AbstractWidget implements TickableGuiEventListener {
+public abstract class AbstractSimiWidget extends ClickableWidget implements TickableGuiEventListener {
 
     public static final Color HEADER_RGB = new Color(0x5391e1, false);
     public static final Color HINT_RGB = new Color(0x96b7e0, false);
 
-    public static final Couple<Color> COLOR_IDLE = Couple.create(
-        new Color(0xdd_8ab6d6, true),
-        new Color(0x90_8ab6d6, true)
-    ).map(Color::setImmutable);
-    public static final Couple<Color> COLOR_HOVER = Couple.create(
-        new Color(0xff_9abbd3, true),
-        new Color(0xd0_9abbd3, true)
-    ).map(Color::setImmutable);
-    public static final Couple<Color> COLOR_CLICK = Couple.create(
-        new Color(0xff_ffffff, true),
-        new Color(0xee_ffffff, true)
-    ).map(Color::setImmutable);
-    public static final Couple<Color> COLOR_DISABLED = Couple.create(
-        new Color(0x80_909090, true),
-        new Color(0x60_909090, true)
-    ).map(Color::setImmutable);
-    public static final Couple<Color> COLOR_SUCCESS = Couple.create(
-        new Color(0xcc_88f788, true),
-        new Color(0xcc_20cc20, true)
-    ).map(Color::setImmutable);
-    public static final Couple<Color> COLOR_FAIL = Couple.create(
-        new Color(0xcc_f78888, true),
-        new Color(0xcc_cc2020, true)
-    ).map(Color::setImmutable);
+    public static final Couple<Color> COLOR_IDLE = Couple.create(new Color(0xdd_8ab6d6, true), new Color(0x90_8ab6d6, true)).map(Color::setImmutable);
+    public static final Couple<Color> COLOR_HOVER = Couple.create(new Color(0xff_9abbd3, true), new Color(0xd0_9abbd3, true))
+        .map(Color::setImmutable);
+    public static final Couple<Color> COLOR_CLICK = Couple.create(new Color(0xff_ffffff, true), new Color(0xee_ffffff, true))
+        .map(Color::setImmutable);
+    public static final Couple<Color> COLOR_DISABLED = Couple.create(new Color(0x80_909090, true), new Color(0x60_909090, true))
+        .map(Color::setImmutable);
+    public static final Couple<Color> COLOR_SUCCESS = Couple.create(new Color(0xcc_88f788, true), new Color(0xcc_20cc20, true))
+        .map(Color::setImmutable);
+    public static final Couple<Color> COLOR_FAIL = Couple.create(new Color(0xcc_f78888, true), new Color(0xcc_cc2020, true)).map(Color::setImmutable);
 
     protected float z;
     protected boolean wasHovered = false;
-    protected List<Component> toolTip = new LinkedList<>();
+    protected List<Text> toolTip = new LinkedList<>();
     protected BiConsumer<Integer, Integer> onClick = (_$, _$$) -> {
     };
 
@@ -58,10 +44,10 @@ public abstract class AbstractSimiWidget extends AbstractWidget implements Ticka
     }
 
     protected AbstractSimiWidget(int x, int y, int width, int height) {
-        this(x, y, width, height, CommonComponents.EMPTY);
+        this(x, y, width, height, ScreenTexts.EMPTY);
     }
 
-    protected AbstractSimiWidget(int x, int y, int width, int height, Component message) {
+    protected AbstractSimiWidget(int x, int y, int width, int height, Text message) {
         super(x, y, width, height, message);
     }
 
@@ -86,7 +72,7 @@ public abstract class AbstractSimiWidget extends AbstractWidget implements Ticka
         return (T) this;
     }
 
-    public List<Component> getToolTip() {
+    public List<Text> getToolTip() {
         return toolTip;
     }
 
@@ -95,44 +81,43 @@ public abstract class AbstractSimiWidget extends AbstractWidget implements Ticka
     }
 
     @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
+    public void render(DrawContext graphics, int mouseX, int mouseY, float partialTicks) {
         if (visible) {
-            isHovered = isMouseOver(mouseX, mouseY);
+            hovered = isMouseOver(mouseX, mouseY);
             renderWidget(graphics, mouseX, mouseY, partialTicks);
             renderTooltip(graphics, mouseX, mouseY, partialTicks);
-            wasHovered = isHoveredOrFocused();
+            wasHovered = isSelected();
         }
     }
 
     @Override
-    protected void renderWidget(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
+    protected void renderWidget(DrawContext graphics, int mouseX, int mouseY, float partialTicks) {
         beforeRender(graphics, mouseX, mouseY, partialTicks);
         doRender(graphics, mouseX, mouseY, partialTicks);
         afterRender(graphics, mouseX, mouseY, partialTicks);
     }
 
-    protected void renderTooltip(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
+    protected void renderTooltip(DrawContext graphics, int mouseX, int mouseY, float partialTicks) {
         if (this.isHovered()) {
-            List<Component> tooltip = this.getToolTip();
-            if (tooltip.isEmpty()) {
+            List<Text> tooltip = this.getToolTip();
+            if (tooltip.isEmpty())
                 return;
-            }
             int ttx = this.lockedTooltipX == -1 ? mouseX : this.lockedTooltipX + this.getX();
             int tty = this.lockedTooltipY == -1 ? mouseY : this.lockedTooltipY + this.getY();
 
-            graphics.setComponentTooltipForNextFrame(graphics.minecraft.font, tooltip, ttx, tty);
+            graphics.drawTooltip(graphics.client.textRenderer, tooltip, ttx, tty);
         }
     }
 
-    protected void beforeRender(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
-        graphics.pose().pushMatrix();
+    protected void beforeRender(DrawContext graphics, int mouseX, int mouseY, float partialTicks) {
+        graphics.getMatrices().pushMatrix();
     }
 
-    protected void doRender(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
+    protected void doRender(DrawContext graphics, int mouseX, int mouseY, float partialTicks) {
     }
 
-    protected void afterRender(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
-        graphics.pose().popMatrix();
+    protected void afterRender(DrawContext graphics, int mouseX, int mouseY, float partialTicks) {
+        graphics.getMatrices().popMatrix();
     }
 
     public void runCallback(double mouseX, double mouseY) {
@@ -140,13 +125,13 @@ public abstract class AbstractSimiWidget extends AbstractWidget implements Ticka
     }
 
     @Override
-    public void onClick(MouseButtonEvent click, boolean doubled) {
+    public void onClick(Click click, boolean doubled) {
         runCallback(click.x(), click.y());
     }
 
     @Override
-    public void updateWidgetNarration(NarrationElementOutput pNarrationElementOutput) {
-        defaultButtonNarrationText(pNarrationElementOutput);
+    public void appendClickableNarrations(NarrationMessageBuilder pNarrationElementOutput) {
+        appendDefaultNarrations(pNarrationElementOutput);
     }
 
     public void setHeight(int value) {

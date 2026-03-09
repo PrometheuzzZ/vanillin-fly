@@ -7,11 +7,11 @@ import com.zurrtum.create.foundation.codec.CreateCodecs;
 import com.zurrtum.create.foundation.recipe.CreateSingleStackRollableRecipe;
 import de.crafty.eiv.common.api.recipe.EivRecipeType;
 import de.crafty.eiv.common.api.recipe.IEivServerRecipe;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.Tag;
-import net.minecraft.resources.RegistryOps;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.crafting.RecipeHolder;
+import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NbtCompound;
+import net.minecraft.nbt.NbtElement;
+import net.minecraft.recipe.RecipeEntry;
+import net.minecraft.registry.RegistryOps;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -24,7 +24,7 @@ public class CrushingDisplay extends CreateDisplay {
     public CrushingDisplay() {
     }
 
-    public CrushingDisplay(RecipeHolder<? extends CreateSingleStackRollableRecipe> entry) {
+    public CrushingDisplay(RecipeEntry<? extends CreateSingleStackRollableRecipe> entry) {
         CreateSingleStackRollableRecipe recipe = entry.value();
         List<ProcessingOutput> outputs = recipe.results();
         int size = outputs.size();
@@ -38,19 +38,19 @@ public class CrushingDisplay extends CreateDisplay {
     }
 
     @Override
-    public void writeToTag(CompoundTag tag) {
-        RegistryOps<Tag> ops = getServerOps();
-        tag.store("results", STACKS_CODEC, ops, results);
-        tag.store("chances", CreateCodecs.FLOAT_LIST_CODEC, ops, chances);
-        tag.store("ingredient", STACKS_CODEC, ops, ingredient);
+    public void writeToTag(NbtCompound tag) {
+        RegistryOps<NbtElement> ops = getServerOps();
+        tag.put("results", STACKS_CODEC, ops, results);
+        tag.put("chances", CreateCodecs.FLOAT_LIST_CODEC, ops, chances);
+        tag.put("ingredient", STACKS_CODEC, ops, ingredient);
     }
 
     @Override
-    public void loadFromTag(CompoundTag tag) {
-        RegistryOps<Tag> ops = getClientOps();
-        results = tag.read("results", STACKS_CODEC, ops).orElseThrow();
-        chances = tag.read("chances", CreateCodecs.FLOAT_LIST_CODEC, ops).orElseThrow();
-        ingredient = tag.read("ingredient", STACKS_CODEC, ops).orElseThrow();
+    public void loadFromTag(NbtCompound tag) {
+        RegistryOps<NbtElement> ops = getClientOps();
+        results = tag.get("results", STACKS_CODEC, ops).orElseThrow();
+        chances = tag.get("chances", CreateCodecs.FLOAT_LIST_CODEC, ops).orElseThrow();
+        ingredient = tag.get("ingredient", STACKS_CODEC, ops).orElseThrow();
     }
 
     @Override

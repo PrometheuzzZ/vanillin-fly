@@ -1,7 +1,7 @@
 package com.zurrtum.create.client.flywheel.api.visual;
 
 import com.zurrtum.create.client.flywheel.api.visualization.VisualizationContext;
-import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.WorldAccess;
 
 /**
  * An effect is not attached to any formal game object, but allows you to hook into
@@ -9,7 +9,7 @@ import net.minecraft.world.level.LevelAccessor;
  * without any built in support for networking.
  */
 public interface Effect {
-    LevelAccessor level();
+    WorldAccess level();
 
     /**
      * Create a visual that will be keyed by this effect object.

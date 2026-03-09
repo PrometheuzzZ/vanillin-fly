@@ -11,12 +11,12 @@ import com.zurrtum.create.client.ponder.api.scene.Selection;
 import com.zurrtum.create.content.fluids.tank.FluidTankBlockEntity;
 import com.zurrtum.create.content.redstone.smartObserver.SmartObserverBlockEntity;
 import com.zurrtum.create.content.redstone.thresholdSwitch.ThresholdSwitchBlock;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.block.Blocks;
+import net.minecraft.item.ItemStack;
+import net.minecraft.item.Items;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Vec3d;
 
 public class DetectorScenes {
 
@@ -57,9 +57,7 @@ public class DetectorScenes {
         ItemStack copperIngot = new ItemStack(Items.COPPER_INGOT);
         ItemStack amethystItem = new ItemStack(Blocks.AMETHYST_BLOCK);
 
-        scene.overlay()
-            .showControls(util.vector().blockSurface(observerPos.north(), Direction.NORTH), Pointing.RIGHT, 40)
-            .withItem(copperIngot);
+        scene.overlay().showControls(util.vector().blockSurface(observerPos.north(), Direction.NORTH), Pointing.RIGHT, 40).withItem(copperIngot);
         scene.idle(7);
         scene.world().toggleRedstonePower(util.select().position(observerPos));
         scene.world().toggleRedstonePower(redstoneDust);
@@ -72,16 +70,15 @@ public class DetectorScenes {
 
         scene.overlay().showCenteredScrollInput(observerPos, Direction.UP, 10);
         scene.idle(5);
-        scene.overlay().showControls(util.vector().blockSurface(observerPos, Direction.UP), Pointing.DOWN, 60)
-            .rightClick().withItem(amethystItem);
+        scene.overlay().showControls(util.vector().blockSurface(observerPos, Direction.UP), Pointing.DOWN, 60).rightClick().withItem(amethystItem);
         scene.idle(7);
         scene.world().setFilterData(util.select().position(observerPos), SmartObserverBlockEntity.class, amethystItem);
         scene.world().toggleRedstonePower(util.select().position(observerPos));
         scene.world().toggleRedstonePower(redstoneDust);
         scene.idle(25);
 
-        scene.overlay().showText(60).text("The filter slot can be used to look for specific contents only")
-            .attachKeyFrame().pointAt(util.vector().blockSurface(observerPos, Direction.UP)).placeNearTarget();
+        scene.overlay().showText(60).text("The filter slot can be used to look for specific contents only").attachKeyFrame()
+            .pointAt(util.vector().blockSurface(observerPos, Direction.UP)).placeNearTarget();
         scene.idle(50);
 
         scene.world().hideIndependentSection(chestLink, Direction.EAST);
@@ -110,11 +107,7 @@ public class DetectorScenes {
         scene.world().setFilterData(util.select().position(0, 2, 4), SmartObserverBlockEntity.class, copperIngot);
         scene.world().showSection(chuteObserver, Direction.DOWN);
         scene.idle(2);
-        scene.world().setFilterData(
-            util.select().position(4, 2, 4),
-            SmartObserverBlockEntity.class,
-            new ItemStack(Items.LAVA_BUCKET)
-        );
+        scene.world().setFilterData(util.select().position(4, 2, 4), SmartObserverBlockEntity.class, new ItemStack(Items.LAVA_BUCKET));
         scene.world().showSection(pipeObserver, Direction.DOWN);
         scene.idle(5);
         scene.world().showSection(chute, Direction.WEST);
@@ -122,8 +115,8 @@ public class DetectorScenes {
         scene.world().showSection(pipe, Direction.EAST);
         scene.idle(10);
 
-        scene.overlay().showText(60).text("Additionally, smart observers can monitor belts, chutes and pipes")
-            .attachKeyFrame().pointAt(util.vector().blockSurface(observerPos, Direction.UP)).placeNearTarget();
+        scene.overlay().showText(60).text("Additionally, smart observers can monitor belts, chutes and pipes").attachKeyFrame()
+            .pointAt(util.vector().blockSurface(observerPos, Direction.UP)).placeNearTarget();
         scene.idle(60);
 
         scene.world().createItemOnBelt(util.grid().at(3, 1, 1), Direction.EAST, amethystItem);
@@ -142,22 +135,20 @@ public class DetectorScenes {
         scene.idle(5);
         scene.world().showSection(util.select().position(funnelPos), Direction.DOWN);
         scene.idle(5);
-        ElementLink<WorldSectionElement> observerLink = scene.world()
-            .makeSectionIndependent(util.select().position(observerPos));
+        ElementLink<WorldSectionElement> observerLink = scene.world().makeSectionIndependent(util.select().position(observerPos));
         scene.world().moveSection(observerLink, util.vector().of(1, 1, 0), 10);
         scene.world().hideSection(redstoneDust, Direction.EAST);
         scene.idle(20);
 
-        scene.overlay().showText(60).text("...and will emit a pulse, if an item enters or exits a funnel")
-            .attachKeyFrame().pointAt(util.vector().blockSurface(observerPos.above().east(), Direction.WEST))
-            .placeNearTarget();
+        scene.overlay().showText(60).text("...and will emit a pulse, if an item enters or exits a funnel").attachKeyFrame()
+            .pointAt(util.vector().blockSurface(observerPos.up().east(), Direction.WEST)).placeNearTarget();
         scene.idle(60);
 
         for (int i = 0; i < 3; i++) {
             scene.world().createItemOnBelt(util.grid().at(3, 1, 1), Direction.EAST, amethystItem);
 
             scene.world().toggleRedstonePower(util.select().position(observerPos));
-            scene.effects().indicateRedstone(observerPos.above().east());
+            scene.effects().indicateRedstone(observerPos.up().east());
             scene.idle(5);
 
             scene.world().toggleRedstonePower(util.select().position(observerPos));
@@ -216,9 +207,8 @@ public class DetectorScenes {
             scene.world().removeItemsFromBelt(util.grid().at(3, 0, 2));
             scene.world().flapFunnel(util.grid().at(3, 1, 2), false);
 
-            if (i % 2 == 1) {
+            if (i % 2 == 1)
                 scene.world().cycleBlockProperty(switchPos, ThresholdSwitchBlock.LEVEL);
-            }
         }
 
         scene.addLazyKeyframe();
@@ -227,10 +217,10 @@ public class DetectorScenes {
         scene.world().multiplyKineticSpeed(util.select().everywhere(), 1 / 8f);
         scene.idle(10);
 
-        Vec3 upper = util.vector().blockSurface(switchPos, Direction.NORTH).add(0, 3 / 16f, 0);
+        Vec3d upper = util.vector().blockSurface(switchPos, Direction.NORTH).add(0, 3 / 16f, 0);
         scene.overlay().showLine(PonderPalette.RED, upper.add(2 / 16f, 0, 0), upper.subtract(2 / 16f, 0, 0), 60);
-        scene.overlay().showText(70).text("When the inventory content exceeds the upper threshold...")
-            .colored(PonderPalette.RED).pointAt(upper.subtract(2 / 16f, 0, 0)).placeNearTarget();
+        scene.overlay().showText(70).text("When the inventory content exceeds the upper threshold...").colored(PonderPalette.RED)
+            .pointAt(upper.subtract(2 / 16f, 0, 0)).placeNearTarget();
 
         scene.idle(60);
         scene.world().removeItemsFromBelt(util.grid().at(3, 0, 2));
@@ -252,39 +242,28 @@ public class DetectorScenes {
         for (int i = 0; i < 5; i++) {
             scene.idle(10);
             scene.world().createItemOnBelt(util.grid().at(3, 0, 4), Direction.NORTH, ironIngot);
-            if (i % 3 == 1) {
-                scene.world().modifyBlock(
-                    switchPos,
-                    s -> s.setValue(ThresholdSwitchBlock.LEVEL, s.getValue(ThresholdSwitchBlock.LEVEL) - 1),
-                    false
-                );
-            }
+            if (i % 3 == 1)
+                scene.world().modifyBlock(switchPos, s -> s.with(ThresholdSwitchBlock.LEVEL, s.get(ThresholdSwitchBlock.LEVEL) - 1), false);
         }
         scene.world().multiplyKineticSpeed(util.select().everywhere(), 1 / 8f);
 
-        Vec3 lower = util.vector().blockSurface(switchPos, Direction.NORTH).add(0, -3 / 16f, 0);
+        Vec3d lower = util.vector().blockSurface(switchPos, Direction.NORTH).add(0, -3 / 16f, 0);
         scene.overlay().showLine(PonderPalette.GREEN, lower.add(2 / 16f, 0, 0), lower.subtract(2 / 16f, 0, 0), 60);
-        scene.overlay().showText(70).text("The signal stays until the lower threshold is reached").attachKeyFrame()
-            .colored(PonderPalette.GREEN).pointAt(lower.subtract(2 / 16f, 0, 0)).placeNearTarget();
+        scene.overlay().showText(70).text("The signal stays until the lower threshold is reached").attachKeyFrame().colored(PonderPalette.GREEN)
+            .pointAt(lower.subtract(2 / 16f, 0, 0)).placeNearTarget();
         scene.idle(30);
 
         for (int i = 0; i < 3; i++) {
             scene.idle(10);
             scene.world().createItemOnBelt(util.grid().at(3, 0, 4), Direction.NORTH, ironIngot);
-            if (i % 3 == 2) {
-                scene.world().modifyBlock(
-                    switchPos,
-                    s -> s.setValue(ThresholdSwitchBlock.LEVEL, s.getValue(ThresholdSwitchBlock.LEVEL) - 1),
-                    false
-                );
-            }
+            if (i % 3 == 2)
+                scene.world().modifyBlock(switchPos, s -> s.with(ThresholdSwitchBlock.LEVEL, s.get(ThresholdSwitchBlock.LEVEL) - 1), false);
         }
 
         scene.world().toggleRedstonePower(redstone);
         scene.idle(40);
 
-        scene.overlay().showText(90)
-            .text("The redstone output can now be used to control item supply, keeping the buffer filled")
+        scene.overlay().showText(90).text("The redstone output can now be used to control item supply, keeping the buffer filled")
             .pointAt(util.vector().blockSurface(switchPos.north(), Direction.DOWN)).attachKeyFrame().placeNearTarget();
         scene.idle(100);
 
@@ -293,11 +272,10 @@ public class DetectorScenes {
         scene.idle(5);
         scene.overlay().showLine(PonderPalette.RED, upper.add(2 / 16f, 0, 0), upper.subtract(2 / 16f, 0, 0), 100);
         scene.idle(15);
-        scene.overlay().showControls(util.vector().blockSurface(switchPos, Direction.UP), Pointing.DOWN, 60)
-            .rightClick();
+        scene.overlay().showControls(util.vector().blockSurface(switchPos, Direction.UP), Pointing.DOWN, 60).rightClick();
         scene.idle(7);
-        scene.overlay().showText(70).text("The specific thresholds can be changed in the UI")
-            .pointAt(upper.subtract(2 / 16f, 0, 0)).placeNearTarget();
+        scene.overlay().showText(70).text("The specific thresholds can be changed in the UI").pointAt(upper.subtract(2 / 16f, 0, 0))
+            .placeNearTarget();
         scene.idle(80);
 
         scene.overlay().showCenteredScrollInput(switchPos, Direction.UP, 70);
@@ -320,11 +298,7 @@ public class DetectorScenes {
         ElementLink<WorldSectionElement> tankLink = scene.world().showIndependentSection(fluidTank, Direction.DOWN);
         scene.world().moveSection(tankLink, util.vector().of(1, 0, -2), 0);
         scene.idle(10);
-        scene.world().modifyBlockEntity(
-            util.grid().at(1, 1, 5),
-            FluidTankBlockEntity.class,
-            tank -> tank.getTankInventory().markDirty()
-        );
+        scene.world().modifyBlockEntity(util.grid().at(1, 1, 5), FluidTankBlockEntity.class, tank -> tank.getTankInventory().markDirty());
 
         scene.world().cycleBlockProperty(switchPos, ThresholdSwitchBlock.LEVEL);
         scene.world().cycleBlockProperty(switchPos, ThresholdSwitchBlock.LEVEL);
@@ -336,11 +310,10 @@ public class DetectorScenes {
 
         scene.world().hideIndependentSection(tankLink, Direction.SOUTH);
         scene.world().hideSection(redstone, Direction.NORTH);
-        ElementLink<WorldSectionElement> switchLink = scene.world()
-            .makeSectionIndependent(util.select().position(switchPos));
+        ElementLink<WorldSectionElement> switchLink = scene.world().makeSectionIndependent(util.select().position(switchPos));
         scene.idle(10);
         scene.world().moveSection(switchLink, util.vector().of(0, 1, 0), 15);
-        scene.world().modifyBlock(switchPos, s -> s.setValue(ThresholdSwitchBlock.LEVEL, 0), false);
+        scene.world().modifyBlock(switchPos, s -> s.with(ThresholdSwitchBlock.LEVEL, 0), false);
         scene.idle(5);
         scene.world().showSection(pulley, Direction.DOWN);
         scene.idle(15);
@@ -348,7 +321,7 @@ public class DetectorScenes {
         scene.world().hideIndependentSection(hole, Direction.DOWN);
 
         scene.overlay().showText(70).text("...as well as, curiously, the length of an extended rope pulley")
-            .pointAt(util.vector().blockSurface(switchPos.above(), Direction.NORTH)).attachKeyFrame().placeNearTarget();
+            .pointAt(util.vector().blockSurface(switchPos.up(), Direction.NORTH)).attachKeyFrame().placeNearTarget();
         scene.idle(10);
 
         scene.world().setKineticSpeed(pulley, 32);
@@ -358,9 +331,8 @@ public class DetectorScenes {
             scene.idle(5);
             scene.world().cycleBlockProperty(switchPos, ThresholdSwitchBlock.LEVEL);
             scene.idle(45);
-            if (i == 1) {
+            if (i == 1)
                 scene.markAsFinished();
-            }
         }
 
         scene.idle(5);

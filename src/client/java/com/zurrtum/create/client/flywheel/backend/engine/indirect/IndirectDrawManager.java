@@ -14,8 +14,8 @@ import com.zurrtum.create.client.flywheel.backend.gl.buffer.GlBufferType;
 import com.zurrtum.create.client.flywheel.backend.gl.buffer.GlBufferUsage;
 import com.zurrtum.create.client.flywheel.lib.material.SimpleMaterial;
 import com.zurrtum.create.client.flywheel.lib.memory.MemoryBlock;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.resources.model.ModelBakery;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.render.model.ModelBaker;
 
 import java.util.HashMap;
 import java.util.List;
@@ -69,10 +69,7 @@ public class IndirectDrawManager extends DrawManager<IndirectInstancer<?>> {
     @SuppressWarnings("unchecked")
     @Override
     protected <I extends Instance> void initialize(InstancerKey<I> key, IndirectInstancer<?> instancer) {
-        var group = (IndirectCullingGroup<I>) cullingGroups.computeIfAbsent(
-            key.type(),
-            t -> new IndirectCullingGroup<>(t, programs)
-        );
+        var group = (IndirectCullingGroup<I>) cullingGroups.computeIfAbsent(key.type(), t -> new IndirectCullingGroup<>(t, programs));
         group.add((IndirectInstancer<I>) instancer, key, meshPool);
     }
 
@@ -228,13 +225,7 @@ public class IndirectDrawManager extends DrawManager<IndirectInstancer<?>> {
 
         // Set up the crumbling program buffers. Nothing changes here between draws.
         GlBufferType.DRAW_INDIRECT_BUFFER.bind(crumblingDrawBuffer.handle());
-        glBindBufferRange(
-            GL_SHADER_STORAGE_BUFFER,
-            BufferBindings.DRAW,
-            crumblingDrawBuffer.handle(),
-            0,
-            IndirectBuffers.DRAW_COMMAND_STRIDE
-        );
+        glBindBufferRange(GL_SHADER_STORAGE_BUFFER, BufferBindings.DRAW, crumblingDrawBuffer.handle(), 0, IndirectBuffers.DRAW_COMMAND_STRIDE);
 
         MaterialRenderState.setupFrameBuffer();
 
@@ -249,7 +240,7 @@ public class IndirectDrawManager extends DrawManager<IndirectInstancer<?>> {
             }
 
             for (var progressEntry : byProgress.int2ObjectEntrySet()) {
-                TextureBinder.bindCrumbling(ModelBakery.BREAKING_LOCATIONS.get(progressEntry.getIntKey()));
+                TextureBinder.bindCrumbling(ModelBaker.BLOCK_DESTRUCTION_STAGE_TEXTURES.get(progressEntry.getIntKey()));
 
                 for (var instanceHandlePair : progressEntry.getValue()) {
                     IndirectInstancer<?> instancer = instanceHandlePair.getFirst();
@@ -284,7 +275,7 @@ public class IndirectDrawManager extends DrawManager<IndirectInstancer<?>> {
     @Override
     public void triggerFallback() {
         IndirectPrograms.kill();
-        Minecraft.getInstance().levelRenderer.allChanged();
+        MinecraftClient.getInstance().worldRenderer.reload();
     }
 
     @Override

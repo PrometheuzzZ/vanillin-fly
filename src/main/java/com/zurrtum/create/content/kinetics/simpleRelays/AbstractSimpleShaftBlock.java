@@ -1,55 +1,49 @@
 package com.zurrtum.create.content.kinetics.simpleRelays;
 
 import com.zurrtum.create.AllBlockEntityTypes;
-import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.content.decoration.bracket.BracketedBlockEntityBehaviour;
 import com.zurrtum.create.content.equipment.wrench.IWrenchableWithBracket;
 import com.zurrtum.create.content.kinetics.base.KineticBlockEntity;
-import net.minecraft.core.BlockPos;
-import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.InteractionResult;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.context.UseOnContext;
-import net.minecraft.world.level.BlockGetter;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.entity.BlockEntityType;
-import net.minecraft.world.level.block.state.BlockBehaviour;
-import net.minecraft.world.level.block.state.BlockState;
+import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
+import net.minecraft.block.AbstractBlock;
+import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.entity.BlockEntityType;
+import net.minecraft.item.ItemStack;
+import net.minecraft.item.ItemUsageContext;
+import net.minecraft.server.world.ServerWorld;
+import net.minecraft.util.ActionResult;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.BlockView;
 
 import java.util.Optional;
 
 public abstract class AbstractSimpleShaftBlock extends AbstractShaftBlock implements IWrenchableWithBracket {
 
-    public AbstractSimpleShaftBlock(BlockBehaviour.Properties properties) {
+    public AbstractSimpleShaftBlock(AbstractBlock.Settings properties) {
         super(properties);
     }
 
     @Override
-    public InteractionResult onWrenched(BlockState state, UseOnContext context) {
+    public ActionResult onWrenched(BlockState state, ItemUsageContext context) {
         return IWrenchableWithBracket.super.onWrenched(state, context);
     }
 
     @Override
-    public void affectNeighborsAfterRemoval(BlockState state, ServerLevel world, BlockPos pos, boolean isMoving) {
+    public void onStateReplaced(BlockState state, ServerWorld world, BlockPos pos, boolean isMoving) {
         if (!isMoving) {
-            removeBracket(world, pos, true).ifPresent(stack -> Block.popResource(world, pos, stack));
+            removeBracket(world, pos, true).ifPresent(stack -> Block.dropStack(world, pos, stack));
         }
     }
 
     @Override
-    public Optional<ItemStack> removeBracket(BlockGetter world, BlockPos pos, boolean inOnReplacedContext) {
-        BracketedBlockEntityBehaviour behaviour = BlockEntityBehaviour.get(
-            world,
-            pos,
-            BracketedBlockEntityBehaviour.TYPE
-        );
-        if (behaviour == null) {
+    public Optional<ItemStack> removeBracket(BlockView world, BlockPos pos, boolean inOnReplacedContext) {
+        BracketedBlockEntityBehaviour behaviour = BlockEntityBehaviour.get(world, pos, BracketedBlockEntityBehaviour.TYPE);
+        if (behaviour == null)
             return Optional.empty();
-        }
         BlockState bracket = behaviour.removeBracket(inOnReplacedContext);
-        if (bracket == null) {
+        if (bracket == null)
             return Optional.empty();
-        }
         return Optional.of(new ItemStack(bracket.getBlock()));
     }
 

@@ -1,43 +1,33 @@
 package com.zurrtum.create.client.foundation.gui.render;
 
 import com.zurrtum.create.content.processing.burner.BlazeBurnerBlock;
-import net.minecraft.client.gui.navigation.ScreenRectangle;
-import net.minecraft.client.gui.render.state.pip.PictureInPictureRenderState;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.block.BlockState;
+import net.minecraft.client.gui.ScreenRect;
+import net.minecraft.client.gui.render.state.special.SpecialGuiElementRenderState;
+import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix3x2f;
 
-public record BlazeBurnerRenderState(Matrix3x2f pose, int x, int y, Level world, BlockState block,
-                                     BlazeBurnerBlock.HeatLevel heatLevel, float animation, boolean drawGoggles,
-                                     int hash, ScreenRectangle bounds) implements PictureInPictureRenderState {
+public record BlazeBurnerRenderState(
+    Matrix3x2f pose, int x, int y, World world, BlockState block, BlazeBurnerBlock.HeatLevel heatLevel, float animation,
+    boolean drawGoggles, int hash, ScreenRect bounds
+) implements SpecialGuiElementRenderState {
     public BlazeBurnerRenderState(
         Matrix3x2f pose,
         int x,
         int y,
-        Level world,
+        World world,
         BlockState block,
         BlazeBurnerBlock.HeatLevel heatLevel,
         float animation,
         boolean drawGoggles,
         int hash
     ) {
-        this(
-            pose,
-            x,
-            y,
-            world,
-            block,
-            heatLevel,
-            animation,
-            drawGoggles,
-            hash,
-            new ScreenRectangle(x, y, 68, 68).transformMaxBounds(pose)
-        );
+        this(pose, x, y, world, block, heatLevel, animation, drawGoggles, hash, new ScreenRect(x, y, 68, 68).transformEachVertex(pose));
     }
 
     @Override
-    public @Nullable ScreenRectangle bounds() {
+    public @Nullable ScreenRect bounds() {
         return bounds;
     }
 
@@ -47,27 +37,27 @@ public record BlazeBurnerRenderState(Matrix3x2f pose, int x, int y, Level world,
     }
 
     @Override
-    public @Nullable ScreenRectangle scissorArea() {
+    public @Nullable ScreenRect scissorArea() {
         return null;
     }
 
     @Override
-    public int x0() {
+    public int x1() {
         return x;
     }
 
     @Override
-    public int x1() {
+    public int x2() {
         return x + 68;
     }
 
     @Override
-    public int y0() {
+    public int y1() {
         return y;
     }
 
     @Override
-    public int y1() {
+    public int y2() {
         return y + 68;
     }
 }

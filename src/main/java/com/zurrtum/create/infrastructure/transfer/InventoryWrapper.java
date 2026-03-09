@@ -13,10 +13,10 @@ import net.fabricmc.fabric.api.transfer.v1.storage.StorageView;
 import net.fabricmc.fabric.api.transfer.v1.storage.base.SingleSlotStorage;
 import net.fabricmc.fabric.api.transfer.v1.transaction.Transaction;
 import net.fabricmc.fabric.impl.transfer.item.ItemVariantImpl;
-import net.minecraft.core.Direction;
-import net.minecraft.core.component.DataComponents;
-import net.minecraft.world.Container;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.component.DataComponentTypes;
+import net.minecraft.inventory.Inventory;
+import net.minecraft.item.ItemStack;
+import net.minecraft.util.math.Direction;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -34,7 +34,7 @@ public abstract class InventoryWrapper<T extends Storage<ItemVariant>, S extends
         init();
     }
 
-    public static Container of(Storage<ItemVariant> storage) {
+    public static Inventory of(Storage<ItemVariant> storage) {
         InventoryWrapper<?, ?> inventory;
         if (storage instanceof SlottedStorage<ItemVariant> slottedStorage) {
             inventory = new Slotted(slottedStorage);
@@ -48,7 +48,7 @@ public abstract class InventoryWrapper<T extends Storage<ItemVariant>, S extends
     }
 
     @Override
-    public void clearContent() {
+    public void clear() {
         try (Transaction transaction = Transaction.openOuter()) {
             for (StorageView<ItemVariant> view : storage.nonEmptyViews()) {
                 view.extract(view.getResource(), view.getAmount(), transaction);
@@ -69,11 +69,7 @@ public abstract class InventoryWrapper<T extends Storage<ItemVariant>, S extends
     @Override
     public int count(ItemStack stack, int maxAmount) {
         try (Transaction transaction = Transaction.openOuter()) {
-            long extract = storage.extract(
-                ItemVariant.of(stack.getItem(), stack.getComponentsPatch()),
-                maxAmount,
-                transaction
-            );
+            long extract = storage.extract(ItemVariant.of(stack.getItem(), stack.getComponentChanges()), maxAmount, transaction);
             transaction.abort();
             return (int) extract;
         }
@@ -125,6 +121,7 @@ public abstract class InventoryWrapper<T extends Storage<ItemVariant>, S extends
     }
 
     @Override
+    @SuppressWarnings("UnstableApiUsage")
     public ItemStack preciseCount(Predicate<ItemStack> predicate, int maxAmount) {
         if (maxAmount == 0) {
             return ItemStack.EMPTY;
@@ -223,11 +220,7 @@ public abstract class InventoryWrapper<T extends Storage<ItemVariant>, S extends
     @Override
     public int countSpace(ItemStack stack, int maxAmount) {
         try (Transaction transaction = Transaction.openOuter()) {
-            long insert = storage.insert(
-                ItemVariant.of(stack.getItem(), stack.getComponentsPatch()),
-                maxAmount,
-                transaction
-            );
+            long insert = storage.insert(ItemVariant.of(stack.getItem(), stack.getComponentChanges()), maxAmount, transaction);
             transaction.abort();
             return (int) insert;
         }
@@ -244,8 +237,7 @@ public abstract class InventoryWrapper<T extends Storage<ItemVariant>, S extends
             int count = stack.getCount();
             return countSpace(stack, count) == count;
         }
-        Object2IntLinkedOpenCustomHashMap<ItemStack> map = new Object2IntLinkedOpenCustomHashMap<>(
-            ITEM_STACK_HASH_STRATEGY);
+        Object2IntLinkedOpenCustomHashMap<ItemStack> map = new Object2IntLinkedOpenCustomHashMap<>(ITEM_STACK_HASH_STRATEGY);
         for (ItemStack stack : stacks) {
             map.merge(stack, stack.getCount(), Integer::sum);
         }
@@ -262,11 +254,7 @@ public abstract class InventoryWrapper<T extends Storage<ItemVariant>, S extends
                 Object2IntMap.Entry<ItemStack> entry = iterator.next();
                 ItemStack stack = entry.getKey();
                 int count = entry.getIntValue();
-                long insert = storage.insert(
-                    ItemVariant.of(stack.getItem(), stack.getComponentsPatch()),
-                    count,
-                    transaction
-                );
+                long insert = storage.insert(ItemVariant.of(stack.getItem(), stack.getComponentChanges()), count, transaction);
                 if (insert < count) {
                     transaction.abort();
                     return false;
@@ -299,11 +287,7 @@ public abstract class InventoryWrapper<T extends Storage<ItemVariant>, S extends
     @Override
     public int extract(ItemStack stack, int maxAmount) {
         try (Transaction transaction = Transaction.openOuter()) {
-            long extract = storage.extract(
-                ItemVariant.of(stack.getItem(), stack.getComponentsPatch()),
-                maxAmount,
-                transaction
-            );
+            long extract = storage.extract(ItemVariant.of(stack.getItem(), stack.getComponentChanges()), maxAmount, transaction);
             transaction.commit();
             return (int) extract;
         }
@@ -371,8 +355,7 @@ public abstract class InventoryWrapper<T extends Storage<ItemVariant>, S extends
             }
             return List.of(directCopy(stack, count - extract));
         }
-        Object2IntLinkedOpenCustomHashMap<ItemStack> map = new Object2IntLinkedOpenCustomHashMap<>(
-            ITEM_STACK_HASH_STRATEGY);
+        Object2IntLinkedOpenCustomHashMap<ItemStack> map = new Object2IntLinkedOpenCustomHashMap<>(ITEM_STACK_HASH_STRATEGY);
         for (ItemStack stack : stacks) {
             map.merge(stack, stack.getCount(), Integer::sum);
         }
@@ -480,7 +463,7 @@ public abstract class InventoryWrapper<T extends Storage<ItemVariant>, S extends
         try (Transaction transaction = Transaction.openOuter()) {
             for (StorageView<ItemVariant> view : storage.nonEmptyViews()) {
                 ItemVariant variant = view.getResource();
-                int maxAmount = variant.getComponentMap().getOrDefault(DataComponents.MAX_STACK_SIZE, 1);
+                int maxAmount = variant.getComponentMap().getOrDefault(DataComponentTypes.MAX_STACK_SIZE, 1);
                 long extract = storage.extract(variant, maxAmount, transaction);
                 if (extract == 0) {
                     continue;
@@ -500,7 +483,7 @@ public abstract class InventoryWrapper<T extends Storage<ItemVariant>, S extends
                 ItemVariant variant = view.getResource();
                 ItemStack stack = ((ItemVariantImpl) variant).getCachedStack();
                 if (predicate.test(stack)) {
-                    int maxAmount = variant.getComponentMap().getOrDefault(DataComponents.MAX_STACK_SIZE, 1);
+                    int maxAmount = variant.getComponentMap().getOrDefault(DataComponentTypes.MAX_STACK_SIZE, 1);
                     long extract = storage.extract(variant, maxAmount, transaction);
                     if (extract == 0) {
                         continue;
@@ -559,18 +542,18 @@ public abstract class InventoryWrapper<T extends Storage<ItemVariant>, S extends
     }
 
     @Override
-    public int getMaxStackSize() {
+    public int getMaxCountPerStack() {
         return capacity;
     }
 
-    protected abstract S getSlotView(int slot);
+    protected abstract S getSlot(int slot);
 
     @Override
-    public ItemStack getItem(int slot) {
-        if (slot >= getContainerSize()) {
+    public ItemStack getStack(int slot) {
+        if (slot >= size()) {
             return ItemStack.EMPTY;
         }
-        StorageView<ItemVariant> view = getSlotView(slot);
+        StorageView<ItemVariant> view = getSlot(slot);
         if (view == null) {
             return ItemStack.EMPTY;
         }
@@ -603,11 +586,7 @@ public abstract class InventoryWrapper<T extends Storage<ItemVariant>, S extends
     @Override
     public int insert(ItemStack stack, int maxAmount) {
         try (Transaction transaction = Transaction.openOuter()) {
-            long insert = storage.insert(
-                ItemVariant.of(stack.getItem(), stack.getComponentsPatch()),
-                maxAmount,
-                transaction
-            );
+            long insert = storage.insert(ItemVariant.of(stack.getItem(), stack.getComponentChanges()), maxAmount, transaction);
             transaction.commit();
             return (int) insert;
         }
@@ -631,8 +610,7 @@ public abstract class InventoryWrapper<T extends Storage<ItemVariant>, S extends
             }
             return List.of(directCopy(stack, count - insert));
         }
-        Object2IntLinkedOpenCustomHashMap<ItemStack> map = new Object2IntLinkedOpenCustomHashMap<>(
-            ITEM_STACK_HASH_STRATEGY);
+        Object2IntLinkedOpenCustomHashMap<ItemStack> map = new Object2IntLinkedOpenCustomHashMap<>(ITEM_STACK_HASH_STRATEGY);
         for (ItemStack stack : stacks) {
             map.merge(stack, stack.getCount(), Integer::sum);
         }
@@ -657,11 +635,7 @@ public abstract class InventoryWrapper<T extends Storage<ItemVariant>, S extends
                 Object2IntMap.Entry<ItemStack> entry = iterator.next();
                 ItemStack stack = entry.getKey();
                 int count = entry.getIntValue();
-                long insert = storage.insert(
-                    ItemVariant.of(stack.getItem(), stack.getComponentsPatch()),
-                    count,
-                    transaction
-                );
+                long insert = storage.insert(ItemVariant.of(stack.getItem(), stack.getComponentChanges()), count, transaction);
                 if (insert == count) {
                     iterator.remove();
                     if (entries.isEmpty()) {
@@ -715,11 +689,7 @@ public abstract class InventoryWrapper<T extends Storage<ItemVariant>, S extends
     @Override
     public int insertExist(ItemStack stack, int maxAmount) {
         try (Transaction transaction = Transaction.openOuter()) {
-            long insert = storage.insert(
-                ItemVariant.of(stack.getItem(), stack.getComponentsPatch()),
-                maxAmount,
-                transaction
-            );
+            long insert = storage.insert(ItemVariant.of(stack.getItem(), stack.getComponentChanges()), maxAmount, transaction);
             transaction.commit();
             return (int) insert;
         }
@@ -746,11 +716,7 @@ public abstract class InventoryWrapper<T extends Storage<ItemVariant>, S extends
         }
         try (Transaction transaction = Transaction.openOuter()) {
             int amount = stack.getCount();
-            long extract = storage.extract(
-                ItemVariant.of(stack.getItem(), stack.getComponentsPatch()),
-                amount,
-                transaction
-            );
+            long extract = storage.extract(ItemVariant.of(stack.getItem(), stack.getComponentChanges()), amount, transaction);
             if (extract < amount) {
                 transaction.abort();
                 return false;
@@ -797,11 +763,7 @@ public abstract class InventoryWrapper<T extends Storage<ItemVariant>, S extends
     @Override
     public boolean preciseInsert(ItemStack stack, int maxAmount) {
         try (Transaction transaction = Transaction.openOuter()) {
-            long insert = storage.insert(
-                ItemVariant.of(stack.getItem(), stack.getComponentsPatch()),
-                maxAmount,
-                transaction
-            );
+            long insert = storage.insert(ItemVariant.of(stack.getItem(), stack.getComponentChanges()), maxAmount, transaction);
             if (insert < maxAmount) {
                 transaction.abort();
                 return false;
@@ -821,8 +783,7 @@ public abstract class InventoryWrapper<T extends Storage<ItemVariant>, S extends
         if (listSize == 1) {
             return preciseInsert(stacks.getFirst());
         }
-        Object2IntLinkedOpenCustomHashMap<ItemStack> map = new Object2IntLinkedOpenCustomHashMap<>(
-            ITEM_STACK_HASH_STRATEGY);
+        Object2IntLinkedOpenCustomHashMap<ItemStack> map = new Object2IntLinkedOpenCustomHashMap<>(ITEM_STACK_HASH_STRATEGY);
         for (ItemStack stack : stacks) {
             map.merge(stack, stack.getCount(), Integer::sum);
         }
@@ -837,11 +798,7 @@ public abstract class InventoryWrapper<T extends Storage<ItemVariant>, S extends
                 Object2IntMap.Entry<ItemStack> entry = iterator.next();
                 ItemStack stack = entry.getKey();
                 int count = entry.getIntValue();
-                long insert = storage.insert(
-                    ItemVariant.of(stack.getItem(), stack.getComponentsPatch()),
-                    count,
-                    transaction
-                );
+                long insert = storage.insert(ItemVariant.of(stack.getItem(), stack.getComponentChanges()), count, transaction);
                 if (insert < count) {
                     transaction.abort();
                     return false;
@@ -853,11 +810,11 @@ public abstract class InventoryWrapper<T extends Storage<ItemVariant>, S extends
     }
 
     @Override
-    public ItemStack removeItemNoUpdate(int slot) {
-        if (slot >= getContainerSize()) {
+    public ItemStack removeStack(int slot) {
+        if (slot >= size()) {
             return ItemStack.EMPTY;
         }
-        StorageView<ItemVariant> view = getSlotView(slot);
+        StorageView<ItemVariant> view = getSlot(slot);
         if (view == null) {
             return ItemStack.EMPTY;
         }
@@ -874,11 +831,11 @@ public abstract class InventoryWrapper<T extends Storage<ItemVariant>, S extends
     }
 
     @Override
-    public ItemStack removeItem(int slot, int amount) {
-        if (slot >= getContainerSize()) {
+    public ItemStack removeStack(int slot, int amount) {
+        if (slot >= size()) {
             return ItemStack.EMPTY;
         }
-        StorageView<ItemVariant> view = getSlotView(slot);
+        StorageView<ItemVariant> view = getSlot(slot);
         if (view == null) {
             return ItemStack.EMPTY;
         }
@@ -894,11 +851,11 @@ public abstract class InventoryWrapper<T extends Storage<ItemVariant>, S extends
     }
 
     @Override
-    public void setItem(int slot, ItemStack stack) {
-        if (slot >= getContainerSize()) {
+    public void setStack(int slot, ItemStack stack) {
+        if (slot >= size()) {
             return;
         }
-        S view = getSlotView(slot);
+        S view = getSlot(slot);
         if (view == null) {
             return;
         }
@@ -908,12 +865,7 @@ public abstract class InventoryWrapper<T extends Storage<ItemVariant>, S extends
                 if (stack.isEmpty()) {
                     return;
                 }
-                insert(
-                    view,
-                    ItemVariant.of(stack.getItem(), stack.getComponentsPatch()),
-                    stack.getCount(),
-                    transaction
-                );
+                insert(view, ItemVariant.of(stack.getItem(), stack.getComponentChanges()), stack.getCount(), transaction);
             } else if (variant.matches(stack)) {
                 int amount = stack.getCount();
                 int targetCount = (int) view.getAmount();
@@ -928,12 +880,7 @@ public abstract class InventoryWrapper<T extends Storage<ItemVariant>, S extends
                 }
             } else {
                 view.extract(variant, view.getAmount(), transaction);
-                insert(
-                    view,
-                    ItemVariant.of(stack.getItem(), stack.getComponentsPatch()),
-                    stack.getCount(),
-                    transaction
-                );
+                insert(view, ItemVariant.of(stack.getItem(), stack.getComponentChanges()), stack.getCount(), transaction);
             }
             transaction.commit();
         }
@@ -948,12 +895,8 @@ public abstract class InventoryWrapper<T extends Storage<ItemVariant>, S extends
             if (predicate.test(stack)) {
                 try (Transaction transaction = Transaction.openOuter()) {
                     long amount = view.getAmount();
-                    ItemStack replace = update.apply(new ItemStack(
-                        variant.getRegistryEntry(),
-                        (int) amount,
-                        variant.getComponents()
-                    ));
-                    if (ItemStack.isSameItemSameComponents(stack, replace)) {
+                    ItemStack replace = update.apply(new ItemStack(variant.getRegistryEntry(), (int) amount, variant.getComponents()));
+                    if (ItemStack.areItemsAndComponentsEqual(stack, replace)) {
                         int count = replace.getCount();
                         if (count == amount) {
                             return true;
@@ -976,7 +919,7 @@ public abstract class InventoryWrapper<T extends Storage<ItemVariant>, S extends
                                 return true;
                             }
                             long insert = storage.insert(
-                                ItemVariant.of(replace.getItem(), replace.getComponentsPatch()),
+                                ItemVariant.of(replace.getItem(), replace.getComponentChanges()),
                                 replace.getCount(),
                                 transaction
                             );
@@ -1007,27 +950,27 @@ public abstract class InventoryWrapper<T extends Storage<ItemVariant>, S extends
 
         public Filter(InventoryWrapper<?, ?> inventory) {
             this.inventory = inventory;
-            this.slots = SlotRangeCache.get(inventory.getContainerSize());
+            this.slots = SlotRangeCache.get(inventory.size());
             this.canInsert = inventory.storage.supportsInsertion();
             this.canExtract = inventory.storage.supportsExtraction();
         }
 
         @Override
-        public boolean canTakeItemThroughFace(int slot, ItemStack stack, Direction dir) {
+        public boolean canExtract(int slot, ItemStack stack, Direction dir) {
             return canExtract;
         }
 
         @Override
-        public boolean canPlaceItemThroughFace(int slot, ItemStack stack, @Nullable Direction dir) {
+        public boolean canInsert(int slot, ItemStack stack, @Nullable Direction dir) {
             return canInsert;
         }
 
         @Override
-        public void clearContent() {
+        public void clear() {
             if (!canExtract) {
                 return;
             }
-            inventory.clearContent();
+            inventory.clear();
         }
 
         @Override
@@ -1324,18 +1267,18 @@ public abstract class InventoryWrapper<T extends Storage<ItemVariant>, S extends
         }
 
         @Override
-        public int[] getSlotsForFace(Direction side) {
+        public int[] getAvailableSlots(Direction side) {
             return slots;
         }
 
         @Override
-        public int getMaxStackSize() {
-            return inventory.getMaxStackSize();
+        public int getMaxCountPerStack() {
+            return inventory.getMaxCountPerStack();
         }
 
         @Override
-        public ItemStack getItem(int slot) {
-            return inventory.getItem(slot);
+        public ItemStack getStack(int slot) {
+            return inventory.getStack(slot);
         }
 
         @Override
@@ -1510,29 +1453,29 @@ public abstract class InventoryWrapper<T extends Storage<ItemVariant>, S extends
         }
 
         @Override
-        public ItemStack removeItemNoUpdate(int slot) {
+        public ItemStack removeStack(int slot) {
             if (!canExtract) {
                 return ItemStack.EMPTY;
             }
-            return inventory.removeItemNoUpdate(slot);
+            return inventory.removeStack(slot);
         }
 
         @Override
-        public ItemStack removeItem(int slot, int amount) {
+        public ItemStack removeStack(int slot, int amount) {
             if (!canExtract) {
                 return ItemStack.EMPTY;
             }
-            return inventory.removeItem(slot, amount);
+            return inventory.removeStack(slot, amount);
         }
 
         @Override
-        public void setItem(int slot, ItemStack stack) {
-            inventory.setItem(slot, stack);
+        public void setStack(int slot, ItemStack stack) {
+            inventory.setStack(slot, stack);
         }
 
         @Override
-        public int getContainerSize() {
-            return inventory.getContainerSize();
+        public int size() {
+            return inventory.size();
         }
 
         @Override
@@ -1554,7 +1497,7 @@ public abstract class InventoryWrapper<T extends Storage<ItemVariant>, S extends
         }
 
         @Override
-        protected StorageView<ItemVariant> getSlotView(int slot) {
+        protected StorageView<ItemVariant> getSlot(int slot) {
             int current = 0;
             for (StorageView<ItemVariant> view : storage) {
                 if (current == slot) {
@@ -1586,7 +1529,7 @@ public abstract class InventoryWrapper<T extends Storage<ItemVariant>, S extends
         }
 
         @Override
-        public int getContainerSize() {
+        public int size() {
             return size;
         }
     }
@@ -1597,17 +1540,12 @@ public abstract class InventoryWrapper<T extends Storage<ItemVariant>, S extends
         }
 
         @Override
-        protected SingleSlotStorage<ItemVariant> getSlotView(int slot) {
+        protected SingleSlotStorage<ItemVariant> getSlot(int slot) {
             return storage.getSlot(slot);
         }
 
         @Override
-        protected void insert(
-            SingleSlotStorage<ItemVariant> view,
-            ItemVariant variant,
-            int amount,
-            Transaction transaction
-        ) {
+        protected void insert(SingleSlotStorage<ItemVariant> view, ItemVariant variant, int amount, Transaction transaction) {
             view.insert(variant, amount, transaction);
         }
 
@@ -1618,7 +1556,7 @@ public abstract class InventoryWrapper<T extends Storage<ItemVariant>, S extends
             }
             try (Transaction transaction = Transaction.openOuter()) {
                 List<SingleSlotStorage<ItemVariant>> emptys = new ArrayList<>();
-                ItemVariant variant = ItemVariant.of(stack.getItem(), stack.getComponentsPatch());
+                ItemVariant variant = ItemVariant.of(stack.getItem(), stack.getComponentChanges());
                 int maxAmount = stack.getCount();
                 long remaining = maxAmount;
                 for (int i = 0, size = storage.getSlotCount(); i < size; i++) {
@@ -1650,7 +1588,7 @@ public abstract class InventoryWrapper<T extends Storage<ItemVariant>, S extends
         @Override
         public int countSpace(ItemStack stack, int maxAmount, int start, int end) {
             try (Transaction transaction = Transaction.openOuter()) {
-                ItemVariant variant = ItemVariant.of(stack.getItem(), stack.getComponentsPatch());
+                ItemVariant variant = ItemVariant.of(stack.getItem(), stack.getComponentChanges());
                 long remaining = maxAmount;
                 for (int i = start; i <= end; i++) {
                     SingleSlotStorage<ItemVariant> target = storage.getSlot(i);
@@ -1677,8 +1615,7 @@ public abstract class InventoryWrapper<T extends Storage<ItemVariant>, S extends
                 int count = stack.getCount();
                 return countSpace(stack, count, start, end) == count;
             }
-            Object2IntLinkedOpenCustomHashMap<ItemStack> map = new Object2IntLinkedOpenCustomHashMap<>(
-                ITEM_STACK_HASH_STRATEGY);
+            Object2IntLinkedOpenCustomHashMap<ItemStack> map = new Object2IntLinkedOpenCustomHashMap<>(ITEM_STACK_HASH_STRATEGY);
             for (ItemStack stack : stacks) {
                 map.merge(stack, stack.getCount(), Integer::sum);
             }
@@ -1695,7 +1632,7 @@ public abstract class InventoryWrapper<T extends Storage<ItemVariant>, S extends
                     Object2IntMap.Entry<ItemStack> entry = iterator.next();
                     ItemStack stack = entry.getKey();
                     int count = entry.getIntValue();
-                    ItemVariant variant = ItemVariant.of(stack.getItem(), stack.getComponentsPatch());
+                    ItemVariant variant = ItemVariant.of(stack.getItem(), stack.getComponentChanges());
                     long remaining = count;
                     for (int i = start; i <= end; i++) {
                         SingleSlotStorage<ItemVariant> target = storage.getSlot(i);
@@ -1722,7 +1659,7 @@ public abstract class InventoryWrapper<T extends Storage<ItemVariant>, S extends
         @Override
         public int insert(ItemStack stack, int maxAmount, int start, int end) {
             try (Transaction transaction = Transaction.openOuter()) {
-                ItemVariant variant = ItemVariant.of(stack.getItem(), stack.getComponentsPatch());
+                ItemVariant variant = ItemVariant.of(stack.getItem(), stack.getComponentChanges());
                 long remaining = maxAmount;
                 for (int i = start; i <= end; i++) {
                     SingleSlotStorage<ItemVariant> target = storage.getSlot(i);
@@ -1756,8 +1693,7 @@ public abstract class InventoryWrapper<T extends Storage<ItemVariant>, S extends
                 }
                 return List.of(directCopy(stack, count - insert));
             }
-            Object2IntLinkedOpenCustomHashMap<ItemStack> map = new Object2IntLinkedOpenCustomHashMap<>(
-                ITEM_STACK_HASH_STRATEGY);
+            Object2IntLinkedOpenCustomHashMap<ItemStack> map = new Object2IntLinkedOpenCustomHashMap<>(ITEM_STACK_HASH_STRATEGY);
             for (ItemStack stack : stacks) {
                 map.merge(stack, stack.getCount(), Integer::sum);
             }
@@ -1840,8 +1776,7 @@ public abstract class InventoryWrapper<T extends Storage<ItemVariant>, S extends
                 }
                 return List.of(directCopy(stack, count - insert));
             }
-            Object2IntLinkedOpenCustomHashMap<ItemStack> map = new Object2IntLinkedOpenCustomHashMap<>(
-                ITEM_STACK_HASH_STRATEGY);
+            Object2IntLinkedOpenCustomHashMap<ItemStack> map = new Object2IntLinkedOpenCustomHashMap<>(ITEM_STACK_HASH_STRATEGY);
             for (ItemStack stack : stacks) {
                 map.merge(stack, stack.getCount(), Integer::sum);
             }
@@ -1866,7 +1801,7 @@ public abstract class InventoryWrapper<T extends Storage<ItemVariant>, S extends
                     Object2IntMap.Entry<ItemStack> entry = iterator.next();
                     ItemStack stack = entry.getKey();
                     int count = entry.getIntValue();
-                    ItemVariant variant = ItemVariant.of(stack.getItem(), stack.getComponentsPatch());
+                    ItemVariant variant = ItemVariant.of(stack.getItem(), stack.getComponentChanges());
                     long remaining = count;
                     for (int i = start; i <= end; i++) {
                         SingleSlotStorage<ItemVariant> target = storage.getSlot(i);
@@ -1916,12 +1851,8 @@ public abstract class InventoryWrapper<T extends Storage<ItemVariant>, S extends
                 if (predicate.test(stack)) {
                     try (Transaction transaction = Transaction.openOuter()) {
                         long amount = slot.getAmount();
-                        ItemStack replace = update.apply(new ItemStack(
-                            variant.getRegistryEntry(),
-                            (int) amount,
-                            variant.getComponents()
-                        ));
-                        if (ItemStack.isSameItemSameComponents(stack, replace)) {
+                        ItemStack replace = update.apply(new ItemStack(variant.getRegistryEntry(), (int) amount, variant.getComponents()));
+                        if (ItemStack.areItemsAndComponentsEqual(stack, replace)) {
                             int count = replace.getCount();
                             if (count == amount) {
                                 return true;
@@ -1944,7 +1875,7 @@ public abstract class InventoryWrapper<T extends Storage<ItemVariant>, S extends
                                     return true;
                                 }
                                 long insert = slot.insert(
-                                    ItemVariant.of(replace.getItem(), replace.getComponentsPatch()),
+                                    ItemVariant.of(replace.getItem(), replace.getComponentChanges()),
                                     replace.getCount(),
                                     transaction
                                 );
@@ -1963,7 +1894,7 @@ public abstract class InventoryWrapper<T extends Storage<ItemVariant>, S extends
         }
 
         @Override
-        public int getContainerSize() {
+        public int size() {
             return storage.getSlotCount();
         }
     }

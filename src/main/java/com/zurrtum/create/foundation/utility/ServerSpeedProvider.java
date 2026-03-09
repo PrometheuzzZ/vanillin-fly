@@ -17,7 +17,7 @@ public class ServerSpeedProvider {
                 ServerSpeedProvider.syncInterval = syncInterval;
                 speedPacket = new ServerSpeedPacket(syncInterval);
             }
-            server.getPlayerList().broadcastAll(speedPacket);
+            server.getPlayerManager().sendToAll(speedPacket);
             serverTimer = 0;
         }
     }

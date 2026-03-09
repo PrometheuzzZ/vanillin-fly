@@ -14,13 +14,13 @@ import com.zurrtum.create.foundation.fluid.FluidIngredient;
 import com.zurrtum.create.infrastructure.fluids.FluidStack;
 import mezz.jei.api.gui.builder.IRecipeLayoutBuilder;
 import mezz.jei.api.recipe.RecipeIngredientRole;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.world.item.crafting.RecipeHolder;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.recipe.RecipeEntry;
 import org.joml.Matrix3x2f;
 
 import java.util.List;
 
-public abstract class BasinCategory<T extends BasinRecipe> extends CreateCategory<RecipeHolder<T>> {
+public abstract class BasinCategory<T extends BasinRecipe> extends CreateCategory<RecipeEntry<T>> {
     @Override
     public int getHeight() {
         return 103;
@@ -34,28 +34,16 @@ public abstract class BasinCategory<T extends BasinRecipe> extends CreateCategor
         int yOffset = size <= 9 ? 51 : 60;
         int i = 0;
         for (SizedIngredient ingredient : ingredients) {
-            builder.addInputSlot(xOffset + (i % 3) * 19, yOffset - (i / 3) * 19).setBackground(SLOT, -1, -1)
-                .addItemStacks(getStacks(ingredient));
+            builder.addInputSlot(xOffset + (i % 3) * 19, yOffset - (i / 3) * 19).setBackground(SLOT, -1, -1).addItemStacks(getStacks(ingredient));
             i++;
         }
         for (FluidIngredient fluidIngredient : fluidIngredients) {
-            addFluidSlot(builder, xOffset + (i % 3) * 19, yOffset - (i / 3) * 19, fluidIngredient).setBackground(
-                SLOT,
-                -1,
-                -1
-            );
+            addFluidSlot(builder, xOffset + (i % 3) * 19, yOffset - (i / 3) * 19, fluidIngredient).setBackground(SLOT, -1, -1);
             i++;
         }
     }
 
-    public static void addResultSlots(
-        IRecipeLayoutBuilder builder,
-        List<ProcessingOutput> results,
-        int i,
-        int end,
-        int y,
-        boolean isOddSize
-    ) {
+    public static void addResultSlots(IRecipeLayoutBuilder builder, List<ProcessingOutput> results, int i, int end, int y, boolean isOddSize) {
         int xPosition, yPosition;
         for (ProcessingOutput result : results) {
             if (isOddSize && i == end) {
@@ -69,14 +57,7 @@ public abstract class BasinCategory<T extends BasinRecipe> extends CreateCategor
         }
     }
 
-    public static void addFluidResultSlots(
-        IRecipeLayoutBuilder builder,
-        List<FluidStack> fluidResults,
-        int i,
-        int end,
-        int y,
-        boolean isOddSize
-    ) {
+    public static void addFluidResultSlots(IRecipeLayoutBuilder builder, List<FluidStack> fluidResults, int i, int end, int y, boolean isOddSize) {
         int xPosition, yPosition;
         for (FluidStack fluidResult : fluidResults) {
             if (isOddSize && i == end) {
@@ -100,7 +81,7 @@ public abstract class BasinCategory<T extends BasinRecipe> extends CreateCategor
         }
     }
 
-    public static void drawBackground(BasinRecipe recipe, GuiGraphics graphics, int size) {
+    public static void drawBackground(BasinRecipe recipe, DrawContext graphics, int size) {
         AllGuiTextures.JEI_DOWN_ARROW.render(graphics, 136, (size <= 4 ? 32 : 41) - (size - 1) / 2 * 19);
         HeatCondition requiredHeat = recipe.heat();
         if (requiredHeat == HeatCondition.NONE) {
@@ -109,15 +90,15 @@ public abstract class BasinCategory<T extends BasinRecipe> extends CreateCategor
         } else {
             AllGuiTextures.JEI_HEAT_BAR.render(graphics, 4, 80);
             AllGuiTextures.JEI_LIGHT.render(graphics, 81, 88);
-            graphics.guiRenderState.submitPicturesInPictureState(new BasinBlazeBurnerRenderState(
-                new Matrix3x2f(graphics.pose()),
+            graphics.state.addSpecialElement(new BasinBlazeBurnerRenderState(
+                new Matrix3x2f(graphics.getMatrices()),
                 91,
                 69,
                 requiredHeat.visualizeAsBlazeBurner()
             ));
         }
-        graphics.drawString(
-            graphics.minecraft.font,
+        graphics.drawText(
+            graphics.client.textRenderer,
             CreateLang.translateDirect(requiredHeat.getTranslationKey()),
             9,
             86,

@@ -1,14 +1,14 @@
 package com.zurrtum.create.content.contraptions.bearing;
 
 import com.zurrtum.create.AllBlocks;
-import net.minecraft.world.item.BlockItem;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.level.block.Block;
+import net.minecraft.block.Block;
+import net.minecraft.item.BlockItem;
+import net.minecraft.item.Item;
 
 import java.util.Map;
 
 public class BlankSailBlockItem extends BlockItem {
-    public BlankSailBlockItem(Block block, Properties properties) {
+    public BlankSailBlockItem(Block block, Settings properties) {
         super(block, properties);
     }
 
@@ -18,7 +18,7 @@ public class BlankSailBlockItem extends BlockItem {
     }
 
     @Override
-    public void registerBlocks(Map<Block, Item> map, Item item) {
+    public void appendBlocks(Map<Block, Item> map, Item item) {
         map.put(AllBlocks.SAIL, item);
         map.put(AllBlocks.ORANGE_SAIL, item);
         map.put(AllBlocks.MAGENTA_SAIL, item);

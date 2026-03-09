@@ -8,28 +8,24 @@ import com.zurrtum.create.content.kinetics.belt.behaviour.DirectBeltInputBehavio
 import com.zurrtum.create.content.logistics.funnel.FunnelBlock;
 import com.zurrtum.create.foundation.item.EntityItem;
 import com.zurrtum.create.infrastructure.packet.s2c.EjectorItemSpawnPacket;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.game.ClientGamePacketListener;
-import net.minecraft.network.protocol.game.ClientboundAddEntityPacket;
-import net.minecraft.server.level.ServerEntity;
-import net.minecraft.util.Mth;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.entity.item.ItemEntity;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.ClipContext;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
-import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.BlockHitResult;
-import net.minecraft.world.phys.HitResult;
-import net.minecraft.world.phys.Vec3;
-import net.minecraft.world.phys.shapes.CollisionContext;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.ShapeContext;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.EntityType;
+import net.minecraft.entity.ItemEntity;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.item.ItemStack;
+import net.minecraft.network.listener.ClientPlayPacketListener;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.s2c.play.EntitySpawnS2CPacket;
+import net.minecraft.server.network.EntityTrackerEntry;
+import net.minecraft.storage.ReadView;
+import net.minecraft.storage.WriteView;
+import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.util.hit.HitResult;
+import net.minecraft.util.math.*;
+import net.minecraft.world.RaycastContext;
+import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
 public class EjectorItemEntity extends ItemEntity {
@@ -37,42 +33,42 @@ public class EjectorItemEntity extends ItemEntity {
     public EntityLauncher launcher;
     public Direction direction;
     @Nullable
-    public Pair<Vec3, BlockPos> earlyTarget;
+    public Pair<Vec3d, BlockPos> earlyTarget;
     public float earlyTargetTime;
     public int progress;
     public RenderData data;
 
-    public EjectorItemEntity(Level world, EjectorBlockEntity ejector, ItemStack stack) {
+    public EjectorItemEntity(World world, EjectorBlockEntity ejector, ItemStack stack) {
         super(AllEntityTypes.EJECTOR_ITEM, world);
-        BlockPos pos = ejector.getBlockPos();
-        setPos(pos.getX() + 0.5f, pos.getY() + 0.5f, pos.getZ() + 0.5f);
-        setItem(stack);
-        if (level().isClientSide()) {
+        BlockPos pos = ejector.getPos();
+        setPosition(pos.getX() + 0.5f, pos.getY() + 0.5f, pos.getZ() + 0.5f);
+        setStack(stack);
+        if (getEntityWorld().isClient()) {
             data = new RenderData();
         }
         loadLauncher(ejector);
     }
 
-    public EjectorItemEntity(EntityType<? extends EjectorItemEntity> type, Level world) {
+    public EjectorItemEntity(EntityType<? extends EjectorItemEntity> type, World world) {
         super(type, world);
-        if (level().isClientSide()) {
+        if (getEntityWorld().isClient()) {
             data = new RenderData();
         }
     }
 
     @Override
-    public Packet<ClientGamePacketListener> getAddEntityPacket(ServerEntity entityTrackerEntry) {
+    public Packet<ClientPlayPacketListener> createSpawnPacket(EntityTrackerEntry entityTrackerEntry) {
         return new EjectorItemSpawnPacket(this, entityTrackerEntry);
     }
 
     @Override
-    public void recreateFromPacket(ClientboundAddEntityPacket packet) {
-        super.recreateFromPacket(packet);
+    public void onSpawnPacket(EntitySpawnS2CPacket packet) {
+        super.onSpawnPacket(packet);
         EjectorItemSpawnPacket spawnPacket = (EjectorItemSpawnPacket) packet;
         alive = spawnPacket.getAlive();
         progress = spawnPacket.getProgress();
         if (!alive) {
-            if (level().getBlockEntity(blockPosition()) instanceof EjectorBlockEntity ejector) {
+            if (getEntityWorld().getBlockEntity(getBlockPos()) instanceof EjectorBlockEntity ejector) {
                 loadLauncher(ejector);
                 return;
             }
@@ -90,38 +86,38 @@ public class EjectorItemEntity extends ItemEntity {
         launcher = ejector.launcher;
         Direction facing = ejector.getFacing();
         direction = facing.getOpposite();
-        if (level().isClientSide()) {
+        if (getEntityWorld().isClient()) {
             data.calcRotate(facing);
         }
     }
 
     @Override
-    public void addAdditionalSaveData(ValueOutput view) {
+    public void writeCustomData(WriteView view) {
         view.putBoolean("Alive", alive);
         view.putInt("Progress", progress);
-        if (!alive && !(level().getBlockEntity(blockPosition()) instanceof EjectorBlockEntity)) {
-            view.store("Launcher", EntityLauncher.CODEC, launcher);
-            view.store("Direction", Direction.CODEC, direction);
+        if (!alive && !(getEntityWorld().getBlockEntity(getBlockPos()) instanceof EjectorBlockEntity)) {
+            view.put("Launcher", EntityLauncher.CODEC, launcher);
+            view.put("Direction", Direction.CODEC, direction);
         }
-        super.addAdditionalSaveData(view);
+        super.writeCustomData(view);
     }
 
     @Override
-    public void readAdditionalSaveData(ValueInput view) {
-        alive = view.getBooleanOr("Alive", false);
-        progress = view.getIntOr("Progress", 0);
+    public void readCustomData(ReadView view) {
+        alive = view.getBoolean("Alive", false);
+        progress = view.getInt("Progress", 0);
         if (!alive) {
-            if (level().getBlockEntity(blockPosition()) instanceof EjectorBlockEntity ejector) {
+            if (getEntityWorld().getBlockEntity(getBlockPos()) instanceof EjectorBlockEntity ejector) {
                 loadLauncher(ejector);
             } else {
                 view.read("Launcher", EntityLauncher.CODEC).ifPresentOrElse(this::setLauncher, this::setIsAlive);
                 view.read("Direction", Direction.CODEC).ifPresentOrElse(this::setDirection, this::setIsAlive);
-                if (!alive && direction != null && level().isClientSide()) {
+                if (!alive && direction != null && getEntityWorld().isClient()) {
                     data.calcRotate(direction.getOpposite());
                 }
             }
         }
-        super.readAdditionalSaveData(view);
+        super.readCustomData(view);
     }
 
     private void setLauncher(EntityLauncher launcher) {
@@ -142,15 +138,15 @@ public class EjectorItemEntity extends ItemEntity {
     }
 
     @Override
-    public void playerTouch(Player player) {
+    public void onPlayerCollision(PlayerEntity player) {
         if (alive) {
-            super.playerTouch(player);
+            super.onPlayerCollision(player);
         }
     }
 
     @Override
     public void tick() {
-        boolean isClient = level().isClientSide();
+        boolean isClient = getEntityWorld().isClient();
         if (alive) {
             if (isClient) {
                 data.tick();
@@ -174,73 +170,64 @@ public class EjectorItemEntity extends ItemEntity {
         progress++;
     }
 
-    private boolean isVirtual() {
-        if (level().getBlockEntity(blockPosition()) instanceof EjectorBlockEntity entity) {
-            return entity.isVirtual();
-        }
-        return false;
-    }
-
     private void placeItemAtTarget(boolean isClient, float maxTime) {
         DirectBeltInputBehaviour targetOpenInv = getTargetOpenInv();
-        ItemStack stack = getItem();
+        ItemStack stack = getStack();
         if (targetOpenInv != null) {
-            ItemStack remainder = targetOpenInv.handleInsertion(stack, Direction.UP, isClient && !isVirtual());
+            ItemStack remainder = targetOpenInv.handleInsertion(stack, Direction.UP, isClient);
             if (remainder.isEmpty()) {
                 discard();
                 return;
             }
-            setItem(remainder);
+            setStack(remainder);
         }
         alive = true;
-        Vec3 ejectVec = earlyTarget != null ? earlyTarget.getFirst() : getLaunchedItemLocation(maxTime);
-        Vec3 ejectMotionVec = getLaunchedItemMotion(maxTime);
-        setPos(ejectVec.x, ejectVec.y, ejectVec.z);
-        setOldPos();
-        setDeltaMovement(ejectMotionVec);
+        Vec3d ejectVec = earlyTarget != null ? earlyTarget.getFirst() : getLaunchedItemLocation(maxTime);
+        Vec3d ejectMotionVec = getLaunchedItemMotion(maxTime);
+        setPosition(ejectVec.x, ejectVec.y, ejectVec.z);
+        updateLastPosition();
+        setVelocity(ejectMotionVec);
         if (stack.getItem() instanceof EntityItem item) {
-            if (!isClient) {
-                Level level = level();
+            if (isClient) {
+                discard();
+            } else {
+                World level = getEntityWorld();
                 Entity newEntity = item.createEntity(level, this, stack);
                 if (newEntity != null) {
                     discard();
-                    level.addFreshEntity(newEntity);
+                    level.spawnEntity(newEntity);
                 }
-            } else {
-                discard();
             }
         }
     }
 
     private DirectBeltInputBehaviour getTargetOpenInv() {
-        BlockPos targetPos = earlyTarget != null ? earlyTarget.getSecond() : blockPosition().above(launcher.getVerticalDistance())
-            .relative(getNearestViewDirection(), Math.max(1, launcher.getHorizontalDistance()));
-        return BlockEntityBehaviour.get(level(), targetPos, DirectBeltInputBehaviour.TYPE);
+        BlockPos targetPos = earlyTarget != null ? earlyTarget.getSecond() : getBlockPos().up(launcher.getVerticalDistance())
+            .offset(getFacing(), Math.max(1, launcher.getHorizontalDistance()));
+        return BlockEntityBehaviour.get(getEntityWorld(), targetPos, DirectBeltInputBehaviour.TYPE);
     }
 
     private boolean scanTrajectoryForObstacles(boolean isClient, float time) {
-        Vec3 source = getLaunchedItemLocation(time);
-        Vec3 target = getLaunchedItemLocation(time + 1);
+        Vec3d source = getLaunchedItemLocation(time);
+        Vec3d target = getLaunchedItemLocation(time + 1);
         if (isClient) {
             data.calcRenderBox(source, target);
         }
 
-        Level world = level();
-        BlockHitResult rayTraceBlocks = world.clip(new ClipContext(
+        World world = getEntityWorld();
+        BlockHitResult rayTraceBlocks = world.raycast(new RaycastContext(
             source,
             target,
-            ClipContext.Block.COLLIDER,
-            ClipContext.Fluid.NONE,
-            CollisionContext.empty()
+            RaycastContext.ShapeType.COLLIDER,
+            RaycastContext.FluidHandling.NONE,
+            ShapeContext.absent()
         ));
         boolean miss = rayTraceBlocks.getType() == HitResult.Type.MISS;
 
         if (!miss && rayTraceBlocks.getType() == HitResult.Type.BLOCK) {
             BlockState blockState = world.getBlockState(rayTraceBlocks.getBlockPos());
-            if (FunnelBlock.isFunnel(blockState) && blockState.hasProperty(FunnelBlock.EXTRACTING) && blockState.getValue(
-                FunnelBlock.EXTRACTING)) {
+            if (FunnelBlock.isFunnel(blockState) && blockState.contains(FunnelBlock.EXTRACTING) && blockState.get(FunnelBlock.EXTRACTING))
                 miss = true;
-            }
         }
 
         if (miss) {
@@ -251,39 +238,36 @@ public class EjectorItemEntity extends ItemEntity {
             return false;
         }
 
-        Vec3 vec = rayTraceBlocks.getLocation();
-        earlyTarget = Pair.of(
-            vec.add(Vec3.atLowerCornerOf(rayTraceBlocks.getDirection().getUnitVec3i()).scale(.25f)),
-            rayTraceBlocks.getBlockPos()
-        );
+        Vec3d vec = rayTraceBlocks.getPos();
+        earlyTarget = Pair.of(vec.add(Vec3d.of(rayTraceBlocks.getSide().getVector()).multiply(.25f)), rayTraceBlocks.getBlockPos());
         earlyTargetTime = (float) (time + (source.distanceTo(vec) / source.distanceTo(target)));
         return true;
     }
 
-    public Vec3 getLaunchedItemLocation(float time) {
-        return launcher.getGlobalPos(time, direction, position());
+    public Vec3d getLaunchedItemLocation(float time) {
+        return launcher.getGlobalPos(time, direction, getEntityPos());
     }
 
-    public Vec3 getLaunchedItemMotion(float time) {
-        return launcher.getGlobalVelocity(time, direction).scale(.5f);
+    public Vec3d getLaunchedItemMotion(float time) {
+        return launcher.getGlobalVelocity(time, direction).multiply(.5f);
     }
 
     @Override
-    public void moveOrInterpolateTo(Vec3 pos, float yaw, float pitch) {
+    public void updateTrackedPositionAndAngles(Vec3d pos, float yaw, float pitch) {
     }
 
     public class RenderData {
         public float rotateY;
-        public AABB renderBox = getBoundingBox();
+        public Box renderBox = getBoundingBox();
         public int initAge = -1;
         public float animateOffset = -0.125f;
 
         public void calcRotate(Direction facing) {
-            rotateY = Mth.DEG_TO_RAD * AngleHelper.horizontalAngle(facing);
+            rotateY = MathHelper.RADIANS_PER_DEGREE * AngleHelper.horizontalAngle(facing);
         }
 
-        public void calcRenderBox(Vec3 source, Vec3 target) {
-            renderBox = new AABB(source.x - 1, source.y - 1, source.z - 1, target.x, target.y, target.z);
+        public void calcRenderBox(Vec3d source, Vec3d target) {
+            renderBox = new Box(source.x - 1, source.y - 1, source.z - 1, target.x, target.y, target.z);
         }
 
         public void calcAnimateOffset(float totalTime) {
@@ -292,8 +276,8 @@ public class EjectorItemEntity extends ItemEntity {
 
         public void tick() {
             if (initAge == -1) {
-                if (onGround()) {
-                    initAge = tickCount;
+                if (isOnGround()) {
+                    initAge = age;
                 }
             } else if (animateOffset < 0) {
                 animateOffset = Math.min(animateOffset + 0.005f, 0);

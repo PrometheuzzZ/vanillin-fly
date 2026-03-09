@@ -2,8 +2,8 @@ package com.zurrtum.create.client.flywheel.lib.backend;
 
 import com.zurrtum.create.client.flywheel.api.backend.Backend;
 import com.zurrtum.create.client.flywheel.api.backend.Engine;
-import net.minecraft.resources.Identifier;
-import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.util.Identifier;
+import net.minecraft.world.WorldAccess;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Objects;
@@ -12,15 +12,11 @@ import java.util.function.Function;
 import java.util.function.IntSupplier;
 
 public final class SimpleBackend implements Backend {
-    private final Function<LevelAccessor, Engine> engineFactory;
+    private final Function<WorldAccess, Engine> engineFactory;
     private final IntSupplier priority;
     private final BooleanSupplier isSupported;
 
-    public SimpleBackend(
-        Function<LevelAccessor, Engine> engineFactory,
-        IntSupplier priority,
-        BooleanSupplier isSupported
-    ) {
+    public SimpleBackend(Function<WorldAccess, Engine> engineFactory, IntSupplier priority, BooleanSupplier isSupported) {
         this.engineFactory = engineFactory;
         this.priority = priority;
         this.isSupported = isSupported;
@@ -30,7 +26,7 @@ public final class SimpleBackend implements Backend {
         return new Builder();
     }
 
-    public Engine createEngine(LevelAccessor level) {
+    public Engine createEngine(WorldAccess level) {
         return this.engineFactory.apply(level);
     }
 
@@ -43,14 +39,14 @@ public final class SimpleBackend implements Backend {
     }
 
     public static final class Builder {
-        private @Nullable Function<LevelAccessor, Engine> engineFactory;
+        private @Nullable Function<WorldAccess, Engine> engineFactory;
         private IntSupplier priority = () -> 0;
         private @Nullable BooleanSupplier isSupported;
 
         public Builder() {
         }
 
-        public Builder engineFactory(Function<LevelAccessor, Engine> engineFactory) {
+        public Builder engineFactory(Function<WorldAccess, Engine> engineFactory) {
             this.engineFactory = engineFactory;
             return this;
         }
@@ -72,10 +68,7 @@ public final class SimpleBackend implements Backend {
         public Backend register(Identifier id) {
             Objects.requireNonNull(this.engineFactory);
             Objects.requireNonNull(this.isSupported);
-            return Backend.REGISTRY.registerAndGet(
-                id,
-                new SimpleBackend(this.engineFactory, this.priority, this.isSupported)
-            );
+            return Backend.REGISTRY.registerAndGet(id, new SimpleBackend(this.engineFactory, this.priority, this.isSupported));
         }
     }
 }

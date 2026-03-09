@@ -6,33 +6,30 @@ import com.zurrtum.create.infrastructure.items.BaseInventory;
 import it.unimi.dsi.fastutil.objects.Object2IntLinkedOpenCustomHashMap;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.ObjectBidirectionalIterator;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.PacketType;
-import net.minecraft.network.protocol.game.ClientGamePacketListener;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.item.ItemStack;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.network.listener.ClientPlayPacketListener;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.PacketType;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public record BlueprintPreviewPacket(List<ItemStack> available, List<ItemStack> missing,
-                                     ItemStack result) implements Packet<ClientGamePacketListener> {
-    public static final StreamCodec<RegistryFriendlyByteBuf, BlueprintPreviewPacket> CODEC = StreamCodec.composite(
-        ItemStack.STREAM_CODEC.apply(ByteBufCodecs.list()),
+public record BlueprintPreviewPacket(
+    List<ItemStack> available, List<ItemStack> missing, ItemStack result
+) implements Packet<ClientPlayPacketListener> {
+    public static final PacketCodec<RegistryByteBuf, BlueprintPreviewPacket> CODEC = PacketCodec.tuple(
+        ItemStack.PACKET_CODEC.collect(PacketCodecs.toList()),
         BlueprintPreviewPacket::available,
-        ItemStack.STREAM_CODEC.apply(ByteBufCodecs.list()),
+        ItemStack.PACKET_CODEC.collect(PacketCodecs.toList()),
         BlueprintPreviewPacket::missing,
-        ItemStack.OPTIONAL_STREAM_CODEC,
+        ItemStack.OPTIONAL_PACKET_CODEC,
         BlueprintPreviewPacket::result,
         BlueprintPreviewPacket::new
     );
-    public static final BlueprintPreviewPacket EMPTY = new BlueprintPreviewPacket(
-        List.of(),
-        List.of(),
-        ItemStack.EMPTY
-    );
+    public static final BlueprintPreviewPacket EMPTY = new BlueprintPreviewPacket(List.of(), List.of(), ItemStack.EMPTY);
 
     public static Object2IntLinkedOpenCustomHashMap<ItemStack> createMap() {
         return new Object2IntLinkedOpenCustomHashMap<>(BaseInventory.ITEM_STACK_HASH_STRATEGY);
@@ -50,11 +47,7 @@ public record BlueprintPreviewPacket(List<ItemStack> available, List<ItemStack> 
         this(toList(available), toList(missing), result);
     }
 
-    public BlueprintPreviewPacket(
-        Object2IntLinkedOpenCustomHashMap<ItemStack> available,
-        List<ItemStack> missing,
-        ItemStack result
-    ) {
+    public BlueprintPreviewPacket(Object2IntLinkedOpenCustomHashMap<ItemStack> available, List<ItemStack> missing, ItemStack result) {
         this(toList(available), missing, result);
     }
 
@@ -64,7 +57,7 @@ public record BlueprintPreviewPacket(List<ItemStack> available, List<ItemStack> 
         while (iterator.hasNext()) {
             Object2IntMap.Entry<ItemStack> entry = iterator.next();
             ItemStack stack = entry.getKey();
-            int maxCount = stack.getMaxStackSize();
+            int maxCount = stack.getMaxCount();
             int count = entry.getIntValue();
             while (count > maxCount) {
                 result.add(stack.copyWithCount(maxCount));
@@ -76,12 +69,12 @@ public record BlueprintPreviewPacket(List<ItemStack> available, List<ItemStack> 
     }
 
     @Override
-    public void handle(ClientGamePacketListener listener) {
+    public void apply(ClientPlayPacketListener listener) {
         AllClientHandle.INSTANCE.onBlueprintPreview(this);
     }
 
     @Override
-    public PacketType<BlueprintPreviewPacket> type() {
+    public PacketType<BlueprintPreviewPacket> getPacketType() {
         return AllPackets.BLUEPRINT_PREVIEW;
     }
 }

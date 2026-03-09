@@ -12,37 +12,33 @@ import com.zurrtum.create.content.kinetics.belt.behaviour.TransportedItemStackHa
 import com.zurrtum.create.foundation.advancement.CreateTrigger;
 import com.zurrtum.create.foundation.blockEntity.behaviour.filtering.ServerFilteringBehaviour;
 import com.zurrtum.create.foundation.codec.CreateCodecs;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.core.UUIDUtil;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.server.level.ServerLevel;
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.sounds.SoundEvents;
-import net.minecraft.sounds.SoundSource;
-import net.minecraft.util.Mth;
-import net.minecraft.util.ProblemReporter;
-import net.minecraft.util.StringRepresentable;
-import net.minecraft.world.Clearable;
-import net.minecraft.world.Container;
-import net.minecraft.world.InteractionHand;
-import net.minecraft.world.ItemStackWithSlot;
-import net.minecraft.world.entity.player.Inventory;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.crafting.*;
-import net.minecraft.world.level.ClipContext;
-import net.minecraft.world.level.ClipContext.Block;
-import net.minecraft.world.level.ClipContext.Fluid;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.properties.BlockStateProperties;
-import net.minecraft.world.level.storage.TagValueInput;
-import net.minecraft.world.level.storage.TagValueOutput;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
-import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.BlockHitResult;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.entity.player.PlayerInventory;
+import net.minecraft.inventory.Inventory;
+import net.minecraft.inventory.StackWithSlot;
+import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NbtCompound;
+import net.minecraft.recipe.PreparedRecipes;
+import net.minecraft.recipe.Recipe;
+import net.minecraft.recipe.RecipeEntry;
+import net.minecraft.recipe.input.RecipeInput;
+import net.minecraft.recipe.input.SingleStackRecipeInput;
+import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.world.ServerWorld;
+import net.minecraft.sound.SoundCategory;
+import net.minecraft.sound.SoundEvents;
+import net.minecraft.state.property.Properties;
+import net.minecraft.storage.NbtReadView;
+import net.minecraft.storage.NbtWriteView;
+import net.minecraft.storage.ReadView;
+import net.minecraft.storage.WriteView;
+import net.minecraft.util.*;
+import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.util.math.*;
+import net.minecraft.world.RaycastContext;
+import net.minecraft.world.RaycastContext.FluidHandling;
+import net.minecraft.world.RaycastContext.ShapeType;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
@@ -63,31 +59,35 @@ public class DeployerBlockEntity extends KineticBlockEntity implements Clearable
     protected boolean redstoneLocked;
     protected UUID owner;
     protected String ownerName;
-    public Container invHandler;
-    private CompoundTag deferredInventoryList;
+    public Inventory invHandler;
+    private NbtCompound deferredInventoryList;
 
     public LerpedFloat animatedOffset;
 
     public BeltProcessingBehaviour processingBehaviour;
 
-    public enum State implements StringRepresentable {
-        WAITING, EXPANDING, RETRACTING, DUMPING;
+    public enum State implements StringIdentifiable {
+        WAITING,
+        EXPANDING,
+        RETRACTING,
+        DUMPING;
 
-        public static final Codec<State> CODEC = StringRepresentable.fromEnum(State::values);
+        public static final Codec<State> CODEC = StringIdentifiable.createCodec(State::values);
 
         @Override
-        public String getSerializedName() {
+        public String asString() {
             return name().toLowerCase(Locale.ROOT);
         }
     }
 
-    public enum Mode implements StringRepresentable {
-        PUNCH, USE;
+    public enum Mode implements StringIdentifiable {
+        PUNCH,
+        USE;
 
-        public static final Codec<Mode> CODEC = StringRepresentable.fromEnum(Mode::values);
+        public static final Codec<Mode> CODEC = StringIdentifiable.createCodec(Mode::values);
 
         @Override
-        public String getSerializedName() {
+        public String asString() {
             return name().toLowerCase(Locale.ROOT);
         }
     }
@@ -102,8 +102,8 @@ public class DeployerBlockEntity extends KineticBlockEntity implements Clearable
     }
 
     @Override
-    public void preRemoveSideEffects(BlockPos pos, BlockState oldState) {
-        super.preRemoveSideEffects(pos, oldState);
+    public void onBlockReplaced(BlockPos pos, BlockState oldState) {
+        super.onBlockReplaced(pos, oldState);
         discardPlayer();
     }
 
@@ -112,10 +112,8 @@ public class DeployerBlockEntity extends KineticBlockEntity implements Clearable
         super.addBehaviours(behaviours);
         filtering = new ServerFilteringBehaviour.CustomInteract(this, List.of(AllItems.MECHANICAL_ARM));
         behaviours.add(filtering);
-        processingBehaviour = new BeltProcessingBehaviour(this).whenItemEnters((s, i) -> BeltDeployerCallbacks.onItemReceived(s,
-            i,
-            this
-        )).whileItemHeld((s, i) -> BeltDeployerCallbacks.whenItemHeld(s, i, this));
+        processingBehaviour = new BeltProcessingBehaviour(this).whenItemEnters((s, i) -> BeltDeployerCallbacks.onItemReceived(s, i, this))
+            .whileItemHeld((s, i) -> BeltDeployerCallbacks.whenItemHeld(s, i, this));
         behaviours.add(processingBehaviour);
     }
 
@@ -139,50 +137,45 @@ public class DeployerBlockEntity extends KineticBlockEntity implements Clearable
     }
 
     public void initHandler() {
-        if (invHandler != null) {
+        if (invHandler != null)
             return;
-        }
-        if (level instanceof ServerLevel sLevel) {
+        if (world instanceof ServerWorld sLevel) {
             player = DeployerPlayer.create(sLevel, owner, ownerName);
-            ServerPlayer serverPlayer = player.cast();
+            ServerPlayerEntity serverPlayer = player.cast();
             if (deferredInventoryList != null) {
-                try (ProblemReporter.ScopedCollector logging = new ProblemReporter.ScopedCollector(
-                    problemPath(),
-                    LOGGER
-                )) {
-                    ValueInput view = TagValueInput.create(logging, level.registryAccess(), deferredInventoryList);
-                    serverPlayer.getInventory().load(view.listOrEmpty("Inventory", ItemStackWithSlot.CODEC));
+                try (ErrorReporter.Logging logging = new ErrorReporter.Logging(getReporterContext(), LOGGER)) {
+                    ReadView view = NbtReadView.create(logging, world.getRegistryManager(), deferredInventoryList);
+                    serverPlayer.getInventory().readData(view.getTypedListView("Inventory", StackWithSlot.CODEC));
                 }
                 deferredInventoryList = null;
-                heldItem = serverPlayer.getMainHandItem();
+                heldItem = serverPlayer.getMainHandStack();
                 sendData();
             }
-            Vec3 initialPos = VecHelper.getCenterOf(worldPosition.relative(getBlockState().getValue(FACING)));
-            serverPlayer.setPos(initialPos.x, initialPos.y, initialPos.z);
+            Vec3d initialPos = VecHelper.getCenterOf(pos.offset(getCachedState().get(FACING)));
+            serverPlayer.setPosition(initialPos.x, initialPos.y, initialPos.z);
         }
         invHandler = createHandler();
     }
 
     protected void onExtract(ItemStack stack) {
-        player.cast().setItemInHand(InteractionHand.MAIN_HAND, stack.copy());
+        player.cast().setStackInHand(Hand.MAIN_HAND, stack.copy());
         sendData();
-        setChanged();
+        markDirty();
     }
 
     public int getTimerSpeed() {
-        return (int) (getSpeed() == 0 ? 0 : Mth.clamp(Math.abs(getSpeed() * 2), 8, 512));
+        return (int) (getSpeed() == 0 ? 0 : MathHelper.clamp(Math.abs(getSpeed() * 2), 8, 512));
     }
 
     @Override
     public void tick() {
         super.tick();
 
-        if (getSpeed() == 0) {
+        if (getSpeed() == 0)
             return;
-        }
-        if (!level.isClientSide() && player != null && player.getBlockBreakingProgress() != null) {
-            if (level.isEmptyBlock(player.getBlockBreakingProgress().getKey())) {
-                level.destroyBlockProgress(player.cast().getId(), player.getBlockBreakingProgress().getKey(), -1);
+        if (!world.isClient() && player != null && player.getBlockBreakingProgress() != null) {
+            if (world.isAir(player.getBlockBreakingProgress().getKey())) {
+                world.setBlockBreakingInfo(player.cast().getId(), player.getBlockBreakingProgress().getKey(), -1);
                 player.setBlockBreakingProgress(null);
             }
         }
@@ -190,15 +183,13 @@ public class DeployerBlockEntity extends KineticBlockEntity implements Clearable
             timer -= getTimerSpeed();
             return;
         }
-        if (level.isClientSide()) {
+        if (world.isClient())
             return;
-        }
-        if (player == null) {
+        if (player == null)
             return;
-        }
 
-        ServerPlayer serverPlayer = player.cast();
-        ItemStack stack = serverPlayer.getMainHandItem();
+        ServerPlayerEntity serverPlayer = player.cast();
+        ItemStack stack = serverPlayer.getMainHandStack();
         if (state == State.WAITING) {
             if (!overflowItems.isEmpty()) {
                 timer = getTimerSpeed() * 10;
@@ -206,18 +197,16 @@ public class DeployerBlockEntity extends KineticBlockEntity implements Clearable
             }
 
             boolean changed = false;
-            Inventory inventory = serverPlayer.getInventory();
-            for (int i = 0, size = inventory.getContainerSize(); i < size; i++) {
-                if (overflowItems.size() > 10) {
+            PlayerInventory inventory = serverPlayer.getInventory();
+            for (int i = 0, size = inventory.size(); i < size; i++) {
+                if (overflowItems.size() > 10)
                     break;
-                }
-                ItemStack item = inventory.getItem(i);
-                if (item.isEmpty()) {
+                ItemStack item = inventory.getStack(i);
+                if (item.isEmpty())
                     continue;
-                }
                 if (item != stack || !filtering.test(item)) {
                     overflowItems.add(item);
-                    inventory.setItem(i, ItemStack.EMPTY);
+                    inventory.setStack(i, ItemStack.EMPTY);
                     changed = true;
                 }
             }
@@ -228,33 +217,25 @@ public class DeployerBlockEntity extends KineticBlockEntity implements Clearable
                 return;
             }
 
-            Direction facing = getBlockState().getValue(FACING);
-            if (mode == Mode.USE && !DeployerHandler.shouldActivate(
-                stack,
-                level,
-                worldPosition.relative(facing, 2),
-                facing
-            )) {
+            Direction facing = getCachedState().get(FACING);
+            if (mode == Mode.USE && !DeployerHandler.shouldActivate(stack, world, pos.offset(facing, 2), facing)) {
                 timer = getTimerSpeed() * 10;
                 return;
             }
 
             // Check for advancement conditions
-            if (mode == Mode.PUNCH && !fistBump && startFistBump(facing)) {
+            if (mode == Mode.PUNCH && !fistBump && startFistBump(facing))
                 return;
-            }
-            if (redstoneLocked) {
+            if (redstoneLocked)
                 return;
-            }
 
             start();
             return;
         }
 
         if (state == State.EXPANDING) {
-            if (fistBump) {
+            if (fistBump)
                 triggerFistBump();
-            }
             activate();
 
             state = State.RETRACTING;
@@ -274,12 +255,12 @@ public class DeployerBlockEntity extends KineticBlockEntity implements Clearable
 
     protected void start() {
         state = State.EXPANDING;
-        Vec3 movementVector = getMovementVector();
-        Vec3 rayOrigin = VecHelper.getCenterOf(worldPosition).add(movementVector.scale(3 / 2f));
-        Vec3 rayTarget = VecHelper.getCenterOf(worldPosition).add(movementVector.scale(5 / 2f));
-        ClipContext rayTraceContext = new ClipContext(rayOrigin, rayTarget, Block.OUTLINE, Fluid.NONE, player.cast());
-        BlockHitResult result = level.clip(rayTraceContext);
-        reach = (float) (.5f + Math.min(result.getLocation().subtract(rayOrigin).length(), .75f));
+        Vec3d movementVector = getMovementVector();
+        Vec3d rayOrigin = VecHelper.getCenterOf(pos).add(movementVector.multiply(3 / 2f));
+        Vec3d rayTarget = VecHelper.getCenterOf(pos).add(movementVector.multiply(5 / 2f));
+        RaycastContext rayTraceContext = new RaycastContext(rayOrigin, rayTarget, ShapeType.OUTLINE, FluidHandling.NONE, player.cast());
+        BlockHitResult result = world.raycast(rayTraceContext);
+        reach = (float) (.5f + Math.min(result.getPos().subtract(rayOrigin).length(), .75f));
         timer = 1000;
         sendData();
     }
@@ -289,28 +270,23 @@ public class DeployerBlockEntity extends KineticBlockEntity implements Clearable
         DeployerBlockEntity partner = null;
 
         for (i = 2; i < 5; i++) {
-            BlockPos otherDeployer = worldPosition.relative(facing, i);
-            if (!level.isLoaded(otherDeployer)) {
+            BlockPos otherDeployer = pos.offset(facing, i);
+            if (!world.isPosLoaded(otherDeployer))
                 return false;
-            }
-            BlockEntity other = level.getBlockEntity(otherDeployer);
+            BlockEntity other = world.getBlockEntity(otherDeployer);
             if (other instanceof DeployerBlockEntity dpe) {
                 partner = dpe;
                 break;
             }
         }
 
-        if (partner == null) {
+        if (partner == null)
             return false;
-        }
 
-        if (level.getBlockState(partner.getBlockPos()).getValue(FACING)
-            .getOpposite() != facing || partner.mode != Mode.PUNCH) {
+        if (world.getBlockState(partner.getPos()).get(FACING).getOpposite() != facing || partner.mode != Mode.PUNCH)
             return false;
-        }
-        if (partner.getSpeed() == 0) {
+        if (partner.getSpeed() == 0)
             return false;
-        }
 
         for (DeployerBlockEntity be : Arrays.asList(this, partner)) {
             be.fistBump = true;
@@ -327,25 +303,21 @@ public class DeployerBlockEntity extends KineticBlockEntity implements Clearable
         int i = 0;
         DeployerBlockEntity deployerBlockEntity = null;
         for (i = 2; i < 5; i++) {
-            BlockPos pos = this.worldPosition.relative(getBlockState().getValue(BlockStateProperties.FACING), i);
-            if (!level.isLoaded(pos)) {
+            BlockPos pos = this.pos.offset(getCachedState().get(Properties.FACING), i);
+            if (!world.isPosLoaded(pos))
                 return;
-            }
-            if (level.getBlockEntity(pos) instanceof DeployerBlockEntity dpe) {
+            if (world.getBlockEntity(pos) instanceof DeployerBlockEntity dpe) {
                 deployerBlockEntity = dpe;
                 break;
             }
         }
 
-        if (deployerBlockEntity == null) {
+        if (deployerBlockEntity == null)
             return;
-        }
-        if (!deployerBlockEntity.fistBump || deployerBlockEntity.state != State.EXPANDING) {
+        if (!deployerBlockEntity.fistBump || deployerBlockEntity.state != State.EXPANDING)
             return;
-        }
-        if (deployerBlockEntity.timer > 0) {
+        if (deployerBlockEntity.timer > 0)
             return;
-        }
 
         fistBump = false;
         deployerBlockEntity.fistBump = false;
@@ -354,167 +326,149 @@ public class DeployerBlockEntity extends KineticBlockEntity implements Clearable
         deployerBlockEntity.sendData();
         award(AllAdvancements.FIST_BUMP);
 
-        BlockPos soundLocation = BlockPos.containing(Vec3.atCenterOf(worldPosition)
-            .add(Vec3.atCenterOf(deployerBlockEntity.getBlockPos())).scale(.5f));
-        level.playSound(null, soundLocation, SoundEvents.PLAYER_ATTACK_NODAMAGE, SoundSource.BLOCKS, .75f, .75f);
+        BlockPos soundLocation = BlockPos.ofFloored(Vec3d.ofCenter(pos).add(Vec3d.ofCenter(deployerBlockEntity.getPos())).multiply(.5f));
+        world.playSound(null, soundLocation, SoundEvents.ENTITY_PLAYER_ATTACK_NODAMAGE, SoundCategory.BLOCKS, .75f, .75f);
     }
 
     protected void activate() {
-        Vec3 movementVector = getMovementVector();
-        Direction direction = getBlockState().getValue(BlockStateProperties.FACING);
-        Vec3 center = VecHelper.getCenterOf(worldPosition);
-        BlockPos clickedPos = worldPosition.relative(direction, 2);
-        ServerPlayer serverPlayer = player.cast();
-        serverPlayer.setXRot(direction == Direction.UP ? -90 : direction == Direction.DOWN ? 90 : 0);
-        serverPlayer.setYRot(direction.toYRot());
+        Vec3d movementVector = getMovementVector();
+        Direction direction = getCachedState().get(Properties.FACING);
+        Vec3d center = VecHelper.getCenterOf(pos);
+        BlockPos clickedPos = pos.offset(direction, 2);
+        ServerPlayerEntity serverPlayer = player.cast();
+        serverPlayer.setPitch(direction == Direction.UP ? -90 : direction == Direction.DOWN ? 90 : 0);
+        serverPlayer.setYaw(direction.getPositiveHorizontalDegrees());
 
-        if (direction == Direction.DOWN && BlockEntityBehaviour.get(
-            level,
-            clickedPos,
-            TransportedItemStackHandlerBehaviour.TYPE
-        ) != null) {
+        if (direction == Direction.DOWN && BlockEntityBehaviour.get(world, clickedPos, TransportedItemStackHandlerBehaviour.TYPE) != null)
             return; // Belt processing handled in BeltDeployerCallbacks
-        }
 
         DeployerHandler.activate(player, center, clickedPos, movementVector, mode);
         award(AllAdvancements.DEPLOYER);
 
         if (player != null) {
             int count = heldItem.getCount();
-            heldItem = serverPlayer.getMainHandItem();
-            if (count != heldItem.getCount()) {
-                setChanged();
-            }
+            heldItem = serverPlayer.getMainHandStack();
+            if (count != heldItem.getCount())
+                markDirty();
         }
     }
 
-    protected Vec3 getMovementVector() {
-        BlockState state = getBlockState();
-        if (!state.is(AllBlocks.DEPLOYER)) {
-            return Vec3.ZERO;
-        }
-        return Vec3.atLowerCornerOf(state.getValue(FACING).getUnitVec3i());
+    protected Vec3d getMovementVector() {
+        BlockState state = getCachedState();
+        if (!state.isOf(AllBlocks.DEPLOYER))
+            return Vec3d.ZERO;
+        return Vec3d.of(state.get(FACING).getVector());
     }
 
     @Override
-    protected void read(ValueInput view, boolean clientPacket) {
+    protected void read(ReadView view, boolean clientPacket) {
         state = view.read("State", State.CODEC).orElse(State.WAITING);
         mode = view.read("Mode", Mode.CODEC).orElse(Mode.PUNCH);
-        timer = view.getIntOr("Timer", 0);
-        redstoneLocked = view.getBooleanOr("Powered", false);
-        owner = view.read("Owner", UUIDUtil.CODEC).orElse(null);
+        timer = view.getInt("Timer", 0);
+        redstoneLocked = view.getBoolean("Powered", false);
+        owner = view.read("Owner", Uuids.INT_STREAM_CODEC).orElse(null);
         ownerName = view.read("OwnerName", Codec.STRING).orElse(null);
 
-        deferredInventoryList = view.read("Inventory", CompoundTag.CODEC).orElseGet(CompoundTag::new);
+        deferredInventoryList = view.read("Inventory", NbtCompound.CODEC).orElseGet(NbtCompound::new);
         overflowItems = new ArrayList<>();
         view.read("Overflow", CreateCodecs.ITEM_LIST_CODEC).ifPresent(overflowItems::addAll);
         view.read("HeldItem", ItemStack.OPTIONAL_CODEC).ifPresent(item -> heldItem = item);
         super.read(view, clientPacket);
 
-        if (!clientPacket) {
+        if (!clientPacket)
             return;
-        }
-        fistBump = view.getBooleanOr("Fistbump", false);
-        reach = view.getFloatOr("Reach", 0);
+        fistBump = view.getBoolean("Fistbump", false);
+        reach = view.getFloat("Reach", 0);
         view.read("Particle", ItemStack.CODEC).ifPresent(particleStack -> {
-            SandPaperItem.spawnParticles(
-                VecHelper.getCenterOf(worldPosition).add(getMovementVector().scale(reach + 1)),
-                particleStack,
-                level
-            );
+            SandPaperItem.spawnParticles(VecHelper.getCenterOf(pos).add(getMovementVector().multiply(reach + 1)), particleStack, world);
         });
     }
 
     @Override
-    public void write(ValueOutput view, boolean clientPacket) {
-        view.store("Mode", Mode.CODEC, mode);
-        view.store("State", State.CODEC, state);
+    public void write(WriteView view, boolean clientPacket) {
+        view.put("Mode", Mode.CODEC, mode);
+        view.put("State", State.CODEC, state);
         view.putInt("Timer", timer);
         view.putBoolean("Powered", redstoneLocked);
         if (owner != null) {
-            view.store("Owner", UUIDUtil.CODEC, owner);
-            view.store("OwnerName", Codec.STRING, ownerName);
+            view.put("Owner", Uuids.INT_STREAM_CODEC, owner);
+            view.put("OwnerName", Codec.STRING, ownerName);
         }
 
         if (player != null) {
-            ServerPlayer serverPlayer = player.cast();
-            try (ProblemReporter.ScopedCollector logging = new ProblemReporter.ScopedCollector(problemPath(), LOGGER)) {
-                TagValueOutput writeView = TagValueOutput.createWithContext(logging, level.registryAccess());
-                serverPlayer.getInventory().save(writeView.list("Inventory", ItemStackWithSlot.CODEC));
-                view.store("Inventory", CompoundTag.CODEC, writeView.buildResult());
+            ServerPlayerEntity serverPlayer = player.cast();
+            try (ErrorReporter.Logging logging = new ErrorReporter.Logging(getReporterContext(), LOGGER)) {
+                NbtWriteView writeView = NbtWriteView.create(logging, world.getRegistryManager());
+                serverPlayer.getInventory().writeData(writeView.getListAppender("Inventory", StackWithSlot.CODEC));
+                view.put("Inventory", NbtCompound.CODEC, writeView.getNbt());
             }
-            ItemStack stack = serverPlayer.getMainHandItem();
-            view.store("HeldItem", ItemStack.OPTIONAL_CODEC, stack);
-            view.store("Overflow", CreateCodecs.ITEM_LIST_CODEC, overflowItems);
+            ItemStack stack = serverPlayer.getMainHandStack();
+            view.put("HeldItem", ItemStack.OPTIONAL_CODEC, stack);
+            view.put("Overflow", CreateCodecs.ITEM_LIST_CODEC, overflowItems);
         } else if (deferredInventoryList != null) {
-            view.store("Inventory", CompoundTag.CODEC, deferredInventoryList);
+            view.put("Inventory", NbtCompound.CODEC, deferredInventoryList);
         }
 
         super.write(view, clientPacket);
 
-        if (!clientPacket) {
+        if (!clientPacket)
             return;
-        }
         view.putBoolean("Fistbump", fistBump);
         view.putFloat("Reach", reach);
-        if (player == null) {
+        if (player == null)
             return;
-        }
         if (player.getSpawnedItemEffects() != null) {
             ItemStack stack = player.getSpawnedItemEffects();
             if (!stack.isEmpty()) {
-                view.store("Particle", ItemStack.CODEC, stack);
+                view.put("Particle", ItemStack.CODEC, stack);
             }
             player.setSpawnedItemEffects(null);
         }
     }
 
     @Override
-    public void writeSafe(ValueOutput view) {
-        view.store("Mode", Mode.CODEC, mode);
+    public void writeSafe(WriteView view) {
+        view.put("Mode", Mode.CODEC, mode);
         super.writeSafe(view);
     }
 
-    private Container createHandler() {
+    private Inventory createHandler() {
         return new DeployerItemHandler(this);
     }
 
     public void redstoneUpdate() {
-        if (level.isClientSide()) {
+        if (world.isClient())
             return;
-        }
-        boolean blockPowered = level.hasNeighborSignal(worldPosition);
-        if (blockPowered == redstoneLocked) {
+        boolean blockPowered = world.isReceivingRedstonePower(pos);
+        if (blockPowered == redstoneLocked)
             return;
-        }
         redstoneLocked = blockPowered;
         sendData();
     }
 
     @Override
-    protected AABB createRenderBoundingBox() {
-        return super.createRenderBoundingBox().inflate(3);
+    protected Box createRenderBoundingBox() {
+        return super.createRenderBoundingBox().expand(3);
     }
 
     public void discardPlayer() {
-        if (player == null) {
+        if (player == null)
             return;
-        }
-        ServerPlayer serverPlayer = player.cast();
+        ServerPlayerEntity serverPlayer = player.cast();
         serverPlayer.getInventory().dropAll();
-        overflowItems.forEach(itemstack -> serverPlayer.drop(itemstack, true, false));
+        overflowItems.forEach(itemstack -> serverPlayer.dropItem(itemstack, true, false));
         serverPlayer.discard();
         player = null;
     }
 
     @Override
-    public void clearContent() {
+    public void clear() {
         filtering.setFilter(ItemStack.EMPTY);
     }
 
     public void changeMode() {
         mode = mode == Mode.PUNCH ? Mode.USE : Mode.PUNCH;
-        setChanged();
+        markDirty();
         sendData();
     }
 
@@ -524,24 +478,19 @@ public class DeployerBlockEntity extends KineticBlockEntity implements Clearable
 
     @Nullable
     public Recipe<? extends RecipeInput> getRecipe(ItemStack stack) {
-        if (player == null || level == null) {
+        if (player == null || world == null)
             return null;
-        }
 
-        ItemStack heldItemMainhand = player.cast().getMainHandItem();
-        RecipeMap preparedRecipes = ((ServerLevel) level).recipeAccess().recipes;
+        ItemStack heldItemMainhand = player.cast().getMainHandStack();
+        PreparedRecipes preparedRecipes = ((ServerWorld) world).getRecipeManager().preparedRecipes;
         if (heldItemMainhand.getItem() instanceof SandPaperItem) {
-            return preparedRecipes.getRecipesFor(
-                AllRecipeTypes.SANDPAPER_POLISHING,
-                new SingleRecipeInput(stack),
-                level
-            ).filter(AllRecipeTypes.CAN_BE_AUTOMATED).map(RecipeHolder::value).findFirst().orElse(null);
+            return preparedRecipes.find(AllRecipeTypes.SANDPAPER_POLISHING, new SingleStackRecipeInput(stack), world)
+                .filter(AllRecipeTypes.CAN_BE_AUTOMATED).map(RecipeEntry::value).findFirst().orElse(null);
         }
 
         ItemApplicationInput input = new ItemApplicationInput(stack, heldItemMainhand);
-        return AllRecipeTypes.DEPLOYER_RECIPES.stream()
-            .flatMap(type -> preparedRecipes.getRecipesFor(type, input, level)).filter(AllRecipeTypes.CAN_BE_AUTOMATED)
-            .map(RecipeHolder::value).findFirst().orElse(null);
+        return AllRecipeTypes.DEPLOYER_RECIPES.stream().flatMap(type -> preparedRecipes.find(type, input, world))
+            .filter(AllRecipeTypes.CAN_BE_AUTOMATED).map(RecipeEntry::value).findFirst().orElse(null);
     }
 
     public DeployerPlayer getPlayer() {

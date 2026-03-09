@@ -3,8 +3,8 @@ package com.zurrtum.create.client.flywheel.impl.visualization.storage;
 import com.zurrtum.create.client.flywheel.api.visual.EntityVisual;
 import com.zurrtum.create.client.flywheel.api.visualization.VisualizationContext;
 import com.zurrtum.create.client.flywheel.lib.visualization.VisualizationHelper;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.level.Level;
+import net.minecraft.entity.Entity;
+import net.minecraft.world.World;
 
 public class EntityStorage extends Storage<Entity> {
     @Override
@@ -27,7 +27,7 @@ public class EntityStorage extends Storage<Entity> {
             return false;
         }
 
-        Level level = entity.level();
+        World level = entity.getEntityWorld();
         return level != null;
     }
 }

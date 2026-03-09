@@ -5,19 +5,18 @@ import com.zurrtum.create.client.foundation.block.connected.CTSpriteShiftEntry;
 import com.zurrtum.create.client.foundation.block.connected.CTType;
 import com.zurrtum.create.client.foundation.block.connected.ConnectedTextureBehaviour;
 import com.zurrtum.create.client.foundation.block.connected.ConnectedTextureBehaviour.CTContext;
-import com.zurrtum.create.client.model.NormalsBakedQuad;
+import com.zurrtum.create.client.foundation.model.BakedQuadHelper;
 import com.zurrtum.create.content.decoration.copycat.CopycatBlock;
-import net.minecraft.client.model.geom.builders.UVPair;
-import net.minecraft.client.renderer.block.model.BakedQuad;
-import net.minecraft.client.renderer.block.model.BlockModelPart;
-import net.minecraft.client.renderer.block.model.SimpleModelWrapper;
-import net.minecraft.client.resources.model.QuadCollection;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.util.RandomSource;
-import net.minecraft.world.level.BlockAndTintGetter;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
+import net.minecraft.client.render.model.BakedGeometry;
+import net.minecraft.client.render.model.BakedQuad;
+import net.minecraft.client.render.model.BlockModelPart;
+import net.minecraft.client.render.model.GeometryBakedModel;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.random.Random;
+import net.minecraft.world.BlockRenderView;
 
 import java.util.List;
 import java.util.function.BiFunction;
@@ -25,102 +24,75 @@ import java.util.function.BiFunction;
 public class CTModel extends WrapperBlockStateModel {
     private final ConnectedTextureBehaviour behaviour;
 
-    public CTModel(BlockState state, UnbakedRoot unbaked, ConnectedTextureBehaviour behaviour) {
+    public CTModel(BlockState state, UnbakedGrouped unbaked, ConnectedTextureBehaviour behaviour) {
         super(state, unbaked);
         this.behaviour = behaviour;
     }
 
-    public static BiFunction<BlockState, UnbakedRoot, UnbakedRoot> of(ConnectedTextureBehaviour behaviour) {
+    public static BiFunction<BlockState, UnbakedGrouped, UnbakedGrouped> of(ConnectedTextureBehaviour behaviour) {
         return (state, unbaked) -> new CTModel(state, unbaked, behaviour);
     }
 
     @Override
-    public void addPartsWithInfo(
-        BlockAndTintGetter world,
-        BlockPos pos,
-        BlockState state,
-        RandomSource random,
-        List<BlockModelPart> parts
-    ) {
+    public void addPartsWithInfo(BlockRenderView world, BlockPos pos, BlockState state, Random random, List<BlockModelPart> parts) {
         int[] indices = createCTData(world, pos, state);
-        for (BlockModelPart part : model.collectParts(random)) {
-            QuadCollection.Builder builder = new QuadCollection.Builder();
+        for (BlockModelPart part : model.getParts(random)) {
+            BakedGeometry.Builder builder = new BakedGeometry.Builder();
             for (BakedQuad quad : part.getQuads(null)) {
-                builder.addUnculledFace(replaceQuad(state, random, indices[quad.direction().get3DDataValue()], quad));
+                builder.add(replaceQuad(state, random, indices[quad.face().getIndex()], quad));
             }
             for (Direction direction : Iterate.directions) {
-                addQuads(builder, part, direction, state, random, indices[direction.get3DDataValue()]);
+                addQuads(builder, part, direction, state, random, indices[direction.getIndex()]);
             }
-            parts.add(new SimpleModelWrapper(builder.build(), part.useAmbientOcclusion(), part.particleIcon()));
+            parts.add(new GeometryBakedModel(builder.build(), part.useAmbientOcclusion(), part.particleSprite()));
         }
     }
 
-    protected void addQuads(
-        QuadCollection.Builder builder,
-        BlockModelPart part,
-        Direction direction,
-        BlockState state,
-        RandomSource random,
-        int index
-    ) {
+    protected void addQuads(BakedGeometry.Builder builder, BlockModelPart part, Direction direction, BlockState state, Random random, int index) {
         for (BakedQuad quad : part.getQuads(direction)) {
-            builder.addCulledFace(direction, replaceQuad(state, random, index, quad));
+            builder.add(direction, replaceQuad(state, random, index, quad));
         }
     }
 
-    private static long calcSpriteUv(long packedUv, CTSpriteShiftEntry spriteShift, int index) {
-        float u = UVPair.unpackU(packedUv);
-        float v = UVPair.unpackV(packedUv);
-        return UVPair.pack(spriteShift.getTargetU(u, index), spriteShift.getTargetV(v, index));
-    }
-
-    protected BakedQuad replaceQuad(BlockState state, RandomSource random, int index, BakedQuad quad) {
+    protected BakedQuad replaceQuad(BlockState state, Random random, int index, BakedQuad quad) {
         if (index == -1) {
             return quad;
         }
-        CTSpriteShiftEntry spriteShift = behaviour.getShift(state, random, quad.direction(), quad.sprite());
+        CTSpriteShiftEntry spriteShift = behaviour.getShift(state, random, quad.face(), quad.sprite());
         if (spriteShift == null || quad.sprite() != spriteShift.getOriginal()) {
             return quad;
         }
-        BakedQuad newQuad = new BakedQuad(
-            quad.position0(),
-            quad.position1(),
-            quad.position2(),
-            quad.position3(),
-            calcSpriteUv(quad.packedUV0(), spriteShift, index),
-            calcSpriteUv(quad.packedUV1(), spriteShift, index),
-            calcSpriteUv(quad.packedUV2(), spriteShift, index),
-            calcSpriteUv(quad.packedUV3(), spriteShift, index),
-            quad.tintIndex(),
-            quad.direction(),
-            quad.sprite(),
-            quad.shade(),
-            quad.lightEmission()
-        );
-        NormalsBakedQuad.setNormals(newQuad, NormalsBakedQuad.getNormals(quad));
+        BakedQuad newQuad = BakedQuadHelper.clone(quad);
+        int[] vertexData = newQuad.vertexData();
+        for (int vertex = 0; vertex < 4; vertex++) {
+            float u = BakedQuadHelper.getU(vertexData, vertex);
+            float v = BakedQuadHelper.getV(vertexData, vertex);
+            BakedQuadHelper.setU(vertexData, vertex, spriteShift.getTargetU(u, index));
+            BakedQuadHelper.setV(vertexData, vertex, spriteShift.getTargetV(v, index));
+        }
         return newQuad;
     }
 
-    protected int[] createCTData(BlockAndTintGetter world, BlockPos pos, BlockState state) {
+    protected int[] createCTData(BlockRenderView world, BlockPos pos, BlockState state) {
         int[] indices = new int[6];
-        BlockPos.MutableBlockPos mutablePos = new BlockPos.MutableBlockPos();
+        BlockPos.Mutable mutablePos = new BlockPos.Mutable();
         for (Direction face : Iterate.directions) {
             BlockState actualState = world.getBlockState(pos);
-            if (!behaviour.buildContextForOccludedDirections() && !Block.shouldRenderFace(
+            if (!behaviour.buildContextForOccludedDirections() && !Block.shouldDrawSide(
                 state,
-                world.getBlockState(mutablePos.setWithOffset(pos, face)),
+                world.getBlockState(mutablePos.set(pos, face)),
                 face
             ) && !(actualState.getBlock() instanceof CopycatBlock ufb && !ufb.canFaceBeOccluded(actualState, face))) {
-                indices[face.get3DDataValue()] = -1;
+                indices[face.getIndex()] = -1;
                 continue;
             }
             CTType dataType = behaviour.getDataType(world, pos, state, face);
             if (dataType == null) {
-                indices[face.get3DDataValue()] = -1;
+                indices[face.getIndex()] = -1;
                 continue;
             }
             CTContext context = behaviour.buildContext(world, pos, state, face, dataType.getContextRequirement());
-            indices[face.get3DDataValue()] = dataType.getTextureIndex(context);
+            indices[face.getIndex()] = dataType.getTextureIndex(context);
         }
         return indices;
     }

@@ -6,17 +6,17 @@ import com.zurrtum.create.foundation.blockEntity.SmartBlockEntity;
 import com.zurrtum.create.foundation.gui.menu.MenuProvider;
 import com.zurrtum.create.foundation.utility.IInteractionChecker;
 import com.zurrtum.create.infrastructure.items.ItemInventory;
-import net.minecraft.core.BlockPos;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.chat.Component;
-import net.minecraft.world.Clearable;
-import net.minecraft.world.Containers;
-import net.minecraft.world.entity.player.Inventory;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.block.BlockState;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.entity.player.PlayerInventory;
+import net.minecraft.item.ItemStack;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.storage.ReadView;
+import net.minecraft.storage.WriteView;
+import net.minecraft.text.Text;
+import net.minecraft.util.Clearable;
+import net.minecraft.util.ItemScatterer;
+import net.minecraft.util.math.BlockPos;
 
 import java.util.List;
 
@@ -33,12 +33,12 @@ public class SchematicTableBlockEntity extends SmartBlockEntity implements MenuP
         ItemStack right = ItemStack.EMPTY;
 
         @Override
-        public int getContainerSize() {
+        public int size() {
             return 2;
         }
 
         @Override
-        public ItemStack getItem(int slot) {
+        public ItemStack getStack(int slot) {
             if (slot >= 2) {
                 return ItemStack.EMPTY;
             }
@@ -46,7 +46,7 @@ public class SchematicTableBlockEntity extends SmartBlockEntity implements MenuP
         }
 
         @Override
-        public void setItem(int slot, ItemStack stack) {
+        public void setStack(int slot, ItemStack stack) {
             if (slot >= 2) {
                 return;
             }
@@ -57,14 +57,14 @@ public class SchematicTableBlockEntity extends SmartBlockEntity implements MenuP
             }
         }
 
-        public void write(ValueOutput view) {
-            ValueOutput.TypedOutputList<ItemStack> list = view.list("Inventory", ItemStack.OPTIONAL_CODEC);
+        public void write(WriteView view) {
+            WriteView.ListAppender<ItemStack> list = view.getListAppender("Inventory", ItemStack.OPTIONAL_CODEC);
             list.add(left);
             list.add(right);
         }
 
-        public void read(ValueInput view) {
-            java.util.Iterator<ItemStack> iterator = view.listOrEmpty("Inventory", ItemStack.OPTIONAL_CODEC).iterator();
+        public void read(ReadView view) {
+            java.util.Iterator<ItemStack> iterator = view.getTypedListView("Inventory", ItemStack.OPTIONAL_CODEC).iterator();
             if (iterator.hasNext()) {
                 left = iterator.next();
                 if (iterator.hasNext()) {
@@ -74,8 +74,8 @@ public class SchematicTableBlockEntity extends SmartBlockEntity implements MenuP
         }
 
         @Override
-        public void setChanged() {
-            SchematicTableBlockEntity.this.setChanged();
+        public void markDirty() {
+            SchematicTableBlockEntity.this.markDirty();
         }
     }
 
@@ -87,22 +87,21 @@ public class SchematicTableBlockEntity extends SmartBlockEntity implements MenuP
     }
 
     @Override
-    public void preRemoveSideEffects(BlockPos pos, BlockState oldState) {
-        super.preRemoveSideEffects(pos, oldState);
-        Containers.dropContents(level, pos, inventory);
+    public void onBlockReplaced(BlockPos pos, BlockState oldState) {
+        super.onBlockReplaced(pos, oldState);
+        ItemScatterer.spawn(world, pos, inventory);
     }
 
     @Override
-    protected void read(ValueInput view, boolean clientPacket) {
+    protected void read(ReadView view, boolean clientPacket) {
         inventory.read(view);
         super.read(view, clientPacket);
-        if (!clientPacket) {
+        if (!clientPacket)
             return;
-        }
-        if (view.getBooleanOr("Uploading", false)) {
+        if (view.getBoolean("Uploading", false)) {
             isUploading = true;
-            uploadingSchematic = view.getStringOr("Schematic", "");
-            uploadingProgress = view.getFloatOr("Progress", 0);
+            uploadingSchematic = view.getString("Schematic", "");
+            uploadingProgress = view.getFloat("Progress", 0);
         } else {
             isUploading = false;
             uploadingSchematic = null;
@@ -111,7 +110,7 @@ public class SchematicTableBlockEntity extends SmartBlockEntity implements MenuP
     }
 
     @Override
-    protected void write(ValueOutput view, boolean clientPacket) {
+    protected void write(WriteView view, boolean clientPacket) {
         inventory.write(view);
         super.write(view, clientPacket);
         if (clientPacket && isUploading) {
@@ -122,8 +121,8 @@ public class SchematicTableBlockEntity extends SmartBlockEntity implements MenuP
     }
 
     @Override
-    public void clearContent() {
-        inventory.clearContent();
+    public void clear() {
+        inventory.clear();
     }
 
     @Override
@@ -131,7 +130,7 @@ public class SchematicTableBlockEntity extends SmartBlockEntity implements MenuP
         // Update Client block entity
         if (sendUpdate) {
             sendUpdate = false;
-            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 6);
+            world.updateListeners(pos, getCachedState(), getCachedState(), 6);
         }
     }
 
@@ -140,7 +139,7 @@ public class SchematicTableBlockEntity extends SmartBlockEntity implements MenuP
         uploadingProgress = 0;
         uploadingSchematic = schematic;
         sendUpdate = true;
-        inventory.setItem(0, ItemStack.EMPTY);
+        inventory.setStack(0, ItemStack.EMPTY);
     }
 
     public void finishUpload() {
@@ -151,26 +150,22 @@ public class SchematicTableBlockEntity extends SmartBlockEntity implements MenuP
     }
 
     @Override
-    public SchematicTableMenu createMenu(int id, Inventory inv, Player player, RegistryFriendlyByteBuf extraData) {
+    public SchematicTableMenu createMenu(int id, PlayerInventory inv, PlayerEntity player, RegistryByteBuf extraData) {
         sendToMenu(extraData);
         return new SchematicTableMenu(id, inv, this);
     }
 
     @Override
-    public Component getDisplayName() {
-        return Component.translatable("create.gui.schematicTable.title");
+    public Text getDisplayName() {
+        return Text.translatable("create.gui.schematicTable.title");
     }
 
     @Override
-    public boolean canPlayerUse(Player player) {
-        if (level == null || level.getBlockEntity(worldPosition) != this) {
+    public boolean canPlayerUse(PlayerEntity player) {
+        if (world == null || world.getBlockEntity(pos) != this) {
             return false;
         }
-        return player.distanceToSqr(
-            worldPosition.getX() + 0.5D,
-            worldPosition.getY() + 0.5D,
-            worldPosition.getZ() + 0.5D
-        ) <= 64.0D;
+        return player.squaredDistanceTo(pos.getX() + 0.5D, pos.getY() + 0.5D, pos.getZ() + 0.5D) <= 64.0D;
     }
 
     @Override

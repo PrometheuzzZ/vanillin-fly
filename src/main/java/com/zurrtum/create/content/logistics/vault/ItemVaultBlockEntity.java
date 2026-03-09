@@ -11,22 +11,22 @@ import com.zurrtum.create.foundation.blockEntity.behaviour.inventory.VersionedIn
 import com.zurrtum.create.infrastructure.config.AllConfigs;
 import com.zurrtum.create.infrastructure.items.ItemInventory;
 import com.zurrtum.create.infrastructure.items.ItemStackHandler;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.core.Direction.Axis;
-import net.minecraft.core.NonNullList;
-import net.minecraft.core.SectionPos;
-import net.minecraft.world.Clearable;
-import net.minecraft.world.Containers;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.levelgen.structure.BoundingBox;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.Blocks;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.item.ItemStack;
+import net.minecraft.storage.ReadView;
+import net.minecraft.storage.WriteView;
+import net.minecraft.util.Clearable;
+import net.minecraft.util.ItemScatterer;
+import net.minecraft.util.collection.DefaultedList;
+import net.minecraft.util.math.BlockBox;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.ChunkSectionPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Direction.Axis;
+import net.minecraft.world.World;
 
 import java.util.BitSet;
 import java.util.List;
@@ -56,10 +56,10 @@ public class ItemVaultBlockEntity extends SmartBlockEntity implements IMultiBloc
     }
 
     @Override
-    public void preRemoveSideEffects(BlockPos pos, BlockState oldState) {
-        super.preRemoveSideEffects(pos, oldState);
-        Containers.dropContents(level, pos, inventory);
-        level.removeBlockEntity(pos);
+    public void onBlockReplaced(BlockPos pos, BlockState oldState) {
+        super.onBlockReplaced(pos, oldState);
+        ItemScatterer.spawn(world, pos, inventory);
+        world.removeBlockEntity(pos);
         ConnectivityHandler.splitMulti(this);
     }
 
@@ -69,24 +69,21 @@ public class ItemVaultBlockEntity extends SmartBlockEntity implements IMultiBloc
 
     protected void updateConnectivity() {
         updateConnectivity = false;
-        if (level.isClientSide()) {
+        if (world.isClient())
             return;
-        }
-        if (!isController()) {
+        if (!isController())
             return;
-        }
         ConnectivityHandler.formMulti(this);
     }
 
     protected void updateComparators() {
         ItemVaultBlockEntity controllerBE = getControllerBE();
-        if (controllerBE == null) {
+        if (controllerBE == null)
             return;
-        }
 
-        level.blockEntityChanged(controllerBE.worldPosition);
+        world.markDirty(controllerBE.pos);
 
-        BlockPos pos = controllerBE.getBlockPos();
+        BlockPos pos = controllerBE.getPos();
 
         int radius = controllerBE.radius;
         int length = controllerBE.length;
@@ -97,9 +94,9 @@ public class ItemVaultBlockEntity extends SmartBlockEntity implements IMultiBloc
         int xMax = (axis == Axis.Z ? radius : length);
 
         // Mutable position we'll use for the blocks we poke updates at.
-        BlockPos.MutableBlockPos updatePos = new BlockPos.MutableBlockPos();
+        BlockPos.Mutable updatePos = new BlockPos.Mutable();
         // Mutable position we'll set to be the vault block next to the update position.
-        BlockPos.MutableBlockPos provokingPos = new BlockPos.MutableBlockPos();
+        BlockPos.Mutable provokingPos = new BlockPos.Mutable();
 
         for (int y = 0; y < radius; y++) {
             for (int z = 0; z < zMax; z++) {
@@ -109,35 +106,35 @@ public class ItemVaultBlockEntity extends SmartBlockEntity implements IMultiBloc
                     // That method pokes all 6 directions in order. We want to preserve the update order
                     // but skip the wasted work of checking other blocks that are part of this vault.
 
-                    var sectionX = SectionPos.blockToSectionCoord(pos.getX() + x);
-                    var sectionZ = SectionPos.blockToSectionCoord(pos.getZ() + z);
-                    if (!level.hasChunk(sectionX, sectionZ)) {
+                    var sectionX = ChunkSectionPos.getSectionCoord(pos.getX() + x);
+                    var sectionZ = ChunkSectionPos.getSectionCoord(pos.getZ() + z);
+                    if (!world.isChunkLoaded(sectionX, sectionZ)) {
                         continue;
                     }
-                    provokingPos.setWithOffset(pos, x, y, z);
+                    provokingPos.set(pos, x, y, z);
 
                     // Technically all this work is wasted for the inner blocks of a long 3x3 vault, but
                     // this is fast enough and relatively simple.
-                    Block provokingBlock = level.getBlockState(provokingPos).getBlock();
+                    Block provokingBlock = world.getBlockState(provokingPos).getBlock();
 
                     // The 6 calls below should match the order of Direction.values().
                     if (y == 0) {
-                        updateComparatorsInner(level, provokingBlock, provokingPos, updatePos, Direction.DOWN);
+                        updateComparatorsInner(world, provokingBlock, provokingPos, updatePos, Direction.DOWN);
                     }
                     if (y == radius - 1) {
-                        updateComparatorsInner(level, provokingBlock, provokingPos, updatePos, Direction.UP);
+                        updateComparatorsInner(world, provokingBlock, provokingPos, updatePos, Direction.UP);
                     }
                     if (z == 0) {
-                        updateComparatorsInner(level, provokingBlock, provokingPos, updatePos, Direction.NORTH);
+                        updateComparatorsInner(world, provokingBlock, provokingPos, updatePos, Direction.NORTH);
                     }
                     if (z == zMax - 1) {
-                        updateComparatorsInner(level, provokingBlock, provokingPos, updatePos, Direction.SOUTH);
+                        updateComparatorsInner(world, provokingBlock, provokingPos, updatePos, Direction.SOUTH);
                     }
                     if (x == 0) {
-                        updateComparatorsInner(level, provokingBlock, provokingPos, updatePos, Direction.WEST);
+                        updateComparatorsInner(world, provokingBlock, provokingPos, updatePos, Direction.WEST);
                     }
                     if (x == xMax - 1) {
-                        updateComparatorsInner(level, provokingBlock, provokingPos, updatePos, Direction.EAST);
+                        updateComparatorsInner(world, provokingBlock, provokingPos, updatePos, Direction.EAST);
                     }
                 }
             }
@@ -145,20 +142,20 @@ public class ItemVaultBlockEntity extends SmartBlockEntity implements IMultiBloc
     }
 
     /**
-     * See {@link Level#updateNeighbourForOutputSignal(BlockPos, Block)}.
+     * See {@link World#updateComparators(BlockPos, Block)}.
      */
     private static void updateComparatorsInner(
-        Level level,
+        World level,
         Block provokingBlock,
         BlockPos provokingPos,
-        BlockPos.MutableBlockPos updatePos,
+        BlockPos.Mutable updatePos,
         Direction direction
     ) {
-        updatePos.setWithOffset(provokingPos, direction);
+        updatePos.set(provokingPos, direction);
 
-        var sectionX = SectionPos.blockToSectionCoord(updatePos.getX());
-        var sectionZ = SectionPos.blockToSectionCoord(updatePos.getZ());
-        if (!level.hasChunk(sectionX, sectionZ)) {
+        var sectionX = ChunkSectionPos.getSectionCoord(updatePos.getX());
+        var sectionZ = ChunkSectionPos.getSectionCoord(updatePos.getZ());
+        if (!level.isChunkLoaded(sectionX, sectionZ)) {
             return;
         }
 
@@ -167,13 +164,13 @@ public class ItemVaultBlockEntity extends SmartBlockEntity implements IMultiBloc
             block.onNeighborChange(blockstate, level, updatePos, provokingPos);
         }
 
-        if (blockstate.is(Blocks.COMPARATOR)) {
-            level.neighborChanged(blockstate, updatePos, provokingBlock, null, false);
-        } else if (blockstate.isRedstoneConductor(level, updatePos)) {
+        if (blockstate.isOf(Blocks.COMPARATOR)) {
+            level.updateNeighbor(blockstate, updatePos, provokingBlock, null, false);
+        } else if (blockstate.isSolidBlock(level, updatePos)) {
             updatePos.move(direction);
             blockstate = level.getBlockState(updatePos);
-            if (blockstate.is(Blocks.COMPARATOR)) {
-                level.neighborChanged(blockstate, updatePos, provokingBlock, null, false);
+            if (blockstate.isOf(Blocks.COMPARATOR)) {
+                level.updateNeighbor(blockstate, updatePos, provokingBlock, null, false);
             }
         }
     }
@@ -182,16 +179,15 @@ public class ItemVaultBlockEntity extends SmartBlockEntity implements IMultiBloc
     public void tick() {
         super.tick();
 
-        if (lastKnownPos == null) {
-            lastKnownPos = getBlockPos();
-        } else if (!lastKnownPos.equals(worldPosition) && worldPosition != null) {
+        if (lastKnownPos == null)
+            lastKnownPos = getPos();
+        else if (!lastKnownPos.equals(pos) && pos != null) {
             onPositionChanged();
             return;
         }
 
-        if (updateConnectivity) {
+        if (updateConnectivity)
             updateConnectivity();
-        }
     }
 
     @Override
@@ -201,87 +197,78 @@ public class ItemVaultBlockEntity extends SmartBlockEntity implements IMultiBloc
 
     @Override
     public boolean isController() {
-        return controller == null || worldPosition.getX() == controller.getX() && worldPosition.getY() == controller.getY() && worldPosition.getZ() == controller.getZ();
+        return controller == null || pos.getX() == controller.getX() && pos.getY() == controller.getY() && pos.getZ() == controller.getZ();
     }
 
     private void onPositionChanged() {
         removeController(true);
-        lastKnownPos = worldPosition;
+        lastKnownPos = pos;
     }
 
     @SuppressWarnings("unchecked")
     @Override
     public ItemVaultBlockEntity getControllerBE() {
-        if (isController()) {
+        if (isController())
             return this;
-        }
-        BlockEntity blockEntity = level.getBlockEntity(controller);
-        if (blockEntity instanceof ItemVaultBlockEntity) {
+        BlockEntity blockEntity = world.getBlockEntity(controller);
+        if (blockEntity instanceof ItemVaultBlockEntity)
             return (ItemVaultBlockEntity) blockEntity;
-        }
         return null;
     }
 
     public void removeController(boolean keepContents) {
-        if (level.isClientSide()) {
+        if (world.isClient())
             return;
-        }
         updateConnectivity = true;
         controller = null;
         radius = 1;
         length = 1;
 
-        BlockState state = getBlockState();
+        BlockState state = getCachedState();
         if (ItemVaultBlock.isVault(state)) {
-            state = state.setValue(ItemVaultBlock.LARGE, false);
-            getLevel().setBlock(
-                worldPosition,
-                state,
-                Block.UPDATE_CLIENTS | Block.UPDATE_INVISIBLE | Block.UPDATE_KNOWN_SHAPE
-            );
+            state = state.with(ItemVaultBlock.LARGE, false);
+            getWorld().setBlockState(pos, state, Block.NOTIFY_LISTENERS | Block.NO_REDRAW | Block.FORCE_STATE);
         }
 
         itemCapability = null;
-        setChanged();
+        markDirty();
         sendData();
     }
 
     @Override
     public void setController(BlockPos controller) {
-        if (level.isClientSide() && !isVirtual()) {
+        if (world.isClient() && !isVirtual())
             return;
-        }
-        if (controller.equals(this.controller)) {
+        if (controller.equals(this.controller))
             return;
-        }
         this.controller = controller;
         itemCapability = null;
-        setChanged();
+        markDirty();
         sendData();
     }
 
     @Override
     public BlockPos getController() {
-        return isController() ? worldPosition : controller;
+        return isController() ? pos : controller;
     }
 
     @Override
-    protected void read(ValueInput view, boolean clientPacket) {
+    protected void read(ReadView view, boolean clientPacket) {
         super.read(view, clientPacket);
 
         BlockPos controllerBefore = controller;
         int prevSize = radius;
         int prevLength = length;
 
-        updateConnectivity = view.getBooleanOr("Uninitialized", false);
+        updateConnectivity = view.getBoolean("Uninitialized", false);
 
         lastKnownPos = view.read("LastKnownPos", BlockPos.CODEC).orElse(null);
 
         controller = view.read("Controller", BlockPos.CODEC).orElse(null);
 
         if (isController()) {
-            radius = view.getIntOr("Size", 0);
-            length = view.getIntOr("Length", 0);
+            radius = view.getInt("Size", 0);
+            length = view.getInt("Length", 0);
         }
 
         if (!clientPacket) {
@@ -290,25 +277,22 @@ public class ItemVaultBlockEntity extends SmartBlockEntity implements IMultiBloc
         }
 
         boolean changeOfController = controllerBefore == null ? controller != null : !controllerBefore.equals(controller);
-        if (hasLevel() && (changeOfController || prevSize != radius || prevLength != length)) {
-            level.setBlocksDirty(getBlockPos(), Blocks.AIR.defaultBlockState(), getBlockState());
-        }
+        if (hasWorld() && (changeOfController || prevSize != radius || prevLength != length))
+            world.scheduleBlockRerenderIfNeeded(getPos(), Blocks.AIR.getDefaultState(), getCachedState());
     }
 
     @Override
-    protected void write(ValueOutput view, boolean clientPacket) {
-        if (updateConnectivity) {
+    protected void write(WriteView view, boolean clientPacket) {
+        if (updateConnectivity)
             view.putBoolean("Uninitialized", true);
-        }
 
-        if (lastKnownPos != null) {
-            view.store("LastKnownPos", BlockPos.CODEC, lastKnownPos);
-        }
+        if (lastKnownPos != null)
+            view.put("LastKnownPos", BlockPos.CODEC, lastKnownPos);
         if (isController()) {
             view.putInt("Size", radius);
             view.putInt("Length", length);
         } else {
-            view.store("Controller", BlockPos.CODEC, controller);
+            view.put("Controller", BlockPos.CODEC, controller);
         }
 
         super.write(view, clientPacket);
@@ -320,8 +304,8 @@ public class ItemVaultBlockEntity extends SmartBlockEntity implements IMultiBloc
     }
 
     @Override
-    public void clearContent() {
-        inventory.clearContent();
+    public void clear() {
+        inventory.clear();
     }
 
     public ItemVaultHandler getInventoryOfBlock() {
@@ -335,52 +319,41 @@ public class ItemVaultBlockEntity extends SmartBlockEntity implements IMultiBloc
     }
 
     public void applyInventoryToBlock(ItemStackHandler handler) {
-        int size = handler.getContainerSize();
+        int size = handler.size();
         for (int i = 0; i < size; i++) {
-            inventory.setItem(i, handler.getItem(i));
+            inventory.setStack(i, handler.getStack(i));
         }
-        for (int i = size, max = inventory.getContainerSize(); i < max; i++) {
-            inventory.setItem(i, ItemStack.EMPTY);
+        for (int i = size, max = inventory.size(); i < max; i++) {
+            inventory.setStack(i, ItemStack.EMPTY);
         }
     }
 
     public void initCapability() {
         if (!isController()) {
             ItemVaultBlockEntity controllerBE = getControllerBE();
-            if (controllerBE == null) {
+            if (controllerBE == null)
                 return;
-            }
-            if (controllerBE.itemCapability == null || controllerBE.itemCapability.get() == null) {
+            if (controllerBE.itemCapability == null || controllerBE.itemCapability.get() == null)
                 controllerBE.initCapability();
-            }
             itemCapability = () -> {
-                if (controllerBE.isRemoved()) {
+                if (controllerBE.isRemoved())
                     return null;
-                }
-                if (controllerBE.itemCapability == null) {
+                if (controllerBE.itemCapability == null)
                     return null;
-                }
                 return controllerBE.itemCapability.get();
             };
             invId = controllerBE.invId;
             return;
         }
 
-        boolean alongZ = ItemVaultBlock.getVaultBlockAxis(getBlockState()) == Axis.Z;
+        boolean alongZ = ItemVaultBlock.getVaultBlockAxis(getCachedState()) == Axis.Z;
         ItemVaultHandler[] invs = new ItemVaultHandler[length * radius * radius];
         Find:
         for (int yOffset = 0; yOffset < length; yOffset++) {
             for (int xOffset = 0; xOffset < radius; xOffset++) {
                 for (int zOffset = 0; zOffset < radius; zOffset++) {
-                    BlockPos vaultPos = alongZ ? worldPosition.offset(xOffset, zOffset, yOffset) : worldPosition.offset(yOffset,
-                        xOffset,
-                        zOffset
-                    );
-                    ItemVaultBlockEntity vaultAt = ConnectivityHandler.partAt(
-                        AllBlockEntityTypes.ITEM_VAULT,
-                        level,
-                        vaultPos
-                    );
+                    BlockPos vaultPos = alongZ ? pos.add(xOffset, zOffset, yOffset) : pos.add(yOffset, xOffset, zOffset);
+                    ItemVaultBlockEntity vaultAt = ConnectivityHandler.partAt(AllBlockEntityTypes.ITEM_VAULT, world, vaultPos);
                     if (vaultAt == null) {
                         invs = null;
                         break Find;
@@ -398,12 +371,8 @@ public class ItemVaultBlockEntity extends SmartBlockEntity implements IMultiBloc
         }
 
         // build an identifier encompassing all component vaults
-        BlockPos farCorner = alongZ ? worldPosition.offset(radius, radius, length) : worldPosition.offset(
-            length,
-            radius,
-            radius
-        );
-        BoundingBox bounds = BoundingBox.fromCorners(this.worldPosition, farCorner);
+        BlockPos farCorner = alongZ ? pos.add(radius, radius, length) : pos.add(length, radius, radius);
+        BlockBox bounds = BlockBox.create(this.pos, farCorner);
         this.invId = new InventoryIdentifier.Bounds(bounds);
     }
 
@@ -418,16 +387,12 @@ public class ItemVaultBlockEntity extends SmartBlockEntity implements IMultiBloc
 
     @Override
     public void notifyMultiUpdated() {
-        BlockState state = this.getBlockState();
+        BlockState state = this.getCachedState();
         if (ItemVaultBlock.isVault(state)) { // safety
-            level.setBlock(
-                getBlockPos(),
-                state.setValue(ItemVaultBlock.LARGE, radius > 2),
-                Block.UPDATE_CLIENTS | Block.UPDATE_INVISIBLE
-            );
+            world.setBlockState(getPos(), state.with(ItemVaultBlock.LARGE, radius > 2), Block.NOTIFY_LISTENERS | Block.NO_REDRAW);
         }
         itemCapability = null;
-        setChanged();
+        markDirty();
     }
 
     @Override
@@ -437,9 +402,8 @@ public class ItemVaultBlockEntity extends SmartBlockEntity implements IMultiBloc
 
     @Override
     public int getMaxLength(Direction.Axis longAxis, int width) {
-        if (longAxis == Direction.Axis.Y) {
+        if (longAxis == Direction.Axis.Y)
             return getMaxWidth();
-        }
         return getMaxLength(width);
     }
 
@@ -475,20 +439,20 @@ public class ItemVaultBlockEntity extends SmartBlockEntity implements IMultiBloc
 
     public class ItemVaultHandler implements ItemInventory {
         private final int size;
-        protected final NonNullList<ItemStack> stacks;
+        protected final DefaultedList<ItemStack> stacks;
 
         public ItemVaultHandler() {
             size = AllConfigs.server().logistics.vaultCapacity.get();
-            stacks = NonNullList.withSize(size, ItemStack.EMPTY);
+            stacks = DefaultedList.ofSize(size, ItemStack.EMPTY);
         }
 
         @Override
-        public int getContainerSize() {
+        public int size() {
             return size;
         }
 
         @Override
-        public ItemStack getItem(int slot) {
+        public ItemStack getStack(int slot) {
             if (slot >= size) {
                 return ItemStack.EMPTY;
             }
@@ -496,7 +460,7 @@ public class ItemVaultBlockEntity extends SmartBlockEntity implements IMultiBloc
         }
 
         @Override
-        public void setItem(int slot, ItemStack stack) {
+        public void setStack(int slot, ItemStack stack) {
             if (slot >= size) {
                 return;
             }
@@ -504,12 +468,12 @@ public class ItemVaultBlockEntity extends SmartBlockEntity implements IMultiBloc
         }
 
         @Override
-        public void setChanged() {
-            level.blockEntityChanged(worldPosition);
+        public void markDirty() {
+            world.markDirty(pos);
         }
 
-        public void write(ValueOutput view) {
-            ValueOutput.TypedOutputList<ItemStack> list = view.list("Inventory", ItemStack.CODEC);
+        public void write(WriteView view) {
+            WriteView.ListAppender<ItemStack> list = view.getListAppender("Inventory", ItemStack.CODEC);
             for (ItemStack stack : stacks) {
                 if (stack.isEmpty()) {
                     continue;
@@ -518,8 +482,8 @@ public class ItemVaultBlockEntity extends SmartBlockEntity implements IMultiBloc
             }
         }
 
-        public void read(ValueInput view) {
-            ValueInput.TypedInputList<ItemStack> list = view.listOrEmpty("Inventory", ItemStack.CODEC);
+        public void read(ReadView view) {
+            ReadView.TypedListReadView<ItemStack> list = view.getTypedListView("Inventory", ItemStack.CODEC);
             int i = 0;
             for (ItemStack itemStack : list) {
                 stacks.set(i++, itemStack);
@@ -548,29 +512,29 @@ public class ItemVaultBlockEntity extends SmartBlockEntity implements IMultiBloc
         }
 
         @Override
-        public int getContainerSize() {
+        public int size() {
             return size;
         }
 
         @Override
-        public ItemStack getItem(int slot) {
+        public ItemStack getStack(int slot) {
             if (slot >= size) {
                 return ItemStack.EMPTY;
             }
             int i = slot / vaultCapacity;
             accessed.set(i);
-            return itemHandler[i].getItem(slot % vaultCapacity);
+            return itemHandler[i].getStack(slot % vaultCapacity);
         }
 
         @Override
-        public void setItem(int slot, ItemStack stack) {
+        public void setStack(int slot, ItemStack stack) {
             if (slot >= size) {
                 return;
             }
             int i = slot / vaultCapacity;
             ItemVaultHandler handler = itemHandler[i];
-            handler.setItem(slot % vaultCapacity, stack);
-            handler.setChanged();
+            handler.setStack(slot % vaultCapacity, stack);
+            handler.markDirty();
         }
 
         @Override
@@ -725,9 +689,9 @@ public class ItemVaultBlockEntity extends SmartBlockEntity implements IMultiBloc
         }
 
         @Override
-        public void setChanged() {
+        public void markDirty() {
             for (ItemVaultHandler inventory : itemHandler) {
-                inventory.setChanged();
+                inventory.markDirty();
             }
             incrementVersion();
         }

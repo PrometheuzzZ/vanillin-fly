@@ -4,15 +4,15 @@ import com.zurrtum.create.AllItems;
 import com.zurrtum.create.client.compat.eiv.CreateCategory;
 import com.zurrtum.create.client.foundation.utility.CreateLang;
 import com.zurrtum.create.compat.eiv.EivCommonPlugin;
-import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.item.ItemStack;
+import net.minecraft.text.Text;
+import net.minecraft.util.Identifier;
 
 import java.util.List;
 
 public class SandPaperPolishingCategory extends CreateCategory {
     @Override
-    public Component getDisplayName() {
+    public Text getDisplayName() {
         return CreateLang.translateDirect("recipe.sandpaper_polishing");
     }
 
@@ -33,11 +33,11 @@ public class SandPaperPolishingCategory extends CreateCategory {
 
     @Override
     public ItemStack getIcon() {
-        return AllItems.SAND_PAPER.getDefaultInstance();
+        return AllItems.SAND_PAPER.getDefaultStack();
     }
 
     @Override
     public List<ItemStack> getCraftReferences() {
-        return List.of(AllItems.SAND_PAPER.getDefaultInstance(), AllItems.RED_SAND_PAPER.getDefaultInstance());
+        return List.of(AllItems.SAND_PAPER.getDefaultStack(), AllItems.RED_SAND_PAPER.getDefaultStack());
     }
 }

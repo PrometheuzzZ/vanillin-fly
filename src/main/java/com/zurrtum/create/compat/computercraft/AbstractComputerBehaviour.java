@@ -8,7 +8,7 @@ import com.zurrtum.create.content.trains.observer.TrackObserver;
 import com.zurrtum.create.content.trains.signal.SignalBlockEntity;
 import com.zurrtum.create.foundation.blockEntity.SmartBlockEntity;
 import com.zurrtum.create.foundation.blockEntity.behaviour.BehaviourType;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.item.ItemStack;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 

@@ -11,24 +11,25 @@ import com.zurrtum.create.client.flywheel.lib.visual.AbstractBlockEntityVisual;
 import com.zurrtum.create.client.flywheel.lib.visual.SimpleDynamicVisual;
 import it.unimi.dsi.fastutil.floats.Float2FloatFunction;
 import it.unimi.dsi.fastutil.longs.LongSet;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.model.geom.ModelLayerLocation;
-import net.minecraft.client.model.geom.ModelLayers;
-import net.minecraft.client.renderer.LevelRenderer;
-import net.minecraft.client.renderer.LightTexture;
-import net.minecraft.client.renderer.Sheets;
-import net.minecraft.client.renderer.blockentity.ChestRenderer;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.SectionPos;
-import net.minecraft.util.Mth;
-import net.minecraft.world.level.block.AbstractChestBlock;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.ChestBlock;
-import net.minecraft.world.level.block.DoubleBlockCombiner;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.entity.ChestBlockEntity;
-import net.minecraft.world.level.block.entity.LidBlockEntity;
-import net.minecraft.world.level.block.state.properties.ChestType;
+import net.minecraft.block.AbstractChestBlock;
+import net.minecraft.block.Block;
+import net.minecraft.block.ChestBlock;
+import net.minecraft.block.DoubleBlockProperties;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.block.entity.ChestBlockEntity;
+import net.minecraft.block.entity.LidOpenable;
+import net.minecraft.block.enums.ChestType;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.render.LightmapTextureManager;
+import net.minecraft.client.render.TexturedRenderLayers;
+import net.minecraft.client.render.WorldRenderer;
+import net.minecraft.client.render.block.entity.ChestBlockEntityRenderer;
+import net.minecraft.client.render.entity.model.EntityModelLayer;
+import net.minecraft.client.render.entity.model.EntityModelLayers;
+import net.minecraft.client.util.SpriteIdentifier;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.ChunkSectionPos;
+import net.minecraft.util.math.MathHelper;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
@@ -38,16 +39,16 @@ import java.util.EnumMap;
 import java.util.Map;
 import java.util.function.Consumer;
 
-public class ChestVisual<T extends BlockEntity & LidBlockEntity> extends AbstractBlockEntityVisual<T> implements SimpleDynamicVisual {
+public class ChestVisual<T extends BlockEntity & LidOpenable> extends AbstractBlockEntityVisual<T> implements SimpleDynamicVisual {
     private static final Material MATERIAL = SimpleMaterial.builder().cutout(CutoutShaders.ONE_TENTH)
-        .texture(Sheets.CHEST_SHEET).mipmap(false).build();
+        .texture(TexturedRenderLayers.CHEST_ATLAS_TEXTURE).mipmap(false).build();
 
-    private static final Map<ChestType, ModelLayerLocation> LAYER_LOCATIONS = new EnumMap<>(ChestType.class);
+    private static final Map<ChestType, EntityModelLayer> LAYER_LOCATIONS = new EnumMap<>(ChestType.class);
 
     static {
-        LAYER_LOCATIONS.put(ChestType.SINGLE, ModelLayers.CHEST);
-        LAYER_LOCATIONS.put(ChestType.LEFT, ModelLayers.DOUBLE_CHEST_LEFT);
-        LAYER_LOCATIONS.put(ChestType.RIGHT, ModelLayers.DOUBLE_CHEST_RIGHT);
+        LAYER_LOCATIONS.put(ChestType.SINGLE, EntityModelLayers.CHEST);
+        LAYER_LOCATIONS.put(ChestType.LEFT, EntityModelLayers.DOUBLE_CHEST_LEFT);
+        LAYER_LOCATIONS.put(ChestType.RIGHT, EntityModelLayers.DOUBLE_CHEST_RIGHT);
     }
 
     @Nullable
@@ -61,7 +62,7 @@ public class ChestVisual<T extends BlockEntity & LidBlockEntity> extends Abstrac
     private final Matrix4fc initialPose;
     private final BrightnessCombiner brightnessCombiner = new BrightnessCombiner();
     @Nullable
-    private final DoubleBlockCombiner.NeighborCombineResult<? extends ChestBlockEntity> neighborCombineResult;
+    private final DoubleBlockProperties.PropertySource<? extends ChestBlockEntity> neighborCombineResult;
     @Nullable
     private final Float2FloatFunction lidProgress;
 
@@ -73,24 +74,17 @@ public class ChestVisual<T extends BlockEntity & LidBlockEntity> extends Abstrac
 
         Block block = blockState.getBlock();
         if (block instanceof AbstractChestBlock<?> chestBlock) {
-            ChestType chestType = blockState.hasProperty(ChestBlock.TYPE) ? blockState.getValue(ChestBlock.TYPE) : ChestType.SINGLE;
-            ChestRenderer<?> renderer = (ChestRenderer) Minecraft.getInstance().getBlockEntityRenderDispatcher()
-                .getRenderer(blockEntity);
-            net.minecraft.client.resources.model.Material texture = Sheets.chooseMaterial(
-                renderer.getChestMaterial(blockEntity,
-                    isChristmas()
-                ), chestType
-            );
-            instances = InstanceTree.create(
-                instancerProvider(),
-                ModelTrees.of(LAYER_LOCATIONS.get(chestType), texture, MATERIAL)
-            );
+            ChestType chestType = blockState.contains(ChestBlock.CHEST_TYPE) ? blockState.get(ChestBlock.CHEST_TYPE) : ChestType.SINGLE;
+            ChestBlockEntityRenderer<?> renderer = (ChestBlockEntityRenderer) MinecraftClient.getInstance().getBlockEntityRenderDispatcher()
+                .get(blockEntity);
+            SpriteIdentifier texture = TexturedRenderLayers.getChestTextureId(renderer.getVariant(blockEntity, isChristmas()), chestType);
+            instances = InstanceTree.create(instancerProvider(), ModelTrees.of(LAYER_LOCATIONS.get(chestType), texture, MATERIAL));
             lid = instances.childOrThrow("lid");
             lock = instances.childOrThrow("lock");
 
             initialPose = createInitialPose();
-            neighborCombineResult = chestBlock.combine(blockState, level, pos, true);
-            lidProgress = neighborCombineResult.apply(ChestBlock.opennessCombiner(blockEntity));
+            neighborCombineResult = chestBlock.getBlockEntitySource(blockState, level, pos, true);
+            lidProgress = neighborCombineResult.apply(ChestBlock.getAnimationProgressRetriever(blockEntity));
 
             lastProgress = lidProgress.get(partialTick);
             applyLidTransform(lastProgress);
@@ -111,9 +105,9 @@ public class ChestVisual<T extends BlockEntity & LidBlockEntity> extends Abstrac
 
     private Matrix4f createInitialPose() {
         BlockPos visualPos = getVisualPosition();
-        float horizontalAngle = blockState.getValue(ChestBlock.FACING).toYRot();
-        return new Matrix4f().translate(visualPos.getX(), visualPos.getY(), visualPos.getZ())
-            .translate(0.5F, 0.5F, 0.5F).rotateY(-horizontalAngle * Mth.DEG_TO_RAD).translate(-0.5F, -0.5F, -0.5F);
+        float horizontalAngle = blockState.get(ChestBlock.FACING).getPositiveHorizontalDegrees();
+        return new Matrix4f().translate(visualPos.getX(), visualPos.getY(), visualPos.getZ()).translate(0.5F, 0.5F, 0.5F)
+            .rotateY(-horizontalAngle * MathHelper.RADIANS_PER_DEGREE).translate(-0.5F, -0.5F, -0.5F);
     }
 
     @Override
@@ -123,7 +117,7 @@ public class ChestVisual<T extends BlockEntity & LidBlockEntity> extends Abstrac
         if (neighborCombineResult != null) {
             lightSections.sections(neighborCombineResult.apply(new SectionPosCombiner()));
         } else {
-            lightSections.sections(LongSet.of(SectionPos.asLong(pos)));
+            lightSections.sections(LongSet.of(ChunkSectionPos.toLong(pos)));
         }
     }
 
@@ -179,11 +173,11 @@ public class ChestVisual<T extends BlockEntity & LidBlockEntity> extends Abstrac
         }
     }
 
-    private class SectionPosCombiner implements DoubleBlockCombiner.Combiner<BlockEntity, LongSet> {
+    private class SectionPosCombiner implements DoubleBlockProperties.PropertyRetriever<BlockEntity, LongSet> {
         @Override
-        public LongSet acceptDouble(BlockEntity first, BlockEntity second) {
-            long firstSection = SectionPos.asLong(first.getBlockPos());
-            long secondSection = SectionPos.asLong(second.getBlockPos());
+        public LongSet getFromBoth(BlockEntity first, BlockEntity second) {
+            long firstSection = ChunkSectionPos.toLong(first.getPos());
+            long secondSection = ChunkSectionPos.toLong(second.getPos());
 
             if (firstSection == secondSection) {
                 return LongSet.of(firstSection);
@@ -193,39 +187,36 @@ public class ChestVisual<T extends BlockEntity & LidBlockEntity> extends Abstrac
         }
 
         @Override
-        public LongSet acceptSingle(BlockEntity single) {
-            return LongSet.of(SectionPos.asLong(single.getBlockPos()));
+        public LongSet getFrom(BlockEntity single) {
+            return LongSet.of(ChunkSectionPos.toLong(single.getPos()));
         }
 
         @Override
-        public LongSet acceptNone() {
-            return LongSet.of(SectionPos.asLong(pos));
+        public LongSet getFallback() {
+            return LongSet.of(ChunkSectionPos.toLong(pos));
         }
     }
 
-    private class BrightnessCombiner implements DoubleBlockCombiner.Combiner<BlockEntity, Integer> {
+    private class BrightnessCombiner implements DoubleBlockProperties.PropertyRetriever<BlockEntity, Integer> {
         @Override
-        public Integer acceptDouble(BlockEntity first, BlockEntity second) {
-            int firstLight = LevelRenderer.getLightColor(first.getLevel(), first.getBlockPos());
-            int secondLight = LevelRenderer.getLightColor(second.getLevel(), second.getBlockPos());
-            int firstBlockLight = LightTexture.block(firstLight);
-            int secondBlockLight = LightTexture.block(secondLight);
-            int firstSkyLight = LightTexture.sky(firstLight);
-            int secondSkyLight = LightTexture.sky(secondLight);
-            return LightTexture.pack(
-                Math.max(firstBlockLight, secondBlockLight),
-                Math.max(firstSkyLight, secondSkyLight)
-            );
+        public Integer getFromBoth(BlockEntity first, BlockEntity second) {
+            int firstLight = WorldRenderer.getLightmapCoordinates(first.getWorld(), first.getPos());
+            int secondLight = WorldRenderer.getLightmapCoordinates(second.getWorld(), second.getPos());
+            int firstBlockLight = LightmapTextureManager.getBlockLightCoordinates(firstLight);
+            int secondBlockLight = LightmapTextureManager.getBlockLightCoordinates(secondLight);
+            int firstSkyLight = LightmapTextureManager.getSkyLightCoordinates(firstLight);
+            int secondSkyLight = LightmapTextureManager.getSkyLightCoordinates(secondLight);
+            return LightmapTextureManager.pack(Math.max(firstBlockLight, secondBlockLight), Math.max(firstSkyLight, secondSkyLight));
         }
 
         @Override
-        public Integer acceptSingle(BlockEntity single) {
-            return LevelRenderer.getLightColor(single.getLevel(), single.getBlockPos());
+        public Integer getFrom(BlockEntity single) {
+            return WorldRenderer.getLightmapCoordinates(single.getWorld(), single.getPos());
         }
 
         @Override
-        public Integer acceptNone() {
-            return LevelRenderer.getLightColor(level, pos);
+        public Integer getFallback() {
+            return WorldRenderer.getLightmapCoordinates(level, pos);
         }
     }
 }

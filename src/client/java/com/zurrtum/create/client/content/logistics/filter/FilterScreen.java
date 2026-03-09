@@ -7,12 +7,12 @@ import com.zurrtum.create.client.foundation.utility.CreateLang;
 import com.zurrtum.create.content.logistics.filter.FilterMenu;
 import com.zurrtum.create.foundation.gui.menu.MenuType;
 import com.zurrtum.create.infrastructure.packet.c2s.FilterScreenPacket.Option;
-import net.minecraft.client.Minecraft;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.world.entity.player.Inventory;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.entity.player.PlayerInventory;
+import net.minecraft.item.ItemStack;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.text.MutableText;
+import net.minecraft.text.Text;
 
 import java.util.Arrays;
 import java.util.List;
@@ -21,30 +21,30 @@ public class FilterScreen extends AbstractFilterScreen<FilterMenu> {
 
     private static final String PREFIX = "gui.filter.";
 
-    private final Component allowN = CreateLang.translateDirect(PREFIX + "allow_list");
-    private final Component allowDESC = CreateLang.translateDirect(PREFIX + "allow_list.description");
-    private final Component denyN = CreateLang.translateDirect(PREFIX + "deny_list");
-    private final Component denyDESC = CreateLang.translateDirect(PREFIX + "deny_list.description");
+    private final Text allowN = CreateLang.translateDirect(PREFIX + "allow_list");
+    private final Text allowDESC = CreateLang.translateDirect(PREFIX + "allow_list.description");
+    private final Text denyN = CreateLang.translateDirect(PREFIX + "deny_list");
+    private final Text denyDESC = CreateLang.translateDirect(PREFIX + "deny_list.description");
 
-    private final Component respectDataN = CreateLang.translateDirect(PREFIX + "respect_data");
-    private final Component respectDataDESC = CreateLang.translateDirect(PREFIX + "respect_data.description");
-    private final Component ignoreDataN = CreateLang.translateDirect(PREFIX + "ignore_data");
-    private final Component ignoreDataDESC = CreateLang.translateDirect(PREFIX + "ignore_data.description");
+    private final Text respectDataN = CreateLang.translateDirect(PREFIX + "respect_data");
+    private final Text respectDataDESC = CreateLang.translateDirect(PREFIX + "respect_data.description");
+    private final Text ignoreDataN = CreateLang.translateDirect(PREFIX + "ignore_data");
+    private final Text ignoreDataDESC = CreateLang.translateDirect(PREFIX + "ignore_data.description");
 
     private IconButton whitelist, blacklist;
     private IconButton respectNBT, ignoreNBT;
 
-    public FilterScreen(FilterMenu menu, Inventory inv, Component title) {
+    public FilterScreen(FilterMenu menu, PlayerInventory inv, Text title) {
         super(menu, inv, title, AllGuiTextures.FILTER);
     }
 
     public static FilterScreen create(
-        Minecraft mc,
+        MinecraftClient mc,
         MenuType<ItemStack> type,
         int syncId,
-        Inventory inventory,
-        Component title,
-        RegistryFriendlyByteBuf extraData
+        PlayerInventory inventory,
+        Text title,
+        RegistryByteBuf extraData
     ) {
         return type.create(FilterScreen::new, syncId, inventory, title, getStack(extraData));
     }
@@ -54,29 +54,29 @@ public class FilterScreen extends AbstractFilterScreen<FilterMenu> {
         setWindowOffset(-11, 5);
         super.init();
 
-        blacklist = new IconButton(leftPos + 18, topPos + 75, AllIcons.I_BLACKLIST);
+        blacklist = new IconButton(x + 18, y + 75, AllIcons.I_BLACKLIST);
         blacklist.withCallback(() -> {
-            menu.blacklist = true;
+            handler.blacklist = true;
             sendOptionUpdate(Option.BLACKLIST);
         });
         blacklist.setToolTip(denyN);
-        whitelist = new IconButton(leftPos + 36, topPos + 75, AllIcons.I_WHITELIST);
+        whitelist = new IconButton(x + 36, y + 75, AllIcons.I_WHITELIST);
         whitelist.withCallback(() -> {
-            menu.blacklist = false;
+            handler.blacklist = false;
             sendOptionUpdate(Option.WHITELIST);
         });
         whitelist.setToolTip(allowN);
         addRenderableWidgets(blacklist, whitelist);
 
-        respectNBT = new IconButton(leftPos + 60, topPos + 75, AllIcons.I_RESPECT_NBT);
+        respectNBT = new IconButton(x + 60, y + 75, AllIcons.I_RESPECT_NBT);
         respectNBT.withCallback(() -> {
-            menu.respectNBT = true;
+            handler.respectNBT = true;
             sendOptionUpdate(Option.RESPECT_DATA);
         });
         respectNBT.setToolTip(respectDataN);
-        ignoreNBT = new IconButton(leftPos + 78, topPos + 75, AllIcons.I_IGNORE_NBT);
+        ignoreNBT = new IconButton(x + 78, y + 75, AllIcons.I_IGNORE_NBT);
         ignoreNBT.withCallback(() -> {
-            menu.respectNBT = false;
+            handler.respectNBT = false;
             sendOptionUpdate(Option.IGNORE_DATA);
         });
         ignoreNBT.setToolTip(ignoreDataN);
@@ -91,29 +91,25 @@ public class FilterScreen extends AbstractFilterScreen<FilterMenu> {
     }
 
     @Override
-    protected List<MutableComponent> getTooltipDescriptions() {
+    protected List<MutableText> getTooltipDescriptions() {
         return Arrays.asList(
-            denyDESC.plainCopy(),
-            allowDESC.plainCopy(),
-            respectDataDESC.plainCopy(),
-            ignoreDataDESC.plainCopy()
+            denyDESC.copyContentOnly(),
+            allowDESC.copyContentOnly(),
+            respectDataDESC.copyContentOnly(),
+            ignoreDataDESC.copyContentOnly()
         );
     }
 
     @Override
     protected boolean isButtonEnabled(IconButton button) {
-        if (button == blacklist) {
-            return !menu.blacklist;
-        }
-        if (button == whitelist) {
-            return menu.blacklist;
-        }
-        if (button == respectNBT) {
-            return !menu.respectNBT;
-        }
-        if (button == ignoreNBT) {
-            return menu.respectNBT;
-        }
+        if (button == blacklist)
+            return !handler.blacklist;
+        if (button == whitelist)
+            return handler.blacklist;
+        if (button == respectNBT)
+            return !handler.respectNBT;
+        if (button == ignoreNBT)
+            return handler.respectNBT;
         return true;
     }
 

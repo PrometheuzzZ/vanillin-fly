@@ -1,21 +1,21 @@
 package com.zurrtum.create.foundation.recipe;
 
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.ComponentContents;
-import net.minecraft.network.chat.Style;
-import net.minecraft.util.FormattedCharSequence;
-import net.minecraft.world.item.crafting.Ingredient;
+import net.minecraft.recipe.Ingredient;
+import net.minecraft.text.OrderedText;
+import net.minecraft.text.Style;
+import net.minecraft.text.Text;
+import net.minecraft.text.TextContent;
 
 import java.util.List;
 import java.util.Optional;
 
-public record IngredientText(IngredientTextContent content) implements Component {
+public record IngredientText(IngredientTextContent content) implements Text {
     public IngredientText(Ingredient content) {
         this(new IngredientTextContent(content));
     }
 
     @Override
-    public <T> Optional<T> visit(ContentConsumer<T> visitor) {
+    public <T> Optional<T> visit(Visitor<T> visitor) {
         return content.visit(visitor);
     }
 
@@ -25,22 +25,22 @@ public record IngredientText(IngredientTextContent content) implements Component
     }
 
     @Override
-    public ComponentContents getContents() {
+    public TextContent getContent() {
         return content;
     }
 
     @Override
-    public List<Component> getSiblings() {
+    public List<Text> getSiblings() {
         return List.of();
     }
 
     @Override
-    public FormattedCharSequence getVisualOrderText() {
-        return FormattedCharSequence.EMPTY;
+    public OrderedText asOrderedText() {
+        return OrderedText.EMPTY;
     }
 
     @Override
-    public <T> Optional<T> visit(StyledContentConsumer<T> visitor, Style style) {
+    public <T> Optional<T> visit(StyledVisitor<T> visitor, Style style) {
         return content.visit(visitor, style);
     }
 }

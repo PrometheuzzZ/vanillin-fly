@@ -3,7 +3,7 @@ package com.zurrtum.create;
 import com.zurrtum.create.catnip.data.Pair;
 import com.zurrtum.create.content.trains.schedule.condition.*;
 import com.zurrtum.create.content.trains.schedule.destination.*;
-import net.minecraft.resources.Identifier;
+import net.minecraft.util.Identifier;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -15,14 +15,8 @@ public class AllSchedules {
     public static List<Pair<Identifier, Function<Identifier, ? extends ScheduleInstruction>>> INSTRUCTION_TYPES = new ArrayList<>();
     public static List<Pair<Identifier, Function<Identifier, ? extends ScheduleWaitCondition>>> CONDITION_TYPES = new ArrayList<>();
     public static final Identifier DESTINATION = registerInstruction("destination", DestinationInstruction::new);
-    public static final Identifier PACKAGE_DELIVERY = registerInstruction(
-        "package_delivery",
-        DeliverPackagesInstruction::new
-    );
-    public static final Identifier PACKAGE_RETRIEVAL = registerInstruction(
-        "package_retrieval",
-        FetchPackagesInstruction::new
-    );
+    public static final Identifier PACKAGE_DELIVERY = registerInstruction("package_delivery", DeliverPackagesInstruction::new);
+    public static final Identifier PACKAGE_RETRIEVAL = registerInstruction("package_retrieval", FetchPackagesInstruction::new);
     public static final Identifier RENAME = registerInstruction("rename", ChangeTitleInstruction::new);
     public static final Identifier THROTTLE = registerInstruction("throttle", ChangeThrottleInstruction::new);
     public static final Identifier DELAY = registerCondition("delay", ScheduledDelay::new);
@@ -53,20 +47,14 @@ public class AllSchedules {
         return null;
     }
 
-    private static Identifier registerInstruction(
-        String name,
-        Function<Identifier, ? extends ScheduleInstruction> factory
-    ) {
-        Identifier id = Identifier.fromNamespaceAndPath(MOD_ID, name);
+    private static Identifier registerInstruction(String name, Function<Identifier, ? extends ScheduleInstruction> factory) {
+        Identifier id = Identifier.of(MOD_ID, name);
         INSTRUCTION_TYPES.add(Pair.of(id, factory));
         return id;
     }
 
-    private static Identifier registerCondition(
-        String name,
-        Function<Identifier, ? extends ScheduleWaitCondition> factory
-    ) {
-        Identifier id = Identifier.fromNamespaceAndPath(MOD_ID, name);
+    private static Identifier registerCondition(String name, Function<Identifier, ? extends ScheduleWaitCondition> factory) {
+        Identifier id = Identifier.of(MOD_ID, name);
         CONDITION_TYPES.add(Pair.of(id, factory));
         return id;
     }

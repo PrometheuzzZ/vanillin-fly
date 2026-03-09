@@ -1,10 +1,10 @@
 package com.zurrtum.create.compat;
 
 import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.Identifier;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.level.block.Block;
+import net.minecraft.block.Block;
+import net.minecraft.item.Item;
+import net.minecraft.registry.Registries;
+import net.minecraft.util.Identifier;
 
 import java.util.Locale;
 
@@ -12,7 +12,11 @@ import java.util.Locale;
  * For compatibility with and without another mod present, we have to define load conditions of the specific code
  */
 public enum Mods {
-    COMPUTERCRAFT, TRINKETS, PACKETFIXER, MODERNUI;
+    COMPUTERCRAFT,
+    TRINKETS,
+    PACKETFIXER,
+    MODERNUI,
+    ACCESSORIES;
 
     private final String id;
     private final boolean loaded;
@@ -30,15 +34,15 @@ public enum Mods {
     }
 
     public Identifier identifier(String name) {
-        return Identifier.fromNamespaceAndPath(id, name);
+        return Identifier.of(id, name);
     }
 
     public Block getBlock(String id) {
-        return BuiltInRegistries.BLOCK.getValue(identifier(id));
+        return Registries.BLOCK.get(identifier(id));
     }
 
     public Item getItem(String id) {
-        return BuiltInRegistries.ITEM.getValue(identifier(id));
+        return Registries.ITEM.get(identifier(id));
     }
 
     /**

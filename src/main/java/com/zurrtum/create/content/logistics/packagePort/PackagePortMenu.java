@@ -5,52 +5,52 @@ import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.foundation.blockEntity.behaviour.animatedContainer.AnimatedContainerBehaviour;
 import com.zurrtum.create.foundation.gui.menu.MenuBase;
 import com.zurrtum.create.foundation.gui.menu.MenuSlot;
-import net.minecraft.world.Container;
-import net.minecraft.world.entity.player.Inventory;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.inventory.Slot;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.entity.player.PlayerInventory;
+import net.minecraft.inventory.Inventory;
+import net.minecraft.item.ItemStack;
+import net.minecraft.screen.slot.Slot;
 
 public class PackagePortMenu extends MenuBase<PackagePortBlockEntity> {
-    public PackagePortMenu(int id, Inventory inv, PackagePortBlockEntity be) {
+    public PackagePortMenu(int id, PlayerInventory inv, PackagePortBlockEntity be) {
         super(AllMenuTypes.PACKAGE_PORT, id, inv, be);
         BlockEntityBehaviour.get(be, AnimatedContainerBehaviour.TYPE).startOpen(player);
     }
 
     @Override
-    public ItemStack quickMoveStack(Player player, int index) {
+    public ItemStack quickMove(PlayerEntity player, int index) {
         // based on the impl from chests.
         Slot slot = this.slots.get(index);
-        if (!slot.hasItem()) {
+        if (!slot.hasStack()) {
             return ItemStack.EMPTY;
         }
 
         // we need to copy the stack here since it may be modified by moveItemStackTo, but the
         // stack may be taken directly from a SlotItemHandler, which just defers to an IItemHandler.
         // modifying the original stack would violate the class's contract and cause problems.
-        ItemStack stack = slot.getItem().copy();
+        ItemStack stack = slot.getStack().copy();
         // we return the stack that was moved out of the slot, so make a copy of that now too.
         ItemStack moved = stack.copy();
 
-        int size = contentHolder.inventory.getContainerSize();
+        int size = contentHolder.inventory.size();
         if (index < size) {
             // move into player inventory
-            if (!moveItemStackTo(stack, size, this.slots.size(), true)) {
+            if (!insertItem(stack, size, this.slots.size(), true)) {
                 return ItemStack.EMPTY;
             }
         } else {
             // move into port inventory
-            if (!moveItemStackTo(stack, 0, size, false)) {
+            if (!insertItem(stack, 0, size, false)) {
                 return ItemStack.EMPTY;
             }
         }
 
         if (stack.isEmpty()) {
-            slot.setByPlayer(ItemStack.EMPTY);
+            slot.setStack(ItemStack.EMPTY);
         } else {
             // setByPlayer instead of just setChanged, since we made a copy
             // setByPlayer instead of set because, I don't know, that's what the other branch does
-            slot.setByPlayer(stack.copy());
+            slot.setStack(stack.copy());
         }
 
         return moved;
@@ -62,15 +62,13 @@ public class PackagePortMenu extends MenuBase<PackagePortBlockEntity> {
 
     @Override
     protected void addSlots() {
-        Container inventory = contentHolder.inventory;
+        Inventory inventory = contentHolder.inventory;
         int x = 27;
         int y = 9;
 
-        for (int row = 0; row < 2; row++) {
-            for (int col = 0; col < 9; col++) {
+        for (int row = 0; row < 2; row++)
+            for (int col = 0; col < 9; col++)
                 addSlot(new MenuSlot(inventory, row * 9 + col, x + col * 18, y + row * 18));
-            }
-        }
 
         addPlayerSlots(38, 108);
     }
@@ -80,15 +78,14 @@ public class PackagePortMenu extends MenuBase<PackagePortBlockEntity> {
     }
 
     @Override
-    public void removed(Player playerIn) {
-        super.removed(playerIn);
-        if (!playerIn.level().isClientSide()) {
+    public void onClosed(PlayerEntity playerIn) {
+        super.onClosed(playerIn);
+        if (!playerIn.getEntityWorld().isClient())
             BlockEntityBehaviour.get(contentHolder, AnimatedContainerBehaviour.TYPE).stopOpen(playerIn);
-        }
     }
 
     @Override
-    protected boolean moveItemStackTo(ItemStack stack, int startIndex, int endIndex, boolean reverseDirection) {
+    protected boolean insertItem(ItemStack stack, int startIndex, int endIndex, boolean reverseDirection) {
         // unfortunately, we kinda need to copy this entire method to make two tiny changes. I'm surprised
         // there's no forge patch for this considering it violates the contract of IItemHandler.getStackInSlot.
 
@@ -109,20 +106,20 @@ public class PackagePortMenu extends MenuBase<PackagePortBlockEntity> {
                 }
 
                 Slot slot = this.slots.get(i);
-                ItemStack stackInSlot = slot.getItem();
-                if (!stackInSlot.isEmpty() && ItemStack.isSameItemSameComponents(stack, stackInSlot)) {
+                ItemStack stackInSlot = slot.getStack();
+                if (!stackInSlot.isEmpty() && ItemStack.areItemsAndComponentsEqual(stack, stackInSlot)) {
                     int totalCount = stackInSlot.getCount() + stack.getCount();
                     // note: forge patches this variable in, vanilla just uses stack.getMaxStackSize 4 times
-                    int maxSize = Math.min(slot.getMaxStackSize(), stack.getMaxStackSize());
+                    int maxSize = Math.min(slot.getMaxItemCount(), stack.getMaxCount());
                     if (totalCount <= maxSize) {
                         stack.setCount(0);
                         // change #1: set a new stack instead of modifying it directly
-                        slot.setByPlayer(stackInSlot.copyWithCount(totalCount));
+                        slot.setStack(stackInSlot.copyWithCount(totalCount));
                         success = true;
                     } else if (stackInSlot.getCount() < maxSize) {
-                        stack.shrink(maxSize - stackInSlot.getCount());
+                        stack.decrement(maxSize - stackInSlot.getCount());
                         // change #2: set a new stack instead of modifying it directly
-                        slot.setByPlayer(stackInSlot.copyWithCount(maxSize));
+                        slot.setStack(stackInSlot.copyWithCount(maxSize));
                         success = true;
                     }
                 }
@@ -152,15 +149,15 @@ public class PackagePortMenu extends MenuBase<PackagePortBlockEntity> {
                 }
 
                 Slot slot = this.slots.get(i);
-                ItemStack stackInSlot = slot.getItem();
-                if (stackInSlot.isEmpty() && slot.mayPlace(stack)) {
-                    if (stack.getCount() > slot.getMaxStackSize()) {
-                        slot.setByPlayer(stack.split(slot.getMaxStackSize()));
+                ItemStack stackInSlot = slot.getStack();
+                if (stackInSlot.isEmpty() && slot.canInsert(stack)) {
+                    if (stack.getCount() > slot.getMaxItemCount()) {
+                        slot.setStack(stack.split(slot.getMaxItemCount()));
                     } else {
-                        slot.setByPlayer(stack.split(stack.getCount()));
+                        slot.setStack(stack.split(stack.getCount()));
                     }
 
-                    slot.setChanged();
+                    slot.markDirty();
                     success = true;
                     break;
                 }

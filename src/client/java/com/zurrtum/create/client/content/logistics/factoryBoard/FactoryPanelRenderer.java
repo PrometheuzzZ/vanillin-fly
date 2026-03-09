@@ -1,31 +1,31 @@
 package com.zurrtum.create.client.content.logistics.factoryBoard;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.zurrtum.create.catnip.theme.Color;
 import com.zurrtum.create.client.AllPartialModels;
 import com.zurrtum.create.client.AllSpriteShifts;
 import com.zurrtum.create.client.catnip.render.CachedBuffers;
+import com.zurrtum.create.client.catnip.render.PonderRenderTypes;
 import com.zurrtum.create.client.catnip.render.SuperByteBuffer;
 import com.zurrtum.create.client.flywheel.lib.model.baked.PartialModel;
 import com.zurrtum.create.client.foundation.blockEntity.renderer.SmartBlockEntityRenderer;
-import com.zurrtum.create.client.foundation.render.CreateRenderTypes;
+import com.zurrtum.create.client.foundation.render.RenderTypes;
 import com.zurrtum.create.content.logistics.factoryBoard.*;
 import com.zurrtum.create.content.redstone.displayLink.DisplayLinkBlockEntity;
 import com.zurrtum.create.content.redstone.link.RedstoneLinkBlockEntity;
-import net.minecraft.client.renderer.LightTexture;
-import net.minecraft.client.renderer.SubmitNodeCollector;
-import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
-import net.minecraft.client.renderer.feature.ModelFeatureRenderer;
-import net.minecraft.client.renderer.rendertype.RenderType;
-import net.minecraft.client.renderer.rendertype.RenderTypes;
-import net.minecraft.client.renderer.state.CameraRenderState;
-import net.minecraft.client.renderer.texture.OverlayTexture;
-import net.minecraft.core.Direction;
-import net.minecraft.util.Mth;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.block.BlockState;
+import net.minecraft.client.render.LightmapTextureManager;
+import net.minecraft.client.render.OverlayTexture;
+import net.minecraft.client.render.RenderLayer;
+import net.minecraft.client.render.VertexConsumer;
+import net.minecraft.client.render.block.entity.BlockEntityRendererFactory;
+import net.minecraft.client.render.command.ModelCommandRenderer;
+import net.minecraft.client.render.command.OrderedRenderCommandQueue;
+import net.minecraft.client.render.state.CameraRenderState;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -33,7 +33,7 @@ import java.util.List;
 import java.util.Map;
 
 public class FactoryPanelRenderer extends SmartBlockEntityRenderer<FactoryPanelBlockEntity, FactoryPanelRenderer.FactoryPanelRenderState> {
-    public FactoryPanelRenderer(BlockEntityRendererProvider.Context context) {
+    public FactoryPanelRenderer(BlockEntityRendererFactory.Context context) {
         super(context);
     }
 
@@ -43,14 +43,14 @@ public class FactoryPanelRenderer extends SmartBlockEntityRenderer<FactoryPanelB
     }
 
     @Override
-    public void extractRenderState(
+    public void updateRenderState(
         FactoryPanelBlockEntity be,
         FactoryPanelRenderState state,
         float tickProgress,
-        Vec3 cameraPos,
-        @Nullable ModelFeatureRenderer.CrumblingOverlay crumblingOverlay
+        Vec3d cameraPos,
+        @Nullable ModelCommandRenderer.CrumblingOverlayCommand crumblingOverlay
     ) {
-        super.extractRenderState(be, state, tickProgress, cameraPos, crumblingOverlay);
+        super.updateRenderState(be, state, tickProgress, cameraPos, crumblingOverlay);
         List<SingleFactoryPanelRenderState> panels = new ArrayList<>();
         boolean[] layers = new boolean[3];
         for (ServerFactoryPanelBehaviour behaviour : be.panels.values()) {
@@ -70,52 +70,28 @@ public class FactoryPanelRenderer extends SmartBlockEntityRenderer<FactoryPanelB
                     panel.offsetX = offsetX + 0.25f;
                     panel.offsetY = offsetY + 0.25f;
                     List<PathRenderState> paths = panel.paths = new ArrayList<>();
-                    Level world = behaviour.getLevel();
+                    World world = behaviour.getWorld();
                     FactoryPanelPosition to = behaviour.getPanelPosition();
                     FactoryPanelBehaviour fromBehaviour = be.getBehaviour(FactoryPanelBehaviour.getTypeForSlot(behaviour.slot));
-                    Vec3 start = fromBehaviour != null ? fromBehaviour.getSlotPositioning()
-                        .getLocalOffset(state.blockState).add(Vec3.atLowerCornerOf(state.blockPos)) : Vec3.ZERO;
+                    Vec3d start = fromBehaviour != null ? fromBehaviour.getSlotPositioning().getLocalOffset(state.blockState)
+                        .add(Vec3d.of(state.pos)) : Vec3d.ZERO;
                     for (FactoryPanelConnection connection : behaviour.targetedBy.values()) {
                         List<Direction> path = connection.getPath(world, state.blockState, to, start);
                         if (path.isEmpty()) {
                             continue;
                         }
-                        paths.add(getPathRenderState(
-                            behaviour,
-                            connection,
-                            path,
-                            world,
-                            state.blockState,
-                            missingAddress,
-                            glow
-                        ));
+                        paths.add(getPathRenderState(behaviour, connection, path, world, state.blockState, missingAddress, glow));
                     }
                     for (FactoryPanelConnection connection : behaviour.targetedByLinks.values()) {
                         List<Direction> path = connection.getPath(world, state.blockState, to, start);
                         if (path.isEmpty()) {
                             continue;
                         }
-                        paths.add(getPathRenderState(
-                            behaviour,
-                            connection,
-                            path,
-                            world,
-                            state.blockState,
-                            missingAddress,
-                            glow
-                        ));
+                        paths.add(getPathRenderState(behaviour, connection, path, world, state.blockState, missingAddress, glow));
                     }
                 }
                 if (bulb) {
-                    panel.bulb = getBulbRenderState(
-                        behaviour,
-                        state.blockState,
-                        missingAddress,
-                        offsetX,
-                        offsetY,
-                        glow,
-                        layers
-                    );
+                    panel.bulb = getBulbRenderState(behaviour, state.blockState, missingAddress, offsetX, offsetY, glow, layers);
                 }
                 panels.add(panel);
             }
@@ -123,39 +99,34 @@ public class FactoryPanelRenderer extends SmartBlockEntityRenderer<FactoryPanelB
         if (panels.isEmpty()) {
             return;
         }
-        state.xRot = FactoryPanelBlock.getXRot(state.blockState) + Mth.PI / 2;
+        state.xRot = FactoryPanelBlock.getXRot(state.blockState) + MathHelper.PI / 2;
         state.yRot = FactoryPanelBlock.getYRot(state.blockState);
         state.panels = panels;
         if (layers[0]) {
-            state.cutout = RenderTypes.cutoutMovingBlock();
+            state.cutout = RenderLayer.getCutoutMipped();
         }
         if (layers[1]) {
-            state.translucent1 = RenderTypes.translucentMovingBlock();
+            state.translucent1 = PonderRenderTypes.translucent();
         }
         if (layers[2]) {
-            state.translucent2 = CreateRenderTypes.translucent();
-            state.additive = CreateRenderTypes.additive();
+            state.translucent2 = RenderTypes.translucent();
+            state.additive = RenderTypes.additive();
         }
     }
 
     @Override
-    public void submit(
-        FactoryPanelRenderState state,
-        PoseStack matrices,
-        SubmitNodeCollector queue,
-        CameraRenderState cameraState
-    ) {
-        super.submit(state, matrices, queue, cameraState);
+    public void render(FactoryPanelRenderState state, MatrixStack matrices, OrderedRenderCommandQueue queue, CameraRenderState cameraState) {
+        super.render(state, matrices, queue, cameraState);
         if (state.panels != null) {
             if (state.cutout != null) {
-                queue.submitCustomGeometry(matrices, state.cutout, state::renderCutout);
+                queue.submitCustom(matrices, state.cutout, state::renderCutout);
             }
             if (state.translucent1 != null) {
-                queue.submitCustomGeometry(matrices, state.translucent1, state::renderTranslucent1);
+                queue.submitCustom(matrices, state.translucent1, state::renderTranslucent1);
             }
             if (state.additive != null) {
-                queue.submitCustomGeometry(matrices, state.translucent2, state::renderTranslucent2);
-                queue.submitCustomGeometry(matrices, state.additive, state::renderAdditive);
+                queue.submitCustom(matrices, state.translucent2, state::renderTranslucent2);
+                queue.submitCustom(matrices, state.additive, state::renderAdditive);
             }
         }
     }
@@ -181,7 +152,7 @@ public class FactoryPanelRenderer extends SmartBlockEntityRenderer<FactoryPanelB
         layers[2] = true;
         state.glow = true;
         glow = (float) (1 - (2 * Math.pow(glow - .75f, 2)));
-        glow = Mth.clamp(glow, -1, 1);
+        glow = MathHelper.clamp(glow, -1, 1);
         state.color = (int) (200 * glow);
         return state;
     }
@@ -190,7 +161,7 @@ public class FactoryPanelRenderer extends SmartBlockEntityRenderer<FactoryPanelB
         ServerFactoryPanelBehaviour behaviour,
         FactoryPanelConnection connection,
         List<Direction> path,
-        Level world,
+        World world,
         BlockState blockState,
         boolean missingAddress,
         float glow
@@ -235,50 +206,50 @@ public class FactoryPanelRenderer extends SmartBlockEntityRenderer<FactoryPanelB
         for (int i = 0, size = path.size(), end = size - 1; i < size; i++) {
             Direction direction = path.get(i);
             if (!pathReversed) {
-                currentX += direction.getStepX() * .5f;
-                currentZ += direction.getStepZ() * .5f;
+                currentX += direction.getOffsetX() * .5f;
+                currentZ += direction.getOffsetZ() * .5f;
             }
             Map<Direction, PartialModel> group = dots ? AllPartialModels.FACTORY_PANEL_DOTTED : (pathReversed ? i == end : i == 0) ? AllPartialModels.FACTORY_PANEL_ARROWS : AllPartialModels.FACTORY_PANEL_LINES;
             PartialModel partial = group.get(pathReversed ? direction : direction.getOpposite());
             SuperByteBuffer model = CachedBuffers.partial(partial, blockState);
-            float currentY = (yOffset + (direction.get2DDataValue() % 2) * 0.125f) / 512f;
+            float currentY = (yOffset + (direction.getHorizontalQuarterTurns() % 2) * 0.125f) / 512f;
             lines.add(new LineRenderData(model, currentX, currentY, currentZ));
             if (pathReversed) {
-                currentX += direction.getStepX() * .5f;
-                currentZ += direction.getStepZ() * .5f;
+                currentX += direction.getOffsetX() * .5f;
+                currentZ += direction.getOffsetZ() * .5f;
             }
         }
         return state;
     }
 
     public static class FactoryPanelRenderState extends SmartRenderState {
-        public RenderType cutout;
-        public RenderType translucent1;
-        public RenderType translucent2;
-        public RenderType additive;
+        public RenderLayer cutout;
+        public RenderLayer translucent1;
+        public RenderLayer translucent2;
+        public RenderLayer additive;
         public float xRot;
         public float yRot;
         public List<SingleFactoryPanelRenderState> panels;
 
-        public void renderCutout(PoseStack.Pose matricesEntry, VertexConsumer vertexConsumer) {
+        public void renderCutout(MatrixStack.Entry matricesEntry, VertexConsumer vertexConsumer) {
             for (SingleFactoryPanelRenderState panel : panels) {
-                panel.renderPaths(matricesEntry, vertexConsumer, xRot, yRot, lightCoords);
+                panel.renderPaths(matricesEntry, vertexConsumer, xRot, yRot, lightmapCoordinates);
             }
         }
 
-        public void renderTranslucent1(PoseStack.Pose matricesEntry, VertexConsumer vertexConsumer) {
+        public void renderTranslucent1(MatrixStack.Entry matricesEntry, VertexConsumer vertexConsumer) {
             for (SingleFactoryPanelRenderState panel : panels) {
-                panel.renderBulb(false, matricesEntry, vertexConsumer, xRot, yRot, lightCoords);
+                panel.renderBulb(false, matricesEntry, vertexConsumer, xRot, yRot, lightmapCoordinates);
             }
         }
 
-        public void renderTranslucent2(PoseStack.Pose matricesEntry, VertexConsumer vertexConsumer) {
+        public void renderTranslucent2(MatrixStack.Entry matricesEntry, VertexConsumer vertexConsumer) {
             for (SingleFactoryPanelRenderState panel : panels) {
-                panel.renderBulb(true, matricesEntry, vertexConsumer, xRot, yRot, lightCoords);
+                panel.renderBulb(true, matricesEntry, vertexConsumer, xRot, yRot, lightmapCoordinates);
             }
         }
 
-        public void renderAdditive(PoseStack.Pose matricesEntry, VertexConsumer vertexConsumer) {
+        public void renderAdditive(MatrixStack.Entry matricesEntry, VertexConsumer vertexConsumer) {
             for (SingleFactoryPanelRenderState panel : panels) {
                 panel.renderGlow(matricesEntry, vertexConsumer, xRot, yRot);
             }
@@ -291,13 +262,7 @@ public class FactoryPanelRenderer extends SmartBlockEntityRenderer<FactoryPanelB
         public List<PathRenderState> paths;
         public BulbRenderState bulb;
 
-        public void renderPaths(
-            PoseStack.Pose matricesEntry,
-            VertexConsumer vertexConsumer,
-            float xRot,
-            float yRot,
-            int light
-        ) {
+        public void renderPaths(MatrixStack.Entry matricesEntry, VertexConsumer vertexConsumer, float xRot, float yRot, int light) {
             if (paths != null) {
                 for (PathRenderState path : paths) {
                     path.render(matricesEntry, vertexConsumer, xRot, yRot, offsetX, offsetY, light);
@@ -305,20 +270,13 @@ public class FactoryPanelRenderer extends SmartBlockEntityRenderer<FactoryPanelB
             }
         }
 
-        public void renderBulb(
-            boolean glow,
-            PoseStack.Pose matricesEntry,
-            VertexConsumer vertexConsumer,
-            float xRot,
-            float yRot,
-            int light
-        ) {
+        public void renderBulb(boolean glow, MatrixStack.Entry matricesEntry, VertexConsumer vertexConsumer, float xRot, float yRot, int light) {
             if (bulb != null) {
                 bulb.renderBulb(glow, matricesEntry, vertexConsumer, xRot, yRot, light);
             }
         }
 
-        public void renderGlow(PoseStack.Pose matricesEntry, VertexConsumer vertexConsumer, float xRot, float yRot) {
+        public void renderGlow(MatrixStack.Entry matricesEntry, VertexConsumer vertexConsumer, float xRot, float yRot) {
             if (bulb != null) {
                 bulb.renderGlow(matricesEntry, vertexConsumer, xRot, yRot);
             }
@@ -332,28 +290,19 @@ public class FactoryPanelRenderer extends SmartBlockEntityRenderer<FactoryPanelB
         public boolean glow;
         public int color;
 
-        public void renderBulb(
-            boolean glow,
-            PoseStack.Pose entry,
-            VertexConsumer vertexConsumer,
-            float xRot,
-            float yRot,
-            int light
-        ) {
+        public void renderBulb(boolean glow, MatrixStack.Entry entry, VertexConsumer vertexConsumer, float xRot, float yRot, int light) {
             if (glow == this.glow) {
-                model.rotateCentered(yRot, Direction.UP).rotateCentered(xRot, Direction.EAST)
-                    .rotateCentered(Mth.PI, Direction.UP).translate(offsetX, 0, offsetY)
-                    .light(glow ? LightTexture.FULL_BRIGHT : light).overlay(OverlayTexture.NO_OVERLAY)
-                    .renderInto(entry, vertexConsumer);
+                model.rotateCentered(yRot, Direction.UP).rotateCentered(xRot, Direction.EAST).rotateCentered(MathHelper.PI, Direction.UP)
+                    .translate(offsetX, 0, offsetY).light(glow ? LightmapTextureManager.MAX_LIGHT_COORDINATE : light)
+                    .overlay(OverlayTexture.DEFAULT_UV).renderInto(entry, vertexConsumer);
             }
         }
 
-        private void renderGlow(PoseStack.Pose entry, VertexConsumer vertexConsumer, float xRot, float yRot) {
+        private void renderGlow(MatrixStack.Entry entry, VertexConsumer vertexConsumer, float xRot, float yRot) {
             if (glow) {
-                model.rotateCentered(yRot, Direction.UP).rotateCentered(xRot, Direction.EAST)
-                    .rotateCentered(Mth.PI, Direction.UP).translate(offsetX, 0, offsetY).light(LightTexture.FULL_BRIGHT)
-                    .color(color, color, color, 255).overlay(OverlayTexture.NO_OVERLAY)
-                    .renderInto(entry, vertexConsumer);
+                model.rotateCentered(yRot, Direction.UP).rotateCentered(xRot, Direction.EAST).rotateCentered(MathHelper.PI, Direction.UP)
+                    .translate(offsetX, 0, offsetY).light(LightmapTextureManager.MAX_LIGHT_COORDINATE).color(color, color, color, 255)
+                    .overlay(OverlayTexture.DEFAULT_UV).renderInto(entry, vertexConsumer);
             }
         }
     }
@@ -363,24 +312,14 @@ public class FactoryPanelRenderer extends SmartBlockEntityRenderer<FactoryPanelB
         public int color;
         public List<LineRenderData> lines;
 
-        public void render(
-            PoseStack.Pose entry,
-            VertexConsumer vertexConsumer,
-            float xRot,
-            float yRot,
-            float offsetX,
-            float offsetY,
-            int light
-        ) {
+        public void render(MatrixStack.Entry entry, VertexConsumer vertexConsumer, float xRot, float yRot, float offsetX, float offsetY, int light) {
             for (LineRenderData line : lines) {
-                line.model.rotateCentered(yRot, Direction.UP).rotateCentered(xRot, Direction.EAST)
-                    .rotateCentered(Mth.PI, Direction.UP).translate(offsetX, 0, offsetY)
-                    .translate(line.x, line.y, line.z);
+                line.model.rotateCentered(yRot, Direction.UP).rotateCentered(xRot, Direction.EAST).rotateCentered(MathHelper.PI, Direction.UP)
+                    .translate(offsetX, 0, offsetY).translate(line.x, line.y, line.z);
                 if (shiftUV) {
                     line.model.shiftUV(AllSpriteShifts.FACTORY_PANEL_CONNECTIONS);
                 }
-                line.model.color(color).light(light).overlay(OverlayTexture.NO_OVERLAY)
-                    .renderInto(entry, vertexConsumer);
+                line.model.color(color).light(light).overlay(OverlayTexture.DEFAULT_UV).renderInto(entry, vertexConsumer);
             }
         }
     }

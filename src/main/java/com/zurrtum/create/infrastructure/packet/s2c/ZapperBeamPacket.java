@@ -3,36 +3,35 @@ package com.zurrtum.create.infrastructure.packet.s2c;
 import com.zurrtum.create.AllClientHandle;
 import com.zurrtum.create.AllPackets;
 import com.zurrtum.create.catnip.codecs.stream.CatnipStreamCodecs;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.PacketType;
-import net.minecraft.network.protocol.game.ClientGamePacketListener;
-import net.minecraft.world.InteractionHand;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.network.listener.ClientPlayPacketListener;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.PacketType;
+import net.minecraft.util.Hand;
+import net.minecraft.util.math.Vec3d;
 
-public record ZapperBeamPacket(Vec3 location, InteractionHand hand, boolean self,
-                               Vec3 target) implements Packet<ClientGamePacketListener> {
-    public static final StreamCodec<RegistryFriendlyByteBuf, ZapperBeamPacket> CODEC = StreamCodec.composite(
-        Vec3.STREAM_CODEC,
+public record ZapperBeamPacket(Vec3d location, Hand hand, boolean self, Vec3d target) implements Packet<ClientPlayPacketListener> {
+    public static final PacketCodec<RegistryByteBuf, ZapperBeamPacket> CODEC = PacketCodec.tuple(
+        Vec3d.PACKET_CODEC,
         ZapperBeamPacket::location,
         CatnipStreamCodecs.HAND,
         ZapperBeamPacket::hand,
-        ByteBufCodecs.BOOL,
+        PacketCodecs.BOOLEAN,
         ZapperBeamPacket::self,
-        Vec3.STREAM_CODEC,
+        Vec3d.PACKET_CODEC,
         ZapperBeamPacket::target,
         ZapperBeamPacket::new
     );
 
     @Override
-    public void handle(ClientGamePacketListener listener) {
+    public void apply(ClientPlayPacketListener listener) {
         AllClientHandle.INSTANCE.onZapperBeam(listener, this);
     }
 
     @Override
-    public PacketType<ZapperBeamPacket> type() {
+    public PacketType<ZapperBeamPacket> getPacketType() {
         return AllPackets.BEAM_EFFECT;
     }
 }

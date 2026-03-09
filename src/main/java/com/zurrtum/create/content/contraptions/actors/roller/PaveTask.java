@@ -1,7 +1,7 @@
 package com.zurrtum.create.content.contraptions.actors.roller;
 
 import com.zurrtum.create.catnip.data.Couple;
-import net.minecraft.core.BlockPos;
+import net.minecraft.util.math.BlockPos;
 
 import java.util.HashMap;
 import java.util.Map;

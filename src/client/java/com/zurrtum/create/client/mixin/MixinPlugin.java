@@ -32,8 +32,13 @@ public class MixinPlugin implements IMixinConfigPlugin {
             mixins.add("RecipeViewScreenMixin");
             mixins.add("CraftingViewRecipeAccessor");
         }
+        if (loader.isModLoaded("modernfix")) {
+            mixins.add("DynamicModelProviderMixin");
+            mixins.add("DynamicModelProviderAccessor");
+            mixins.add("DynamicBakerImplMixin");
+        }
         if (!loader.isModLoaded("fabric-item-group-api-v1")) {
-            mixins.add("CreativeModeInventoryScreenMixin");
+            mixins.add("CreativeInventoryScreenMixin");
         }
         if (loader.isModLoaded("fabric-renderer-api-v1")) {
             mixins.add("FabricBlockStateModelMixin");
@@ -51,7 +56,7 @@ public class MixinPlugin implements IMixinConfigPlugin {
         if (loader.isModLoaded("fabric-model-loading-api-v1")) {
             mixins.add("WrapperBlockStateModelMixin");
         } else {
-            mixins.add("LoadBlockModelMixin");
+            mixins.add("LoadBakedModelMixin");
         }
     }
 

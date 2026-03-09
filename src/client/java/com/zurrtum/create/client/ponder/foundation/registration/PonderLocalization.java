@@ -3,8 +3,8 @@ package com.zurrtum.create.client.ponder.foundation.registration;
 import com.zurrtum.create.catnip.data.Couple;
 import com.zurrtum.create.client.ponder.api.registration.LangRegistryAccess;
 import com.zurrtum.create.client.ponder.foundation.PonderIndex;
-import net.minecraft.client.resources.language.I18n;
-import net.minecraft.resources.Identifier;
+import net.minecraft.client.resource.language.I18n;
+import net.minecraft.util.Identifier;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -61,60 +61,51 @@ public class PonderLocalization implements LangRegistryAccess {
 
     @Override
     public String getShared(Identifier key) {
-        if (PonderIndex.editingModeActive()) {
+        if (PonderIndex.editingModeActive())
             return shared.containsKey(key) ? shared.get(key) : ("unregistered shared entry: " + key);
-        }
-        return I18n.get(langKeyForShared(key));
+        return I18n.translate(langKeyForShared(key));
     }
 
     @Override
     public String getShared(Identifier key, Object... params) {
-        if (PonderIndex.editingModeActive()) {
-            return shared.containsKey(key) ? String.format(
-                shared.get(key),
-                params
-            ) : ("unregistered shared entry: " + key);
-        }
-        return I18n.get(langKeyForShared(key), params);
+        if (PonderIndex.editingModeActive())
+            return shared.containsKey(key) ? String.format(shared.get(key), params) : ("unregistered shared entry: " + key);
+        return I18n.translate(langKeyForShared(key), params);
     }
 
     @Override
     public String getTagName(Identifier key) {
-        if (PonderIndex.editingModeActive()) {
+        if (PonderIndex.editingModeActive())
             return tag.containsKey(key) ? tag.get(key).getFirst() : ("unregistered tag entry: " + key);
-        }
-        return I18n.get(langKeyForTag(key));
+        return I18n.translate(langKeyForTag(key));
     }
 
     @Override
     public String getTagDescription(Identifier key) {
-        if (PonderIndex.editingModeActive()) {
+        if (PonderIndex.editingModeActive())
             return tag.containsKey(key) ? tag.get(key).getSecond() : ("unregistered tag entry: " + key);
-        }
-        return I18n.get(langKeyForTagDescription(key));
+        return I18n.translate(langKeyForTagDescription(key));
     }
 
     @Override
     public String getSpecific(Identifier sceneId, String k) {
-        if (PonderIndex.editingModeActive()) {
+        if (PonderIndex.editingModeActive())
             try {
                 return specific.get(sceneId).get(k);
             } catch (Exception e) {
                 return "MISSING_SPECIFIC";
             }
-        }
-        return I18n.get(langKeyForSpecific(sceneId, k));
+        return I18n.translate(langKeyForSpecific(sceneId, k));
     }
 
     @Override
     public String getSpecific(Identifier sceneId, String k, Object... params) {
-        if (PonderIndex.editingModeActive()) {
+        if (PonderIndex.editingModeActive())
             try {
                 return String.format(specific.get(sceneId).get(k), params);
             } catch (Exception e) {
                 return "MISSING_SPECIFIC";
             }
-        }
-        return I18n.get(langKeyForSpecific(sceneId, k), params);
+        return I18n.translate(langKeyForSpecific(sceneId, k), params);
     }
 }

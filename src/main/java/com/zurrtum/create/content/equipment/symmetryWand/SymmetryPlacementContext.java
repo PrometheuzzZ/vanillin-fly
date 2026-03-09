@@ -1,27 +1,27 @@
 package com.zurrtum.create.content.equipment.symmetryWand;
 
 import com.zurrtum.create.foundation.utility.BlockHelper;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.world.InteractionHand;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.context.BlockPlaceContext;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.properties.BooleanProperty;
-import net.minecraft.world.phys.BlockHitResult;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.item.ItemPlacementContext;
+import net.minecraft.item.ItemStack;
+import net.minecraft.state.property.BooleanProperty;
+import net.minecraft.util.Hand;
+import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.World;
 
-public class SymmetryPlacementContext extends BlockPlaceContext {
+public class SymmetryPlacementContext extends ItemPlacementContext {
     private final BlockState replace;
     private final BlockState state;
 
     public SymmetryPlacementContext(
-        Level world,
-        Player player,
-        InteractionHand hand,
+        World world,
+        PlayerEntity player,
+        Hand hand,
         ItemStack stack,
         BlockPos position,
         Direction direction,
@@ -32,28 +32,27 @@ public class SymmetryPlacementContext extends BlockPlaceContext {
     ) {
         super(
             world, player, hand, stack, new BlockHitResult(
-                new Vec3(
-                    position.getX() + 0.5 + direction.getStepX() * 0.5,
-                    y,
-                    position.getZ() + 0.5 + direction.getStepZ() * 0.5
-                ), direction, position, false
+                new Vec3d(position.getX() + 0.5 + direction.getOffsetX() * 0.5, y, position.getZ() + 0.5 + direction.getOffsetZ() * 0.5),
+                direction,
+                position,
+                false
             )
         );
         if (!canReplaceExisting) {
-            this.replaceClicked = false;
-            this.relativePos = position;
+            this.canReplaceExisting = false;
+            this.placementPos = position;
         }
         this.replace = replace;
         this.state = state;
     }
 
     @Override
-    public Direction[] getNearestLookingDirections() {
+    public Direction[] getPlacementDirections() {
         Block block = state.getBlock();
         if (!BlockHelper.VINELIKE_BLOCKS.contains(block)) {
-            return super.getNearestLookingDirections();
+            return super.getPlacementDirections();
         }
-        boolean replaceable = replace.canBeReplaced() && !replace.is(block);
+        boolean replaceable = replace.isReplaceable() && !replace.isOf(block);
         Direction[] vines = new Direction[6];
         Direction[] emptys = new Direction[6];
         int vinesCount = 0;
@@ -61,7 +60,7 @@ public class SymmetryPlacementContext extends BlockPlaceContext {
 
         for (BooleanProperty vineState : BlockHelper.VINELIKE_STATES) {
             Direction direction = getDirection(vineState);
-            if (state.hasProperty(vineState) && state.getValue(vineState) && (replaceable || !replace.getValue(vineState))) {
+            if (state.contains(vineState) && state.get(vineState) && (replaceable || !replace.get(vineState))) {
                 vines[vinesCount++] = direction;
             } else {
                 emptys[emptysCount++] = direction;

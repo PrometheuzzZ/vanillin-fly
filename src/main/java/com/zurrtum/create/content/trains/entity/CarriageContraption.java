@@ -15,18 +15,17 @@ import com.zurrtum.create.content.contraptions.actors.trainControls.ControlsBloc
 import com.zurrtum.create.content.contraptions.minecart.TrainCargoManager;
 import com.zurrtum.create.content.trains.bogey.AbstractBogeyBlock;
 import com.zurrtum.create.foundation.collision.CollisionList;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.core.Direction.Axis;
-import net.minecraft.network.chat.Component;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate.StructureBlockInfo;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.storage.ReadView;
+import net.minecraft.storage.WriteView;
+import net.minecraft.structure.StructureTemplate.StructureBlockInfo;
+import net.minecraft.text.Text;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Direction.Axis;
+import net.minecraft.world.World;
 import org.apache.commons.lang3.tuple.Pair;
-import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -83,52 +82,38 @@ public class CarriageContraption extends Contraption {
     }
 
     @Override
-    public boolean assemble(Level world, BlockPos pos) throws AssemblyException {
-        if (!searchMovedStructure(world, pos, null)) {
+    public boolean assemble(World world, BlockPos pos) throws AssemblyException {
+        if (!searchMovedStructure(world, pos, null))
             return false;
-        }
-        if (blocks.size() <= 1) {
+        if (blocks.size() <= 1)
             return false;
-        }
-        if (bogeys == 0) {
+        if (bogeys == 0)
             return false;
-        }
-        if (bogeys > 2) {
-            throw new AssemblyException(Component.translatable("create.train_assembly.too_many_bogeys", bogeys));
-        }
-        if (sidewaysControls) {
-            throw new AssemblyException(Component.translatable("create.train_assembly.sideways_controls"));
-        }
+        if (bogeys > 2)
+            throw new AssemblyException(Text.translatable("create.train_assembly.too_many_bogeys", bogeys));
+        if (sidewaysControls)
+            throw new AssemblyException(Text.translatable("create.train_assembly.sideways_controls"));
 
-        for (BlockPos blazePos : assembledBlockConductors) {
-            for (Direction direction : Iterate.directionsInAxis(assemblyDirection.getAxis())) {
-                if (inControl(blazePos, direction)) {
+        for (BlockPos blazePos : assembledBlockConductors)
+            for (Direction direction : Iterate.directionsInAxis(assemblyDirection.getAxis()))
+                if (inControl(blazePos, direction))
                     blockConductors.set(direction != assemblyDirection, true);
-                }
-            }
-        }
-        for (BlockPos seatPos : getSeats()) {
-            for (Direction direction : Iterate.directionsInAxis(assemblyDirection.getAxis())) {
-                if (inControl(seatPos, direction)) {
-                    conductorSeats.computeIfAbsent(seatPos, p -> Couple.create(false, false))
-                        .set(direction != assemblyDirection, true);
-                }
-            }
-        }
+        for (BlockPos seatPos : getSeats())
+            for (Direction direction : Iterate.directionsInAxis(assemblyDirection.getAxis()))
+                if (inControl(seatPos, direction))
+                    conductorSeats.computeIfAbsent(seatPos, p -> Couple.create(false, false)).set(direction != assemblyDirection, true);
 
         return true;
     }
 
     public boolean inControl(BlockPos pos, Direction direction) {
-        BlockPos controlsPos = pos.relative(direction);
-        if (!blocks.containsKey(controlsPos)) {
+        BlockPos controlsPos = pos.offset(direction);
+        if (!blocks.containsKey(controlsPos))
             return false;
-        }
         StructureBlockInfo info = blocks.get(controlsPos);
-        if (!info.state().is(AllBlocks.TRAIN_CONTROLS)) {
+        if (!info.state().isOf(AllBlocks.TRAIN_CONTROLS))
             return false;
-        }
-        return info.state().getValue(ControlsBlock.FACING) == direction.getOpposite();
+        return info.state().get(ControlsBlock.FACING) == direction.getOpposite();
     }
 
     public void swapStorageAfterAssembly(CarriageContraptionEntity cce) {
@@ -152,20 +137,19 @@ public class CarriageContraption extends Contraption {
     }
 
     @Override
-    protected Pair<StructureBlockInfo, BlockEntity> capture(Level world, BlockPos pos) {
+    protected Pair<StructureBlockInfo, BlockEntity> capture(World world, BlockPos pos) {
         BlockState blockState = world.getBlockState(pos);
 
         if (ArrivalSoundQueue.isPlayable(blockState)) {
             int anchorCoord = VecHelper.getCoordinate(anchor, assemblyDirection.getAxis());
             int posCoord = VecHelper.getCoordinate(pos, assemblyDirection.getAxis());
-            soundQueue.add((posCoord - anchorCoord) * assemblyDirection.getAxisDirection().getStep(), toLocalPos(pos));
+            soundQueue.add((posCoord - anchorCoord) * assemblyDirection.getDirection().offset(), toLocalPos(pos));
         }
 
         if (blockState.getBlock() instanceof AbstractBogeyBlock<?>) {
             bogeys++;
-            if (bogeys == 2) {
+            if (bogeys == 2)
                 secondBogeyPos = pos;
-            }
         }
 
         MovingInteractionBehaviour behaviour = MovingInteractionBehaviour.REGISTRY.get(blockState);
@@ -173,17 +157,16 @@ public class CarriageContraption extends Contraption {
             assembledBlockConductors.add(toLocalPos(pos));
         }
 
-        if (blockState.is(AllBlocks.TRAIN_CONTROLS)) {
-            Direction facing = blockState.getValue(ControlsBlock.FACING);
-            if (facing.getAxis() != assemblyDirection.getAxis()) {
+        if (blockState.isOf(AllBlocks.TRAIN_CONTROLS)) {
+            Direction facing = blockState.get(ControlsBlock.FACING);
+            if (facing.getAxis() != assemblyDirection.getAxis())
                 sidewaysControls = true;
-            } else {
+            else {
                 boolean forwards = facing == assemblyDirection;
-                if (forwards) {
+                if (forwards)
                     forwardControls = true;
-                } else {
+                else
                     backwardControls = true;
-                }
             }
         }
 
@@ -191,17 +174,17 @@ public class CarriageContraption extends Contraption {
     }
 
     @Override
-    public void write(ValueOutput view, boolean spawnPacket) {
+    public void write(WriteView view, boolean spawnPacket) {
         super.write(view, spawnPacket);
-        view.store("AssemblyDirection", Direction.CODEC, getAssemblyDirection());
+        view.put("AssemblyDirection", Direction.CODEC, getAssemblyDirection());
         view.putBoolean("FrontControls", forwardControls);
         view.putBoolean("BackControls", backwardControls);
         view.putBoolean("FrontBlazeConductor", blockConductors.getFirst());
         view.putBoolean("BackBlazeConductor", blockConductors.getSecond());
-        ValueOutput.ValueOutputList list = view.childrenList("ConductorSeats");
+        WriteView.ListView list = view.getList("ConductorSeats");
         for (Map.Entry<BlockPos, Couple<Boolean>> entry : conductorSeats.entrySet()) {
-            ValueOutput item = list.addChild();
-            item.store("Pos", BlockPos.CODEC, entry.getKey());
+            WriteView item = list.add();
+            item.put("Pos", BlockPos.CODEC, entry.getKey());
             Couple<Boolean> couple = entry.getValue();
             item.putBoolean("Forward", couple.getFirst());
             item.putBoolean("Backward", couple.getSecond());
@@ -210,19 +193,16 @@ public class CarriageContraption extends Contraption {
     }
 
     @Override
-    public void read(Level world, ValueInput view, boolean spawnData) {
+    public void read(World world, ReadView view, boolean spawnData) {
         assemblyDirection = view.read("AssemblyDirection", Direction.CODEC).orElse(Direction.DOWN);
-        forwardControls = view.getBooleanOr("FrontControls", false);
-        backwardControls = view.getBooleanOr("BackControls", false);
-        blockConductors = Couple.create(
-            view.getBooleanOr("FrontBlazeConductor", false),
-            view.getBooleanOr("BackBlazeConductor", false)
-        );
+        forwardControls = view.getBoolean("FrontControls", false);
+        backwardControls = view.getBoolean("BackControls", false);
+        blockConductors = Couple.create(view.getBoolean("FrontBlazeConductor", false), view.getBoolean("BackBlazeConductor", false));
         conductorSeats.clear();
-        view.childrenListOrEmpty("ConductorSeats").forEach(item -> {
+        view.getListReadView("ConductorSeats").forEach(item -> {
             conductorSeats.put(
-                item.read("Pos", BlockPos.CODEC).orElse(BlockPos.ZERO),
-                Couple.create(item.getBooleanOr("Forward", false), item.getBooleanOr("Backward", false))
+                item.read("Pos", BlockPos.CODEC).orElse(BlockPos.ORIGIN),
+                Couple.create(item.getBoolean("Forward", false), item.getBoolean("Backward", false))
             );
         });
         soundQueue.read(view);
@@ -256,30 +236,25 @@ public class CarriageContraption extends Contraption {
     }
 
     @Override
-    @Nullable
     public CollisionList getSimplifiedEntityColliders() {
-        if (notInPortal()) {
+        if (notInPortal())
             return super.getSimplifiedEntityColliders();
-        }
         return null;
     }
 
     @Override
     public boolean isHiddenInPortal(BlockPos localPos) {
-        if (notInPortal()) {
+        if (notInPortal())
             return super.isHiddenInPortal(localPos);
-        }
         Direction facing = assemblyDirection;
-        Axis axis = facing.getClockWise().getAxis();
-        int coord = axis.choose(localPos.getZ(), localPos.getY(), localPos.getX()) * -facing.getAxisDirection()
-            .getStep();
+        Axis axis = facing.rotateYClockwise().getAxis();
+        int coord = axis.choose(localPos.getZ(), localPos.getY(), localPos.getX()) * -facing.getDirection().offset();
         return !withinVisible(coord) || atSeam(coord);
     }
 
     public boolean isHiddenInPortal(int posAlongMovementAxis) {
-        if (notInPortal()) {
+        if (notInPortal())
             return false;
-        }
         return !withinVisible(posAlongMovementAxis) || atSeam(posAlongMovementAxis);
     }
 
@@ -289,17 +264,15 @@ public class CarriageContraption extends Contraption {
 
     public boolean atSeam(BlockPos localPos) {
         Direction facing = assemblyDirection;
-        Axis axis = facing.getClockWise().getAxis();
-        int coord = axis.choose(localPos.getZ(), localPos.getY(), localPos.getX()) * -facing.getAxisDirection()
-            .getStep();
+        Axis axis = facing.rotateYClockwise().getAxis();
+        int coord = axis.choose(localPos.getZ(), localPos.getY(), localPos.getX()) * -facing.getDirection().offset();
         return coord == portalCutoffMin || coord == portalCutoffMax;
     }
 
     public boolean withinVisible(BlockPos localPos) {
         Direction facing = assemblyDirection;
-        Axis axis = facing.getClockWise().getAxis();
-        int coord = axis.choose(localPos.getZ(), localPos.getY(), localPos.getX()) * -facing.getAxisDirection()
-            .getStep();
+        Axis axis = facing.rotateYClockwise().getAxis();
+        int coord = axis.choose(localPos.getZ(), localPos.getY(), localPos.getX()) * -facing.getDirection().offset();
         return withinVisible(coord);
     }
 
@@ -317,13 +290,11 @@ public class CarriageContraption extends Contraption {
     }
 
     @Override
-    public void writeStorage(ValueOutput view, boolean spawnPacket) {
-        if (!spawnPacket) {
+    public void writeStorage(WriteView view, boolean spawnPacket) {
+        if (!spawnPacket)
             return;
-        }
-        if (storageProxy != null) {
+        if (storageProxy != null)
             storageProxy.write(view, spawnPacket);
-        }
     }
 
 }

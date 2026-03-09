@@ -1,11 +1,11 @@
 package com.zurrtum.create.content.logistics.packagePort;
 
 import com.mojang.serialization.MapCodec;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.network.codec.PacketCodec;
 
 public interface PackagePortTargetType {
     MapCodec<? extends PackagePortTarget> codec();
 
-    StreamCodec<? super RegistryFriendlyByteBuf, ? extends PackagePortTarget> packetCodec();
+    PacketCodec<? super RegistryByteBuf, ? extends PackagePortTarget> packetCodec();
 }

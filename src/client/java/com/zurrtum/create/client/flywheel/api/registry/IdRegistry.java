@@ -1,6 +1,6 @@
 package com.zurrtum.create.client.flywheel.api.registry;
 
-import net.minecraft.resources.Identifier;
+import net.minecraft.util.Identifier;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.UnmodifiableView;

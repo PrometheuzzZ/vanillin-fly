@@ -2,7 +2,7 @@ package com.zurrtum.create.client.ponder.foundation.instruction;
 
 import com.zurrtum.create.client.ponder.api.element.ElementLink;
 import com.zurrtum.create.client.ponder.api.element.MinecartElement;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.util.math.Vec3d;
 
 import java.util.function.BiConsumer;
 import java.util.function.Function;
@@ -12,14 +12,14 @@ public class AnimateMinecartInstruction extends AnimateElementInstruction<Mineca
     public static AnimateMinecartInstruction rotate(ElementLink<MinecartElement> link, float rotation, int ticks) {
         return new AnimateMinecartInstruction(
             link,
-            new Vec3(0, rotation, 0),
+            new Vec3d(0, rotation, 0),
             ticks,
             (wse, v) -> wse.setRotation((float) v.y, ticks == 0),
             MinecartElement::getRotation
         );
     }
 
-    public static AnimateMinecartInstruction move(ElementLink<MinecartElement> link, Vec3 offset, int ticks) {
+    public static AnimateMinecartInstruction move(ElementLink<MinecartElement> link, Vec3d offset, int ticks) {
         return new AnimateMinecartInstruction(
             link,
             offset,
@@ -31,10 +31,10 @@ public class AnimateMinecartInstruction extends AnimateElementInstruction<Mineca
 
     protected AnimateMinecartInstruction(
         ElementLink<MinecartElement> link,
-        Vec3 totalDelta,
+        Vec3d totalDelta,
         int ticks,
-        BiConsumer<MinecartElement, Vec3> setter,
-        Function<MinecartElement, Vec3> getter
+        BiConsumer<MinecartElement, Vec3d> setter,
+        Function<MinecartElement, Vec3d> getter
     ) {
         super(link, totalDelta, ticks, setter, getter);
     }

@@ -4,8 +4,8 @@ import com.zurrtum.create.client.foundation.blockEntity.behaviour.scrollValue.IN
 import com.zurrtum.create.client.foundation.gui.AllIcons;
 import com.zurrtum.create.client.foundation.utility.CreateLang;
 import com.zurrtum.create.foundation.blockEntity.behaviour.ValueSettings;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.text.MutableText;
+import net.minecraft.text.Text;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.function.Function;
@@ -13,9 +13,9 @@ import java.util.function.Function;
 public class ValueSettingsFormatter {
 
     @Nullable
-    private final Function<ValueSettings, MutableComponent> formatter;
+    private final Function<ValueSettings, MutableText> formatter;
 
-    public ValueSettingsFormatter(@Nullable Function<ValueSettings, MutableComponent> formatter) {
+    public ValueSettingsFormatter(@Nullable Function<ValueSettings, MutableText> formatter) {
         this.formatter = formatter;
     }
 
@@ -23,11 +23,11 @@ public class ValueSettingsFormatter {
         this(null);
     }
 
-    public MutableComponent format(ValueSettings valueSettings) {
+    public MutableText format(ValueSettings valueSettings) {
         return formatter == null ? toLocaleNumber(valueSettings) : formatter.apply(valueSettings);
     }
 
-    public static MutableComponent toLocaleNumber(ValueSettings valueSettings) {
+    public static MutableText toLocaleNumber(ValueSettings valueSettings) {
         return CreateLang.number(valueSettings.value()).component();
     }
 
@@ -36,7 +36,7 @@ public class ValueSettingsFormatter {
         private final INamedIconOptions[] options;
 
         public ScrollOptionSettingsFormatter(INamedIconOptions[] options) {
-            super(v -> Component.translatable(options[v.value()].getTranslationKey()));
+            super(v -> Text.translatable(options[v.value()].getTranslationKey()));
             this.options = options;
         }
 

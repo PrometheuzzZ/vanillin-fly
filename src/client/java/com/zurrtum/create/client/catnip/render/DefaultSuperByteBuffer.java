@@ -1,16 +1,16 @@
 package com.zurrtum.create.client.catnip.render;
 
-import com.mojang.blaze3d.vertex.MeshData;
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
 import it.unimi.dsi.fastutil.longs.Long2IntMap;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.LevelRenderer;
-import net.minecraft.client.renderer.texture.OverlayTexture;
-import net.minecraft.core.BlockPos;
-import net.minecraft.world.level.BlockAndTintGetter;
-import net.minecraft.world.level.Level;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.render.BuiltBuffer;
+import net.minecraft.client.render.OverlayTexture;
+import net.minecraft.client.render.VertexConsumer;
+import net.minecraft.client.render.WorldRenderer;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.BlockRenderView;
+import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 import org.joml.*;
 
@@ -24,7 +24,7 @@ public class DefaultSuperByteBuffer implements SuperByteBuffer {
     protected int formatSize;
 
     // Vertex Position
-    protected PoseStack transforms;
+    protected MatrixStack transforms;
 
     // Vertex Coloring
     protected boolean shouldColor;
@@ -37,7 +37,7 @@ public class DefaultSuperByteBuffer implements SuperByteBuffer {
 
     // Vertex Overlay Color
     protected boolean hasOverlay;
-    protected int overlay = OverlayTexture.NO_OVERLAY;
+    protected int overlay = OverlayTexture.DEFAULT_UV;
 
     // Vertex Lighting
     protected boolean useWorldLight;
@@ -56,9 +56,9 @@ public class DefaultSuperByteBuffer implements SuperByteBuffer {
     private final ShiftOutput shiftOutput = new ShiftOutput();
 
 
-    public DefaultSuperByteBuffer(MeshData data) {
-        ByteBuffer rendered = data.vertexBuffer();
-        MeshData.DrawState drawState = data.drawState();
+    public DefaultSuperByteBuffer(BuiltBuffer data) {
+        ByteBuffer rendered = data.getBuffer();
+        BuiltBuffer.DrawParameters drawState = data.getDrawParameters();
 
         // Vanilla issue, endianness does not carry over into sliced buffers - fixed by forge only
         rendered.order(ByteOrder.nativeOrder());
@@ -72,26 +72,25 @@ public class DefaultSuperByteBuffer implements SuperByteBuffer {
         template.limit(rendered.limit());
         template.put(rendered);
 
-        transforms = new PoseStack();
-        transforms.pushPose();
+        transforms = new MatrixStack();
+        transforms.push();
     }
 
     @Override
-    public void renderInto(PoseStack.Pose entry, VertexConsumer consumer) {
-        if (isEmpty()) {
+    public void renderInto(MatrixStack.Entry entry, VertexConsumer consumer) {
+        if (isEmpty())
             return;
-        }
 
-        Matrix4f modelMatrix = new Matrix4f(entry.pose());
-        Matrix4f localTransforms = transforms.last().pose();
+        Matrix4f modelMatrix = new Matrix4f(entry.getPositionMatrix());
+        Matrix4f localTransforms = transforms.peek().getPositionMatrix();
         modelMatrix.mul(localTransforms);
 
         Matrix3f normalMatrix;
         if (fullNormalTransform) {
-            normalMatrix = new Matrix3f(entry.normal());
-            normalMatrix.mul(transforms.last().normal());
+            normalMatrix = new Matrix3f(entry.getNormalMatrix());
+            normalMatrix.mul(transforms.peek().getNormalMatrix());
         } else {
-            normalMatrix = new Matrix3f(transforms.last().normal());
+            normalMatrix = new Matrix3f(transforms.peek().getNormalMatrix());
         }
 
         for (int i = 0; i < vertexCount(); i++) {
@@ -110,7 +109,7 @@ public class DefaultSuperByteBuffer implements SuperByteBuffer {
             normal.mul(normalMatrix);
             lightPos.mul(localTransforms);
 
-            consumer.addVertex(pos.x(), pos.y(), pos.z());
+            consumer.vertex(pos.x(), pos.y(), pos.z());
 
             byte r, g, b, a;
             if (shouldColor) {
@@ -125,10 +124,10 @@ public class DefaultSuperByteBuffer implements SuperByteBuffer {
                 a = getA(i);
             }
             if (disableDiffuse) {
-                consumer.setColor(r, g, b, a);
+                consumer.color(r, g, b, a);
             } else {
                 // missing flywheel's diffuse calc stuff
-                consumer.setColor(r, g, b, a);
+                consumer.color(r, g, b, a);
             }
             float u = getU(i);
             float v = getV(i);
@@ -139,7 +138,7 @@ public class DefaultSuperByteBuffer implements SuperByteBuffer {
                 v = shiftOutput.v;
             }
 
-            consumer.setUv(u, v);
+            consumer.texture(u, v);
 
             int light;
             if (useWorldLight) {
@@ -149,7 +148,7 @@ public class DefaultSuperByteBuffer implements SuperByteBuffer {
                     lightPos.mul(lightTransform);
                 }
 
-                light = getLight(Minecraft.getInstance().level, lightPos);
+                light = getLight(MinecraftClient.getInstance().world, lightPos);
                 if (hasCustomLight) {
                     light = SuperByteBuffer.maxLight(light, packedLightCoordinates);
                 }
@@ -160,12 +159,12 @@ public class DefaultSuperByteBuffer implements SuperByteBuffer {
             }
 
             if (hybridLight) {
-                consumer.setLight(SuperByteBuffer.maxLight(light, getLight(i)));
+                consumer.light(SuperByteBuffer.maxLight(light, getLight(i)));
             } else {
-                consumer.setLight(light);
+                consumer.light(light);
             }
 
-            consumer.setNormal(normal.x(), normal.y(), normal.z());
+            consumer.normal(normal.x(), normal.y(), normal.z());
         }
 
         reset();
@@ -174,11 +173,10 @@ public class DefaultSuperByteBuffer implements SuperByteBuffer {
 
     @Override
     public DefaultSuperByteBuffer reset() {
-        while (!transforms.isEmpty()) {
-            transforms.popPose();
-        }
+        while (!transforms.isEmpty())
+            transforms.pop();
 
-        transforms.pushPose();
+        transforms.push();
 
         shouldColor = false;
         r = 0;
@@ -188,7 +186,7 @@ public class DefaultSuperByteBuffer implements SuperByteBuffer {
         disableDiffuse = false;
         spriteShiftFunc = null;
         hasOverlay = false;
-        overlay = OverlayTexture.NO_OVERLAY;
+        overlay = OverlayTexture.DEFAULT_UV;
         useWorldLight = false;
         lightTransform = null;
         hasCustomLight = false;
@@ -207,7 +205,7 @@ public class DefaultSuperByteBuffer implements SuperByteBuffer {
     }
 
     @Override
-    public PoseStack getTransforms() {
+    public MatrixStack getTransforms() {
         return transforms;
     }
 
@@ -232,32 +230,32 @@ public class DefaultSuperByteBuffer implements SuperByteBuffer {
 
     @Override
     public DefaultSuperByteBuffer pushPose() {
-        transforms.pushPose();
+        transforms.push();
         return this;
     }
 
     @Override
     public DefaultSuperByteBuffer popPose() {
-        transforms.popPose();
+        transforms.pop();
         return this;
     }
 
     @Override
     public DefaultSuperByteBuffer mulPose(Matrix4fc matrix4fc) {
-        transforms.last().pose().mul(matrix4fc);
+        transforms.peek().getPositionMatrix().mul(matrix4fc);
         return this;
     }
 
     @Override
     public DefaultSuperByteBuffer mulNormal(Matrix3fc matrix3fc) {
-        transforms.last().normal().mul(matrix3fc);
+        transforms.peek().getNormalMatrix().mul(matrix3fc);
         return this;
     }
 
     @Override
-    public DefaultSuperByteBuffer transform(PoseStack ms) {
-        transforms.last().pose().mul(ms.last().pose());
-        transforms.last().normal().mul(ms.last().normal());
+    public DefaultSuperByteBuffer transform(MatrixStack ms) {
+        transforms.peek().getPositionMatrix().mul(ms.peek().getPositionMatrix());
+        transforms.peek().getNormalMatrix().mul(ms.peek().getNormalMatrix());
         return this;
     }
 
@@ -296,8 +294,8 @@ public class DefaultSuperByteBuffer implements SuperByteBuffer {
     @Override
     public DefaultSuperByteBuffer shiftUVScrolling(SpriteShiftEntry entry, float scrollU, float scrollV) {
         spriteShiftFunc = (u, v, output) -> {
-            float targetU = u - entry.getOriginal().getU0() + entry.getTarget().getU0() + scrollU;
-            float targetV = v - entry.getOriginal().getV0() + entry.getTarget().getV0() + scrollV;
+            float targetU = u - entry.getOriginal().getMinU() + entry.getTarget().getMinU() + scrollU;
+            float targetV = v - entry.getOriginal().getMinV() + entry.getTarget().getMinV() + scrollV;
             output.accept(targetU, targetV);
         };
         return this;
@@ -306,10 +304,8 @@ public class DefaultSuperByteBuffer implements SuperByteBuffer {
     @Override
     public DefaultSuperByteBuffer shiftUVtoSheet(SpriteShiftEntry entry, float uTarget, float vTarget, int sheetSize) {
         spriteShiftFunc = (u, v, output) -> {
-            float targetU = entry.getTarget()
-                .getU((SpriteShiftEntry.getUnInterpolatedU(entry.getOriginal(), u) / sheetSize) + uTarget);
-            float targetV = entry.getTarget()
-                .getV((SpriteShiftEntry.getUnInterpolatedV(entry.getOriginal(), v) / sheetSize) + vTarget);
+            float targetU = entry.getTarget().getFrameU((SpriteShiftEntry.getUnInterpolatedU(entry.getOriginal(), u) / sheetSize) + uTarget);
+            float targetV = entry.getTarget().getFrameV((SpriteShiftEntry.getUnInterpolatedV(entry.getOriginal(), v) / sheetSize) + vTarget);
             output.accept(targetU, targetV);
         };
         return this;
@@ -323,12 +319,12 @@ public class DefaultSuperByteBuffer implements SuperByteBuffer {
     }
 
     @Override
-    public DefaultSuperByteBuffer useLevelLight(BlockAndTintGetter level) {
+    public DefaultSuperByteBuffer useLevelLight(BlockRenderView level) {
         return this;
     }
 
     @Override
-    public DefaultSuperByteBuffer useLevelLight(BlockAndTintGetter level, Matrix4f lightTransform) {
+    public DefaultSuperByteBuffer useLevelLight(BlockRenderView level, Matrix4f lightTransform) {
         return this;
     }
 
@@ -401,9 +397,9 @@ public class DefaultSuperByteBuffer implements SuperByteBuffer {
         return template.get(getBufferPosition(index) + 30);
     }
 
-    private static int getLight(Level world, Vector4f lightPos) {
-        BlockPos pos = BlockPos.containing(lightPos.x(), lightPos.y(), lightPos.z());
-        return WORLD_LIGHT_CACHE.computeIfAbsent(pos.asLong(), $ -> LevelRenderer.getLightColor(world, pos));
+    private static int getLight(World world, Vector4f lightPos) {
+        BlockPos pos = BlockPos.ofFloored(lightPos.x(), lightPos.y(), lightPos.z());
+        return WORLD_LIGHT_CACHE.computeIfAbsent(pos.asLong(), $ -> WorldRenderer.getLightmapCoordinates(world, pos));
     }
 
     @Override

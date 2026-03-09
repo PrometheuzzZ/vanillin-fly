@@ -5,48 +5,49 @@ import com.zurrtum.create.AllBlockEntityTypes;
 import com.zurrtum.create.content.equipment.wrench.IWrenchable;
 import com.zurrtum.create.foundation.block.IBE;
 import com.zurrtum.create.foundation.block.WeakPowerControlBlock;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.network.chat.Component;
-import net.minecraft.server.level.ServerLevel;
-import net.minecraft.util.RandomSource;
-import net.minecraft.util.StringRepresentable;
-import net.minecraft.world.InteractionResult;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.context.BlockPlaceContext;
-import net.minecraft.world.item.context.UseOnContext;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.SignalGetter;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.entity.BlockEntityType;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.StateDefinition;
-import net.minecraft.world.level.block.state.properties.BlockStateProperties;
-import net.minecraft.world.level.block.state.properties.BooleanProperty;
-import net.minecraft.world.level.block.state.properties.EnumProperty;
-import net.minecraft.world.level.redstone.Orientation;
+import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.entity.BlockEntityType;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.item.ItemPlacementContext;
+import net.minecraft.item.ItemUsageContext;
+import net.minecraft.server.world.ServerWorld;
+import net.minecraft.state.StateManager;
+import net.minecraft.state.property.BooleanProperty;
+import net.minecraft.state.property.EnumProperty;
+import net.minecraft.state.property.Properties;
+import net.minecraft.text.Text;
+import net.minecraft.util.ActionResult;
+import net.minecraft.util.StringIdentifiable;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.random.Random;
+import net.minecraft.world.RedstoneView;
+import net.minecraft.world.World;
+import net.minecraft.world.block.WireOrientation;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Locale;
 
 public class SignalBlock extends Block implements IBE<SignalBlockEntity>, IWrenchable, WeakPowerControlBlock {
 
-    public static final EnumProperty<SignalType> TYPE = EnumProperty.create("type", SignalType.class);
-    public static final BooleanProperty POWERED = BlockStateProperties.POWERED;
+    public static final EnumProperty<SignalType> TYPE = EnumProperty.of("type", SignalType.class);
+    public static final BooleanProperty POWERED = Properties.POWERED;
 
-    public enum SignalType implements StringRepresentable {
-        ENTRY_SIGNAL, CROSS_SIGNAL;
-        public static final Codec<SignalType> CODEC = StringRepresentable.fromEnum(SignalType::values);
+    public enum SignalType implements StringIdentifiable {
+        ENTRY_SIGNAL,
+        CROSS_SIGNAL;
+        public static final Codec<SignalType> CODEC = StringIdentifiable.createCodec(SignalType::values);
 
         @Override
-        public String getSerializedName() {
+        public String asString() {
             return name().toLowerCase(Locale.ROOT);
         }
     }
 
-    public SignalBlock(Properties p_53182_) {
+    public SignalBlock(Settings p_53182_) {
         super(p_53182_);
-        registerDefaultState(defaultBlockState().setValue(TYPE, SignalType.ENTRY_SIGNAL).setValue(POWERED, false));
+        setDefaultState(getDefaultState().with(TYPE, SignalType.ENTRY_SIGNAL).with(POWERED, false));
     }
 
     @Override
@@ -55,49 +56,46 @@ public class SignalBlock extends Block implements IBE<SignalBlockEntity>, IWrenc
     }
 
     @Override
-    protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> pBuilder) {
-        super.createBlockStateDefinition(pBuilder.add(TYPE, POWERED));
+    protected void appendProperties(StateManager.Builder<Block, BlockState> pBuilder) {
+        super.appendProperties(pBuilder.add(TYPE, POWERED));
     }
 
     @Override
-    public boolean shouldCheckWeakPower(BlockState state, SignalGetter level, BlockPos pos, Direction side) {
+    public boolean shouldCheckWeakPower(BlockState state, RedstoneView level, BlockPos pos, Direction side) {
         return false;
     }
 
     @Nullable
     @Override
-    public BlockState getStateForPlacement(BlockPlaceContext pContext) {
-        return defaultBlockState().setValue(POWERED, pContext.getLevel().hasNeighborSignal(pContext.getClickedPos()));
+    public BlockState getPlacementState(ItemPlacementContext pContext) {
+        return getDefaultState().with(POWERED, pContext.getWorld().isReceivingRedstonePower(pContext.getBlockPos()));
     }
 
     @Override
-    public void neighborChanged(
+    public void neighborUpdate(
         BlockState pState,
-        Level pLevel,
+        World pLevel,
         BlockPos pPos,
         Block pBlock,
-        @Nullable Orientation wireOrientation,
+        @Nullable WireOrientation wireOrientation,
         boolean pIsMoving
     ) {
-        if (pLevel.isClientSide()) {
+        if (pLevel.isClient())
             return;
-        }
-        boolean powered = pState.getValue(POWERED);
-        if (powered == pLevel.hasNeighborSignal(pPos)) {
+        boolean powered = pState.get(POWERED);
+        if (powered == pLevel.isReceivingRedstonePower(pPos))
             return;
-        }
         if (powered) {
-            pLevel.scheduleTick(pPos, this, 4);
+            pLevel.scheduleBlockTick(pPos, this, 4);
         } else {
-            pLevel.setBlock(pPos, pState.cycle(POWERED), Block.UPDATE_CLIENTS);
+            pLevel.setBlockState(pPos, pState.cycle(POWERED), Block.NOTIFY_LISTENERS);
         }
     }
 
     @Override
-    public void tick(BlockState pState, ServerLevel pLevel, BlockPos pPos, RandomSource pRand) {
-        if (pState.getValue(POWERED) && !pLevel.hasNeighborSignal(pPos)) {
-            pLevel.setBlock(pPos, pState.cycle(POWERED), Block.UPDATE_CLIENTS);
-        }
+    public void scheduledTick(BlockState pState, ServerWorld pLevel, BlockPos pPos, Random pRand) {
+        if (pState.get(POWERED) && !pLevel.isReceivingRedstonePower(pPos))
+            pLevel.setBlockState(pPos, pState.cycle(POWERED), Block.NOTIFY_LISTENERS);
     }
 
     @Override
@@ -106,39 +104,33 @@ public class SignalBlock extends Block implements IBE<SignalBlockEntity>, IWrenc
     }
 
     @Override
-    public InteractionResult onWrenched(BlockState state, UseOnContext context) {
-        Level level = context.getLevel();
-        BlockPos pos = context.getClickedPos();
-        if (level.isClientSide()) {
-            return InteractionResult.SUCCESS;
-        }
+    public ActionResult onWrenched(BlockState state, ItemUsageContext context) {
+        World level = context.getWorld();
+        BlockPos pos = context.getBlockPos();
+        if (level.isClient())
+            return ActionResult.SUCCESS;
         withBlockEntityDo(
             level, pos, ste -> {
                 SignalBoundary signal = ste.getSignal();
-                Player player = context.getPlayer();
+                PlayerEntity player = context.getPlayer();
                 if (signal != null) {
                     signal.cycleSignalType(pos);
-                    if (player != null) {
-                        player.displayClientMessage(
-                            Component.translatable("create.track_signal.mode_change." + signal.getTypeFor(pos)
-                                .getSerializedName()), true
-                        );
-                    }
-                } else if (player != null) {
-                    player.displayClientMessage(Component.translatable("create.track_signal.cannot_change_mode"), true);
-                }
+                    if (player != null)
+                        player.sendMessage(Text.translatable("create.track_signal.mode_change." + signal.getTypeFor(pos).asString()), true);
+                } else if (player != null)
+                    player.sendMessage(Text.translatable("create.track_signal.cannot_change_mode"), true);
             }
         );
-        return InteractionResult.SUCCESS;
+        return ActionResult.SUCCESS;
     }
 
     @Override
-    public boolean hasAnalogOutputSignal(BlockState pState) {
+    public boolean hasComparatorOutput(BlockState pState) {
         return true;
     }
 
     @Override
-    public int getAnalogOutputSignal(BlockState pState, Level blockAccess, BlockPos pPos, Direction direction) {
+    public int getComparatorOutput(BlockState pState, World blockAccess, BlockPos pPos, Direction direction) {
         return getBlockEntityOptional(blockAccess, pPos).filter(SignalBlockEntity::isPowered).map($ -> 15).orElse(0);
     }
 

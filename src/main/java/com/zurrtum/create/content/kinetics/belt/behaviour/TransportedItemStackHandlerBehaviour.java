@@ -1,13 +1,13 @@
 package com.zurrtum.create.content.kinetics.belt.behaviour;
 
 import com.google.common.collect.ImmutableList;
-import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.catnip.math.VecHelper;
 import com.zurrtum.create.content.kinetics.belt.transport.TransportedItemStack;
 import com.zurrtum.create.foundation.blockEntity.SmartBlockEntity;
 import com.zurrtum.create.foundation.blockEntity.behaviour.BehaviourType;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.phys.Vec3;
+import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
+import net.minecraft.item.ItemStack;
+import net.minecraft.util.math.Vec3d;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
@@ -43,10 +43,7 @@ public class TransportedItemStackHandlerBehaviour extends BlockEntityBehaviour<S
             return new TransportedResult(outputs, null);
         }
 
-        public static TransportedResult convertToAndLeaveHeld(
-            List<TransportedItemStack> outputs,
-            TransportedItemStack heldOutput
-        ) {
+        public static TransportedResult convertToAndLeaveHeld(List<TransportedItemStack> outputs, TransportedItemStack heldOutput) {
             return new TransportedResult(outputs, heldOutput);
         }
 
@@ -60,16 +57,12 @@ public class TransportedItemStackHandlerBehaviour extends BlockEntityBehaviour<S
         }
 
         public boolean didntChangeFrom(ItemStack stackBefore) {
-            return doesNothing() || outputs.size() == 1 && ItemStack.matches(
-                outputs.get(0).stack,
-                stackBefore
-            ) && !hasHeldOutput();
+            return doesNothing() || outputs.size() == 1 && ItemStack.areEqual(outputs.get(0).stack, stackBefore) && !hasHeldOutput();
         }
 
         public List<TransportedItemStack> getOutputs() {
-            if (outputs == null) {
+            if (outputs == null)
                 throw new IllegalStateException("Do not call getOutputs() on a Result that doesNothing().");
-            }
             return outputs;
         }
 
@@ -79,9 +72,8 @@ public class TransportedItemStackHandlerBehaviour extends BlockEntityBehaviour<S
 
         @Nullable
         public TransportedItemStack getHeldOutput() {
-            if (heldOutput == null) {
+            if (heldOutput == null)
                 throw new IllegalStateException("Do not call getHeldOutput() on a Result with hasHeldOutput() == false.");
-            }
             return heldOutput;
         }
 
@@ -90,7 +82,7 @@ public class TransportedItemStackHandlerBehaviour extends BlockEntityBehaviour<S
     public TransportedItemStackHandlerBehaviour(SmartBlockEntity be, ProcessingCallback processingCallback) {
         super(be);
         this.processingCallback = processingCallback;
-        positionGetter = t -> VecHelper.getCenterOf(be.getBlockPos());
+        positionGetter = t -> VecHelper.getCenterOf(be.getPos());
     }
 
     public TransportedItemStackHandlerBehaviour withStackPlacement(PositionGetter function) {
@@ -105,22 +97,18 @@ public class TransportedItemStackHandlerBehaviour extends BlockEntityBehaviour<S
     public void handleProcessingOnItem(TransportedItemStack item, TransportedResult processOutput) {
         handleCenteredProcessingOnAllItems(
             .51f, t -> {
-                if (t == item) {
+                if (t == item)
                     return processOutput;
-                }
                 return null;
             }
         );
     }
 
-    public void handleCenteredProcessingOnAllItems(
-        float maxDistanceFromCenter,
-        Function<TransportedItemStack, TransportedResult> processFunction
-    ) {
+    public void handleCenteredProcessingOnAllItems(float maxDistanceFromCenter, Function<TransportedItemStack, TransportedResult> processFunction) {
         this.processingCallback.applyToAllItems(maxDistanceFromCenter, processFunction);
     }
 
-    public Vec3 getWorldPositionOf(TransportedItemStack transported) {
+    public Vec3d getWorldPositionOf(TransportedItemStack transported) {
         return positionGetter.getWorldPositionVector(transported);
     }
 
@@ -131,15 +119,12 @@ public class TransportedItemStackHandlerBehaviour extends BlockEntityBehaviour<S
 
     @FunctionalInterface
     public interface ProcessingCallback {
-        void applyToAllItems(
-            float maxDistanceFromCenter,
-            Function<TransportedItemStack, TransportedResult> processFunction
-        );
+        void applyToAllItems(float maxDistanceFromCenter, Function<TransportedItemStack, TransportedResult> processFunction);
     }
 
     @FunctionalInterface
     public interface PositionGetter {
-        Vec3 getWorldPositionVector(TransportedItemStack transported);
+        Vec3d getWorldPositionVector(TransportedItemStack transported);
     }
 
 }

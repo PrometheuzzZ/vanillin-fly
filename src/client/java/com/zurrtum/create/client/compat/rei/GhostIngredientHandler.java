@@ -15,14 +15,14 @@ import me.shedaniel.rei.api.client.gui.drag.DraggableStack;
 import me.shedaniel.rei.api.client.gui.drag.DraggableStackVisitor;
 import me.shedaniel.rei.api.client.gui.drag.DraggedAcceptorResult;
 import me.shedaniel.rei.api.client.gui.drag.DraggingContext;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.world.inventory.Slot;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.shapes.Shapes;
-import net.minecraft.world.phys.shapes.VoxelShape;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.network.ClientPlayerEntity;
+import net.minecraft.item.ItemStack;
+import net.minecraft.screen.slot.Slot;
+import net.minecraft.util.math.Box;
+import net.minecraft.util.shape.VoxelShape;
+import net.minecraft.util.shape.VoxelShapes;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -31,17 +31,14 @@ import java.util.stream.Stream;
 
 public class GhostIngredientHandler<T extends GhostItemMenu<?>> implements DraggableStackVisitor<AbstractSimiContainerScreen<T>> {
     @Override
-    public DraggedAcceptorResult acceptDraggedStack(
-        DraggingContext<AbstractSimiContainerScreen<T>> context,
-        DraggableStack stack
-    ) {
+    public DraggedAcceptorResult acceptDraggedStack(DraggingContext<AbstractSimiContainerScreen<T>> context, DraggableStack stack) {
         Stream<BoundsProvider> bounds = getDraggableAcceptingBounds(context, stack);
         Point cursor = context.getCurrentPosition();
         if (cursor != null) {
             int x = cursor.getX();
             int y = cursor.getY();
             Optional<BoundsProvider> target = bounds.filter(b -> {
-                AABB box = b.bounds().bounds();
+                Box box = b.bounds().getBoundingBox();
                 double minX = box.minX;
                 double minY = box.minY;
                 double maxX = box.maxX;
@@ -60,24 +57,18 @@ public class GhostIngredientHandler<T extends GhostItemMenu<?>> implements Dragg
     }
 
     @Override
-    public Stream<BoundsProvider> getDraggableAcceptingBounds(
-        DraggingContext<AbstractSimiContainerScreen<T>> context,
-        DraggableStack stack
-    ) {
+    public Stream<BoundsProvider> getDraggableAcceptingBounds(DraggingContext<AbstractSimiContainerScreen<T>> context, DraggableStack stack) {
         List<BoundsProvider> targets = new ArrayList<>();
         AbstractSimiContainerScreen<T> gui = context.getScreen();
 
         if (stack.getStack().getValue() instanceof ItemStack) {
-            List<Slot> slots = gui.getMenu().slots;
             if (gui instanceof AttributeFilterScreen) {
-                if (slots.get(36).isActive()) {
+                if (gui.getScreenHandler().slots.get(36).isEnabled())
                     targets.add(new GhostTarget<>(gui, 0, true));
-                }
             } else {
-                for (int i = 36; i < slots.size(); i++) {
-                    if (slots.get(i).isActive()) {
+                for (int i = 36; i < gui.getScreenHandler().slots.size(); i++) {
+                    if (gui.getScreenHandler().slots.get(i).isEnabled())
                         targets.add(new GhostTarget<>(gui, i - 36, false));
-                    }
                 }
             }
         }
@@ -100,25 +91,24 @@ public class GhostIngredientHandler<T extends GhostItemMenu<?>> implements Dragg
             this.gui = gui;
             this.slotIndex = slotIndex;
             this.isAttributeFilter = isAttributeFilter;
-            Slot slot = gui.getMenu().slots.get(slotIndex + 36);
+            Slot slot = gui.getScreenHandler().slots.get(slotIndex + 36);
             int minX = gui.getGuiLeft() + slot.x;
             int minY = gui.getGuiTop() + slot.y;
-            this.area = Shapes.create(minX, minY, 0, minX + 16, minY + 16, 0.1);
+            this.area = VoxelShapes.cuboidUnchecked(minX, minY, 0, minX + 16, minY + 16, 0.1);
         }
 
         public void accept(ItemStack ingredient) {
             ItemStack stack = ingredient.copy();
             stack.setCount(1);
-            gui.getMenu().ghostInventory.setItem(slotIndex, stack);
+            gui.getScreenHandler().ghostInventory.setStack(slotIndex, stack);
 
-            if (isAttributeFilter) {
+            if (isAttributeFilter)
                 return;
-            }
 
             // sync new filter contents with server
-            LocalPlayer player = Minecraft.getInstance().player;
+            ClientPlayerEntity player = MinecraftClient.getInstance().player;
             if (player != null) {
-                player.connection.send(new GhostItemSubmitPacket(stack, slotIndex));
+                player.networkHandler.sendPacket(new GhostItemSubmitPacket(stack, slotIndex));
             }
         }
 

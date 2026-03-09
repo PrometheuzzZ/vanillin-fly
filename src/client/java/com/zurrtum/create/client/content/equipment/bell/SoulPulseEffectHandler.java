@@ -1,7 +1,7 @@
 package com.zurrtum.create.client.content.equipment.bell;
 
-import net.minecraft.core.BlockPos;
-import net.minecraft.world.level.Level;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.World;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -17,7 +17,7 @@ public class SoulPulseEffectHandler {
         occupied = new HashSet<>();
     }
 
-    public void tick(Level world) {
+    public void tick(World world) {
         Iterator<SoulPulseEffect> iterator = pulses.iterator();
         SoulPulseEffect pulse;
         while (iterator.hasNext()) {

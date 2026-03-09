@@ -1,17 +1,17 @@
 package com.zurrtum.create.client.model;
 
-import net.minecraft.client.renderer.block.model.BakedQuad;
+import net.minecraft.client.render.model.BakedQuad;
 
 public interface NormalsBakedQuad {
-    void create$setNormals(int[] normal);
+    void create$markNormals();
 
-    int[] create$getNormals();
+    boolean create$hasNormals();
 
-    static int[] getNormals(BakedQuad quad) {
-        return ((NormalsBakedQuad) (Object) quad).create$getNormals();
+    static boolean hasNormals(BakedQuad quad) {
+        return ((NormalsBakedQuad) (Object) quad).create$hasNormals();
     }
 
-    static void setNormals(BakedQuad quad, int[] normals) {
-        ((NormalsBakedQuad) (Object) quad).create$setNormals(normals);
+    static void markNormals(BakedQuad quad) {
+        ((NormalsBakedQuad) (Object) quad).create$markNormals();
     }
 }

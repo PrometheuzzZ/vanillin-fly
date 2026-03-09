@@ -4,29 +4,29 @@ import com.zurrtum.create.content.kinetics.base.KineticBlockEntity;
 import com.zurrtum.create.content.kinetics.base.RotatedPillarKineticBlock;
 import com.zurrtum.create.foundation.block.IBE;
 import com.zurrtum.create.foundation.block.ProperWaterloggedBlock;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.core.Direction.Axis;
-import net.minecraft.util.RandomSource;
-import net.minecraft.world.item.context.BlockPlaceContext;
-import net.minecraft.world.level.LevelReader;
-import net.minecraft.world.level.ScheduledTickAccess;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.StateDefinition.Builder;
-import net.minecraft.world.level.block.state.properties.BlockStateProperties;
-import net.minecraft.world.level.material.FluidState;
-import net.minecraft.world.level.pathfinder.PathComputationType;
+import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
+import net.minecraft.entity.ai.pathing.NavigationType;
+import net.minecraft.fluid.FluidState;
+import net.minecraft.item.ItemPlacementContext;
+import net.minecraft.state.StateManager.Builder;
+import net.minecraft.state.property.Properties;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Direction.Axis;
+import net.minecraft.util.math.random.Random;
+import net.minecraft.world.WorldView;
+import net.minecraft.world.tick.ScheduledTickView;
 
 public abstract class AbstractShaftBlock extends RotatedPillarKineticBlock implements IBE<KineticBlockEntity>, ProperWaterloggedBlock {
 
-    public AbstractShaftBlock(Properties properties) {
+    public AbstractShaftBlock(Settings properties) {
         super(properties);
-        registerDefaultState(super.defaultBlockState().setValue(BlockStateProperties.WATERLOGGED, false));
+        setDefaultState(super.getDefaultState().with(Properties.WATERLOGGED, false));
     }
 
     @Override
-    protected boolean isPathfindable(BlockState state, PathComputationType pathComputationType) {
+    protected boolean canPathfindThrough(BlockState state, NavigationType pathComputationType) {
         return false;
     }
 
@@ -36,13 +36,13 @@ public abstract class AbstractShaftBlock extends RotatedPillarKineticBlock imple
     }
 
     @Override
-    public boolean hasShaftTowards(LevelReader world, BlockPos pos, BlockState state, Direction face) {
-        return face.getAxis() == state.getValue(AXIS);
+    public boolean hasShaftTowards(WorldView world, BlockPos pos, BlockState state, Direction face) {
+        return face.getAxis() == state.get(AXIS);
     }
 
     @Override
     public Axis getRotationAxis(BlockState state) {
-        return state.getValue(AXIS);
+        return state.get(AXIS);
     }
 
     @Override
@@ -51,28 +51,28 @@ public abstract class AbstractShaftBlock extends RotatedPillarKineticBlock imple
     }
 
     @Override
-    protected void createBlockStateDefinition(Builder<Block, BlockState> builder) {
-        super.createBlockStateDefinition(builder.add(BlockStateProperties.WATERLOGGED));
+    protected void appendProperties(Builder<Block, BlockState> builder) {
+        super.appendProperties(builder.add(Properties.WATERLOGGED));
     }
 
     @Override
-    public BlockState updateShape(
+    public BlockState getStateForNeighborUpdate(
         BlockState state,
-        LevelReader world,
-        ScheduledTickAccess tickView,
+        WorldView world,
+        ScheduledTickView tickView,
         BlockPos pos,
         Direction direction,
         BlockPos neighbourPos,
         BlockState neighbourState,
-        RandomSource random
+        Random random
     ) {
         updateWater(world, tickView, state, pos);
         return state;
     }
 
     @Override
-    public BlockState getStateForPlacement(BlockPlaceContext context) {
-        return withWater(super.getStateForPlacement(context), context);
+    public BlockState getPlacementState(ItemPlacementContext context) {
+        return withWater(super.getPlacementState(context), context);
     }
 
 }

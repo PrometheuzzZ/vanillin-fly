@@ -1,27 +1,26 @@
 package com.zurrtum.create;
 
-import net.minecraft.core.Registry;
-import net.minecraft.core.RegistryAccess;
-import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.ResourceKey;
-import net.minecraft.world.damagesource.DamageSource;
-import net.minecraft.world.damagesource.DamageType;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.level.Level;
-import org.jetbrains.annotations.Nullable;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.damage.DamageSource;
+import net.minecraft.entity.damage.DamageType;
+import net.minecraft.registry.DynamicRegistryManager;
+import net.minecraft.registry.Registry;
+import net.minecraft.registry.RegistryKey;
+import net.minecraft.registry.RegistryKeys;
+import net.minecraft.world.World;
 
 import java.util.IdentityHashMap;
 import java.util.Map;
 
 public class AllDamageSources {
-    private static final Map<RegistryAccess, AllDamageSources> ALL = new IdentityHashMap<>();
+    private static final Map<DynamicRegistryManager, AllDamageSources> ALL = new IdentityHashMap<>();
 
-    public static AllDamageSources get(RegistryAccess registryManager) {
+    public static AllDamageSources get(DynamicRegistryManager registryManager) {
         return ALL.get(registryManager);
     }
 
-    public static AllDamageSources get(Level world) {
-        return ALL.get(world.registryAccess());
+    public static AllDamageSources get(World world) {
+        return ALL.get(world.getRegistryManager());
     }
 
     public Registry<DamageType> registry;
@@ -33,8 +32,8 @@ public class AllDamageSources {
     public DamageSource roller;
     public DamageSource saw;
 
-    public AllDamageSources(RegistryAccess registryManager) {
-        registryManager.lookup(Registries.DAMAGE_TYPE).ifPresent(value -> {
+    public AllDamageSources(DynamicRegistryManager registryManager) {
+        registryManager.getOptional(RegistryKeys.DAMAGE_TYPE).ifPresent(value -> {
             registry = value;
             crush = create(AllDamageTypes.CRUSH);
             cuckoo_surprise = create(AllDamageTypes.CUCKOO_SURPRISE);
@@ -46,9 +45,8 @@ public class AllDamageSources {
         });
     }
 
-    @Nullable
-    public DamageSource create(ResourceKey<DamageType> type) {
-        return registry.get(type).map(DamageSource::new).orElse(null);
+    public DamageSource create(RegistryKey<DamageType> type) {
+        return registry.getOptional(type).map(DamageSource::new).orElse(null);
     }
 
     public DamageSource potatoCannon(Entity causingEntity, Entity directEntity) {
@@ -59,7 +57,7 @@ public class AllDamageSources {
         return new DamageSource(registry.getOrThrow(AllDamageTypes.RUN_OVER), entity);
     }
 
-    public static void register(RegistryAccess registryManager) {
+    public static void register(DynamicRegistryManager registryManager) {
         ALL.put(registryManager, new AllDamageSources(registryManager));
     }
 }

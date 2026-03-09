@@ -2,29 +2,29 @@ package com.zurrtum.create.client.compat.eiv;
 
 import de.crafty.eiv.common.api.recipe.IEivRecipeViewType;
 import de.crafty.eiv.common.recipe.inventory.RecipeViewMenu.SlotDefinition;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.Button;
-import net.minecraft.resources.Identifier;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.widget.ButtonWidget;
+import net.minecraft.item.ItemStack;
+import net.minecraft.util.Identifier;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix3x2fStack;
 
 import static com.zurrtum.create.Create.MOD_ID;
 
 public abstract class CreateCategory implements IEivRecipeViewType {
-    public void placeButton(Button button) {
+    public void placeButton(ButtonWidget button) {
         button.setX(button.getX() - 21);
         button.setY(button.getY() - (getDisplayHeight() / 2));
     }
 
-    public void renderSubIcon(GuiGraphics context, int x, int y) {
+    public void renderSubIcon(DrawContext context, int x, int y) {
         ItemStack subIcon = getSubIcon();
         if (subIcon != null) {
-            Matrix3x2fStack matrices = context.pose();
+            Matrix3x2fStack matrices = context.getMatrices();
             matrices.pushMatrix();
             matrices.translate(x + 13, y + 13);
             matrices.scale(0.5f, 0.5f);
-            context.renderItem(subIcon, 0, 0);
+            context.drawItem(subIcon, 0, 0);
             matrices.popMatrix();
         }
     }
@@ -48,6 +48,6 @@ public abstract class CreateCategory implements IEivRecipeViewType {
 
     @Override
     public Identifier getGuiTexture() {
-        return Identifier.fromNamespaceAndPath(MOD_ID, "textures/gui/jei/background.png");
+        return Identifier.of(MOD_ID, "textures/gui/jei/background.png");
     }
 }

@@ -4,51 +4,46 @@ import com.zurrtum.create.content.redstone.displayLink.DisplayLinkContext;
 import com.zurrtum.create.content.redstone.displayLink.target.DisplayTargetStats;
 import com.zurrtum.create.content.trains.display.FlapDisplayBlockEntity;
 import com.zurrtum.create.content.trains.display.FlapDisplaySection;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.util.Mth;
-import net.minecraft.world.level.block.entity.SignBlockEntity;
+import net.minecraft.block.entity.SignBlockEntity;
+import net.minecraft.text.MutableText;
+import net.minecraft.text.Text;
+import net.minecraft.util.math.MathHelper;
 import org.jetbrains.annotations.Nullable;
 
 public abstract class PercentOrProgressBarDisplaySource extends NumericSingleLineDisplaySource {
     @Override
-    protected MutableComponent provideLine(DisplayLinkContext context, DisplayTargetStats stats) {
+    protected MutableText provideLine(DisplayLinkContext context, DisplayTargetStats stats) {
         Float rawProgress = this.getProgress(context);
-        if (rawProgress == null) {
+        if (rawProgress == null)
             return EMPTY_LINE;
-        }
 
-        if (!progressBarActive(context)) {
+        if (!progressBarActive(context))
             return formatNumeric(context, rawProgress);
-        }
 
-        String label = context.sourceConfig().getStringOr("Label", "");
+        String label = context.sourceConfig().getString("Label", "");
 
         int labelSize = label.isEmpty() ? 0 : label.length() + 1;
         int length = Math.min(stats.maxColumns() - labelSize, 128);
 
-        if (context.getTargetBlockEntity() instanceof SignBlockEntity) {
+        if (context.getTargetBlockEntity() instanceof SignBlockEntity)
             length = (int) (length * 6f / 9f);
-        }
-        if (context.getTargetBlockEntity() instanceof FlapDisplayBlockEntity) {
+        if (context.getTargetBlockEntity() instanceof FlapDisplayBlockEntity)
             length = sizeForWideChars(length);
-        }
 
         // clamp just in case - #7371
-        float currentLevel = Mth.clamp(rawProgress, 0, 1);
+        float currentLevel = MathHelper.clamp(rawProgress, 0, 1);
         int filledLength = (int) (currentLevel * length);
 
-        if (length < 1) {
+        if (length < 1)
             return EMPTY_LINE;
-        }
 
         int emptySpaces = length - filledLength;
         String s = "█".repeat(Math.max(0, filledLength)) + "▒".repeat(Math.max(0, emptySpaces));
-        return Component.literal(s);
+        return Text.literal(s);
     }
 
-    protected MutableComponent formatNumeric(DisplayLinkContext context, Float currentLevel) {
-        return Component.literal(Mth.clamp((int) (currentLevel * 100), 0, 100) + "%");
+    protected MutableText formatNumeric(DisplayLinkContext context, Float currentLevel) {
+        return Text.literal(MathHelper.clamp((int) (currentLevel * 100), 0, 100) + "%");
     }
 
     @Nullable

@@ -1,33 +1,33 @@
 package com.zurrtum.create.client.catnip.gui.render;
 
+import com.mojang.blaze3d.systems.ProjectionType;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.textures.FilterMode;
-import com.mojang.blaze3d.vertex.PoseStack;
 import com.zurrtum.create.client.flywheel.lib.model.baked.SinglePosVirtualBlockGetter;
 import com.zurrtum.create.client.model.LayerBakedModel;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.render.TextureSetup;
-import net.minecraft.client.gui.render.pip.PictureInPictureRenderer;
-import net.minecraft.client.gui.render.state.BlitRenderState;
+import net.minecraft.block.Blocks;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gl.RenderPipelines;
+import net.minecraft.client.gui.render.SpecialGuiElementRenderer;
 import net.minecraft.client.gui.render.state.GuiRenderState;
-import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.RenderPipelines;
-import net.minecraft.client.renderer.Sheets;
-import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
-import net.minecraft.client.renderer.rendertype.RenderType;
-import net.minecraft.core.BlockPos;
-import net.minecraft.world.level.block.Blocks;
+import net.minecraft.client.gui.render.state.TexturedQuadGuiElementRenderState;
+import net.minecraft.client.render.BlockRenderLayer;
+import net.minecraft.client.render.RenderLayer;
+import net.minecraft.client.render.TexturedRenderLayers;
+import net.minecraft.client.render.VertexConsumerProvider;
+import net.minecraft.client.texture.TextureSetup;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.util.math.BlockPos;
 
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 
-public class PartialElementRenderer extends PictureInPictureRenderer<PartialRenderState> {
+public class PartialElementRenderer extends SpecialGuiElementRenderer<PartialRenderState> {
     private static final Map<PartialRenderState, GpuTexture> TEXTURES = new IdentityHashMap<>();
-    private final PoseStack matrices = new PoseStack();
+    private final MatrixStack matrices = new MatrixStack();
     private int windowScaleFactor;
 
-    public PartialElementRenderer(MultiBufferSource.BufferSource vertexConsumers) {
+    public PartialElementRenderer(VertexConsumerProvider.Immediate vertexConsumers) {
         super(vertexConsumers);
     }
 
@@ -39,7 +39,7 @@ public class PartialElementRenderer extends PictureInPictureRenderer<PartialRend
     }
 
     @Override
-    public void prepare(PartialRenderState partial, GuiRenderState state, int windowScaleFactor) {
+    public void render(PartialRenderState partial, GuiRenderState state, int windowScaleFactor) {
         if (this.windowScaleFactor != windowScaleFactor) {
             this.windowScaleFactor = windowScaleFactor;
             TEXTURES.values().forEach(GpuTexture::close);
@@ -60,39 +60,34 @@ public class PartialElementRenderer extends PictureInPictureRenderer<PartialRend
                 texture = GpuTexture.create((int) size);
                 TEXTURES.put(partial, texture);
             }
-            texture.prepare(projectionMatrixBuffer);
-            matrices.pushPose();
+            RenderSystem.setProjectionMatrix(projectionMatrix.set(size, size), ProjectionType.ORTHOGRAPHIC);
+            texture.prepare();
+            matrices.push();
             if (partial.padding != 0) {
                 size -= partial.padding * windowScaleFactor;
             }
             matrices.scale(size, size, size);
             partial.transform(matrices);
-            Minecraft mc = Minecraft.getInstance();
-            ChunkSectionLayer blockRenderLayer = LayerBakedModel.getBlockRenderLayer(
-                partial.model,
-                () -> ChunkSectionLayer.SOLID
-            );
-            RenderType layer = blockRenderLayer == ChunkSectionLayer.TRANSLUCENT ? Sheets.translucentItemSheet() : Sheets.cutoutBlockSheet();
+            MinecraftClient mc = MinecraftClient.getInstance();
+            BlockRenderLayer blockRenderLayer = LayerBakedModel.getBlockRenderLayer(partial.model, () -> BlockRenderLayer.SOLID);
+            RenderLayer layer = blockRenderLayer == BlockRenderLayer.TRANSLUCENT ? TexturedRenderLayers.getItemEntityTranslucentCull() : TexturedRenderLayers.getEntityCutout();
             SinglePosVirtualBlockGetter world = SinglePosVirtualBlockGetter.createFullBright();
-            mc.getBlockRenderer().renderBatched(
-                Blocks.AIR.defaultBlockState(),
-                BlockPos.ZERO,
+            mc.getBlockRenderManager().renderBlock(
+                Blocks.AIR.getDefaultState(),
+                BlockPos.ORIGIN,
                 world,
                 matrices,
-                bufferSource.getBuffer(layer),
+                vertexConsumers.getBuffer(layer),
                 false,
                 List.of(partial.model)
             );
-            bufferSource.endBatch();
-            matrices.popPose();
+            vertexConsumers.draw();
+            matrices.pop();
             texture.clear();
         }
-        state.submitBlitToCurrentLayer(new BlitRenderState(
+        state.addSimpleElementToCurrentLayer(new TexturedQuadGuiElementRenderState(
             RenderPipelines.GUI_TEXTURED_PREMULTIPLIED_ALPHA,
-            TextureSetup.singleTexture(
-                texture.textureView(),
-                RenderSystem.getSamplerCache().getRepeat(FilterMode.NEAREST)
-            ),
+            TextureSetup.withoutGlTexture(texture.textureView()),
             partial.pose,
             partial.x1,
             partial.y1,
@@ -109,16 +104,16 @@ public class PartialElementRenderer extends PictureInPictureRenderer<PartialRend
     }
 
     @Override
-    protected void renderToTexture(PartialRenderState partial, PoseStack matrices) {
+    protected void render(PartialRenderState partial, MatrixStack matrices) {
     }
 
     @Override
-    protected String getTextureLabel() {
+    protected String getName() {
         return "Partial";
     }
 
     @Override
-    public Class<PartialRenderState> getRenderStateClass() {
+    public Class<PartialRenderState> getElementClass() {
         return PartialRenderState.class;
     }
 }

@@ -30,10 +30,7 @@ public class HosePulleyVisual extends AbstractPulleyVisual<HosePulleyBlockEntity
 
     @Override
     protected Instancer<TransformedInstance> getHalfMagnetModel() {
-        return instancerProvider().instancer(
-            InstanceTypes.TRANSFORMED,
-            Models.partial(AllPartialModels.HOSE_HALF_MAGNET)
-        );
+        return instancerProvider().instancer(InstanceTypes.TRANSFORMED, Models.partial(AllPartialModels.HOSE_HALF_MAGNET));
     }
 
     @Override

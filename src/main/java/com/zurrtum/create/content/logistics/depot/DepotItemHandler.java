@@ -2,7 +2,7 @@ package com.zurrtum.create.content.logistics.depot;
 
 import com.zurrtum.create.content.kinetics.belt.transport.TransportedItemStack;
 import com.zurrtum.create.infrastructure.items.ItemInventory;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.item.ItemStack;
 
 public class DepotItemHandler implements ItemInventory {
     private final DepotBehaviour behaviour;
@@ -12,10 +12,9 @@ public class DepotItemHandler implements ItemInventory {
     }
 
     @Override
-    public boolean canPlaceItem(int slot, ItemStack stack) {
-        if (slot != 0) {
+    public boolean isValid(int slot, ItemStack stack) {
+        if (slot != 0)
             return false;
-        }
         if (!behaviour.isItemValid(stack) || !behaviour.canAcceptItems.get()) {
             return false;
         }
@@ -31,17 +30,17 @@ public class DepotItemHandler implements ItemInventory {
     }
 
     @Override
-    public int getContainerSize() {
+    public int size() {
         return 9;
     }
 
     @Override
-    public ItemStack getItem(int slot) {
-        return slot == 0 ? behaviour.getHeldItemStack() : behaviour.processingOutputBuffer.getItem(slot - 1);
+    public ItemStack getStack(int slot) {
+        return slot == 0 ? behaviour.getHeldItemStack() : behaviour.processingOutputBuffer.getStack(slot - 1);
     }
 
     @Override
-    public void setItem(int slot, ItemStack stack) {
+    public void setStack(int slot, ItemStack stack) {
         if (slot == 0) {
             if (stack.isEmpty()) {
                 behaviour.removeHeldItem();
@@ -49,12 +48,12 @@ public class DepotItemHandler implements ItemInventory {
                 behaviour.setHeldItem(new TransportedItemStack(stack));
             }
         } else {
-            behaviour.processingOutputBuffer.setItem(slot - 1, stack);
+            behaviour.processingOutputBuffer.setStack(slot - 1, stack);
         }
     }
 
     @Override
-    public void setChanged() {
+    public void markDirty() {
         behaviour.blockEntity.notifyUpdate();
     }
 }

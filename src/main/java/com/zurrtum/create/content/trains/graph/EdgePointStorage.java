@@ -4,8 +4,8 @@ import com.mojang.serialization.*;
 import com.zurrtum.create.Create;
 import com.zurrtum.create.content.trains.signal.TrackEdgePoint;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.storage.ReadView;
+import net.minecraft.storage.WriteView;
 
 import java.util.Collection;
 import java.util.HashMap;
@@ -59,20 +59,15 @@ public class EdgePointStorage {
         pointsByType.clear();
     }
 
-    public void write(ValueOutput view, DimensionPalette dimensions) {
+    public void write(WriteView view, DimensionPalette dimensions) {
         for (Map.Entry<EdgePointType<?>, Map<UUID, TrackEdgePoint>> entry : pointsByType.entrySet()) {
             EdgePointType<?> type = entry.getKey();
-            ValueOutput.ValueOutputList list = view.childrenList(type.getId().toString());
-            entry.getValue().values().forEach(edgePoint -> edgePoint.write(list.addChild(), dimensions));
+            WriteView.ListView list = view.getList(type.getId().toString());
+            entry.getValue().values().forEach(edgePoint -> edgePoint.write(list.add(), dimensions));
         }
     }
 
-    public static <T> DataResult<T> encode(
-        final EdgePointStorage input,
-        final DynamicOps<T> ops,
-        final T empty,
-        DimensionPalette dimensions
-    ) {
+    public static <T> DataResult<T> encode(final EdgePointStorage input, final DynamicOps<T> ops, final T empty, DimensionPalette dimensions) {
         RecordBuilder<T> map = ops.mapBuilder();
         for (Map.Entry<EdgePointType<?>, Map<UUID, TrackEdgePoint>> entry : input.pointsByType.entrySet()) {
             EdgePointType<?> type = entry.getKey();
@@ -85,10 +80,10 @@ public class EdgePointStorage {
         return map.build(empty);
     }
 
-    public void read(ValueInput view, DimensionPalette dimensions) {
+    public void read(ReadView view, DimensionPalette dimensions) {
         for (EdgePointType<?> type : EdgePointType.TYPES.values()) {
             Map<UUID, TrackEdgePoint> map = getMap(type);
-            view.childrenListOrEmpty(type.getId().toString()).forEach(item -> {
+            view.getListReadView(type.getId().toString()).forEach(item -> {
                 TrackEdgePoint edgePoint = type.create();
                 edgePoint.read(item, false, dimensions);
                 map.put(edgePoint.getId(), edgePoint);

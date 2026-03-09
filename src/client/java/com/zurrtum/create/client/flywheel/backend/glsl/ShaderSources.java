@@ -2,9 +2,9 @@ package com.zurrtum.create.client.flywheel.backend.glsl;
 
 import com.zurrtum.create.client.flywheel.backend.compile.FlwPrograms;
 import com.zurrtum.create.client.flywheel.lib.util.StringUtil;
-import net.minecraft.resources.Identifier;
-import net.minecraft.server.packs.resources.Resource;
-import net.minecraft.server.packs.resources.ResourceManager;
+import net.minecraft.resource.Resource;
+import net.minecraft.resource.ResourceManager;
+import net.minecraft.util.Identifier;
 import org.jetbrains.annotations.VisibleForTesting;
 
 import java.io.IOException;
@@ -25,21 +25,17 @@ public class ShaderSources {
         var sourceFinder = new SourceFinder(manager);
 
         long loadStart = System.nanoTime();
-        manager.listResources("flywheel", ShaderSources::isShader).forEach(sourceFinder::rootLoad);
+        manager.findResources("flywheel", ShaderSources::isShader).forEach(sourceFinder::rootLoad);
 
         long loadEnd = System.nanoTime();
 
-        FlwPrograms.LOGGER.info(
-            "Loaded {} shader sources in {}",
-            sourceFinder.results.size(),
-            StringUtil.formatTime(loadEnd - loadStart)
-        );
+        FlwPrograms.LOGGER.info("Loaded {} shader sources in {}", sourceFinder.results.size(), StringUtil.formatTime(loadEnd - loadStart));
 
         this.cache = sourceFinder.results;
     }
 
     private static Identifier locationWithoutFlywheelPrefix(Identifier loc) {
-        return Identifier.fromNamespaceAndPath(loc.getNamespace(), loc.getPath().substring(SHADER_DIR.length()));
+        return Identifier.of(loc.getNamespace(), loc.getPath().substring(SHADER_DIR.length()));
     }
 
     public LoadResult find(Identifier location) {
@@ -102,12 +98,12 @@ public class ShaderSources {
         }
 
         private LoadResult load(Identifier loc) {
-            return manager.getResource(loc.withPrefix(SHADER_DIR)).map(resource -> readResource(loc, resource))
+            return manager.getResource(loc.withPrefixedPath(SHADER_DIR)).map(resource -> readResource(loc, resource))
                 .orElseGet(() -> new LoadResult.Failure(new LoadError.ResourceError(loc)));
         }
 
         private LoadResult readResource(Identifier loc, Resource resource) {
-            try (InputStream stream = resource.open()) {
+            try (InputStream stream = resource.getInputStream()) {
                 String sourceString = new String(stream.readAllBytes(), StandardCharsets.UTF_8);
                 return SourceFile.parse(this::recursiveLoad, loc, sourceString);
             } catch (IOException e) {

@@ -3,30 +3,29 @@ package com.zurrtum.create.infrastructure.packet.s2c;
 import com.zurrtum.create.AllClientHandle;
 import com.zurrtum.create.AllPackets;
 import io.netty.buffer.ByteBuf;
-import net.minecraft.core.BlockPos;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.PacketType;
-import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.network.listener.ClientPlayPacketListener;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.PacketType;
+import net.minecraft.util.math.BlockPos;
 
-public record AttachedComputerPacket(BlockPos pos,
-                                     boolean hasAttachedComputer) implements Packet<ClientGamePacketListener> {
-    public static final StreamCodec<ByteBuf, AttachedComputerPacket> CODEC = StreamCodec.composite(
-        BlockPos.STREAM_CODEC,
+public record AttachedComputerPacket(BlockPos pos, boolean hasAttachedComputer) implements Packet<ClientPlayPacketListener> {
+    public static final PacketCodec<ByteBuf, AttachedComputerPacket> CODEC = PacketCodec.tuple(
+        BlockPos.PACKET_CODEC,
         AttachedComputerPacket::pos,
-        ByteBufCodecs.BOOL,
+        PacketCodecs.BOOLEAN,
         AttachedComputerPacket::hasAttachedComputer,
         AttachedComputerPacket::new
     );
 
     @Override
-    public void handle(ClientGamePacketListener listener) {
+    public void apply(ClientPlayPacketListener listener) {
         AllClientHandle.INSTANCE.onAttachedComputer(listener, this);
     }
 
     @Override
-    public PacketType<AttachedComputerPacket> type() {
+    public PacketType<AttachedComputerPacket> getPacketType() {
         return AllPackets.ATTACHED_COMPUTER;
     }
 }

@@ -1,6 +1,5 @@
 package com.zurrtum.create.client.content.contraptions.render;
 
-import com.mojang.blaze3d.vertex.PoseStack;
 import com.zurrtum.create.api.behaviour.movement.MovementBehaviour;
 import com.zurrtum.create.client.api.behaviour.movement.MovementRenderBehaviour;
 import com.zurrtum.create.client.content.contraptions.render.ClientContraption.RenderedBlocks;
@@ -32,14 +31,15 @@ import com.zurrtum.create.content.contraptions.Contraption;
 import com.zurrtum.create.content.contraptions.behaviour.MovementContext;
 import it.unimi.dsi.fastutil.longs.LongArraySet;
 import it.unimi.dsi.fastutil.longs.LongSet;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.SectionPos;
-import net.minecraft.core.Vec3i;
-import net.minecraft.util.Mth;
-import net.minecraft.world.level.BlockAndTintGetter;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.structure.StructureTemplate;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.ChunkSectionPos;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.Vec3i;
+import net.minecraft.world.BlockRenderView;
 import org.apache.commons.lang3.tuple.MutablePair;
 
 import java.util.ArrayList;
@@ -63,7 +63,7 @@ public class ContraptionVisual<E extends AbstractContraptionEntity> extends Abst
     protected int lastStructureVersion;
     protected int lastVersionChildren;
 
-    private final PoseStack contraptionMatrix = new PoseStack();
+    private final MatrixStack contraptionMatrix = new MatrixStack();
 
     public ContraptionVisual(VisualizationContext ctx, E entity, float partialTick) {
         super(ctx, entity, partialTick);
@@ -73,9 +73,8 @@ public class ContraptionVisual<E extends AbstractContraptionEntity> extends Abst
 
         Contraption contraption = entity.getContraption();
         // The contraption could be null if it wasn't synced (ex. too much data)
-        if (contraption == null) {
+        if (contraption == null)
             return;
-        }
 
         var clientContraption = getOrCreateClientContraptionLazy(contraption);
 
@@ -88,7 +87,7 @@ public class ContraptionVisual<E extends AbstractContraptionEntity> extends Abst
 
         RenderedBlocks blocks = clientContraption.getRenderedBlocks();
         // Must wrap the render level so that the differences between the contraption's actual structure and the rendered blocks are accounted for in e.g. ambient occlusion.
-        BlockAndTintGetter modelWorld = new WrappedBlockAndTintGetter(renderLevel) {
+        BlockRenderView modelWorld = new WrappedBlockAndTintGetter(renderLevel) {
             @Override
             public BlockState getBlockState(BlockPos pos) {
                 return blocks.lookup().apply(pos);
@@ -165,8 +164,7 @@ public class ContraptionVisual<E extends AbstractContraptionEntity> extends Abst
 
     @SuppressWarnings("unchecked")
     protected <T extends BlockEntity> void setupVisualizer(T be, float partialTicks) {
-        BlockEntityVisualizer<? super T> visualizer = (BlockEntityVisualizer<? super T>) VisualizerRegistry.getVisualizer(
-            be.getType());
+        BlockEntityVisualizer<? super T> visualizer = (BlockEntityVisualizer<? super T>) VisualizerRegistry.getVisualizer(be.getType());
         if (visualizer == null) {
             return;
         }
@@ -184,10 +182,7 @@ public class ContraptionVisual<E extends AbstractContraptionEntity> extends Abst
         }
     }
 
-    protected void setupActor(
-        MutablePair<StructureTemplate.StructureBlockInfo, MovementContext> actor,
-        VirtualRenderWorld renderLevel
-    ) {
+    protected void setupActor(MutablePair<StructureTemplate.StructureBlockInfo, MovementContext> actor, VirtualRenderWorld renderLevel) {
         MovementContext context = actor.getRight();
         if (context == null) {
             return;
@@ -220,8 +215,7 @@ public class ContraptionVisual<E extends AbstractContraptionEntity> extends Abst
     @Override
     public Plan<DynamicVisual.Context> planFrame() {
         // Must run beginFrame first to ensure changes to child visuals are picked up.
-        return RunnablePlan.of(this::beginFrame)
-            .then(NestedPlan.of(ForEachPlan.of(() -> actors, ActorVisual::beginFrame), dynamicVisuals));
+        return RunnablePlan.of(this::beginFrame).then(NestedPlan.of(ForEachPlan.of(() -> actors, ActorVisual::beginFrame), dynamicVisuals));
     }
 
     protected void beginFrame(DynamicVisual.Context context) {
@@ -254,19 +248,19 @@ public class ContraptionVisual<E extends AbstractContraptionEntity> extends Abst
             z = entity.getZ() - origin.getZ();
 
         } else {
-            x = Mth.lerp(partialTick, entity.xo, entity.getX()) - origin.getX();
-            y = Mth.lerp(partialTick, entity.yo, entity.getY()) - origin.getY();
-            z = Mth.lerp(partialTick, entity.zo, entity.getZ()) - origin.getZ();
+            x = MathHelper.lerp(partialTick, entity.lastX, entity.getX()) - origin.getX();
+            y = MathHelper.lerp(partialTick, entity.lastY, entity.getY()) - origin.getY();
+            z = MathHelper.lerp(partialTick, entity.lastZ, entity.getZ()) - origin.getZ();
         }
 
-        contraptionMatrix.setIdentity();
+        contraptionMatrix.loadIdentity();
         contraptionMatrix.translate(x, y, z);
         transform(contraptionMatrix, partialTick);
 
-        embedding.transforms(contraptionMatrix.last().pose(), contraptionMatrix.last().normal());
+        embedding.transforms(contraptionMatrix.peek().getPositionMatrix(), contraptionMatrix.peek().getNormalMatrix());
     }
 
-    public void transform(PoseStack contraptionMatrix, float partialTick) {
+    public void transform(MatrixStack contraptionMatrix, float partialTick) {
     }
 
     @Override
@@ -278,29 +272,30 @@ public class ContraptionVisual<E extends AbstractContraptionEntity> extends Abst
     private void checkAndUpdateLightSections() {
         var boundingBox = entity.getBoundingBox();
 
-        var minSectionX = SectionPos.posToSectionCoord(Mth.floor(boundingBox.minX) - lightPaddingBlocks);
-        var minSectionY = SectionPos.posToSectionCoord(Mth.floor(boundingBox.minY) - lightPaddingBlocks);
-        var minSectionZ = SectionPos.posToSectionCoord(Mth.floor(boundingBox.minZ) - lightPaddingBlocks);
-        int maxSectionX = SectionPos.posToSectionCoord(Mth.ceil(boundingBox.maxX) + lightPaddingBlocks);
-        int maxSectionY = SectionPos.posToSectionCoord(Mth.ceil(boundingBox.maxY) + lightPaddingBlocks);
-        int maxSectionZ = SectionPos.posToSectionCoord(Mth.ceil(boundingBox.maxZ) + lightPaddingBlocks);
+        var minSectionX = ChunkSectionPos.getSectionCoord(MathHelper.floor(boundingBox.minX) - lightPaddingBlocks);
+        var minSectionY = ChunkSectionPos.getSectionCoord(MathHelper.floor(boundingBox.minY) - lightPaddingBlocks);
+        var minSectionZ = ChunkSectionPos.getSectionCoord(MathHelper.floor(boundingBox.minZ) - lightPaddingBlocks);
+        int maxSectionX = ChunkSectionPos.getSectionCoord(MathHelper.ceil(boundingBox.maxX) + lightPaddingBlocks);
+        int maxSectionY = ChunkSectionPos.getSectionCoord(MathHelper.ceil(boundingBox.maxY) + lightPaddingBlocks);
+        int maxSectionZ = ChunkSectionPos.getSectionCoord(MathHelper.ceil(boundingBox.maxZ) + lightPaddingBlocks);
 
-        if (minSection == SectionPos.asLong(minSectionX, minSectionY, minSectionZ) && maxSection == SectionPos.asLong(maxSectionX,
+        if (minSection == ChunkSectionPos.asLong(minSectionX, minSectionY, minSectionZ) && maxSection == ChunkSectionPos.asLong(
+            maxSectionX,
             maxSectionY,
             maxSectionZ
         )) {
             return;
         }
 
-        minSection = SectionPos.asLong(minSectionX, minSectionY, minSectionZ);
-        maxSection = SectionPos.asLong(maxSectionX, maxSectionY, maxSectionZ);
+        minSection = ChunkSectionPos.asLong(minSectionX, minSectionY, minSectionZ);
+        maxSection = ChunkSectionPos.asLong(maxSectionX, maxSectionY, maxSectionZ);
 
         LongSet longSet = new LongArraySet();
 
         for (int x = minSectionX; x <= maxSectionX; x++) {
             for (int y = minSectionY; y <= maxSectionY; y++) {
                 for (int z = minSectionZ; z <= maxSectionZ; z++) {
-                    longSet.add(SectionPos.asLong(x, y, z));
+                    longSet.add(ChunkSectionPos.asLong(x, y, z));
                 }
             }
         }

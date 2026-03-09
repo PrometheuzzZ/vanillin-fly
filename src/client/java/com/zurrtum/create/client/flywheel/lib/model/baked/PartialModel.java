@@ -1,8 +1,8 @@
 package com.zurrtum.create.client.flywheel.lib.model.baked;
 
 import com.google.common.collect.MapMaker;
-import net.minecraft.client.renderer.block.model.SimpleModelWrapper;
-import net.minecraft.resources.Identifier;
+import net.minecraft.client.render.model.GeometryBakedModel;
+import net.minecraft.util.Identifier;
 import org.jetbrains.annotations.UnknownNullability;
 
 import java.util.concurrent.ConcurrentMap;
@@ -20,7 +20,7 @@ public final class PartialModel {
 
     private final Identifier modelLocation;
     @UnknownNullability
-    SimpleModelWrapper bakedModel;
+    GeometryBakedModel bakedModel;
 
     private PartialModel(Identifier modelLocation) {
         this.modelLocation = modelLocation;
@@ -34,7 +34,7 @@ public final class PartialModel {
     }
 
     @UnknownNullability
-    public SimpleModelWrapper get() {
+    public GeometryBakedModel get() {
         return bakedModel;
     }
 

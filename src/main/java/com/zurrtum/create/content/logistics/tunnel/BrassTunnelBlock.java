@@ -1,36 +1,30 @@
 package com.zurrtum.create.content.logistics.tunnel;
 
 import com.zurrtum.create.AllBlockEntityTypes;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.sounds.SoundEvents;
-import net.minecraft.sounds.SoundSource;
-import net.minecraft.world.Container;
-import net.minecraft.world.InteractionResult;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.LevelAccessor;
-import net.minecraft.world.level.block.entity.BlockEntityType;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.entity.BlockEntityType;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.inventory.Inventory;
+import net.minecraft.item.ItemStack;
+import net.minecraft.sound.SoundCategory;
+import net.minecraft.sound.SoundEvents;
+import net.minecraft.util.ActionResult;
+import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.world.World;
+import net.minecraft.world.WorldAccess;
 
 import java.util.List;
 
 public class BrassTunnelBlock extends BeltTunnelBlock {
 
-    public BrassTunnelBlock(Properties properties) {
+    public BrassTunnelBlock(Settings properties) {
         super(properties);
     }
 
     @Override
-    public Container getInventory(
-        LevelAccessor world,
-        BlockPos pos,
-        BlockState state,
-        BeltTunnelBlockEntity blockEntity,
-        Direction context
-    ) {
+    public Inventory getInventory(WorldAccess world, BlockPos pos, BlockState state, BeltTunnelBlockEntity blockEntity, Direction context) {
         if (blockEntity instanceof BrassTunnelBlockEntity brassTunnelBlockEntity) {
             return brassTunnelBlockEntity.tunnelCapability;
         }
@@ -38,37 +32,20 @@ public class BrassTunnelBlock extends BeltTunnelBlock {
     }
 
     @Override
-    protected InteractionResult useWithoutItem(
-        BlockState state,
-        Level level,
-        BlockPos pos,
-        Player player,
-        BlockHitResult hitResult
-    ) {
+    protected ActionResult onUse(BlockState state, World level, BlockPos pos, PlayerEntity player, BlockHitResult hitResult) {
         return onBlockEntityUse(
             level, pos, be -> {
-                if (!(be instanceof BrassTunnelBlockEntity bte)) {
-                    return InteractionResult.PASS;
-                }
-                List<ItemStack> stacksOfGroup = bte.grabAllStacksOfGroup(level.isClientSide());
-                if (stacksOfGroup.isEmpty()) {
-                    return InteractionResult.PASS;
-                }
-                if (level.isClientSide()) {
-                    return InteractionResult.SUCCESS;
-                }
-                for (ItemStack itemStack : stacksOfGroup) {
-                    player.getInventory().placeItemBackInInventory(itemStack.copy());
-                }
-                level.playSound(
-                    null,
-                    pos,
-                    SoundEvents.ITEM_PICKUP,
-                    SoundSource.PLAYERS,
-                    .2f,
-                    1f + level.random.nextFloat()
-                );
-                return InteractionResult.SUCCESS;
+                if (!(be instanceof BrassTunnelBlockEntity bte))
+                    return ActionResult.PASS;
+                List<ItemStack> stacksOfGroup = bte.grabAllStacksOfGroup(level.isClient());
+                if (stacksOfGroup.isEmpty())
+                    return ActionResult.PASS;
+                if (level.isClient())
+                    return ActionResult.SUCCESS;
+                for (ItemStack itemStack : stacksOfGroup)
+                    player.getInventory().offerOrDrop(itemStack.copy());
+                level.playSound(null, pos, SoundEvents.ENTITY_ITEM_PICKUP, SoundCategory.PLAYERS, .2f, 1f + level.random.nextFloat());
+                return ActionResult.SUCCESS;
             }
         );
     }

@@ -9,19 +9,19 @@ import com.zurrtum.create.client.ponder.api.registration.StoryBoardEntry;
 import com.zurrtum.create.client.ponder.api.scene.SceneBuilder;
 import com.zurrtum.create.client.ponder.foundation.PonderIndex;
 import com.zurrtum.create.client.ponder.foundation.PonderScene;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.multiplayer.ClientLevel;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.NbtAccounter;
+import net.minecraft.block.Block;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.world.ClientWorld;
+import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtIo;
-import net.minecraft.resources.Identifier;
-import net.minecraft.server.packs.resources.Resource;
-import net.minecraft.server.packs.resources.ResourceManager;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings;
-import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
+import net.minecraft.nbt.NbtSizeTracker;
+import net.minecraft.registry.Registries;
+import net.minecraft.resource.Resource;
+import net.minecraft.resource.ResourceManager;
+import net.minecraft.structure.StructurePlacementData;
+import net.minecraft.structure.StructureTemplate;
+import net.minecraft.util.Identifier;
+import net.minecraft.util.math.BlockPos;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.BufferedInputStream;
@@ -51,9 +51,8 @@ public class PonderSceneRegistry implements SceneRegistryAccess {
     //
 
     public void addStoryBoard(StoryBoardEntry entry) {
-        if (!allowRegistration) {
+        if (!allowRegistration)
             throw new IllegalStateException("Registration Phase has already ended!");
-        }
 
         scenes.put(entry.getComponent(), entry);
     }
@@ -74,15 +73,13 @@ public class PonderSceneRegistry implements SceneRegistryAccess {
 
     @Override
     public List<PonderScene> compile(Identifier id) {
-        if (PonderIndex.editingModeActive()) {
+        if (PonderIndex.editingModeActive())
             PonderIndex.reload();
-        }
 
         Collection<StoryBoardEntry> entries = scenes.get(id);
 
-        if (entries.isEmpty()) {
+        if (entries.isEmpty())
             return Collections.emptyList();
-        }
 
         return compile(entries);
 
@@ -97,18 +94,11 @@ public class PonderSceneRegistry implements SceneRegistryAccess {
 
         List<PonderScene> scenes = new ArrayList<>();
 
-        ClientLevel world = Minecraft.getInstance().level;
+        ClientWorld world = MinecraftClient.getInstance().world;
         for (StoryBoardEntry storyBoard : entries) {
             StructureTemplate activeTemplate = loadSchematic(storyBoard.getSchematicLocation());
-            PonderLevel level = new PonderLevel(BlockPos.ZERO, world);
-            activeTemplate.placeInWorld(
-                level,
-                BlockPos.ZERO,
-                BlockPos.ZERO,
-                new StructurePlaceSettings(),
-                level.random,
-                Block.UPDATE_CLIENTS
-            );
+            PonderLevel level = new PonderLevel(BlockPos.ORIGIN, world);
+            activeTemplate.place(level, BlockPos.ORIGIN, BlockPos.ORIGIN, new StructurePlacementData(), level.random, Block.NOTIFY_LISTENERS);
             level.createBackup();
             PonderScene scene = compileScene(localization, storyBoard, level);
             scene.begin();
@@ -118,32 +108,21 @@ public class PonderSceneRegistry implements SceneRegistryAccess {
         return scenes;
     }
 
-    public static PonderScene compileScene(
-        PonderLocalization localization,
-        StoryBoardEntry sb,
-        @Nullable PonderLevel level
-    ) {
-        PonderScene scene = new PonderScene(
-            level,
-            localization,
-            sb.getNamespace(),
-            sb.getComponent(),
-            sb.getTags(),
-            sb.getOrderingEntries()
-        );
+    public static PonderScene compileScene(PonderLocalization localization, StoryBoardEntry sb, @Nullable PonderLevel level) {
+        PonderScene scene = new PonderScene(level, localization, sb.getNamespace(), sb.getComponent(), sb.getTags(), sb.getOrderingEntries());
         SceneBuilder builder = scene.builder();
         sb.getBoard().program(builder, scene.getSceneBuildingUtil());
         return scene;
     }
 
     public static StructureTemplate loadSchematic(Identifier location) {
-        return loadSchematic(Minecraft.getInstance().getResourceManager(), location);
+        return loadSchematic(MinecraftClient.getInstance().getResourceManager(), location);
     }
 
     public static StructureTemplate loadSchematic(ResourceManager resourceManager, Identifier location) {
         String namespace = location.getNamespace();
         String path = "ponder/" + location.getPath() + ".nbt";
-        Identifier location1 = Identifier.fromNamespaceAndPath(namespace, path);
+        Identifier location1 = Identifier.of(namespace, path);
 
         Optional<Resource> optionalResource = resourceManager.getResource(location1);
         if (optionalResource.isEmpty()) {
@@ -153,7 +132,7 @@ public class PonderSceneRegistry implements SceneRegistryAccess {
         }
 
         Resource resource = optionalResource.get();
-        try (InputStream inputStream = resource.open()) {
+        try (InputStream inputStream = resource.getInputStream()) {
             return loadSchematic(inputStream);
         } catch (IOException e) {
             Ponder.LOGGER.error("Failed to read ponder schematic: " + location1, e);
@@ -165,9 +144,9 @@ public class PonderSceneRegistry implements SceneRegistryAccess {
     public static StructureTemplate loadSchematic(InputStream resourceStream) throws IOException {
         StructureTemplate t = new StructureTemplate();
         DataInputStream stream = new DataInputStream(new BufferedInputStream(new GZIPInputStream(resourceStream)));
-        CompoundTag nbt = NbtIo.read(stream, NbtAccounter.create(0x20000000L));
+        NbtCompound nbt = NbtIo.readCompound(stream, NbtSizeTracker.of(0x20000000L));
         //t.load(Minecraft.getInstance().level.holderLookup(Registries.BLOCK), nbt);
-        t.load(BuiltInRegistries.BLOCK, nbt);
+        t.readNbt(Registries.BLOCK, nbt);
         return t;
     }
 }

@@ -5,18 +5,14 @@ import com.zurrtum.create.client.foundation.block.connected.AllCTTypes;
 import com.zurrtum.create.client.foundation.block.connected.CTSpriteShiftEntry;
 import com.zurrtum.create.client.foundation.block.connected.CTSpriteShifter;
 import com.zurrtum.create.client.foundation.block.connected.CTType;
-import net.minecraft.resources.Identifier;
+import net.minecraft.util.Identifier;
 
 import java.util.function.Function;
 
 public enum CTs {
-    PILLAR(AllCTTypes.RECTANGLE, s -> toLocation(s, "pillar")), CAP(
-        AllCTTypes.OMNIDIRECTIONAL,
-        s -> toLocation(s, "cap")
-    ), LAYERED(
-        AllCTTypes.HORIZONTAL_KRYPPERS,
-        s -> toLocation(s, "layered")
-    );
+    PILLAR(AllCTTypes.RECTANGLE, s -> toLocation(s, "pillar")),
+    CAP(AllCTTypes.OMNIDIRECTIONAL, s -> toLocation(s, "cap")),
+    LAYERED(AllCTTypes.HORIZONTAL_KRYPPERS, s -> toLocation(s, "layered"));
 
     public final CTType type;
     private final Function<String, Identifier> srcFactory;
@@ -35,14 +31,10 @@ public enum CTs {
     public CTSpriteShiftEntry get(String variant) {
         Identifier resLoc = srcFactory.apply(variant);
         Identifier resLocTarget = targetFactory.apply(variant);
-        return CTSpriteShifter.getCT(type, resLoc, resLocTarget.withSuffix("_connected"));
+        return CTSpriteShifter.getCT(type, resLoc, resLocTarget.withSuffixedPath("_connected"));
     }
 
     private static Identifier toLocation(String variant, String texture) {
-        return Create.asResource(String.format(
-            "block/palettes/stone_types/%s/%s",
-            texture,
-            variant + "_cut_" + texture
-        ));
+        return Create.asResource(String.format("block/palettes/stone_types/%s/%s", texture, variant + "_cut_" + texture));
     }
 }

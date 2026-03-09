@@ -13,17 +13,17 @@ import com.zurrtum.create.infrastructure.fluids.FluidStack;
 import de.crafty.eiv.common.api.recipe.EivRecipeType;
 import de.crafty.eiv.common.api.recipe.IEivServerRecipe;
 import de.crafty.eiv.common.api.recipe.ItemView;
-import net.minecraft.core.component.DataComponentPatch;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.Tag;
-import net.minecraft.resources.RegistryOps;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
-import net.minecraft.world.item.crafting.RecipeHolder;
-import net.minecraft.world.level.material.Fluid;
-import net.minecraft.world.level.material.FluidState;
+import net.minecraft.component.ComponentChanges;
+import net.minecraft.fluid.Fluid;
+import net.minecraft.fluid.FluidState;
+import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
+import net.minecraft.item.Items;
+import net.minecraft.nbt.NbtCompound;
+import net.minecraft.nbt.NbtElement;
+import net.minecraft.recipe.RecipeEntry;
+import net.minecraft.registry.Registries;
+import net.minecraft.registry.RegistryOps;
 
 import java.util.HashMap;
 import java.util.List;
@@ -36,7 +36,7 @@ public class SpoutFillingDisplay extends CreateDisplay {
     public SpoutFillingDisplay() {
     }
 
-    public SpoutFillingDisplay(RecipeHolder<FillingRecipe> entry) {
+    public SpoutFillingDisplay(RecipeEntry<FillingRecipe> entry) {
         FillingRecipe recipe = entry.value();
         result = recipe.result();
         fluidIngredient = recipe.fluidIngredient();
@@ -50,9 +50,9 @@ public class SpoutFillingDisplay extends CreateDisplay {
     }
 
     public static void registerGenericItem(List<IEivServerRecipe> recipes) {
-        for (Fluid fluid : BuiltInRegistries.FLUID) {
-            FluidState fluidState = fluid.defaultFluidState();
-            if (fluid.isSource(fluidState)) {
+        for (Fluid fluid : Registries.FLUID) {
+            FluidState fluidState = fluid.getDefaultState();
+            if (fluid.isStill(fluidState)) {
                 registerGenericItem(recipes, fluid);
             }
         }
@@ -69,7 +69,7 @@ public class SpoutFillingDisplay extends CreateDisplay {
     }
 
     public static void registerGenericItem(List<IEivServerRecipe> recipes, Fluid fluid) {
-        ItemStack item = Items.BUCKET.getDefaultInstance();
+        ItemStack item = Items.BUCKET.getDefaultStack();
         try (FluidItemInventory capability = FluidHelper.getFluidInventory(item)) {
             int insert = capability.insert(new FluidStack(fluid, BucketFluidInventory.CAPACITY));
             if (insert == 0) {
@@ -79,14 +79,10 @@ public class SpoutFillingDisplay extends CreateDisplay {
             if (result.isEmpty()) {
                 return;
             }
-            if (result.is(Items.BUCKET)) {
+            if (result.isOf(Items.BUCKET)) {
                 return;
             }
-            FluidIngredient ingredient = new FluidStackIngredient(
-                fluid,
-                DataComponentPatch.EMPTY,
-                BucketFluidInventory.CAPACITY
-            );
+            FluidIngredient ingredient = new FluidStackIngredient(fluid, ComponentChanges.EMPTY, BucketFluidInventory.CAPACITY);
             recipes.add(new SpoutFillingDisplay(result, ingredient, List.of(item)));
         }
     }
@@ -96,24 +92,24 @@ public class SpoutFillingDisplay extends CreateDisplay {
         recipes.add(new SpoutFillingDisplay(
             stack,
             new FluidStackIngredient(fluidStack.getFluid(), fluidStack.getComponentChanges(), fluidStack.getAmount()),
-            List.of(Items.GLASS_BOTTLE.getDefaultInstance())
+            List.of(Items.GLASS_BOTTLE.getDefaultStack())
         ));
     }
 
     @Override
-    public void writeToTag(CompoundTag tag) {
-        RegistryOps<Tag> ops = getServerOps();
-        tag.store("result", ItemStack.CODEC, ops, result);
-        tag.store("fluidIngredient", FluidIngredient.CODEC, ops, fluidIngredient);
-        tag.store("ingredient", STACKS_CODEC, ops, ingredient);
+    public void writeToTag(NbtCompound tag) {
+        RegistryOps<NbtElement> ops = getServerOps();
+        tag.put("result", ItemStack.CODEC, ops, result);
+        tag.put("fluidIngredient", FluidIngredient.CODEC, ops, fluidIngredient);
+        tag.put("ingredient", STACKS_CODEC, ops, ingredient);
     }
 
     @Override
-    public void loadFromTag(CompoundTag tag) {
-        RegistryOps<Tag> ops = getClientOps();
-        result = tag.read("result", ItemStack.CODEC, ops).orElseThrow();
-        fluidIngredient = tag.read("fluidIngredient", FluidIngredient.CODEC, ops).orElseThrow();
-        ingredient = tag.read("ingredient", STACKS_CODEC, ops).orElseThrow();
+    public void loadFromTag(NbtCompound tag) {
+        RegistryOps<NbtElement> ops = getClientOps();
+        result = tag.get("result", ItemStack.CODEC, ops).orElseThrow();
+        fluidIngredient = tag.get("fluidIngredient", FluidIngredient.CODEC, ops).orElseThrow();
+        ingredient = tag.get("ingredient", STACKS_CODEC, ops).orElseThrow();
     }
 
     @Override

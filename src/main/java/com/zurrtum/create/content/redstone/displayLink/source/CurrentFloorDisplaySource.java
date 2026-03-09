@@ -3,17 +3,16 @@ package com.zurrtum.create.content.redstone.displayLink.source;
 import com.zurrtum.create.content.contraptions.elevator.ElevatorContactBlockEntity;
 import com.zurrtum.create.content.redstone.displayLink.DisplayLinkContext;
 import com.zurrtum.create.content.redstone.displayLink.target.DisplayTargetStats;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.text.MutableText;
+import net.minecraft.text.Text;
 
 public class CurrentFloorDisplaySource extends SingleLineDisplaySource {
 
     @Override
-    protected MutableComponent provideLine(DisplayLinkContext context, DisplayTargetStats stats) {
-        if (!(context.getSourceBlockEntity() instanceof ElevatorContactBlockEntity ecbe)) {
+    protected MutableText provideLine(DisplayLinkContext context, DisplayTargetStats stats) {
+        if (!(context.getSourceBlockEntity() instanceof ElevatorContactBlockEntity ecbe))
             return EMPTY_LINE;
-        }
-        return Component.literal(ecbe.lastReportedCurrentFloor);
+        return Text.literal(ecbe.lastReportedCurrentFloor);
     }
 
     @Override

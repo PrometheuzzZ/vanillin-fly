@@ -2,34 +2,33 @@ package com.zurrtum.create.infrastructure.packet.c2s;
 
 import com.zurrtum.create.AllHandle;
 import com.zurrtum.create.AllPackets;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.PacketType;
-import net.minecraft.network.protocol.game.ServerGamePacketListener;
-import net.minecraft.server.network.ServerGamePacketListenerImpl;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.item.ItemStack;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.network.listener.ServerPlayPacketListener;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.PacketType;
+import net.minecraft.server.network.ServerPlayNetworkHandler;
 
 import java.util.List;
 
-public record BlueprintAssignCompleteRecipePacket(List<ItemStack> input,
-                                                  ItemStack output) implements Packet<ServerGamePacketListener> {
-    public static final StreamCodec<RegistryFriendlyByteBuf, BlueprintAssignCompleteRecipePacket> CODEC = StreamCodec.composite(
-        ItemStack.OPTIONAL_STREAM_CODEC.apply(ByteBufCodecs.list()),
+public record BlueprintAssignCompleteRecipePacket(List<ItemStack> input, ItemStack output) implements Packet<ServerPlayPacketListener> {
+    public static final PacketCodec<RegistryByteBuf, BlueprintAssignCompleteRecipePacket> CODEC = PacketCodec.tuple(
+        ItemStack.OPTIONAL_PACKET_CODEC.collect(PacketCodecs.toList()),
         BlueprintAssignCompleteRecipePacket::input,
-        ItemStack.STREAM_CODEC,
+        ItemStack.PACKET_CODEC,
         BlueprintAssignCompleteRecipePacket::output,
         BlueprintAssignCompleteRecipePacket::new
     );
 
     @Override
-    public void handle(ServerGamePacketListener listener) {
-        AllHandle.onBlueprintAssignCompleteRecipe((ServerGamePacketListenerImpl) listener, this);
+    public void apply(ServerPlayPacketListener listener) {
+        AllHandle.onBlueprintAssignCompleteRecipe((ServerPlayNetworkHandler) listener, this);
     }
 
     @Override
-    public PacketType<BlueprintAssignCompleteRecipePacket> type() {
+    public PacketType<BlueprintAssignCompleteRecipePacket> getPacketType() {
         return AllPackets.BLUEPRINT_COMPLETE_RECIPE;
     }
 }

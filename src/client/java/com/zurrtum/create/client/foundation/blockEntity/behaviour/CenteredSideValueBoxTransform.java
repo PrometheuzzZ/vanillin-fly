@@ -1,9 +1,9 @@
 package com.zurrtum.create.client.foundation.blockEntity.behaviour;
 
 import com.zurrtum.create.catnip.math.VecHelper;
-import net.minecraft.core.Direction;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.block.BlockState;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Vec3d;
 
 import java.util.function.BiPredicate;
 
@@ -20,7 +20,7 @@ public class CenteredSideValueBoxTransform extends ValueBoxTransform.Sided {
     }
 
     @Override
-    protected Vec3 getSouthLocation() {
+    protected Vec3d getSouthLocation() {
         return VecHelper.voxelSpace(8, 8, 15.5);
     }
 

@@ -2,18 +2,18 @@ package com.zurrtum.create.content.equipment.symmetryWand.mirror;
 
 import com.zurrtum.create.catnip.data.Pair;
 import com.zurrtum.create.infrastructure.component.SymmetryMirror;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.util.StringRepresentable;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.block.BlockState;
+import net.minecraft.util.StringIdentifiable;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Vec3d;
 
 import java.util.Map;
 import java.util.Set;
 
 public class EmptyMirror extends SymmetryMirror {
 
-    public enum Align implements StringRepresentable {
+    public enum Align implements StringIdentifiable {
         None("none");
 
         private final String name;
@@ -23,7 +23,7 @@ public class EmptyMirror extends SymmetryMirror {
         }
 
         @Override
-        public String getSerializedName() {
+        public String asString() {
             return name;
         }
 
@@ -33,7 +33,7 @@ public class EmptyMirror extends SymmetryMirror {
         }
     }
 
-    public EmptyMirror(Vec3 pos) {
+    public EmptyMirror(Vec3d pos) {
         super(pos);
         orientation = Align.None;
     }

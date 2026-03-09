@@ -1,26 +1,26 @@
 package com.zurrtum.create.content.kinetics.fan;
 
 import com.zurrtum.create.AllBlockEntityTypes;
-import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.catnip.math.VecHelper;
 import com.zurrtum.create.foundation.blockEntity.SmartBlockEntity;
+import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.infrastructure.config.AllConfigs;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.particles.ParticleTypes;
-import net.minecraft.util.Mth;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.item.ItemEntity;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.level.ClipContext;
-import net.minecraft.world.level.ClipContext.Block;
-import net.minecraft.world.level.ClipContext.Fluid;
-import net.minecraft.world.level.Level.ExplosionInteraction;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
-import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.ItemEntity;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.particle.ParticleTypes;
+import net.minecraft.storage.ReadView;
+import net.minecraft.storage.WriteView;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Box;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.RaycastContext;
+import net.minecraft.world.RaycastContext.FluidHandling;
+import net.minecraft.world.RaycastContext.ShapeType;
+import net.minecraft.world.World.ExplosionSourceType;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -43,28 +43,26 @@ public class NozzleBlockEntity extends SmartBlockEntity {
     }
 
     @Override
-    protected void write(ValueOutput view, boolean clientPacket) {
+    protected void write(WriteView view, boolean clientPacket) {
         super.write(view, clientPacket);
-        if (!clientPacket) {
+        if (!clientPacket)
             return;
-        }
         view.putFloat("Range", range);
         view.putBoolean("Pushing", pushing);
     }
 
     @Override
-    protected void read(ValueInput view, boolean clientPacket) {
+    protected void read(ReadView view, boolean clientPacket) {
         super.read(view, clientPacket);
-        if (!clientPacket) {
+        if (!clientPacket)
             return;
-        }
-        range = view.getFloatOr("Range", 0);
-        pushing = view.getBooleanOr("Pushing", false);
+        range = view.getFloat("Range", 0);
+        pushing = view.getBoolean("Pushing", false);
     }
 
     @Override
     public void initialize() {
-        fanPos = worldPosition.relative(getBlockState().getValue(NozzleBlock.FACING).getOpposite());
+        fanPos = pos.offset(getCachedState().get(NozzleBlock.FACING).getOpposite());
         super.initialize();
     }
 
@@ -73,71 +71,60 @@ public class NozzleBlockEntity extends SmartBlockEntity {
         super.tick();
 
         float range = calcRange();
-        if (this.range != range) {
+        if (this.range != range)
             setRange(range);
-        }
 
-        Vec3 center = VecHelper.getCenterOf(worldPosition);
-        if (level.isClientSide() && range != 0) {
-            if (level.random.nextInt(Mth.clamp(
-                (AllConfigs.server().kinetics.fanPushDistance.get() - (int) range),
-                1,
-                10
-            )) == 0) {
-                Vec3 start = VecHelper.offsetRandomly(center, level.random, pushing ? 1 : range / 2);
-                Vec3 motion = center.subtract(start).normalize()
-                    .scale(Mth.clamp(range * (pushing ? .025f : 1f), 0, .5f) * (pushing ? -1 : 1));
-                level.addParticle(ParticleTypes.POOF, start.x, start.y, start.z, motion.x, motion.y, motion.z);
+        Vec3d center = VecHelper.getCenterOf(pos);
+        if (world.isClient() && range != 0) {
+            if (world.random.nextInt(MathHelper.clamp((AllConfigs.server().kinetics.fanPushDistance.get() - (int) range), 1, 10)) == 0) {
+                Vec3d start = VecHelper.offsetRandomly(center, world.random, pushing ? 1 : range / 2);
+                Vec3d motion = center.subtract(start).normalize()
+                    .multiply(MathHelper.clamp(range * (pushing ? .025f : 1f), 0, .5f) * (pushing ? -1 : 1));
+                world.addParticleClient(ParticleTypes.POOF, start.x, start.y, start.z, motion.x, motion.y, motion.z);
             }
         }
 
         for (Iterator<Entity> iterator = pushingEntities.iterator(); iterator.hasNext(); ) {
             Entity entity = iterator.next();
-            Vec3 diff = entity.position().subtract(center);
+            Vec3d diff = entity.getEntityPos().subtract(center);
 
-            if (!(entity instanceof Player) && level.isClientSide()) {
+            if (!(entity instanceof PlayerEntity) && world.isClient())
                 continue;
-            }
 
             double distance = diff.length();
-            if (distance > range || entity.isShiftKeyDown() || AirCurrent.isPlayerCreativeFlying(entity)) {
+            if (distance > range || entity.isSneaking() || AirCurrent.isPlayerCreativeFlying(entity)) {
                 iterator.remove();
                 continue;
             }
 
-            if (!pushing && distance < 1.5f) {
+            if (!pushing && distance < 1.5f)
                 continue;
-            }
 
             float factor = (entity instanceof ItemEntity) ? 1 / 128f : 1 / 32f;
-            Vec3 pushVec = diff.normalize().scale((range - distance) * (pushing ? 1 : -1));
-            entity.setDeltaMovement(entity.getDeltaMovement().add(pushVec.scale(factor)));
+            Vec3d pushVec = diff.normalize().multiply((range - distance) * (pushing ? 1 : -1));
+            entity.setVelocity(entity.getVelocity().add(pushVec.multiply(factor)));
             entity.fallDistance = 0;
-            entity.hurtMarked = true;
+            entity.velocityModified = true;
         }
 
     }
 
     public void setRange(float range) {
         this.range = range;
-        if (range == 0) {
+        if (range == 0)
             pushingEntities.clear();
-        }
         sendData();
     }
 
     private float calcRange() {
-        BlockEntity be = level.getBlockEntity(fanPos);
-        if (!(be instanceof IAirCurrentSource source)) {
+        BlockEntity be = world.getBlockEntity(fanPos);
+        if (!(be instanceof IAirCurrentSource source))
             return 0;
-        }
 
-        if (source.getAirCurrent() == null) {
+        if (source.getAirCurrent() == null)
             return 0;
-        }
-        if (source.getSpeed() == 0) {
+        if (source.getSpeed() == 0)
             return 0;
-        }
         pushing = source.getAirFlowDirection() == source.getAirflowOriginSide();
         return source.getMaxDistance();
     }
@@ -146,20 +133,18 @@ public class NozzleBlockEntity extends SmartBlockEntity {
     public void lazyTick() {
         super.lazyTick();
 
-        if (range == 0) {
+        if (range == 0)
             return;
-        }
 
-        Vec3 center = VecHelper.getCenterOf(worldPosition);
-        AABB bb = new AABB(center, center).inflate(range / 2f);
+        Vec3d center = VecHelper.getCenterOf(pos);
+        Box bb = new Box(center, center).expand(range / 2f);
 
-        for (Entity entity : level.getEntitiesOfClass(Entity.class, bb)) {
-            Vec3 diff = entity.position().subtract(center);
+        for (Entity entity : world.getNonSpectatingEntities(Entity.class, bb)) {
+            Vec3d diff = entity.getEntityPos().subtract(center);
 
             double distance = diff.length();
-            if (distance > range || entity.isShiftKeyDown() || AirCurrent.isPlayerCreativeFlying(entity)) {
+            if (distance > range || entity.isSneaking() || AirCurrent.isPlayerCreativeFlying(entity))
                 continue;
-            }
 
             boolean canSee = canSee(entity);
             if (!canSee) {
@@ -167,21 +152,19 @@ public class NozzleBlockEntity extends SmartBlockEntity {
                 continue;
             }
 
-            if (!pushingEntities.contains(entity)) {
+            if (!pushingEntities.contains(entity))
                 pushingEntities.add(entity);
-            }
         }
 
         for (Iterator<Entity> iterator = pushingEntities.iterator(); iterator.hasNext(); ) {
             Entity entity = iterator.next();
-            if (entity.isAlive()) {
+            if (entity.isAlive())
                 continue;
-            }
             iterator.remove();
         }
 
-        if (!pushing && pushingEntities.size() > 256 && !level.isClientSide()) {
-            level.explode(null, center.x, center.y, center.z, 2, ExplosionInteraction.NONE);
+        if (!pushing && pushingEntities.size() > 256 && !world.isClient()) {
+            world.createExplosion(null, center.x, center.y, center.z, 2, ExplosionSourceType.NONE);
             for (Iterator<Entity> iterator = pushingEntities.iterator(); iterator.hasNext(); ) {
                 Entity entity = iterator.next();
                 entity.discard();
@@ -192,14 +175,14 @@ public class NozzleBlockEntity extends SmartBlockEntity {
     }
 
     private boolean canSee(Entity entity) {
-        ClipContext context = new ClipContext(
-            entity.position(),
-            VecHelper.getCenterOf(worldPosition),
-            Block.COLLIDER,
-            Fluid.NONE,
+        RaycastContext context = new RaycastContext(
+            entity.getEntityPos(),
+            VecHelper.getCenterOf(pos),
+            ShapeType.COLLIDER,
+            FluidHandling.NONE,
             entity
         );
-        return worldPosition.equals(level.clip(context).getBlockPos());
+        return pos.equals(world.raycast(context).getBlockPos());
     }
 
 }

@@ -1,7 +1,5 @@
 package com.zurrtum.create.client.foundation.blockEntity.behaviour.edgeInteraction;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.catnip.math.VecHelper;
 import com.zurrtum.create.client.Create;
 import com.zurrtum.create.client.catnip.outliner.Outliner;
@@ -9,111 +7,103 @@ import com.zurrtum.create.client.foundation.blockEntity.behaviour.ValueBox;
 import com.zurrtum.create.client.foundation.blockEntity.behaviour.ValueBoxTransform;
 import com.zurrtum.create.client.foundation.utility.CreateLang;
 import com.zurrtum.create.content.kinetics.crafter.CrafterHelper;
+import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.foundation.blockEntity.behaviour.edgeInteraction.EdgeInteractionBehaviour;
 import com.zurrtum.create.foundation.blockEntity.behaviour.edgeInteraction.EdgeInteractionHandler;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.multiplayer.ClientLevel;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.network.chat.CommonComponents;
-import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.BlockHitResult;
-import net.minecraft.world.phys.HitResult;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.block.BlockState;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.client.world.ClientWorld;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.item.ItemStack;
+import net.minecraft.screen.ScreenTexts;
+import net.minecraft.text.MutableText;
+import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.util.hit.HitResult;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Box;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Vec3d;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public class EdgeInteractionRenderer {
 
-    public static void tick(Minecraft mc) {
-        HitResult target = mc.hitResult;
-        if (!(target instanceof BlockHitResult result)) {
+    public static void tick(MinecraftClient mc) {
+        HitResult target = mc.crosshairTarget;
+        if (!(target instanceof BlockHitResult result))
             return;
-        }
 
-        ClientLevel world = mc.level;
+        ClientWorld world = mc.world;
         BlockPos pos = result.getBlockPos();
-        Player player = mc.player;
-        ItemStack heldItem = player.getMainHandItem();
+        PlayerEntity player = mc.player;
+        ItemStack heldItem = player.getMainHandStack();
 
-        if (player.isShiftKeyDown()) {
+        if (player.isSneaking())
             return;
-        }
         EdgeInteractionBehaviour behaviour = BlockEntityBehaviour.get(world, pos, EdgeInteractionBehaviour.TYPE);
-        if (behaviour == null) {
+        if (behaviour == null)
             return;
-        }
-        if (!behaviour.requiredItem.test(heldItem.getItem())) {
+        if (!behaviour.requiredItem.test(heldItem.getItem()))
             return;
-        }
 
-        Direction face = result.getDirection();
+        Direction face = result.getSide();
         List<Direction> connectiveSides = EdgeInteractionHandler.getConnectiveSides(world, pos, face, behaviour);
-        if (connectiveSides.isEmpty()) {
+        if (connectiveSides.isEmpty())
             return;
-        }
 
         Direction closestEdge = connectiveSides.getFirst();
         double bestDistance = Double.MAX_VALUE;
-        Vec3 center = VecHelper.getCenterOf(pos);
+        Vec3d center = VecHelper.getCenterOf(pos);
         for (Direction direction : connectiveSides) {
-            double distance = Vec3.atLowerCornerOf(direction.getUnitVec3i())
-                .subtract(target.getLocation().subtract(center)).length();
-            if (distance > bestDistance) {
+            double distance = Vec3d.of(direction.getVector()).subtract(target.getPos().subtract(center)).length();
+            if (distance > bestDistance)
                 continue;
-            }
             bestDistance = distance;
             closestEdge = direction;
         }
 
-        AABB bb = EdgeInteractionHandler.getBB(pos, closestEdge);
-        boolean hit = bb.contains(target.getLocation());
-        Vec3 offset = Vec3.atLowerCornerOf(closestEdge.getUnitVec3i()).scale(.5)
-            .add(Vec3.atLowerCornerOf(face.getUnitVec3i()).scale(.469)).add(VecHelper.CENTER_OF_ORIGIN);
+        Box bb = EdgeInteractionHandler.getBB(pos, closestEdge);
+        boolean hit = bb.contains(target.getPos());
+        Vec3d offset = Vec3d.of(closestEdge.getVector()).multiply(.5).add(Vec3d.of(face.getVector()).multiply(.469)).add(VecHelper.CENTER_OF_ORIGIN);
 
-        ValueBox box = new ValueBox(CommonComponents.EMPTY, bb, pos).passive(!hit)
-            .transform(new EdgeValueBoxTransform(offset)).wideOutline();
+        ValueBox box = new ValueBox(ScreenTexts.EMPTY, bb, pos).passive(!hit).transform(new EdgeValueBoxTransform(offset)).wideOutline();
         Outliner.getInstance().showOutline("edge", box).highlightFace(face);
 
-        if (!hit) {
+        if (!hit)
             return;
-        }
 
-        List<MutableComponent> tip = new ArrayList<>();
+        List<MutableText> tip = new ArrayList<>();
         tip.add(CreateLang.translateDirect("logistics.crafter.connected"));
         tip.add(CreateLang.translateDirect(CrafterHelper.areCraftersConnected(
             world,
             pos,
-            pos.relative(closestEdge)
+            pos.offset(closestEdge)
         ) ? "logistics.crafter.click_to_separate" : "logistics.crafter.click_to_merge"));
         Create.VALUE_SETTINGS_HANDLER.showHoverTip(mc, tip);
     }
 
     static class EdgeValueBoxTransform extends ValueBoxTransform.Sided {
 
-        private final Vec3 add;
+        private final Vec3d add;
 
-        public EdgeValueBoxTransform(Vec3 add) {
+        public EdgeValueBoxTransform(Vec3d add) {
             this.add = add;
         }
 
         @Override
-        protected Vec3 getSouthLocation() {
-            return Vec3.ZERO;
+        protected Vec3d getSouthLocation() {
+            return Vec3d.ZERO;
         }
 
         @Override
-        public Vec3 getLocalOffset(BlockState state) {
+        public Vec3d getLocalOffset(BlockState state) {
             return add;
         }
 
         @Override
-        public void rotate(BlockState state, PoseStack ms) {
+        public void rotate(BlockState state, MatrixStack ms) {
             super.rotate(state, ms);
         }
 

@@ -5,14 +5,14 @@ import com.zurrtum.create.content.logistics.filter.FilterItemStack.ListFilterIte
 import com.zurrtum.create.foundation.gui.menu.MenuBase;
 import com.zurrtum.create.foundation.item.ItemHelper;
 import com.zurrtum.create.infrastructure.items.ItemStackHandler;
-import net.minecraft.ChatFormatting;
-import net.minecraft.core.component.DataComponentType;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.chat.Component;
-import net.minecraft.world.entity.player.Inventory;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.component.ItemContainerContents;
+import net.minecraft.component.ComponentType;
+import net.minecraft.component.type.ContainerComponent;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.entity.player.PlayerInventory;
+import net.minecraft.item.ItemStack;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -20,50 +20,48 @@ import java.util.Collections;
 import java.util.List;
 
 public class ListFilterItem extends FilterItem {
-    protected ListFilterItem(Properties properties) {
+    protected ListFilterItem(Settings properties) {
         super(properties);
     }
 
     @Override
-    public List<Component> makeSummary(ItemStack filter) {
-        List<Component> list = new ArrayList<>();
+    public List<Text> makeSummary(ItemStack filter) {
+        List<Text> list = new ArrayList<>();
 
         ItemStackHandler filterItems = getFilterItemHandler(filter);
         boolean blacklist = filter.getOrDefault(AllDataComponents.FILTER_ITEMS_BLACKLIST, false);
 
-        list.add((blacklist ? Component.translatable("create.gui.filter.deny_list") : Component.translatable(
-            "create.gui.filter.allow_list")).withStyle(ChatFormatting.GOLD));
+        list.add((blacklist ? Text.translatable("create.gui.filter.deny_list") : Text.translatable("create.gui.filter.allow_list")).formatted(
+            Formatting.GOLD));
         int count = 0;
-        for (int i = 0, size = filterItems.getContainerSize(); i < size; i++) {
+        for (int i = 0, size = filterItems.size(); i < size; i++) {
             if (count > 3) {
-                list.add(Component.literal("- ...").withStyle(ChatFormatting.DARK_GRAY));
+                list.add(Text.literal("- ...").formatted(Formatting.DARK_GRAY));
                 break;
             }
 
-            ItemStack filterStack = filterItems.getItem(i);
-            if (filterStack.isEmpty()) {
+            ItemStack filterStack = filterItems.getStack(i);
+            if (filterStack.isEmpty())
                 continue;
-            }
-            list.add(Component.literal("- ").append(filterStack.getHoverName()).withStyle(ChatFormatting.GRAY));
+            list.add(Text.literal("- ").append(filterStack.getName()).formatted(Formatting.GRAY));
             count++;
         }
 
-        if (count == 0) {
+        if (count == 0)
             return Collections.emptyList();
-        }
 
         return list;
     }
 
     @Override
-    public @Nullable MenuBase<?> createMenu(int id, Inventory inv, Player player, RegistryFriendlyByteBuf extraData) {
-        ItemStack heldItem = player.getMainHandItem();
-        ItemStack.STREAM_CODEC.encode(extraData, heldItem);
+    public @Nullable MenuBase<?> createMenu(int id, PlayerInventory inv, PlayerEntity player, RegistryByteBuf extraData) {
+        ItemStack heldItem = player.getMainHandStack();
+        ItemStack.PACKET_CODEC.encode(extraData, heldItem);
         return new FilterMenu(id, inv, heldItem);
     }
 
     @Override
-    public DataComponentType<?> getComponentType() {
+    public ComponentType<?> getComponentType() {
         return AllDataComponents.FILTER_ITEMS;
     }
 
@@ -74,19 +72,15 @@ public class ListFilterItem extends FilterItem {
 
     public ItemStackHandler getFilterItemHandler(ItemStack stack) {
         ItemStackHandler newInv = new ItemStackHandler(18);
-        ItemContainerContents contents = stack.getOrDefault(
-            AllDataComponents.FILTER_ITEMS,
-            ItemContainerContents.EMPTY
-        );
+        ContainerComponent contents = stack.getOrDefault(AllDataComponents.FILTER_ITEMS, ContainerComponent.DEFAULT);
         ItemHelper.fillItemStackHandler(contents, newInv);
         return newInv;
     }
 
     @Override
     public ItemStack[] getFilterItems(ItemStack stack) {
-        if (stack.getOrDefault(AllDataComponents.FILTER_ITEMS_BLACKLIST, false)) {
+        if (stack.getOrDefault(AllDataComponents.FILTER_ITEMS_BLACKLIST, false))
             return new ItemStack[0];
-        }
         return ItemHelper.getNonEmptyStacks(getFilterItemHandler(stack)).toArray(ItemStack[]::new);
     }
 }

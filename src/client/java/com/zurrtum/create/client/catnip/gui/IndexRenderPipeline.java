@@ -6,8 +6,8 @@ import com.mojang.blaze3d.platform.DepthTestFunction;
 import com.mojang.blaze3d.platform.LogicOp;
 import com.mojang.blaze3d.platform.PolygonMode;
 import com.mojang.blaze3d.vertex.VertexFormat;
-import net.minecraft.client.renderer.ShaderDefines;
-import net.minecraft.resources.Identifier;
+import net.minecraft.client.gl.Defines;
+import net.minecraft.util.Identifier;
 
 import java.util.List;
 import java.util.Optional;
@@ -18,7 +18,7 @@ public class IndexRenderPipeline extends RenderPipeline {
         Identifier location,
         Identifier vertexShader,
         Identifier fragmentShader,
-        ShaderDefines shaderDefines,
+        Defines shaderDefines,
         List<String> samplers,
         List<UniformDescription> uniforms,
         Optional<BlendFunction> blendFunction,
@@ -30,7 +30,7 @@ public class IndexRenderPipeline extends RenderPipeline {
         boolean writeDepth,
         LogicOp colorLogic,
         VertexFormat vertexFormat,
-        VertexFormat.Mode vertexFormatMode,
+        VertexFormat.DrawMode vertexFormatMode,
         float depthBiasScaleFactor,
         float depthBiasConstant,
         int sortKey

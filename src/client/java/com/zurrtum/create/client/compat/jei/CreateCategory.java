@@ -15,12 +15,12 @@ import com.zurrtum.create.infrastructure.fluids.FluidStack;
 import mezz.jei.api.gui.builder.IRecipeLayoutBuilder;
 import mezz.jei.api.gui.builder.IRecipeSlotBuilder;
 import mezz.jei.api.recipe.category.IRecipeCategory;
-import net.minecraft.core.HolderSet;
-import net.minecraft.core.component.DataComponentPatch;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.crafting.Ingredient;
-import net.minecraft.world.level.material.Fluid;
+import net.minecraft.component.ComponentChanges;
+import net.minecraft.fluid.Fluid;
+import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
+import net.minecraft.recipe.Ingredient;
+import net.minecraft.registry.entry.RegistryEntryList;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -34,11 +34,11 @@ public abstract class CreateCategory<T> implements IRecipeCategory<T> {
 
     public static List<ItemStack> getStacks(SizedIngredient ingredient) {
         int count = ingredient.getCount();
-        return ingredient.getIngredient().values.stream().map(entry -> new ItemStack(entry, count)).toList();
+        return ingredient.getIngredient().entries.stream().map(entry -> new ItemStack(entry, count)).toList();
     }
 
     public static List<ItemStack> getStacks(Ingredient ingredient) {
-        return ingredient.values.stream().map(ItemStack::new).toList();
+        return ingredient.entries.stream().map(ItemStack::new).toList();
     }
 
     public static List<List<ItemStack>> condenseIngredients(List<Ingredient> ingredients) {
@@ -46,19 +46,19 @@ public abstract class CreateCategory<T> implements IRecipeCategory<T> {
         List<List<ItemStack>> result = new ArrayList<>();
         Find:
         for (Ingredient ingredient : ingredients) {
-            HolderSet<Item> entries = ingredient.values;
+            RegistryEntryList<Item> entries = ingredient.entries;
             if (entries.size() != 1) {
                 result.add(getStacks(ingredient));
                 continue;
             }
             Item item = entries.get(0).value();
             for (ItemStack target : cache) {
-                if (target.is(item)) {
-                    target.grow(1);
+                if (target.isOf(item)) {
+                    target.increment(1);
                     continue Find;
                 }
             }
-            ItemStack stack = item.getDefaultInstance();
+            ItemStack stack = item.getDefaultStack();
             cache.add(stack);
             result.add(List.of(stack));
         }
@@ -75,15 +75,10 @@ public abstract class CreateCategory<T> implements IRecipeCategory<T> {
         return slot;
     }
 
-    public static IRecipeSlotBuilder addFluidSlot(
-        IRecipeLayoutBuilder builder,
-        int x,
-        int y,
-        FluidIngredient fluidIngredient
-    ) {
+    public static IRecipeSlotBuilder addFluidSlot(IRecipeLayoutBuilder builder, int x, int y, FluidIngredient fluidIngredient) {
         int amount = fluidIngredient.amount();
         IRecipeSlotBuilder slot = builder.addInputSlot(x, y).setFluidRenderer(amount, false, 16, 16);
-        DataComponentPatch components = DataComponentPatch.EMPTY;
+        ComponentChanges components = ComponentChanges.EMPTY;
         if (fluidIngredient instanceof FluidStackIngredient stackIngredient) {
             components = stackIngredient.components();
         }

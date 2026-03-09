@@ -5,23 +5,19 @@ import com.zurrtum.create.client.content.kinetics.KineticDebugger;
 import com.zurrtum.create.client.content.trains.graph.TrackGraphVisualizer;
 import com.zurrtum.create.client.infrastructure.config.AllConfigs;
 import com.zurrtum.create.content.trains.graph.TrackGraph;
-import net.minecraft.client.Minecraft;
+import net.minecraft.client.MinecraftClient;
 
 public class GlobalRailwayManagerClient {
-    public static void tickSignalOverlay(Minecraft mc) {
-        if (!isTrackGraphDebugActive()) {
-            for (TrackGraph trackGraph : Create.RAILWAYS.trackNetworks.values()) {
+    public static void tickSignalOverlay(MinecraftClient mc) {
+        if (!isTrackGraphDebugActive())
+            for (TrackGraph trackGraph : Create.RAILWAYS.trackNetworks.values())
                 TrackGraphVisualizer.visualiseSignalEdgeGroups(mc, trackGraph);
-            }
-        }
     }
 
-    public static void tick(Minecraft mc) {
-        if (isTrackGraphDebugActive()) {
-            for (TrackGraph trackGraph : Create.RAILWAYS.trackNetworks.values()) {
+    public static void tick(MinecraftClient mc) {
+        if (isTrackGraphDebugActive())
+            for (TrackGraph trackGraph : Create.RAILWAYS.trackNetworks.values())
                 TrackGraphVisualizer.debugViewGraph(mc, trackGraph, isTrackGraphDebugExtended());
-            }
-        }
     }
 
     private static boolean isTrackGraphDebugActive() {

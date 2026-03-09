@@ -9,11 +9,11 @@ import com.zurrtum.create.foundation.codec.CreateCodecs;
 import com.zurrtum.create.foundation.fluid.FluidIngredient;
 import com.zurrtum.create.infrastructure.fluids.FluidStack;
 import de.crafty.eiv.common.api.recipe.EivRecipeType;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.Tag;
-import net.minecraft.resources.RegistryOps;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.crafting.RecipeHolder;
+import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NbtCompound;
+import net.minecraft.nbt.NbtElement;
+import net.minecraft.recipe.RecipeEntry;
+import net.minecraft.registry.RegistryOps;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -29,7 +29,7 @@ public class MixingDisplay extends CreateDisplay {
     public MixingDisplay() {
     }
 
-    public MixingDisplay(RecipeHolder<MixingRecipe> entry) {
+    public MixingDisplay(RecipeEntry<MixingRecipe> entry) {
         MixingRecipe recipe = entry.value();
         List<ProcessingOutput> outputs = recipe.results();
         int size = outputs.size();
@@ -47,31 +47,31 @@ public class MixingDisplay extends CreateDisplay {
     }
 
     @Override
-    public void writeToTag(CompoundTag tag) {
-        RegistryOps<Tag> ops = getServerOps();
-        tag.store("results", STACKS_CODEC, ops, results);
-        tag.store("chances", CreateCodecs.FLOAT_LIST_CODEC, ops, chances);
+    public void writeToTag(NbtCompound tag) {
+        RegistryOps<NbtElement> ops = getServerOps();
+        tag.put("results", STACKS_CODEC, ops, results);
+        tag.put("chances", CreateCodecs.FLOAT_LIST_CODEC, ops, chances);
         if (!fluidResults.isEmpty()) {
-            tag.store("fluidResults", FLUID_STACKS_CODEC, fluidResults);
+            tag.put("fluidResults", FLUID_STACKS_CODEC, fluidResults);
         }
-        tag.store("ingredients", STACKS_LIST_CODEC, ops, ingredients);
+        tag.put("ingredients", STACKS_LIST_CODEC, ops, ingredients);
         if (!fluidIngredients.isEmpty()) {
-            tag.store("fluidIngredients", FLUID_INGREDIENTS_CODEC, ops, fluidIngredients);
+            tag.put("fluidIngredients", FLUID_INGREDIENTS_CODEC, ops, fluidIngredients);
         }
         if (heat != HeatCondition.NONE) {
-            tag.store("heat", HeatCondition.CODEC, ops, heat);
+            tag.put("heat", HeatCondition.CODEC, ops, heat);
         }
     }
 
     @Override
-    public void loadFromTag(CompoundTag tag) {
-        RegistryOps<Tag> ops = getClientOps();
-        results = tag.read("results", STACKS_CODEC, ops).orElseThrow();
-        chances = tag.read("chances", CreateCodecs.FLOAT_LIST_CODEC, ops).orElseThrow();
-        fluidResults = tag.read("fluidResults", FLUID_STACKS_CODEC, ops).orElse(List.of());
-        fluidIngredients = tag.read("fluidIngredients", FLUID_INGREDIENTS_CODEC, ops).orElse(List.of());
-        ingredients = tag.read("ingredients", STACKS_LIST_CODEC, ops).orElseThrow();
-        heat = tag.read("heat", HeatCondition.CODEC, ops).orElse(HeatCondition.NONE);
+    public void loadFromTag(NbtCompound tag) {
+        RegistryOps<NbtElement> ops = getClientOps();
+        results = tag.get("results", STACKS_CODEC, ops).orElseThrow();
+        chances = tag.get("chances", CreateCodecs.FLOAT_LIST_CODEC, ops).orElseThrow();
+        fluidResults = tag.get("fluidResults", FLUID_STACKS_CODEC, ops).orElse(List.of());
+        fluidIngredients = tag.get("fluidIngredients", FLUID_INGREDIENTS_CODEC, ops).orElse(List.of());
+        ingredients = tag.get("ingredients", STACKS_LIST_CODEC, ops).orElseThrow();
+        heat = tag.get("heat", HeatCondition.CODEC, ops).orElse(HeatCondition.NONE);
     }
 
     @Override

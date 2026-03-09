@@ -18,11 +18,11 @@ import me.shedaniel.rei.api.common.category.CategoryIdentifier;
 import me.shedaniel.rei.api.common.entry.EntryIngredient;
 import me.shedaniel.rei.api.common.entry.EntryStack;
 import me.shedaniel.rei.api.common.util.EntryStacks;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.network.chat.Component;
-import net.minecraft.world.item.BlockItem;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.block.BlockState;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.item.BlockItem;
+import net.minecraft.item.ItemStack;
+import net.minecraft.text.Text;
 import org.joml.Matrix3x2f;
 
 import java.util.ArrayList;
@@ -35,7 +35,7 @@ public class ManualApplicationCategory extends CreateCategory<ManualApplicationD
     }
 
     @Override
-    public Component getTitle() {
+    public Text getTitle() {
         return CreateLang.translateDirect("recipe.item_application");
     }
 
@@ -54,18 +54,10 @@ public class ManualApplicationCategory extends CreateCategory<ManualApplicationD
         List<EntryIngredient> chanceIngredients = new ArrayList<>();
         List<ProcessingOutput> results = display.outputs();
         for (int i = 0, size = results.size(), start = bounds.x + 137, y = bounds.y + 43; i < size; i++) {
-            addOutputData(
-                results.get(i),
-                i % 2 == 0 ? start : start + 19,
-                y + (i / 2) * -19,
-                outputs,
-                outputIngredients,
-                chances,
-                chanceIngredients
-            );
+            addOutputData(results.get(i), i % 2 == 0 ? start : start + 19, y + (i / 2) * -19, outputs, outputIngredients, chances, chanceIngredients);
         }
         Slot targetSlot = createInputSlot(target).entries(display.target());
-        widgets.add(Widgets.createDrawableWidget((GuiGraphics graphics, int mouseX, int mouseY, float delta) -> {
+        widgets.add(Widgets.createDrawableWidget((DrawContext graphics, int mouseX, int mouseY, float delta) -> {
             drawSlotBackground(graphics, outputs, input, target);
             drawChanceSlotBackground(graphics, chances);
             AllGuiTextures.JEI_SHADOW.render(graphics, bounds.x + 67, bounds.y + 52);
@@ -73,9 +65,9 @@ public class ManualApplicationCategory extends CreateCategory<ManualApplicationD
             EntryStack<ItemStack> slot = targetSlot.getCurrentEntry().cast();
             ItemStack stack = slot.getValue();
             if (stack.getItem() instanceof BlockItem blockItem) {
-                BlockState block = blockItem.getBlock().defaultBlockState();
-                graphics.guiRenderState.submitPicturesInPictureState(new ManualBlockRenderState(
-                    new Matrix3x2f(graphics.pose()),
+                BlockState block = blockItem.getBlock().getDefaultState();
+                graphics.state.addSpecialElement(new ManualBlockRenderState(
+                    new Matrix3x2f(graphics.getMatrices()),
                     block,
                     bounds.x + 79,
                     bounds.y + 34

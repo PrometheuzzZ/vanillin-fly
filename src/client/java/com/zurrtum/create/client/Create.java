@@ -19,7 +19,7 @@ import com.zurrtum.create.client.ponder.foundation.PonderIndex;
 import com.zurrtum.create.client.vanillin.Vanillin;
 import com.zurrtum.create.content.trains.GlobalRailwayManager;
 import net.fabricmc.api.ClientModInitializer;
-import net.minecraft.resources.Identifier;
+import net.minecraft.util.Identifier;
 
 import static com.zurrtum.create.Create.MOD_ID;
 
@@ -80,7 +80,7 @@ public class Create implements ClientModInitializer {
     }
 
     public static Identifier asResource(String path) {
-        return Identifier.fromNamespaceAndPath(MOD_ID, path);
+        return Identifier.of(MOD_ID, path);
     }
 
     public static void invalidateRenderers() {

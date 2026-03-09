@@ -1,8 +1,8 @@
 package com.zurrtum.create.client.catnip.gui;
 
 import com.zurrtum.create.catnip.animation.LerpedFloat;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.screen.Screen;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayDeque;
@@ -13,33 +13,39 @@ import java.util.List;
 public class ScreenOpener {
 
     private static final Deque<Screen> backStack = new ArrayDeque<>();
+    @Nullable
+    private static Screen backSteppedFrom = null;
 
     public static void open(@Nullable Screen screen) {
-        open(Minecraft.getInstance().screen, screen);
+        open(MinecraftClient.getInstance().currentScreen, screen);
     }
 
     public static void open(@Nullable Screen current, @Nullable Screen toOpen) {
+        backSteppedFrom = null;
         if (current != null) {
             if (backStack.size() >= 15) // don't go deeper than 15 steps
-            {
                 backStack.pollLast();
-            }
 
             backStack.push(current);
-        } else {
+        } else
             backStack.clear();
-        }
 
         openScreen(toOpen);
     }
 
-    public static void openPreviousScreen() {
-        Screen previousScreen = backStack.pollFirst();
-        if (previousScreen == null) {
+    public static void openPreviousScreen(Screen current, @Nullable NavigatableSimiScreen screenWithContext) {
+        if (backStack.isEmpty())
             return;
-        }
+        backSteppedFrom = current;
+        Screen previousScreen = backStack.pop();
         if (previousScreen instanceof NavigatableSimiScreen previousNavScreen) {
-            previousNavScreen.transition.startWithValue(-0.001).chase(-1, .3f, LerpedFloat.Chaser.EXP);
+            if (screenWithContext != null) {
+                screenWithContext.shareContextWith(previousNavScreen);
+            }
+            previousNavScreen.transition.startWithValue(-0.001)
+                //.chaseTimed(-1, 8);
+                //.chase(-1, .2f, LerpedFloat.Chaser.LINEAR);
+                .chase(-1, .3f, LerpedFloat.Chaser.EXP);
         }
         openScreen(previousScreen);
     }
@@ -47,27 +53,26 @@ public class ScreenOpener {
     // transitions are only supported in simiScreens atm. they take care of all the
     // rendering for it
     public static void transitionTo(NavigatableSimiScreen screen) {
-        if (tryBackTracking(screen)) {
+        if (tryBackTracking(screen))
             return;
-        }
-        screen.transition.startWithValue(0.001).chase(1, .3f, LerpedFloat.Chaser.EXP);
+        screen.transition.startWithValue(0.001)
+            //.chaseTimed(1, 8);
+            //.chase(1, .2f, LerpedFloat.Chaser.LINEAR);
+            .chase(1, .3f, LerpedFloat.Chaser.EXP);
         open(screen);
     }
 
     private static boolean tryBackTracking(NavigatableSimiScreen screen) {
-        Screen previouslyRenderedScreen = getScreenFirst();
-        if (previouslyRenderedScreen == null) {
+        List<Screen> screenHistory = getScreenHistory();
+        if (screenHistory.isEmpty())
             return false;
-        }
-        if (!(previouslyRenderedScreen instanceof NavigatableSimiScreen navigatableSimiScreen)) {
+        Screen previouslyRenderedScreen = screenHistory.get(0);
+        if (!(previouslyRenderedScreen instanceof NavigatableSimiScreen))
             return false;
-        }
-        if (!screen.isEquivalentTo(navigatableSimiScreen)) {
+        if (!screen.isEquivalentTo((NavigatableSimiScreen) previouslyRenderedScreen))
             return false;
-        }
 
-        screen.shareContextWith(navigatableSimiScreen);
-        openPreviousScreen();
+        openPreviousScreen(MinecraftClient.getInstance().currentScreen, screen);
         return true;
     }
 
@@ -79,18 +84,22 @@ public class ScreenOpener {
         return new ArrayList<>(backStack);
     }
 
-    public static @Nullable Screen getScreenFirst() {
-        return backStack.peekFirst();
-    }
-
     @Nullable
     public static Screen getBackStepScreen() {
         return backStack.peek();
     }
 
+    @Nullable
+    public static Screen getPreviouslyRenderedScreen() {
+        return backSteppedFrom != null ? backSteppedFrom : backStack.peek();
+    }
+
     private static void openScreen(@Nullable Screen screen) {
-        Minecraft.getInstance().schedule(() -> {
-            Minecraft.getInstance().setScreen(screen);
+        MinecraftClient.getInstance().send(() -> {
+            MinecraftClient.getInstance().setScreen(screen);
+            Screen previouslyRenderedScreen = getPreviouslyRenderedScreen();
+            if (previouslyRenderedScreen != null && screen instanceof NavigatableSimiScreen)
+                previouslyRenderedScreen.init(MinecraftClient.getInstance(), screen.width, screen.height);
         });
     }
 

@@ -16,8 +16,8 @@ import me.shedaniel.rei.api.common.entry.EntryStack;
 import me.shedaniel.rei.api.common.entry.InputIngredient;
 import me.shedaniel.rei.api.common.entry.type.VanillaEntryTypes;
 import me.shedaniel.rei.plugin.common.BuiltinPlugin;
-import net.minecraft.resources.Identifier;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.item.ItemStack;
+import net.minecraft.util.Identifier;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -40,8 +40,7 @@ public class StockKeeperTransferHandler implements TransferHandler {
 
     @Override
     public ApplicabilityResult checkApplicable(Context context) {
-        if (context.getContainerScreen() instanceof StockKeeperRequestScreen && context.getDisplay()
-            .getDisplayLocation().isPresent()) {
+        if (context.getContainerScreen() instanceof StockKeeperRequestScreen && context.getDisplay().getDisplayLocation().isPresent()) {
             return ApplicabilityResult.createApplicable();
         }
         return ApplicabilityResult.createNotApplicable();
@@ -61,10 +60,7 @@ public class StockKeeperTransferHandler implements TransferHandler {
             return Result.createFailed(CreateLang.translateDirect("gui.stock_keeper.slots_full"));
         }
         CraftableInput inputs = CraftableInput.create(display.getCategoryIdentifier().equals(BuiltinPlugin.CRAFTING));
-        List<InputIngredient<EntryStack<?>>> inputIngredients = display.getInputIngredients(
-            context.getMenu(),
-            context.getMinecraft().player
-        );
+        List<InputIngredient<EntryStack<?>>> inputIngredients = display.getInputIngredients(context.getMenu(), context.getMinecraft().player);
         for (InputIngredient<EntryStack<?>> input : inputIngredients) {
             List<EntryStack<?>> ingredient = input.get();
             int size = ingredient.size();
@@ -96,7 +92,7 @@ public class StockKeeperTransferHandler implements TransferHandler {
         if (output.isEmpty()) {
             return Result.createFailed(CreateLang.translateDirect("gui.stock_keeper.recipe_result_empty"));
         }
-        InventorySummary summary = screen.getMenu().contentHolder.getLastClientsideStockSnapshotAsSummary();
+        InventorySummary summary = screen.getScreenHandler().contentHolder.getLastClientsideStockSnapshotAsSummary();
         if (summary == null) {
             return Result.createNotApplicable();
         }
@@ -109,13 +105,7 @@ public class StockKeeperTransferHandler implements TransferHandler {
                         if (widget instanceof Slot slot && slot.getNoticeMark() == Slot.INPUT) {
                             if (missingIndices.contains(i++)) {
                                 Rectangle innerBounds = slot.getInnerBounds();
-                                graphics.fill(
-                                    innerBounds.x,
-                                    innerBounds.y,
-                                    innerBounds.getMaxX(),
-                                    innerBounds.getMaxY(),
-                                    0x40ff0000
-                                );
+                                graphics.fill(innerBounds.x, innerBounds.y, innerBounds.getMaxX(), innerBounds.getMaxY(), 0x40ff0000);
                             }
                         }
                     }
@@ -124,9 +114,9 @@ public class StockKeeperTransferHandler implements TransferHandler {
         if (context.isActuallyCrafting()) {
             CraftableBigItemStack cbis = new CraftableBigItemStack(id, inputs, output);
             screen.recipesToOrder.add(cbis);
-            screen.searchBox.setValue("");
+            screen.searchBox.setText("");
             screen.refreshSearchNextTick = true;
-            screen.requestCraftable(cbis, context.isStackedCrafting() ? cbis.stack.getMaxStackSize() : 1);
+            screen.requestCraftable(cbis, context.isStackedCrafting() ? cbis.stack.getMaxCount() : 1);
         }
         return Result.createSuccessful().blocksFurtherHandling();
     }

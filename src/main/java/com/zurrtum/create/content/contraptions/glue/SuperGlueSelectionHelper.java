@@ -2,16 +2,16 @@ package com.zurrtum.create.content.contraptions.glue;
 
 import com.zurrtum.create.api.contraption.BlockMovementChecks;
 import com.zurrtum.create.catnip.data.Iterate;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.core.NonNullList;
-import net.minecraft.world.entity.EquipmentSlot;
-import net.minecraft.world.entity.player.Inventory;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.entity.EquipmentSlot;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.entity.player.PlayerInventory;
+import net.minecraft.item.ItemStack;
+import net.minecraft.util.collection.DefaultedList;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Box;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.World;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -20,12 +20,11 @@ import java.util.Set;
 
 public class SuperGlueSelectionHelper {
 
-    public static Set<BlockPos> searchGlueGroup(Level level, BlockPos startPos, BlockPos endPos, boolean includeOther) {
-        if (endPos == null || startPos == null) {
+    public static Set<BlockPos> searchGlueGroup(World level, BlockPos startPos, BlockPos endPos, boolean includeOther) {
+        if (endPos == null || startPos == null)
             return null;
-        }
 
-        AABB bb = SuperGlueEntity.span(startPos, endPos);
+        Box bb = SuperGlueEntity.span(startPos, endPos);
 
         List<BlockPos> frontier = new ArrayList<>();
         Set<BlockPos> visited = new HashSet<>();
@@ -40,68 +39,54 @@ public class SuperGlueSelectionHelper {
             attached.add(currentPos);
 
             for (Direction d : Iterate.directions) {
-                BlockPos offset = currentPos.relative(d);
+                BlockPos offset = currentPos.offset(d);
                 boolean gluePresent = includeOther && SuperGlueEntity.isGlued(level, currentPos, d, cachedOther);
-                boolean alreadySticky = includeOther && SuperGlueEntity.isSideSticky(
-                    level,
-                    currentPos,
-                    d
-                ) || SuperGlueEntity.isSideSticky(level, offset, d.getOpposite());
-
-                if (!alreadySticky && !gluePresent && !bb.contains(Vec3.atCenterOf(offset))) {
-                    continue;
-                }
-                if (!BlockMovementChecks.isMovementNecessary(level.getBlockState(offset), level, offset)) {
-                    continue;
-                }
-                if (!SuperGlueEntity.isValidFace(level, currentPos, d) || !SuperGlueEntity.isValidFace(
+                boolean alreadySticky = includeOther && SuperGlueEntity.isSideSticky(level, currentPos, d) || SuperGlueEntity.isSideSticky(
                     level,
                     offset,
                     d.getOpposite()
-                )) {
-                    continue;
-                }
+                );
 
-                if (visited.add(offset)) {
+                if (!alreadySticky && !gluePresent && !bb.contains(Vec3d.ofCenter(offset)))
+                    continue;
+                if (!BlockMovementChecks.isMovementNecessary(level.getBlockState(offset), level, offset))
+                    continue;
+                if (!SuperGlueEntity.isValidFace(level, currentPos, d) || !SuperGlueEntity.isValidFace(level, offset, d.getOpposite()))
+                    continue;
+
+                if (visited.add(offset))
                     frontier.add(offset);
-                }
             }
         }
 
-        if (attached.size() < 2 && attached.contains(endPos)) {
+        if (attached.size() < 2 && attached.contains(endPos))
             return null;
-        }
 
         return attached;
     }
 
-    public static boolean collectGlueFromInventory(Player player, int requiredAmount, boolean simulate) {
-        if (player.isCreative()) {
+    public static boolean collectGlueFromInventory(PlayerEntity player, int requiredAmount, boolean simulate) {
+        if (player.isCreative())
             return true;
-        }
-        if (requiredAmount == 0) {
+        if (requiredAmount == 0)
             return true;
-        }
 
-        NonNullList<ItemStack> items = player.getInventory().getNonEquipmentItems();
-        for (int i = -1; i < Inventory.INVENTORY_SIZE; i++) {
+        DefaultedList<ItemStack> items = player.getInventory().getMainStacks();
+        for (int i = -1; i < PlayerInventory.MAIN_SIZE; i++) {
             int slot = i == -1 ? player.getInventory().getSelectedSlot() : i;
             ItemStack stack = items.get(slot);
-            if (stack.isEmpty()) {
+            if (stack.isEmpty())
                 continue;
-            }
-            if (!(stack.getItem() instanceof SuperGlueItem)) {
+            if (!(stack.getItem() instanceof SuperGlueItem))
                 continue;
-            }
 
-            int charges = Math.min(requiredAmount, stack.getMaxDamage() - stack.getDamageValue());
+            int charges = Math.min(requiredAmount, stack.getMaxDamage() - stack.getDamage());
 
-            stack.hurtAndBreak(charges, player, EquipmentSlot.MAINHAND);
+            stack.damage(charges, player, EquipmentSlot.MAINHAND);
 
             requiredAmount -= charges;
-            if (requiredAmount <= 0) {
+            if (requiredAmount <= 0)
                 return true;
-            }
         }
 
         return false;

@@ -9,10 +9,10 @@ import com.zurrtum.create.catnip.animation.LerpedFloat;
 import com.zurrtum.create.catnip.animation.LerpedFloat.Chaser;
 import com.zurrtum.create.content.contraptions.glue.SuperGlueEntity;
 import com.zurrtum.create.foundation.blockEntity.SmartBlockEntity;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.block.BlockState;
+import net.minecraft.storage.ReadView;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
 
 import java.util.List;
 
@@ -33,72 +33,55 @@ public class StickerBlockEntity extends SmartBlockEntity {
     @Override
     public void initialize() {
         super.initialize();
-        if (!level.isClientSide()) {
+        if (!world.isClient())
             return;
-        }
         piston.startWithValue(isBlockStateExtended() ? 1 : 0);
     }
 
     public boolean isBlockStateExtended() {
-        BlockState blockState = getBlockState();
-        return blockState.is(AllBlocks.STICKER) && blockState.getValue(StickerBlock.EXTENDED);
+        BlockState blockState = getCachedState();
+        return blockState.isOf(AllBlocks.STICKER) && blockState.get(StickerBlock.EXTENDED);
     }
 
     @Override
     public void tick() {
         super.tick();
-        if (!level.isClientSide()) {
+        if (!world.isClient())
             return;
-        }
         piston.tickChaser();
 
         if (isAttachedToBlock() && piston.getValue(0) != piston.getValue() && piston.getValue() == 1) {
-            AllClientHandle.INSTANCE.spawnSuperGlueParticles(
-                level,
-                worldPosition,
-                getBlockState().getValue(StickerBlock.FACING),
-                true
-            );
+            AllClientHandle.INSTANCE.spawnSuperGlueParticles(world, pos, getCachedState().get(StickerBlock.FACING), true);
             playSound(true);
         }
 
-        if (!update) {
+        if (!update)
             return;
-        }
         update = false;
         int target = isBlockStateExtended() ? 1 : 0;
-        if (isAttachedToBlock() && target == 0 && piston.getChaseTarget() == 1) {
+        if (isAttachedToBlock() && target == 0 && piston.getChaseTarget() == 1)
             playSound(false);
-        }
         piston.chase(target, .4f, Chaser.LINEAR);
 
         AllClientHandle.INSTANCE.queueUpdate(this);
     }
 
     public boolean isAttachedToBlock() {
-        BlockState blockState = getBlockState();
-        if (!blockState.is(AllBlocks.STICKER)) {
+        BlockState blockState = getCachedState();
+        if (!blockState.isOf(AllBlocks.STICKER))
             return false;
-        }
-        Direction direction = blockState.getValue(StickerBlock.FACING);
-        return SuperGlueEntity.isValidFace(level, worldPosition.relative(direction), direction.getOpposite());
+        Direction direction = blockState.get(StickerBlock.FACING);
+        return SuperGlueEntity.isValidFace(world, pos.offset(direction), direction.getOpposite());
     }
 
     @Override
-    protected void read(ValueInput view, boolean clientPacket) {
+    protected void read(ReadView view, boolean clientPacket) {
         super.read(view, clientPacket);
-        if (clientPacket) {
+        if (clientPacket)
             update = true;
-        }
     }
 
     public void playSound(boolean attach) {
-        AllSoundEvents.SLIME_ADDED.play(
-            level,
-            AllClientHandle.INSTANCE.getPlayer(),
-            worldPosition,
-            0.35f,
-            attach ? 0.75f : 0.2f
-        );
+        AllSoundEvents.SLIME_ADDED.play(world, AllClientHandle.INSTANCE.getPlayer(), pos, 0.35f, attach ? 0.75f : 0.2f);
     }
 }

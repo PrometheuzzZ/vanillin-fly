@@ -1,6 +1,6 @@
 package com.zurrtum.create.content.trains.bogey;
 
-import net.minecraft.resources.Identifier;
+import net.minecraft.util.Identifier;
 import org.jetbrains.annotations.UnmodifiableView;
 
 import java.util.*;
@@ -22,7 +22,7 @@ public class AllBogeySizes {
     public static final BogeySize LARGE = register("large", 12.5f);
 
     private static BogeySize register(String id, float radius) {
-        BogeySize size = new BogeySize(Identifier.fromNamespaceAndPath(MOD_ID, id), radius / 16f);
+        BogeySize size = new BogeySize(Identifier.of(MOD_ID, id), radius / 16f);
         register(size);
         return size;
     }

@@ -1,7 +1,7 @@
 package com.zurrtum.create.client.flywheel.lib.model.baked;
 
 import com.zurrtum.create.client.flywheel.lib.model.SimpleModel;
-import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.block.BlockState;
 import org.jetbrains.annotations.ApiStatus;
 
 @ApiStatus.Internal
@@ -21,14 +21,7 @@ public final class ModelBuilderImpl {
                 builder.materialFunc
             );
         }
-        return BakedModelBufferer.bufferModel(
-            builder.model,
-            builder.pos,
-            builder.level,
-            blockState,
-            builder.poseStack,
-            builder.materialFunc
-        );
+        return BakedModelBufferer.bufferModel(builder.model, builder.pos, builder.level, blockState, builder.poseStack, builder.materialFunc);
     }
 
     public static SimpleModel buildBlockModelBuilder(BlockModelBuilder builder) {

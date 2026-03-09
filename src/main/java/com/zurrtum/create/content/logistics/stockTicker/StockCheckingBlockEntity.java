@@ -1,16 +1,16 @@
 package com.zurrtum.create.content.logistics.stockTicker;
 
-import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.content.logistics.packager.IdentifiedInventory;
 import com.zurrtum.create.content.logistics.packager.InventorySummary;
 import com.zurrtum.create.content.logistics.packagerLink.LogisticallyLinkedBehaviour;
 import com.zurrtum.create.content.logistics.packagerLink.LogisticallyLinkedBehaviour.RequestType;
 import com.zurrtum.create.content.logistics.packagerLink.LogisticsManager;
 import com.zurrtum.create.foundation.blockEntity.SmartBlockEntity;
+import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.infrastructure.component.PackageOrderWithCrafts;
-import net.minecraft.core.BlockPos;
-import net.minecraft.world.level.block.entity.BlockEntityType;
-import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.entity.BlockEntityType;
+import net.minecraft.util.math.BlockPos;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
@@ -37,12 +37,7 @@ public abstract class StockCheckingBlockEntity extends SmartBlockEntity {
         return LogisticsManager.getSummaryOfNetwork(behaviour.freqId, true);
     }
 
-    public boolean broadcastPackageRequest(
-        RequestType type,
-        PackageOrder order,
-        @Nullable IdentifiedInventory ignoredHandler,
-        String address
-    ) {
+    public boolean broadcastPackageRequest(RequestType type, PackageOrder order, @Nullable IdentifiedInventory ignoredHandler, String address) {
         return broadcastPackageRequest(type, PackageOrderWithCrafts.simple(order.stacks()), ignoredHandler, address);
     }
 

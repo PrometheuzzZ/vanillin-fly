@@ -11,15 +11,15 @@ import com.zurrtum.create.content.fluids.tank.FluidTankBlockEntity;
 import com.zurrtum.create.infrastructure.fluids.FluidStack;
 import net.caffeinemc.mods.sodium.api.texture.SpriteUtil;
 import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.texture.TextureAtlas;
-import net.minecraft.client.resources.model.AtlasManager;
-import net.minecraft.client.resources.model.Material;
-import net.minecraft.core.BlockPos;
-import net.minecraft.resources.Identifier;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.material.Fluid;
-import net.minecraft.world.level.material.FluidState;
+import net.minecraft.block.BlockState;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.texture.AtlasManager;
+import net.minecraft.client.texture.SpriteAtlasTexture;
+import net.minecraft.client.util.SpriteIdentifier;
+import net.minecraft.fluid.Fluid;
+import net.minecraft.fluid.FluidState;
+import net.minecraft.util.Identifier;
+import net.minecraft.util.math.BlockPos;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -30,28 +30,28 @@ import java.util.Set;
 @SuppressWarnings("deprecation")
 public class SodiumCompat {
     private static final boolean DISABLE = !FabricLoader.getInstance().isModLoaded("sodium");
-    public static final Material SAW_TEXTURE = new Material(
-        TextureAtlas.LOCATION_BLOCKS,
+    public static final SpriteIdentifier SAW_TEXTURE = new SpriteIdentifier(
+        SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE,
         Create.asResource("block/saw_reversed")
     );
-    public static final Material FACTORY_PANEL_TEXTURE = new Material(
-        TextureAtlas.LOCATION_BLOCKS,
+    public static final SpriteIdentifier FACTORY_PANEL_TEXTURE = new SpriteIdentifier(
+        SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE,
         Create.asResource("block/factory_panel_connections_animated")
     );
-    public static final Material SAW_VANILLA_TEXTURE = new Material(
-        TextureAtlas.LOCATION_BLOCKS,
-        Identifier.withDefaultNamespace("block/stonecutter_saw")
+    public static final SpriteIdentifier SAW_VANILLA_TEXTURE = new SpriteIdentifier(
+        SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE,
+        Identifier.ofVanilla("block/stonecutter_saw")
     );
 
     @SuppressWarnings("UnstableApiUsage")
-    public static void markSpriteActive(Minecraft mc) {
+    public static void markSpriteActive(MinecraftClient mc) {
         if (DISABLE) {
             return;
         }
         AtlasManager atlasManager = mc.getAtlasManager();
-        SpriteUtil.INSTANCE.markSpriteActive(atlasManager.get(SAW_TEXTURE));
-        SpriteUtil.INSTANCE.markSpriteActive(atlasManager.get(SAW_VANILLA_TEXTURE));
-        SpriteUtil.INSTANCE.markSpriteActive(atlasManager.get(FACTORY_PANEL_TEXTURE));
+        SpriteUtil.INSTANCE.markSpriteActive(atlasManager.getSprite(SAW_TEXTURE));
+        SpriteUtil.INSTANCE.markSpriteActive(atlasManager.getSprite(SAW_VANILLA_TEXTURE));
+        SpriteUtil.INSTANCE.markSpriteActive(atlasManager.getSprite(FACTORY_PANEL_TEXTURE));
     }
 
     @SuppressWarnings("UnstableApiUsage")
@@ -67,16 +67,15 @@ public class SodiumCompat {
             if (state.isAir()) {
                 continue;
             }
-            if (saw && state.is(AllBlocks.MECHANICAL_SAW)) {
-                AtlasManager atlasManager = Minecraft.getInstance().getAtlasManager();
-                SpriteUtil.INSTANCE.markSpriteActive(atlasManager.get(SAW_TEXTURE));
-                SpriteUtil.INSTANCE.markSpriteActive(atlasManager.get(SAW_VANILLA_TEXTURE));
+            if (saw && state.isOf(AllBlocks.MECHANICAL_SAW)) {
+                AtlasManager atlasManager = MinecraftClient.getInstance().getAtlasManager();
+                SpriteUtil.INSTANCE.markSpriteActive(atlasManager.getSprite(SAW_TEXTURE));
+                SpriteUtil.INSTANCE.markSpriteActive(atlasManager.getSprite(SAW_VANILLA_TEXTURE));
                 saw = false;
                 continue;
             }
-            if (panel && state.is(AllBlocks.FACTORY_GAUGE)) {
-                SpriteUtil.INSTANCE.markSpriteActive(Minecraft.getInstance().getAtlasManager()
-                    .get(FACTORY_PANEL_TEXTURE));
+            if (panel && state.isOf(AllBlocks.FACTORY_GAUGE)) {
+                SpriteUtil.INSTANCE.markSpriteActive(MinecraftClient.getInstance().getAtlasManager().getSprite(FACTORY_PANEL_TEXTURE));
                 panel = false;
                 continue;
             }
@@ -93,7 +92,7 @@ public class SodiumCompat {
             }
             FluidState fluidState = state.getFluidState();
             if (!fluidState.isEmpty()) {
-                Fluid fluid = fluidState.getType();
+                Fluid fluid = fluidState.getFluid();
                 if (fluids.add(fluid)) {
                     markFluidSpriteActive(fluid);
                 }

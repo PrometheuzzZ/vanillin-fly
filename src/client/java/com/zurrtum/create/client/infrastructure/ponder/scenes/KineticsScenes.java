@@ -22,16 +22,12 @@ import com.zurrtum.create.content.kinetics.transmission.sequencer.SequencedGears
 import com.zurrtum.create.content.kinetics.waterwheel.WaterWheelBlockEntity;
 import com.zurrtum.create.content.redstone.nixieTube.NixieTubeBlock;
 import com.zurrtum.create.content.redstone.nixieTube.NixieTubeBlockEntity;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.core.Direction.Axis;
-import net.minecraft.core.Vec3i;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
-import net.minecraft.world.level.block.RedStoneWireBlock;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.RedstoneWireBlock;
+import net.minecraft.item.ItemStack;
+import net.minecraft.item.Items;
+import net.minecraft.util.math.*;
+import net.minecraft.util.math.Direction.Axis;
 
 public class KineticsScenes {
 
@@ -51,9 +47,8 @@ public class KineticsScenes {
         scene.idle(10);
 
         for (int i = 4; i >= 1; i--) {
-            if (i == 2) {
+            if (i == 2)
                 scene.rotateCameraY(70);
-            }
             scene.idle(5);
             scene.world().showSection(util.select().position(i, 1, 2), Direction.DOWN);
         }
@@ -82,23 +77,20 @@ public class KineticsScenes {
         scene.idle(20);
 
         EncasedShaftBlock andesiteEncased = AllBlocks.ANDESITE_ENCASED_SHAFT;
-        ItemStack andesiteCasingItem = AllItems.ANDESITE_CASING.getDefaultInstance();
+        ItemStack andesiteCasingItem = AllItems.ANDESITE_CASING.getDefaultStack();
 
-        scene.overlay().showControls(util.vector().topOf(3, 1, 2), Pointing.DOWN, 60).rightClick()
-            .withItem(andesiteCasingItem);
+        scene.overlay().showControls(util.vector().topOf(3, 1, 2), Pointing.DOWN, 60).rightClick().withItem(andesiteCasingItem);
         scene.idle(7);
-        scene.world()
-            .setBlocks(andesite, andesiteEncased.defaultBlockState().setValue(EncasedShaftBlock.AXIS, Axis.X), true);
+        scene.world().setBlocks(andesite, andesiteEncased.getDefaultState().with(EncasedShaftBlock.AXIS, Axis.X), true);
         scene.world().setKineticSpeed(shaft, 32);
         scene.idle(10);
 
         EncasedShaftBlock brassEncased = AllBlocks.BRASS_ENCASED_SHAFT;
-        ItemStack brassCasingItem = AllItems.BRASS_CASING.getDefaultInstance();
+        ItemStack brassCasingItem = AllItems.BRASS_CASING.getDefaultStack();
 
-        scene.overlay().showControls(util.vector().topOf(1, 0, 2), Pointing.UP, 60).rightClick()
-            .withItem(brassCasingItem);
+        scene.overlay().showControls(util.vector().topOf(1, 0, 2), Pointing.UP, 60).rightClick().withItem(brassCasingItem);
         scene.idle(7);
-        scene.world().setBlocks(brass, brassEncased.defaultBlockState().setValue(EncasedShaftBlock.AXIS, Axis.X), true);
+        scene.world().setBlocks(brass, brassEncased.getDefaultState().with(EncasedShaftBlock.AXIS, Axis.X), true);
         scene.world().setKineticSpeed(shaft, 32);
 
         scene.idle(10);
@@ -122,9 +114,8 @@ public class KineticsScenes {
 
         for (int i = 1; i <= 4; i++) {
             scene.idle(5);
-            if (i == 2) {
+            if (i == 2)
                 scene.world().showSection(util.select().position(0, 1, 2), Direction.DOWN);
-            }
             scene.world().showSection(util.select().position(i, 1, 2), Direction.DOWN);
         }
 
@@ -140,9 +131,8 @@ public class KineticsScenes {
         scene.effects().rotationDirectionIndicator(util.grid().at(1, 1, 1));
         scene.effects().rotationDirectionIndicator(util.grid().at(2, 1, 1));
         scene.idle(20);
-        scene.overlay().showText(100).text("Neighbouring shafts connected like this will rotate in opposite directions")
-            .placeNearTarget().attachKeyFrame()
-            .pointAt(util.vector().blockSurface(util.grid().at(1, 1, 2), Direction.NORTH));
+        scene.overlay().showText(100).text("Neighbouring shafts connected like this will rotate in opposite directions").placeNearTarget()
+            .attachKeyFrame().pointAt(util.vector().blockSurface(util.grid().at(1, 1, 2), Direction.NORTH));
         scene.idle(70);
 
     }
@@ -151,11 +141,7 @@ public class KineticsScenes {
         CreateSceneBuilder scene = new CreateSceneBuilder(builder);
         scene.title("large_cogwheel", "Relaying rotational force using Large Cogwheels");
         scene.configureBasePlate(1, 1, 5);
-        scene.world().setBlock(
-            util.grid().at(4, 2, 3),
-            AllBlocks.LARGE_COGWHEEL.defaultBlockState().setValue(CogWheelBlock.AXIS, Axis.X),
-            false
-        );
+        scene.world().setBlock(util.grid().at(4, 2, 3), AllBlocks.LARGE_COGWHEEL.getDefaultState().with(CogWheelBlock.AXIS, Axis.X), false);
 
         scene.showBasePlate();
         scene.idle(5);
@@ -165,9 +151,8 @@ public class KineticsScenes {
 
         for (int i = 3; i >= 1; i--) {
             scene.idle(5);
-            if (i == 3) {
+            if (i == 3)
                 scene.world().showSection(util.select().position(3, 2, 5), Direction.DOWN);
-            }
             scene.world().showSection(util.select().position(3, 2, i), Direction.DOWN);
         }
 
@@ -177,21 +162,20 @@ public class KineticsScenes {
         scene.world().hideSection(util.select().fromTo(3, 2, 1, 3, 2, 5), Direction.SOUTH);
 
         scene.idle(15);
-        scene.world().modifyBlock(util.grid().at(3, 2, 3), s -> s.setValue(ShaftBlock.AXIS, Axis.X), false);
+        scene.world().modifyBlock(util.grid().at(3, 2, 3), s -> s.with(ShaftBlock.AXIS, Axis.X), false);
         scene.world().setKineticSpeed(util.select().fromTo(1, 2, 3, 5, 2, 3), 16);
         scene.world().showSection(util.select().position(4, 2, 3), Direction.WEST);
 
         for (int i = 3; i >= 1; i--) {
             scene.idle(5);
-            if (i == 3) {
+            if (i == 3)
                 scene.world().showSection(util.select().position(5, 2, 3), Direction.DOWN);
-            }
             scene.world().showSection(util.select().position(i, 2, 3), Direction.DOWN);
         }
 
         scene.idle(5);
-        scene.overlay().showText(90).text("It will help relaying conveyed speed to other axes of rotation")
-            .placeNearTarget().pointAt(util.vector().blockSurface(util.grid().at(1, 2, 3), Direction.WEST));
+        scene.overlay().showText(90).text("It will help relaying conveyed speed to other axes of rotation").placeNearTarget()
+            .pointAt(util.vector().blockSurface(util.grid().at(1, 2, 3), Direction.WEST));
         scene.effects().rotationSpeedIndicator(util.grid().at(3, 1, 3));
         scene.effects().rotationSpeedIndicator(util.grid().at(4, 2, 3));
         scene.idle(60);
@@ -209,8 +193,8 @@ public class KineticsScenes {
 
         BlockPos lowerCog = util.grid().at(3, 1, 2);
         BlockPos upperCog = util.grid().at(3, 2, 3);
-        BlockState largeCogState = AllBlocks.LARGE_COGWHEEL.defaultBlockState().setValue(CogWheelBlock.AXIS, Axis.X);
-        BlockState smallCogState = AllBlocks.COGWHEEL.defaultBlockState().setValue(CogWheelBlock.AXIS, Axis.X);
+        BlockState largeCogState = AllBlocks.LARGE_COGWHEEL.getDefaultState().with(CogWheelBlock.AXIS, Axis.X);
+        BlockState smallCogState = AllBlocks.COGWHEEL.getDefaultState().with(CogWheelBlock.AXIS, Axis.X);
 
         scene.world().setBlock(lowerCog, largeCogState, false);
         scene.world().setBlock(upperCog, smallCogState, false);
@@ -225,9 +209,8 @@ public class KineticsScenes {
 
         Selection gaugesSelect = util.select().fromTo(0, 1, 2, 2, 2, 3);
         scene.world().showSection(gaugesSelect, Direction.DOWN);
-        scene.overlay().showText(80).text("Shifting from large to small cogs, the conveyed speed will be doubled")
-            .colored(PonderPalette.GREEN).attachKeyFrame().placeNearTarget()
-            .pointAt(util.vector().blockSurface(util.grid().at(1, 2, 3), Direction.NORTH));
+        scene.overlay().showText(80).text("Shifting from large to small cogs, the conveyed speed will be doubled").colored(PonderPalette.GREEN)
+            .attachKeyFrame().placeNearTarget().pointAt(util.vector().blockSurface(util.grid().at(1, 2, 3), Direction.NORTH));
         scene.idle(30);
         scene.effects().rotationSpeedIndicator(upperCog);
         scene.idle(60);
@@ -240,8 +223,7 @@ public class KineticsScenes {
         scene.idle(45);
 
         scene.world().setKineticSpeed(util.select().fromTo(lowerCog, upperShaftEnd), 0);
-        ElementLink<WorldSectionElement> cogs = scene.world()
-            .makeSectionIndependent(util.select().fromTo(lowerCog, upperCog));
+        ElementLink<WorldSectionElement> cogs = scene.world().makeSectionIndependent(util.select().fromTo(lowerCog, upperCog));
         scene.world().moveSection(cogs, util.vector().of(0, 1, 0), 5);
         scene.idle(5);
         scene.world().rotateSection(cogs, 180, 0, 0, 10);
@@ -255,9 +237,8 @@ public class KineticsScenes {
         scene.world().setKineticSpeed(util.select().fromTo(lowerCog, lowerShaftEnd), 32);
         scene.world().setKineticSpeed(util.select().fromTo(upperCog, upperShaftEnd), -16);
 
-        scene.overlay().showText(80).text("Shifting the opposite way, the conveyed speed will be halved")
-            .colored(PonderPalette.RED).attachKeyFrame().placeNearTarget()
-            .pointAt(util.vector().blockSurface(util.grid().at(1, 2, 3), Direction.NORTH));
+        scene.overlay().showText(80).text("Shifting the opposite way, the conveyed speed will be halved").colored(PonderPalette.RED).attachKeyFrame()
+            .placeNearTarget().pointAt(util.vector().blockSurface(util.grid().at(1, 2, 3), Direction.NORTH));
         scene.idle(10);
         scene.effects().rotationSpeedIndicator(upperCog);
         scene.idle(80);
@@ -294,75 +275,63 @@ public class KineticsScenes {
         scene.idle(20);
 
         EncasedCogwheelBlock andesiteEncased = AllBlocks.ANDESITE_ENCASED_COGWHEEL;
-        ItemStack andesiteCasingItem = AllItems.ANDESITE_CASING.getDefaultInstance();
+        ItemStack andesiteCasingItem = AllItems.ANDESITE_CASING.getDefaultStack();
 
-        scene.overlay().showControls(util.vector().topOf(3, 0, 2), Pointing.UP, 100).rightClick()
-            .withItem(andesiteCasingItem);
+        scene.overlay().showControls(util.vector().topOf(3, 0, 2), Pointing.UP, 100).rightClick().withItem(andesiteCasingItem);
         scene.idle(7);
         scene.world().setBlocks(
             util.select().position(3, 1, 2),
-            andesiteEncased.defaultBlockState().setValue(EncasedCogwheelBlock.AXIS, Axis.Y)
-                .setValue(EncasedCogwheelBlock.TOP_SHAFT, true),
+            andesiteEncased.getDefaultState().with(EncasedCogwheelBlock.AXIS, Axis.Y).with(EncasedCogwheelBlock.TOP_SHAFT, true),
             true
         );
         scene.world().setKineticSpeed(util.select().position(3, 1, 2), -32);
         scene.idle(15);
 
-        scene.overlay().showControls(util.vector().topOf(2, 1, 2), Pointing.DOWN, 30).rightClick()
-            .withItem(andesiteCasingItem);
+        scene.overlay().showControls(util.vector().topOf(2, 1, 2), Pointing.DOWN, 30).rightClick().withItem(andesiteCasingItem);
         scene.idle(7);
-        scene.world()
-            .setBlocks(small2, andesiteEncased.defaultBlockState().setValue(EncasedCogwheelBlock.AXIS, Axis.Y), true);
+        scene.world().setBlocks(small2, andesiteEncased.getDefaultState().with(EncasedCogwheelBlock.AXIS, Axis.Y), true);
         scene.world().setKineticSpeed(small2, 32);
         scene.idle(15);
 
         EncasedCogwheelBlock brassEncased = AllBlocks.BRASS_ENCASED_LARGE_COGWHEEL;
-        ItemStack brassCasingItem = AllItems.BRASS_CASING.getDefaultInstance();
+        ItemStack brassCasingItem = AllItems.BRASS_CASING.getDefaultStack();
 
-        scene.overlay().showControls(util.vector().topOf(1, 0, 3), Pointing.UP, 60).rightClick()
-            .withItem(brassCasingItem);
+        scene.overlay().showControls(util.vector().topOf(1, 0, 3), Pointing.UP, 60).rightClick().withItem(brassCasingItem);
         scene.idle(7);
-        scene.world().setBlocks(
-            util.select().position(1, 1, 3),
-            brassEncased.defaultBlockState().setValue(EncasedCogwheelBlock.AXIS, Axis.Y),
-            true
-        );
+        scene.world().setBlocks(util.select().position(1, 1, 3), brassEncased.getDefaultState().with(EncasedCogwheelBlock.AXIS, Axis.Y), true);
         scene.world().setKineticSpeed(util.select().position(1, 1, 3), -16);
 
         scene.idle(10);
-        scene.overlay().showText(70).placeNearTarget().attachKeyFrame()
-            .text("Brass or Andesite Casing can be used to decorate Cogwheels").pointAt(util.vector().topOf(1, 1, 3));
+        scene.overlay().showText(70).placeNearTarget().attachKeyFrame().text("Brass or Andesite Casing can be used to decorate Cogwheels")
+            .pointAt(util.vector().topOf(1, 1, 3));
         scene.idle(80);
 
         ElementLink<WorldSectionElement> shaftLink = scene.world().showIndependentSection(shaft2, Direction.DOWN);
         scene.idle(15);
         scene.overlay().showText(90).placeNearTarget().colored(PonderPalette.RED).attachKeyFrame()
-            .text("Components added after encasing will not connect to the shaft outputs")
-            .pointAt(util.vector().centerOf(2, 2, 2));
+            .text("Components added after encasing will not connect to the shaft outputs").pointAt(util.vector().centerOf(2, 2, 2));
         scene.idle(90);
 
-        scene.world().moveSection(shaftLink, new Vec3(0, .5f, 0), 10);
+        scene.world().moveSection(shaftLink, new Vec3d(0, .5f, 0), 10);
         scene.idle(10);
 
         scene.addKeyframe();
-        Vec3 wrenchHere = util.vector().topOf(2, 1, 2).add(.25, 0, -.25);
-        scene.overlay().showControls(wrenchHere, Pointing.RIGHT, 25).rightClick()
-            .withItem(AllItems.WRENCH.getDefaultInstance());
+        Vec3d wrenchHere = util.vector().topOf(2, 1, 2).add(.25, 0, -.25);
+        scene.overlay().showControls(wrenchHere, Pointing.RIGHT, 25).rightClick().withItem(AllItems.WRENCH.getDefaultStack());
         scene.idle(7);
         scene.world().cycleBlockProperty(util.grid().at(2, 1, 2), EncasedCogwheelBlock.TOP_SHAFT);
         scene.idle(15);
-        scene.world().moveSection(shaftLink, new Vec3(0, -.5f, 0), 10);
+        scene.world().moveSection(shaftLink, new Vec3d(0, -.5f, 0), 10);
         scene.idle(10);
         scene.world().setKineticSpeed(shaft2, 32);
         scene.effects().rotationDirectionIndicator(util.grid().at(2, 2, 2));
         scene.idle(20);
 
-        scene.overlay().showText(90).placeNearTarget().colored(PonderPalette.GREEN)
-            .text("The Wrench can be used to toggle connections").pointAt(wrenchHere.add(-.5, 0, .5));
+        scene.overlay().showText(90).placeNearTarget().colored(PonderPalette.GREEN).text("The Wrench can be used to toggle connections")
+            .pointAt(wrenchHere.add(-.5, 0, .5));
         scene.idle(40);
 
-        scene.overlay().showControls(wrenchHere, Pointing.RIGHT, 25).rightClick()
-            .withItem(AllItems.WRENCH.getDefaultInstance());
+        scene.overlay().showControls(wrenchHere, Pointing.RIGHT, 25).rightClick().withItem(AllItems.WRENCH.getDefaultStack());
         scene.idle(7);
         scene.world().cycleBlockProperty(util.grid().at(2, 1, 2), EncasedCogwheelBlock.TOP_SHAFT);
         scene.world().setKineticSpeed(shaft2, 0);
@@ -395,29 +364,28 @@ public class KineticsScenes {
 
         scene.idle(10);
 
-        scene.overlay().showText(80).colored(PonderPalette.RED)
-            .pointAt(util.vector().blockSurface(largeCogRight.west(), Direction.WEST)).placeNearTarget()
-            .text("Jumping between axes of rotation can get bulky quickly");
+        scene.overlay().showText(80).colored(PonderPalette.RED).pointAt(util.vector().blockSurface(largeCogRight.west(), Direction.WEST))
+            .placeNearTarget().text("Jumping between axes of rotation can get bulky quickly");
         scene.idle(80);
         Selection gearbox = util.select().position(3, 2, 3);
         scene.world().hideSection(util.select().fromTo(4, 2, 2, 2, 2, 4).substract(gearbox), Direction.UP);
         scene.idle(20);
 
-        BlockState defaultState = AllBlocks.SHAFT.defaultBlockState();
-        BlockState cogState = AllBlocks.COGWHEEL.defaultBlockState();
-        scene.world().setBlock(largeCogBack, defaultState.setValue(CogWheelBlock.AXIS, Axis.Z), false);
-        scene.world().setBlock(largeCogFront, defaultState.setValue(CogWheelBlock.AXIS, Axis.Z), false);
-        scene.world().setBlock(largeCogRight, defaultState.setValue(CogWheelBlock.AXIS, Axis.X), false);
-        scene.world().setBlock(largeCogLeft, defaultState.setValue(CogWheelBlock.AXIS, Axis.X), false);
+        BlockState defaultState = AllBlocks.SHAFT.getDefaultState();
+        BlockState cogState = AllBlocks.COGWHEEL.getDefaultState();
+        scene.world().setBlock(largeCogBack, defaultState.with(CogWheelBlock.AXIS, Axis.Z), false);
+        scene.world().setBlock(largeCogFront, defaultState.with(CogWheelBlock.AXIS, Axis.Z), false);
+        scene.world().setBlock(largeCogRight, defaultState.with(CogWheelBlock.AXIS, Axis.X), false);
+        scene.world().setBlock(largeCogLeft, defaultState.with(CogWheelBlock.AXIS, Axis.X), false);
         scene.world().showSection(util.select().fromTo(4, 2, 2, 2, 2, 4), Direction.DOWN);
 
         scene.idle(20);
-        scene.overlay().showText(80).colored(PonderPalette.GREEN).pointAt(util.vector().topOf(3, 2, 3))
-            .placeNearTarget().attachKeyFrame().text("A gearbox is the more compact equivalent of this setup");
+        scene.overlay().showText(80).colored(PonderPalette.GREEN).pointAt(util.vector().topOf(3, 2, 3)).placeNearTarget().attachKeyFrame()
+            .text("A gearbox is the more compact equivalent of this setup");
 
         scene.idle(90);
-        scene.world().setBlock(largeCogFront.north(), cogState.setValue(CogWheelBlock.AXIS, Axis.Z), true);
-        scene.world().setBlock(largeCogRight.west(), cogState.setValue(CogWheelBlock.AXIS, Axis.X), true);
+        scene.world().setBlock(largeCogFront.north(), cogState.with(CogWheelBlock.AXIS, Axis.Z), true);
+        scene.world().setBlock(largeCogRight.west(), cogState.with(CogWheelBlock.AXIS, Axis.X), true);
         scene.idle(10);
         scene.effects().rotationDirectionIndicator(largeCogFront.north());
         scene.effects().rotationDirectionIndicator(largeCogRight.west());
@@ -429,14 +397,13 @@ public class KineticsScenes {
 
         scene.world().hideSection(util.select().fromTo(1, 2, 3, 2, 2, 3), Direction.WEST);
         scene.world().hideSection(util.select().fromTo(4, 2, 3, 5, 2, 3), Direction.EAST);
-        scene.world().setBlock(largeCogBack.south(), cogState.setValue(CogWheelBlock.AXIS, Axis.Z), true);
+        scene.world().setBlock(largeCogBack.south(), cogState.with(CogWheelBlock.AXIS, Axis.Z), true);
         scene.idle(10);
 
         scene.effects().rotationDirectionIndicator(largeCogFront.north());
         scene.effects().rotationDirectionIndicator(largeCogBack.south());
         scene.idle(15);
-        scene.overlay().showText(60).pointAt(util.vector().centerOf(3, 2, 5)).placeNearTarget()
-            .text("Straight connections will be reversed");
+        scene.overlay().showText(60).pointAt(util.vector().centerOf(3, 2, 5)).placeNearTarget().text("Straight connections will be reversed");
 
     }
 
@@ -467,8 +434,7 @@ public class KineticsScenes {
         scene.world().setKineticSpeed(gauge, 32);
         scene.effects().indicateSuccess(gaugePos);
         scene.idle(10);
-        scene.overlay().showText(50).text("Clutches will relay rotation in a straight line").placeNearTarget()
-            .pointAt(util.vector().topOf(clutch));
+        scene.overlay().showText(50).text("Clutches will relay rotation in a straight line").placeNearTarget().pointAt(util.vector().topOf(clutch));
 
         scene.idle(60);
         scene.world().toggleRedstonePower(util.select().fromTo(leverPos, leverPos.south(2)));
@@ -477,9 +443,8 @@ public class KineticsScenes {
         scene.idle(10);
 
         scene.idle(10);
-        scene.overlay().showText(50).colored(PonderPalette.RED)
-            .text("When powered by Redstone, it breaks the connection").attachKeyFrame().placeNearTarget()
-            .pointAt(util.vector().topOf(clutch));
+        scene.overlay().showText(50).colored(PonderPalette.RED).text("When powered by Redstone, it breaks the connection").attachKeyFrame()
+            .placeNearTarget().pointAt(util.vector().topOf(clutch));
 
         scene.idle(70);
         scene.world().toggleRedstonePower(util.select().fromTo(leverPos, leverPos.south(2)));
@@ -518,9 +483,8 @@ public class KineticsScenes {
         scene.effects().rotationDirectionIndicator(gearshift.west(2));
         scene.idle(30);
 
-        scene.overlay().showText(50).colored(PonderPalette.RED).placeNearTarget()
-            .text("When powered by Redstone, it reverses the transmission").attachKeyFrame()
-            .pointAt(util.vector().topOf(gearshift));
+        scene.overlay().showText(50).colored(PonderPalette.RED).placeNearTarget().text("When powered by Redstone, it reverses the transmission")
+            .attachKeyFrame().pointAt(util.vector().topOf(gearshift));
 
         for (int i = 0; i < 3; i++) {
             scene.idle(60);
@@ -547,17 +511,17 @@ public class KineticsScenes {
 
         scene.idle(10);
         scene.effects().rotationSpeedIndicator(motor);
-        scene.overlay().showText(50).text("Creative motors are a compact and configurable source of Rotational Force")
-            .placeNearTarget().pointAt(util.vector().topOf(motor));
+        scene.overlay().showText(50).text("Creative motors are a compact and configurable source of Rotational Force").placeNearTarget()
+            .pointAt(util.vector().topOf(motor));
         scene.idle(70);
 
-        Vec3 blockSurface = util.vector().blockSurface(motor, Direction.NORTH).add(1 / 16f, 0, 3 / 16f);
+        Vec3d blockSurface = util.vector().blockSurface(motor, Direction.NORTH).add(1 / 16f, 0, 3 / 16f);
         scene.overlay().showFilterSlotInput(blockSurface, Direction.NORTH, 80);
         scene.overlay().showControls(blockSurface, Pointing.DOWN, 60).rightClick();
         scene.idle(20);
 
-        scene.overlay().showText(60).text("The generated speed can be configured on its input panels").attachKeyFrame()
-            .placeNearTarget().pointAt(blockSurface);
+        scene.overlay().showText(60).text("The generated speed can be configured on its input panels").attachKeyFrame().placeNearTarget()
+            .pointAt(blockSurface);
         scene.idle(10);
         scene.idle(50);
         scene.world().modifyKineticSpeed(util.select().fromTo(1, 1, 2, 3, 1, 2), f -> 4 * f);
@@ -579,7 +543,7 @@ public class KineticsScenes {
 
         for (int i = 0; i < 4; i++) {
             scene.idle(5);
-            scene.world().showSection(util.select().fromTo(gaugePos.east(i).below(), gaugePos.east(i)), Direction.DOWN);
+            scene.world().showSection(util.select().fromTo(gaugePos.east(i).down(), gaugePos.east(i)), Direction.DOWN);
         }
 
         scene.idle(10);
@@ -597,18 +561,14 @@ public class KineticsScenes {
             .pointAt(util.vector().topOf(wheel));
         scene.idle(10);
 
-        AABB bb = new AABB(wheel).inflate(1 / 16f, 0, 0);
-        scene.overlay()
-            .chaseBoundingBoxOutline(PonderPalette.MEDIUM, new Object(), bb.move(0, 1, 0).contract(0, .75, 0), 80);
+        Box bb = new Box(wheel).expand(1 / 16f, 0, 0);
+        scene.overlay().chaseBoundingBoxOutline(PonderPalette.MEDIUM, new Object(), bb.offset(0, 1, 0).shrink(0, .75, 0), 80);
         scene.idle(5);
-        scene.overlay()
-            .chaseBoundingBoxOutline(PonderPalette.MEDIUM, new Object(), bb.move(0, 0, -1).contract(0, 0, -.75), 75);
+        scene.overlay().chaseBoundingBoxOutline(PonderPalette.MEDIUM, new Object(), bb.offset(0, 0, -1).shrink(0, 0, -.75), 75);
         scene.idle(5);
-        scene.overlay()
-            .chaseBoundingBoxOutline(PonderPalette.MEDIUM, new Object(), bb.move(0, -1, 0).contract(0, -.75, 0), 70);
+        scene.overlay().chaseBoundingBoxOutline(PonderPalette.MEDIUM, new Object(), bb.offset(0, -1, 0).shrink(0, -.75, 0), 70);
         scene.idle(5);
-        scene.overlay()
-            .chaseBoundingBoxOutline(PonderPalette.MEDIUM, new Object(), bb.move(0, 0, 1).contract(0, 0, .75), 65);
+        scene.overlay().chaseBoundingBoxOutline(PonderPalette.MEDIUM, new Object(), bb.offset(0, 0, 1).shrink(0, 0, .75), 65);
         scene.idle(75);
 
         scene.addKeyframe();
@@ -619,8 +579,8 @@ public class KineticsScenes {
         }
 
         scene.idle(10);
-        scene.overlay().showText(50).text("Covering additional sides will not improve its kinetic output further")
-            .colored(PonderPalette.RED).placeNearTarget().pointAt(util.vector().blockSurface(wheel, Direction.NORTH));
+        scene.overlay().showText(50).text("Covering additional sides will not improve its kinetic output further").colored(PonderPalette.RED)
+            .placeNearTarget().pointAt(util.vector().blockSurface(wheel, Direction.NORTH));
 
         scene.idle(80);
 
@@ -634,13 +594,11 @@ public class KineticsScenes {
 
         scene.idle(5);
         ItemStack crimsonPlanks = new ItemStack(Items.CRIMSON_PLANKS);
-        scene.overlay().showControls(util.vector().topOf(wheel), Pointing.DOWN, 20).rightClick()
-            .withItem(crimsonPlanks);
+        scene.overlay().showControls(util.vector().topOf(wheel), Pointing.DOWN, 20).rightClick().withItem(crimsonPlanks);
         scene.idle(7);
-        scene.world()
-            .modifyBlockEntity(wheel, WaterWheelBlockEntity.class, be -> be.applyMaterialIfValid(crimsonPlanks));
-        scene.overlay().showText(50).text("Use wood planks on the wheel to change its appearance")
-            .colored(PonderPalette.BLUE).placeNearTarget().pointAt(util.vector().blockSurface(wheel, Direction.WEST));
+        scene.world().modifyBlockEntity(wheel, WaterWheelBlockEntity.class, be -> be.applyMaterialIfValid(crimsonPlanks));
+        scene.overlay().showText(50).text("Use wood planks on the wheel to change its appearance").colored(PonderPalette.BLUE).placeNearTarget()
+            .pointAt(util.vector().blockSurface(wheel, Direction.WEST));
         scene.idle(40);
 
         ItemStack birchPlanks = new ItemStack(Items.BIRCH_PLANKS);
@@ -652,8 +610,7 @@ public class KineticsScenes {
         ItemStack junglePlanks = new ItemStack(Items.JUNGLE_PLANKS);
         scene.overlay().showControls(util.vector().topOf(wheel), Pointing.DOWN, 20).rightClick().withItem(junglePlanks);
         scene.idle(7);
-        scene.world()
-            .modifyBlockEntity(wheel, WaterWheelBlockEntity.class, be -> be.applyMaterialIfValid(junglePlanks));
+        scene.world().modifyBlockEntity(wheel, WaterWheelBlockEntity.class, be -> be.applyMaterialIfValid(junglePlanks));
         scene.idle(20);
 
         scene.world().moveSection(water, util.vector().of(-1, -0.5, 0.5), 15);
@@ -667,8 +624,7 @@ public class KineticsScenes {
         scene.title("large_water_wheel", "Generating Rotational Force using Large Water Wheels");
         scene.configureBasePlate(0, 0, 5);
         scene.world().showSection(util.select().layer(0).substract(util.select().position(3, 0, 0)), Direction.UP);
-        ElementLink<WorldSectionElement> strip = scene.world()
-            .showIndependentSection(util.select().fromTo(1, 0, 0, 1, 0, 4), Direction.UP);
+        ElementLink<WorldSectionElement> strip = scene.world().showIndependentSection(util.select().fromTo(1, 0, 0, 1, 0, 4), Direction.UP);
         scene.world().moveSection(strip, util.vector().of(2, 0, 0), 0);
         scene.idle(10);
         scene.world().showSection(util.select().fromTo(3, 1, 3, 3, 2, 3), Direction.DOWN);
@@ -678,9 +634,8 @@ public class KineticsScenes {
 
         for (int i = 0; i < 4; i++) {
             scene.idle(5);
-            if (i == 0) {
+            if (i == 0)
                 scene.world().hideIndependentSection(strip, Direction.DOWN);
-            }
             scene.world().showSection(util.select().position(gaugePos.east(i)), Direction.DOWN);
         }
 
@@ -695,22 +650,18 @@ public class KineticsScenes {
 
         BlockPos wheel = util.grid().at(3, 1, 2);
         scene.effects().rotationSpeedIndicator(wheel);
-        scene.overlay().showText(60).text("Large Water Wheels draw force from adjacent Water Currents")
-            .placeNearTarget().pointAt(util.vector().topOf(wheel));
+        scene.overlay().showText(60).text("Large Water Wheels draw force from adjacent Water Currents").placeNearTarget()
+            .pointAt(util.vector().topOf(wheel));
         scene.idle(10);
 
-        AABB bb = new AABB(wheel).inflate(.125, 1, 1);
-        scene.overlay()
-            .chaseBoundingBoxOutline(PonderPalette.MEDIUM, new Object(), bb.move(0, 3, 0).contract(0, 2.75, 0), 80);
+        Box bb = new Box(wheel).expand(.125, 1, 1);
+        scene.overlay().chaseBoundingBoxOutline(PonderPalette.MEDIUM, new Object(), bb.offset(0, 3, 0).shrink(0, 2.75, 0), 80);
         scene.idle(5);
-        scene.overlay()
-            .chaseBoundingBoxOutline(PonderPalette.MEDIUM, new Object(), bb.move(0, 0, -3).contract(0, 0, -2.75), 75);
+        scene.overlay().chaseBoundingBoxOutline(PonderPalette.MEDIUM, new Object(), bb.offset(0, 0, -3).shrink(0, 0, -2.75), 75);
         scene.idle(5);
-        scene.overlay()
-            .chaseBoundingBoxOutline(PonderPalette.MEDIUM, new Object(), bb.move(0, -3, 0).contract(0, -2.75, 0), 70);
+        scene.overlay().chaseBoundingBoxOutline(PonderPalette.MEDIUM, new Object(), bb.offset(0, -3, 0).shrink(0, -2.75, 0), 70);
         scene.idle(5);
-        scene.overlay()
-            .chaseBoundingBoxOutline(PonderPalette.MEDIUM, new Object(), bb.move(0, 0, 3).contract(0, 0, 2.75), 65);
+        scene.overlay().chaseBoundingBoxOutline(PonderPalette.MEDIUM, new Object(), bb.offset(0, 0, 3).shrink(0, 0, 2.75), 65);
         scene.idle(75);
 
         scene.addKeyframe();
@@ -721,19 +672,17 @@ public class KineticsScenes {
         }
 
         scene.idle(10);
-        scene.overlay().showText(50).text("Covering additional sides will not improve its kinetic output further")
-            .colored(PonderPalette.RED).placeNearTarget().pointAt(util.vector().blockSurface(wheel, Direction.NORTH));
+        scene.overlay().showText(50).text("Covering additional sides will not improve its kinetic output further").colored(PonderPalette.RED)
+            .placeNearTarget().pointAt(util.vector().blockSurface(wheel, Direction.NORTH));
 
         scene.idle(80);
 
         scene.idle(10);
-        scene.overlay().showText(70).attachKeyFrame()
-            .text("These rotate only at half the speed of regular water wheels...").colored(PonderPalette.WHITE)
-            .placeNearTarget().pointAt(util.vector().blockSurface(gaugePos, Direction.NORTH));
+        scene.overlay().showText(70).attachKeyFrame().text("These rotate only at half the speed of regular water wheels...")
+            .colored(PonderPalette.WHITE).placeNearTarget().pointAt(util.vector().blockSurface(gaugePos, Direction.NORTH));
 
         scene.idle(78);
-        scene.overlay().showText(60).text("...but provide a substantially higher stress capacity")
-            .colored(PonderPalette.WHITE).placeNearTarget()
+        scene.overlay().showText(60).text("...but provide a substantially higher stress capacity").colored(PonderPalette.WHITE).placeNearTarget()
             .pointAt(util.vector().blockSurface(gaugePos, Direction.WEST));
 
         scene.idle(80);
@@ -746,17 +695,15 @@ public class KineticsScenes {
         scene.idle(5);
         scene.world().setKineticSpeed(util.select().everywhere(), 0);
 
-        BlockPos target = wheel.south().above();
+        BlockPos target = wheel.south().up();
 
         scene.idle(5);
         ItemStack crimsonPlanks = new ItemStack(Items.CRIMSON_PLANKS);
-        scene.overlay().showControls(util.vector().topOf(target), Pointing.DOWN, 20).rightClick()
-            .withItem(crimsonPlanks);
+        scene.overlay().showControls(util.vector().topOf(target), Pointing.DOWN, 20).rightClick().withItem(crimsonPlanks);
         scene.idle(7);
-        scene.world()
-            .modifyBlockEntity(wheel, WaterWheelBlockEntity.class, be -> be.applyMaterialIfValid(crimsonPlanks));
-        scene.overlay().showText(50).text("Use wood planks on the wheel to change its appearance")
-            .colored(PonderPalette.BLUE).placeNearTarget().pointAt(util.vector().blockSurface(target, Direction.WEST));
+        scene.world().modifyBlockEntity(wheel, WaterWheelBlockEntity.class, be -> be.applyMaterialIfValid(crimsonPlanks));
+        scene.overlay().showText(50).text("Use wood planks on the wheel to change its appearance").colored(PonderPalette.BLUE).placeNearTarget()
+            .pointAt(util.vector().blockSurface(target, Direction.WEST));
         scene.idle(40);
 
         ItemStack birchPlanks = new ItemStack(Items.BIRCH_PLANKS);
@@ -766,11 +713,9 @@ public class KineticsScenes {
         scene.idle(40);
 
         ItemStack junglePlanks = new ItemStack(Items.JUNGLE_PLANKS);
-        scene.overlay().showControls(util.vector().topOf(target), Pointing.DOWN, 20).rightClick()
-            .withItem(junglePlanks);
+        scene.overlay().showControls(util.vector().topOf(target), Pointing.DOWN, 20).rightClick().withItem(junglePlanks);
         scene.idle(7);
-        scene.world()
-            .modifyBlockEntity(wheel, WaterWheelBlockEntity.class, be -> be.applyMaterialIfValid(junglePlanks));
+        scene.world().modifyBlockEntity(wheel, WaterWheelBlockEntity.class, be -> be.applyMaterialIfValid(junglePlanks));
         scene.idle(20);
 
         scene.world().moveSection(water, util.vector().of(-1, -0.5, 0.5), 15);
@@ -795,11 +740,10 @@ public class KineticsScenes {
         scene.world().showSection(handleSelect, Direction.DOWN);
         scene.idle(20);
 
-        Vec3 centerOf = util.vector().centerOf(handlePos);
-        Vec3 sideOf = centerOf.add(-0.5, 0, 0);
+        Vec3d centerOf = util.vector().centerOf(handlePos);
+        Vec3d sideOf = centerOf.add(-0.5, 0, 0);
 
-        scene.overlay().showText(70).text("Hand Cranks can be used by players to apply rotational force manually")
-            .placeNearTarget().pointAt(sideOf);
+        scene.overlay().showText(70).text("Hand Cranks can be used by players to apply rotational force manually").placeNearTarget().pointAt(sideOf);
         scene.idle(80);
 
         scene.overlay().showControls(centerOf, Pointing.DOWN, 40).rightClick();
@@ -809,8 +753,7 @@ public class KineticsScenes {
         scene.effects().rotationDirectionIndicator(handlePos);
         scene.effects().indicateSuccess(gaugePos);
         scene.idle(10);
-        scene.overlay().showText(50).text("Hold Right-Click to rotate it Counter-Clockwise").attachKeyFrame()
-            .placeNearTarget().pointAt(sideOf);
+        scene.overlay().showText(50).text("Hold Right-Click to rotate it Counter-Clockwise").attachKeyFrame().placeNearTarget().pointAt(sideOf);
 
         scene.idle(35);
         scene.world().setKineticSpeed(util.select().everywhere(), 0);
@@ -823,8 +766,7 @@ public class KineticsScenes {
         scene.effects().rotationDirectionIndicator(handlePos);
         scene.effects().indicateSuccess(gaugePos);
         scene.idle(10);
-        scene.overlay().showText(90).text("Sneak and Hold Right-Click to rotate it Clockwise").attachKeyFrame()
-            .placeNearTarget().pointAt(sideOf);
+        scene.overlay().showText(90).text("Sneak and Hold Right-Click to rotate it Clockwise").attachKeyFrame().placeNearTarget().pointAt(sideOf);
 
         scene.idle(35);
         scene.world().setKineticSpeed(util.select().everywhere(), 0);
@@ -841,21 +783,19 @@ public class KineticsScenes {
         Selection armS = util.select().fromTo(3, 2, 3, 1, 2, 3);
         BlockPos bearing = util.grid().at(2, 2, 2);
         BlockPos valvePos = util.grid().at(2, 2, 1);
-        Vec3 centerOf = util.vector().centerOf(valvePos);
-        Vec3 sideOf = centerOf.add(-0.5, 0, 0);
-        Vec3 topOf = centerOf.add(0, 0.5, 0);
+        Vec3d centerOf = util.vector().centerOf(valvePos);
+        Vec3d sideOf = centerOf.add(-0.5, 0, 0);
+        Vec3d topOf = centerOf.add(0, 0.5, 0);
 
-        scene.world().showSection(util.select().fromTo(bearing, bearing.below()), Direction.DOWN);
+        scene.world().showSection(util.select().fromTo(bearing, bearing.down()), Direction.DOWN);
         scene.idle(3);
         ElementLink<WorldSectionElement> contraption = scene.world().showIndependentSection(armS, Direction.NORTH);
         scene.idle(3);
-        ElementLink<WorldSectionElement> valve = scene.world()
-            .showIndependentSection(util.select().position(valvePos), Direction.SOUTH);
+        ElementLink<WorldSectionElement> valve = scene.world().showIndependentSection(util.select().position(valvePos), Direction.SOUTH);
         scene.world().rotateSection(valve, 0, 0, 45, 0);
         scene.idle(20);
 
-        scene.overlay().showText(70).text("Valve handles can be used to rotate components by a precise angle")
-            .placeNearTarget().pointAt(sideOf);
+        scene.overlay().showText(70).text("Valve handles can be used to rotate components by a precise angle").placeNearTarget().pointAt(sideOf);
 
         scene.idle(20);
         scene.world().rotateSection(valve, 0, 0, 45, 15);
@@ -866,9 +806,9 @@ public class KineticsScenes {
         scene.world().setKineticSpeed(util.select().everywhere(), 0);
         scene.idle(60);
 
-        Vec3 blockSurface = util.vector().centerOf(valvePos).add(0, 0, 4 / 16f);
-        AABB point = new AABB(blockSurface, blockSurface);
-        AABB expanded = point.inflate(1 / 8f, 1 / 8f, 1 / 16f);
+        Vec3d blockSurface = util.vector().centerOf(valvePos).add(0, 0, 4 / 16f);
+        Box point = new Box(blockSurface, blockSurface);
+        Box expanded = point.expand(1 / 8f, 1 / 8f, 1 / 16f);
 
         scene.overlay().chaseBoundingBoxOutline(PonderPalette.WHITE, blockSurface, point, 1);
         scene.idle(1);
@@ -876,8 +816,7 @@ public class KineticsScenes {
         scene.overlay().showControls(blockSurface, Pointing.DOWN, 60).rightClick();
         scene.idle(10);
 
-        scene.overlay().showText(60).text("The angle can be configured on the input panel").attachKeyFrame()
-            .placeNearTarget().pointAt(blockSurface);
+        scene.overlay().showText(60).text("The angle can be configured on the input panel").attachKeyFrame().placeNearTarget().pointAt(blockSurface);
 
         scene.idle(70);
         scene.overlay().showControls(topOf, Pointing.DOWN, 40).rightClick();
@@ -888,8 +827,7 @@ public class KineticsScenes {
         scene.world().setKineticSpeed(util.select().everywhere(), 16);
 
         scene.idle(10);
-        scene.overlay().showText(40).text("Right-Click to activate one rotation").attachKeyFrame().placeNearTarget()
-            .pointAt(sideOf);
+        scene.overlay().showText(40).text("Right-Click to activate one rotation").attachKeyFrame().placeNearTarget().pointAt(sideOf);
 
         scene.idle(20);
         scene.world().setKineticSpeed(util.select().everywhere(), 0);
@@ -903,37 +841,32 @@ public class KineticsScenes {
         scene.world().setKineticSpeed(util.select().everywhere(), -16);
 
         scene.idle(10);
-        scene.overlay().showText(50).text("Sneak-Right-Click to activate it in the opposite direction")
-            .placeNearTarget().pointAt(sideOf);
+        scene.overlay().showText(50).text("Sneak-Right-Click to activate it in the opposite direction").placeNearTarget().pointAt(sideOf);
 
         scene.idle(15);
         scene.world().setKineticSpeed(util.select().everywhere(), 0);
         scene.idle(40);
 
         blockSurface = util.vector().topOf(bearing).add(0, 0, -1 / 8f);
-        point = new AABB(blockSurface, blockSurface);
-        expanded = point.inflate(1 / 8f, 0, 1 / 8f);
+        point = new Box(blockSurface, blockSurface);
+        expanded = point.expand(1 / 8f, 0, 1 / 8f);
 
         scene.overlay().chaseBoundingBoxOutline(PonderPalette.WHITE, blockSurface, point, 1);
         scene.idle(1);
         scene.overlay().chaseBoundingBoxOutline(PonderPalette.WHITE, blockSurface, expanded, 80);
         scene.idle(10);
-        scene.overlay().showText(70).text("Mind that Bearings have to be specifically told not to disassemble")
-            .placeNearTarget().pointAt(blockSurface);
+        scene.overlay().showText(70).text("Mind that Bearings have to be specifically told not to disassemble").placeNearTarget()
+            .pointAt(blockSurface);
 
         scene.idle(90);
 
         scene.addKeyframe();
         scene.overlay().showControls(topOf, Pointing.DOWN, 40).rightClick().withItem(new ItemStack(Items.BLUE_DYE));
         scene.idle(7);
-        scene.world().modifyBlock(
-            valvePos,
-            s -> AllBlocks.BLUE_VALVE_HANDLE.defaultBlockState().setValue(ValveHandleBlock.FACING, Direction.NORTH),
-            true
-        );
+        scene.world().modifyBlock(valvePos, s -> AllBlocks.BLUE_VALVE_HANDLE.getDefaultState().with(ValveHandleBlock.FACING, Direction.NORTH), true);
         scene.idle(10);
-        scene.overlay().showText(70).text("Valve handles can be dyed for aesthetic purposes").placeNearTarget()
-            .colored(PonderPalette.BLUE).pointAt(sideOf);
+        scene.overlay().showText(70).text("Valve handles can be dyed for aesthetic purposes").placeNearTarget().colored(PonderPalette.BLUE)
+            .pointAt(sideOf);
         scene.idle(60);
     }
 
@@ -964,19 +897,18 @@ public class KineticsScenes {
         scene.world().showSection(util.select().fromTo(2, 1, 2, 1, 1, 2), Direction.EAST);
         scene.idle(10);
 
-        Vec3 top = util.vector().topOf(gearshiftPos);
-        scene.overlay().showText(60).text("Seq. Gearshifts relay rotation by following a timed list of instructions")
-            .attachKeyFrame().pointAt(top).placeNearTarget();
+        Vec3d top = util.vector().topOf(gearshiftPos);
+        scene.overlay().showText(60).text("Seq. Gearshifts relay rotation by following a timed list of instructions").attachKeyFrame().pointAt(top)
+            .placeNearTarget();
         scene.idle(80);
 
         scene.overlay().showControls(top, Pointing.DOWN, 40).rightClick();
         scene.idle(7);
-        scene.overlay().showOutlineWithText(gearshiftSelection, 50).colored(PonderPalette.BLUE)
-            .text("Right-click it to open the Configuration UI").pointAt(top).placeNearTarget();
+        scene.overlay().showOutlineWithText(gearshiftSelection, 50).colored(PonderPalette.BLUE).text("Right-click it to open the Configuration UI")
+            .pointAt(top).placeNearTarget();
         scene.idle(60);
 
-        ElementLink<WorldSectionElement> contraption = scene.world()
-            .showIndependentSection(util.select().fromTo(0, 3, 2, 0, 0, 2), Direction.EAST);
+        ElementLink<WorldSectionElement> contraption = scene.world().showIndependentSection(util.select().fromTo(0, 3, 2, 0, 0, 2), Direction.EAST);
         scene.world().configureCenterOfRotation(contraption, util.vector().centerOf(bearingPos));
 
         scene.idle(20);
@@ -991,8 +923,7 @@ public class KineticsScenes {
         scene.world().toggleRedstonePower(redstone);
         scene.idle(20);
 
-        scene.overlay().showText(80)
-            .text("Upon receiving a Redstone Signal, it will start running its configured sequence").attachKeyFrame()
+        scene.overlay().showText(80).text("Upon receiving a Redstone Signal, it will start running its configured sequence").attachKeyFrame()
             .pointAt(top);
 
         scene.world().cycleBlockProperty(gearshiftPos, SequencedGearshiftBlock.STATE);
@@ -1033,8 +964,8 @@ public class KineticsScenes {
         scene.effects().rotationDirectionIndicator(gearshiftPos.west());
         scene.idle(20);
 
-        scene.overlay().showText(60).text("A redstone comparator can be used to read the current progress")
-            .attachKeyFrame().pointAt(util.vector().topOf(util.grid().at(3, 0, 1)));
+        scene.overlay().showText(60).text("A redstone comparator can be used to read the current progress").attachKeyFrame()
+            .pointAt(util.vector().topOf(util.grid().at(3, 0, 1)));
 
         scene.world().hideSection(redstone, Direction.NORTH);
         scene.idle(15);
@@ -1044,11 +975,10 @@ public class KineticsScenes {
         scene.world().cycleBlockProperty(util.grid().at(4, 1, 0), NixieTubeBlock.FACING);
         scene.world().cycleBlockProperty(util.grid().at(4, 1, 0), NixieTubeBlock.FACING);
 
-        ElementLink<WorldSectionElement> comparator = scene.world()
-            .showIndependentSection(util.select().fromTo(5, 1, 1, 4, 1, 0), Direction.SOUTH);
+        ElementLink<WorldSectionElement> comparator = scene.world().showIndependentSection(util.select().fromTo(5, 1, 1, 4, 1, 0), Direction.SOUTH);
         scene.world().moveSection(comparator, util.vector().of(-2, 0, 0), 0);
         scene.world().toggleRedstonePower(util.select().position(5, 1, 1));
-        scene.world().cycleBlockProperty(wire, RedStoneWireBlock.POWER);
+        scene.world().cycleBlockProperty(wire, RedstoneWireBlock.POWER);
         scene.world().modifyBlockEntityNBT(nixie, NixieTubeBlockEntity.class, nbt -> nbt.putInt("RedstoneStrength", 1));
 
         scene.idle(5);
@@ -1058,13 +988,13 @@ public class KineticsScenes {
         scene.world().rotateBearing(bearingPos, -180, 40);
         scene.world().rotateSection(contraption, -180, 0, 0, 40);
         scene.effects().rotationDirectionIndicator(gearshiftPos.west());
-        scene.world().cycleBlockProperty(wire, RedStoneWireBlock.POWER);
+        scene.world().cycleBlockProperty(wire, RedstoneWireBlock.POWER);
         scene.world().modifyBlockEntityNBT(nixie, NixieTubeBlockEntity.class, nbt -> nbt.putInt("RedstoneStrength", 2));
         scene.idle(40);
 
         scene.world().cycleBlockProperty(gearshiftPos, SequencedGearshiftBlock.STATE);
         scene.world().setKineticSpeed(outputKinetics, 0);
-        scene.world().cycleBlockProperty(wire, RedStoneWireBlock.POWER);
+        scene.world().cycleBlockProperty(wire, RedstoneWireBlock.POWER);
         scene.world().modifyBlockEntityNBT(nixie, NixieTubeBlockEntity.class, nbt -> nbt.putInt("RedstoneStrength", 3));
         scene.idle(20);
 
@@ -1073,13 +1003,13 @@ public class KineticsScenes {
         scene.world().rotateBearing(bearingPos, 90, 40);
         scene.world().rotateSection(contraption, 90, 0, 0, 40);
         scene.effects().rotationDirectionIndicator(gearshiftPos.west());
-        scene.world().cycleBlockProperty(wire, RedStoneWireBlock.POWER);
+        scene.world().cycleBlockProperty(wire, RedstoneWireBlock.POWER);
         scene.world().modifyBlockEntityNBT(nixie, NixieTubeBlockEntity.class, nbt -> nbt.putInt("RedstoneStrength", 4));
         scene.idle(40);
 
         scene.world().cycleBlockProperty(gearshiftPos, SequencedGearshiftBlock.STATE);
         scene.world().cycleBlockProperty(gearshiftPos, SequencedGearshiftBlock.STATE);
-        scene.world().modifyBlock(wire, s -> s.setValue(RedStoneWireBlock.POWER, 0), false);
+        scene.world().modifyBlock(wire, s -> s.with(RedstoneWireBlock.POWER, 0), false);
         scene.world().toggleRedstonePower(util.select().position(5, 1, 1));
         scene.world().modifyBlockEntityNBT(nixie, NixieTubeBlockEntity.class, nbt -> nbt.putInt("RedstoneStrength", 0));
         scene.world().setKineticSpeed(outputKinetics, 0);
@@ -1100,11 +1030,9 @@ public class KineticsScenes {
         scene.world().showSection(util.select().fromTo(5, 1, 1, 2, 1, 1), Direction.DOWN);
         scene.world().showSection(util.select().fromTo(1, 1, 3, 1, 2, 3), Direction.DOWN);
         scene.idle(10);
-        ElementLink<WorldSectionElement> rsc = scene.world()
-            .showIndependentSection(util.select().position(0, 1, 1), Direction.DOWN);
+        ElementLink<WorldSectionElement> rsc = scene.world().showIndependentSection(util.select().position(0, 1, 1), Direction.DOWN);
         scene.world().moveSection(rsc, util.vector().of(1, 0, 0), 0);
-        ElementLink<WorldSectionElement> rsc2 = scene.world()
-            .showIndependentSection(util.select().position(1, 1, 1), Direction.DOWN);
+        ElementLink<WorldSectionElement> rsc2 = scene.world().showIndependentSection(util.select().position(1, 1, 1), Direction.DOWN);
         scene.world().moveSection(rsc2, util.vector().of(0, -100, 0), 0);
         scene.idle(10);
         scene.world().showSection(util.select().position(1, 2, 1), Direction.DOWN);
@@ -1118,12 +1046,11 @@ public class KineticsScenes {
         scene.world().setKineticSpeed(gaugeSelect, 8);
         scene.effects().indicateSuccess(util.grid().at(1, 2, 3));
 
-        scene.overlay().showText(90).placeNearTarget().attachKeyFrame()
-            .pointAt(util.vector().blockSurface(cogPos, Direction.NORTH))
+        scene.overlay().showText(90).placeNearTarget().attachKeyFrame().pointAt(util.vector().blockSurface(cogPos, Direction.NORTH))
             .text("Rot. Speed Controllers relay rotation from their axis to a Large Cogwheel above them");
         scene.idle(100);
 
-        Vec3 inputVec = util.vector().of(1.5, 1.75 - 1 / 16f, 1);
+        Vec3d inputVec = util.vector().of(1.5, 1.75 - 1 / 16f, 1);
         scene.overlay().showFilterSlotInput(inputVec, Direction.NORTH, 60);
 
         scene.overlay().showText(70).placeNearTarget().attachKeyFrame().pointAt(inputVec)
@@ -1178,8 +1105,7 @@ public class KineticsScenes {
 
         scene.world().setBlock(
             gaugePos,
-            (speed ? AllBlocks.SPEEDOMETER : AllBlocks.STRESSOMETER).defaultBlockState()
-                .setValue(GaugeBlock.FACING, Direction.UP),
+            (speed ? AllBlocks.SPEEDOMETER : AllBlocks.STRESSOMETER).getDefaultState().with(GaugeBlock.FACING, Direction.UP),
             true
         );
         scene.world().setKineticSpeed(util.select().position(gaugePos), 32);
@@ -1197,34 +1123,25 @@ public class KineticsScenes {
             scene.effects().indicateSuccess(gaugePos);
 
         } else {
-            BlockState state = AllBlocks.CRUSHING_WHEEL.defaultBlockState().setValue(CrushingWheelBlock.AXIS, Axis.X);
+            BlockState state = AllBlocks.CRUSHING_WHEEL.getDefaultState().with(CrushingWheelBlock.AXIS, Axis.X);
             scene.world().setBlock(util.grid().at(5, 1, 3), state, true);
             scene.world().setKineticSpeed(util.select().position(5, 1, 3), 32);
-            scene.world().modifyBlockEntityNBT(
-                util.select().position(gaugePos),
-                StressGaugeBlockEntity.class,
-                nbt -> nbt.putFloat("Value", .5f)
-            );
+            scene.world().modifyBlockEntityNBT(util.select().position(gaugePos), StressGaugeBlockEntity.class, nbt -> nbt.putFloat("Value", .5f));
             scene.effects().indicateRedstone(gaugePos);
             scene.idle(20);
             scene.world().setBlock(util.grid().at(4, 1, 3), state, true);
             scene.world().setKineticSpeed(util.select().position(4, 1, 3), 32);
-            scene.world().modifyBlockEntityNBT(
-                util.select().position(gaugePos),
-                StressGaugeBlockEntity.class,
-                nbt -> nbt.putFloat("Value", .9f)
-            );
+            scene.world().modifyBlockEntityNBT(util.select().position(gaugePos), StressGaugeBlockEntity.class, nbt -> nbt.putFloat("Value", .9f));
             scene.effects().indicateRedstone(gaugePos);
             scene.idle(10);
         }
 
         scene.idle(30);
 
-        Vec3 blockSurface = util.vector().blockSurface(gaugePos, Direction.NORTH);
-        scene.overlay().showControls(blockSurface, Pointing.RIGHT, 80).withItem(AllItems.GOGGLES.getDefaultInstance());
+        Vec3d blockSurface = util.vector().blockSurface(gaugePos, Direction.NORTH);
+        scene.overlay().showControls(blockSurface, Pointing.RIGHT, 80).withItem(AllItems.GOGGLES.getDefaultStack());
         scene.idle(7);
-        scene.overlay().showText(80)
-            .text("When wearing Engineers' Goggles, the player can get more detailed information from the Gauge")
+        scene.overlay().showText(80).text("When wearing Engineers' Goggles, the player can get more detailed information from the Gauge")
             .attachKeyFrame().colored(PonderPalette.MEDIUM).pointAt(blockSurface).placeNearTarget();
         scene.idle(100);
 
@@ -1235,10 +1152,8 @@ public class KineticsScenes {
         scene.effects().indicateRedstone(util.grid().at(2, 1, 2));
         scene.idle(20);
 
-        scene.overlay().showText(120)
-            .text("Comparators can emit analog Redstone Signals relative to the " + component + "'s measurements")
-            .attachKeyFrame().colored(PonderPalette.RED).pointAt(util.vector().centerOf(2, 1, 2).add(0, -0.35, 0))
-            .placeNearTarget();
+        scene.overlay().showText(120).text("Comparators can emit analog Redstone Signals relative to the " + component + "'s measurements")
+            .attachKeyFrame().colored(PonderPalette.RED).pointAt(util.vector().centerOf(2, 1, 2).add(0, -0.35, 0)).placeNearTarget();
         scene.idle(130);
         scene.markAsFinished();
     }
@@ -1289,11 +1204,11 @@ public class KineticsScenes {
         scene.idle(3);
         scene.world().showSection(util.select().fromTo(7, 3, 9, 8, 3, 8), Direction.UP);
         scene.idle(3);
-        scene.world().showSection(
-            util.select().fromTo(6, 3, 7, 9, 3, 7).add(util.select().fromTo(6, 3, 8, 6, 3, 10))
-                .add(util.select().fromTo(7, 3, 10, 9, 3, 10)).add(util.select().fromTo(9, 3, 7, 9, 3, 9)),
-            Direction.DOWN
-        );
+        scene.world()
+            .showSection(
+                util.select().fromTo(6, 3, 7, 9, 3, 7).add(util.select().fromTo(6, 3, 8, 6, 3, 10)).add(util.select().fromTo(7, 3, 10, 9, 3, 10))
+                    .add(util.select().fromTo(9, 3, 7, 9, 3, 9)), Direction.DOWN
+            );
         scene.idle(3);
         scene.world().showSection(util.select().fromTo(10, 4, 7, 6, 4, 10), Direction.DOWN);
         scene.idle(3);

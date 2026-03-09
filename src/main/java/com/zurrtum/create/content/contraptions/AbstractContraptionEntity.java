@@ -17,42 +17,39 @@ import com.zurrtum.create.content.trains.entity.Train;
 import com.zurrtum.create.foundation.collision.Matrix3d;
 import com.zurrtum.create.infrastructure.packet.s2c.*;
 import io.netty.handler.codec.DecoderException;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.NbtAccounter;
-import net.minecraft.nbt.Tag;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.game.ClientGamePacketListener;
-import net.minecraft.network.protocol.game.ClientboundAddEntityPacket;
-import net.minecraft.network.syncher.EntityDataAccessor;
-import net.minecraft.network.syncher.EntityDataSerializers;
-import net.minecraft.network.syncher.SynchedEntityData;
-import net.minecraft.server.level.ServerChunkCache;
-import net.minecraft.server.level.ServerEntity;
-import net.minecraft.server.level.ServerLevel;
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.util.Mth;
-import net.minecraft.util.ProblemReporter;
-import net.minecraft.world.InteractionHand;
-import net.minecraft.world.damagesource.DamageSource;
-import net.minecraft.world.entity.*;
-import net.minecraft.world.entity.decoration.ArmorStand;
-import net.minecraft.world.entity.decoration.HangingEntity;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.entity.projectile.Projectile;
-import net.minecraft.world.entity.vehicle.minecart.AbstractMinecart;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate.StructureBlockInfo;
-import net.minecraft.world.level.material.PushReaction;
-import net.minecraft.world.level.storage.TagValueInput;
-import net.minecraft.world.level.storage.TagValueOutput;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
-import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.block.piston.PistonBehavior;
+import net.minecraft.entity.*;
+import net.minecraft.entity.damage.DamageSource;
+import net.minecraft.entity.data.DataTracker;
+import net.minecraft.entity.data.TrackedData;
+import net.minecraft.entity.data.TrackedDataHandlerRegistry;
+import net.minecraft.entity.decoration.AbstractDecorationEntity;
+import net.minecraft.entity.decoration.ArmorStandEntity;
+import net.minecraft.entity.passive.TameableEntity;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.entity.projectile.ProjectileEntity;
+import net.minecraft.entity.vehicle.AbstractMinecartEntity;
+import net.minecraft.nbt.NbtCompound;
+import net.minecraft.nbt.NbtElement;
+import net.minecraft.nbt.NbtSizeTracker;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.network.listener.ClientPlayPacketListener;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.s2c.play.EntitySpawnS2CPacket;
+import net.minecraft.server.network.EntityTrackerEntry;
+import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.world.ServerChunkManager;
+import net.minecraft.server.world.ServerWorld;
+import net.minecraft.storage.NbtReadView;
+import net.minecraft.storage.NbtWriteView;
+import net.minecraft.storage.ReadView;
+import net.minecraft.storage.WriteView;
+import net.minecraft.structure.StructureTemplate.StructureBlockInfo;
+import net.minecraft.text.Text;
+import net.minecraft.util.ErrorReporter;
+import net.minecraft.util.Hand;
+import net.minecraft.util.math.*;
+import net.minecraft.world.World;
 import org.apache.commons.lang3.mutable.MutableInt;
 import org.apache.commons.lang3.tuple.MutablePair;
 import org.jetbrains.annotations.NotNull;
@@ -62,11 +59,9 @@ import java.util.*;
 
 public abstract class AbstractContraptionEntity extends Entity {
 
-    private static final EntityDataAccessor<Boolean> STALLED = SynchedEntityData.defineId(
+    private static final TrackedData<Boolean> STALLED = DataTracker.registerData(AbstractContraptionEntity.class, TrackedDataHandlerRegistry.BOOLEAN);
+    private static final TrackedData<Optional<UUID>> CONTROLLED_BY = DataTracker.registerData(
         AbstractContraptionEntity.class,
-        EntityDataSerializers.BOOLEAN
-    );
-    private static final EntityDataAccessor<Optional<UUID>> CONTROLLED_BY = SynchedEntityData.defineId(AbstractContraptionEntity.class,
         AllSynchedDatas.OPTIONAL_UUID_HANDLER
     );
 
@@ -86,7 +81,7 @@ public abstract class AbstractContraptionEntity extends Entity {
      */
     public int staleTicks = 3;
 
-    public AbstractContraptionEntity(EntityType<?> entityTypeIn, Level worldIn) {
+    public AbstractContraptionEntity(EntityType<?> entityTypeIn, World worldIn) {
         super(entityTypeIn, worldIn);
         prevPosInvalid = true;
         collidingEntities = new IdentityHashMap<>();
@@ -94,26 +89,21 @@ public abstract class AbstractContraptionEntity extends Entity {
 
     protected void setContraption(Contraption contraption) {
         this.contraption = contraption;
-        if (contraption == null) {
+        if (contraption == null)
             return;
-        }
-        if (level().isClientSide()) {
+        if (getEntityWorld().isClient())
             return;
-        }
         contraption.onEntityCreated(this);
     }
 
     @Override
-    public void move(MoverType pType, Vec3 pPos) {
-        if (pType == MoverType.SHULKER) {
+    public void move(MovementType pType, Vec3d pPos) {
+        if (pType == MovementType.SHULKER)
             return;
-        }
-        if (pType == MoverType.SHULKER_BOX) {
+        if (pType == MovementType.SHULKER_BOX)
             return;
-        }
-        if (pType == MoverType.PISTON) {
+        if (pType == MovementType.PISTON)
             return;
-        }
         super.move(pType, pPos);
     }
 
@@ -122,7 +112,7 @@ public abstract class AbstractContraptionEntity extends Entity {
     }
 
     protected void contraptionInitialize() {
-        contraption.onEntityInitialize(level(), this);
+        contraption.onEntityInitialize(getEntityWorld(), this);
         initialized = true;
     }
 
@@ -135,28 +125,24 @@ public abstract class AbstractContraptionEntity extends Entity {
     }
 
     public void addSittingPassenger(Entity passenger, int seatIndex) {
-        for (Entity entity : getPassengers()) {
-            BlockPos seatOf = contraption.getSeatOf(entity.getUUID());
+        for (Entity entity : getPassengerList()) {
+            BlockPos seatOf = contraption.getSeatOf(entity.getUuid());
             if (seatOf != null && seatOf.equals(contraption.getSeats().get(seatIndex))) {
-                if (entity instanceof Player) {
+                if (entity instanceof PlayerEntity)
                     return;
-                }
-                if (!(passenger instanceof Player)) {
+                if (!(passenger instanceof PlayerEntity))
                     return;
-                }
                 entity.stopRiding();
             }
         }
         passenger.startRiding(this, true, true);
-        if (passenger instanceof TamableAnimal ta) {
+        if (passenger instanceof TameableEntity ta)
             ta.setInSittingPose(true);
-        }
-        if (level().isClientSide()) {
+        if (getEntityWorld().isClient())
             return;
-        }
-        contraption.getSeatMapping().put(passenger.getUUID(), seatIndex);
+        contraption.getSeatMapping().put(passenger.getUuid(), seatIndex);
 
-        ((ServerChunkCache) level().getChunkSource()).sendToTrackingPlayers(
+        ((ServerChunkManager) getEntityWorld().getChunkManager()).sendToOtherNearbyPlayers(
             this,
             new ContraptionSeatMappingPacket(getId(), contraption.getSeatMapping())
         );
@@ -164,37 +150,34 @@ public abstract class AbstractContraptionEntity extends Entity {
 
     @Override
     protected void removePassenger(Entity passenger) {
-        Vec3 transformedVector = getPassengerPosition(passenger, 1);
+        Vec3d transformedVector = getPassengerPosition(passenger, 1);
         super.removePassenger(passenger);
-        if (passenger instanceof TamableAnimal ta) {
+        if (passenger instanceof TameableEntity ta)
             ta.setInSittingPose(false);
-        }
-        if (level().isClientSide()) {
+        if (getEntityWorld().isClient())
             return;
-        }
         if (transformedVector != null && passenger instanceof LivingEntity entity) {
             AllSynchedDatas.CONTRAPTION_DISMOUNT_LOCATION.set(entity, Optional.of(transformedVector));
         }
-        contraption.getSeatMapping().remove(passenger.getUUID());
+        contraption.getSeatMapping().remove(passenger.getUuid());
 
-        ((ServerChunkCache) level().getChunkSource()).sendToTrackingPlayers(
+        ((ServerChunkManager) getEntityWorld().getChunkManager()).sendToOtherNearbyPlayers(
             this,
             new ContraptionSeatMappingPacket(getId(), contraption.getSeatMapping(), passenger.getId())
         );
     }
 
     @Override
-    public Vec3 getDismountLocationForPassenger(LivingEntity entityLiving) {
-        Vec3 position = super.getDismountLocationForPassenger(entityLiving);
+    public Vec3d updatePassengerForDismount(LivingEntity entityLiving) {
+        Vec3d position = super.updatePassengerForDismount(entityLiving);
         return AllSynchedDatas.CONTRAPTION_DISMOUNT_LOCATION.get(entityLiving).map(dismount -> {
             entityLiving.setOnGround(false);
             AllSynchedDatas.CONTRAPTION_DISMOUNT_LOCATION.set(entityLiving, Optional.empty());
-            if (entityLiving instanceof Player player) {
+            if (entityLiving instanceof PlayerEntity player) {
                 AllSynchedDatas.CONTRAPTION_MOUNT_LOCATION.get(player).ifPresent(mount -> {
                     AllSynchedDatas.CONTRAPTION_MOUNT_LOCATION.set(player, Optional.empty());
-                    if (entityLiving instanceof ServerPlayer serverPlayer && !mount.closerThan(position, 5000)) {
+                    if (entityLiving instanceof ServerPlayerEntity serverPlayer && !mount.isInRange(position, 5000))
                         AllAdvancements.LONG_TRAVEL.trigger(serverPlayer);
-                    }
                 });
             }
             return dismount;
@@ -202,19 +185,16 @@ public abstract class AbstractContraptionEntity extends Entity {
     }
 
     @Override
-    public void positionRider(Entity passenger, MoveFunction callback) {
-        if (!hasPassenger(passenger)) {
+    public void updatePassengerPosition(Entity passenger, PositionUpdater callback) {
+        if (!hasPassenger(passenger))
             return;
-        }
-        Vec3 transformedVector = getPassengerPosition(passenger, 1);
-        if (transformedVector == null) {
+        Vec3d transformedVector = getPassengerPosition(passenger, 1);
+        if (transformedVector == null)
             return;
-        }
 
         float offset = -1 / 8f;
-        if (passenger instanceof AbstractContraptionEntity) {
+        if (passenger instanceof AbstractContraptionEntity)
             offset = 0.0f;
-        }
         callback.accept(
             passenger,
             transformedVector.x,
@@ -223,145 +203,120 @@ public abstract class AbstractContraptionEntity extends Entity {
         );
     }
 
-    public Vec3 getPassengerPosition(Entity passenger, float partialTicks) {
-        if (contraption == null) {
+    public Vec3d getPassengerPosition(Entity passenger, float partialTicks) {
+        if (contraption == null)
             return null;
-        }
 
-        UUID id = passenger.getUUID();
+        UUID id = passenger.getUuid();
         if (passenger instanceof OrientedContraptionEntity) {
             BlockPos localPos = contraption.getBearingPosOf(id);
-            if (localPos != null) {
-                return toGlobalVector(
-                    VecHelper.getCenterOf(localPos),
-                    partialTicks
-                ).add(VecHelper.getCenterOf(BlockPos.ZERO)).subtract(.5f, 1, .5f);
-            }
+            if (localPos != null)
+                return toGlobalVector(VecHelper.getCenterOf(localPos), partialTicks).add(VecHelper.getCenterOf(BlockPos.ZERO)).subtract(.5f, 1, .5f);
         }
 
-        AABB bb = passenger.getBoundingBox();
-        double ySize = bb.getYsize();
+        Box bb = passenger.getBoundingBox();
+        double ySize = bb.getLengthY();
         BlockPos seat = contraption.getSeatOf(id);
-        if (seat == null) {
+        if (seat == null)
             return null;
-        }
 
-        Vec3 transformedVector = toGlobalVector(
-            Vec3.atLowerCornerOf(seat).add(
-                .5,
-                -passenger.getVehicleAttachmentPoint(this).y + ySize + .125 - SeatEntity.getCustomEntitySeatOffset(
-                    passenger),
-                .5
-            ), partialTicks
+        Vec3d transformedVector = toGlobalVector(
+            Vec3d.of(seat).add(.5, -passenger.getVehicleAttachmentPos(this).y + ySize + .125 - SeatEntity.getCustomEntitySeatOffset(passenger), .5),
+            partialTicks
         ).add(VecHelper.getCenterOf(BlockPos.ZERO)).subtract(0.5, ySize, 0.5);
         return transformedVector;
     }
 
     @Override
     protected boolean canAddPassenger(@NotNull Entity pPassenger) {
-        if (pPassenger instanceof OrientedContraptionEntity) {
+        if (pPassenger instanceof OrientedContraptionEntity)
             return true;
-        }
         return contraption.getSeatMapping().size() < contraption.getSeats().size();
     }
 
-    public Component getContraptionName() {
+    public Text getContraptionName() {
         return getName();
     }
 
     public Optional<UUID> getControllingPlayer() {
-        return entityData.get(CONTROLLED_BY);
+        return dataTracker.get(CONTROLLED_BY);
     }
 
     public void setControllingPlayer(@Nullable LivingEntity player) {
-        entityData.set(CONTROLLED_BY, player == null ? Optional.empty() : Optional.of(player.getUUID()));
+        dataTracker.set(CONTROLLED_BY, player == null ? Optional.empty() : Optional.of(player.getUuid()));
     }
 
-    public boolean startControlling(BlockPos controlsLocalPos, Player player) {
+    public boolean startControlling(BlockPos controlsLocalPos, PlayerEntity player) {
         return false;
     }
 
-    public boolean control(BlockPos controlsLocalPos, Collection<Integer> heldControls, Player player) {
+    public boolean control(BlockPos controlsLocalPos, Collection<Integer> heldControls, PlayerEntity player) {
         return true;
     }
 
     public void stopControlling(BlockPos controlsLocalPos) {
-        getControllingPlayer().map(level()::getPlayerByUUID)
-            .map(p -> (p instanceof ServerPlayer) ? ((ServerPlayer) p) : null)
-            .ifPresent(p -> p.connection.send(AllPackets.CONTROLS_ABORT));
+        getControllingPlayer().map(getEntityWorld()::getPlayerByUuid).map(p -> (p instanceof ServerPlayerEntity) ? ((ServerPlayerEntity) p) : null)
+            .ifPresent(p -> p.networkHandler.sendPacket(AllPackets.CONTROLS_ABORT));
         setControllingPlayer(null);
     }
 
-    public boolean handlePlayerInteraction(
-        Player player,
-        BlockPos localPos,
-        Direction side,
-        InteractionHand interactionHand
-    ) {
+    public boolean handlePlayerInteraction(PlayerEntity player, BlockPos localPos, Direction side, Hand interactionHand) {
         int indexOfSeat = contraption.getSeats().indexOf(localPos);
-        if (indexOfSeat == -1 || player.getItemInHand(interactionHand).is(AllItems.WRENCH)) {
-            if (contraption.interactors.containsKey(localPos)) {
-                return contraption.interactors.get(localPos)
-                    .handlePlayerInteraction(player, interactionHand, localPos, this);
-            }
+        if (indexOfSeat == -1 || player.getStackInHand(interactionHand).isOf(AllItems.WRENCH)) {
+            if (contraption.interactors.containsKey(localPos))
+                return contraption.interactors.get(localPos).handlePlayerInteraction(player, interactionHand, localPos, this);
             return contraption.storage.handlePlayerStorageInteraction(contraption, player, localPos);
         }
-        if (player.isPassenger()) {
+        if (player.hasVehicle())
             return false;
-        }
 
         // Eject potential existing passenger
         Entity toDismount = null;
         for (Map.Entry<UUID, Integer> entry : contraption.getSeatMapping().entrySet()) {
-            if (entry.getValue() != indexOfSeat) {
+            if (entry.getValue() != indexOfSeat)
                 continue;
-            }
-            for (Entity entity : getPassengers()) {
-                if (!entry.getKey().equals(entity.getUUID())) {
+            for (Entity entity : getPassengerList()) {
+                if (!entry.getKey().equals(entity.getUuid()))
                     continue;
-                }
-                if (entity instanceof Player) {
+                if (entity instanceof PlayerEntity)
                     return false;
-                }
                 toDismount = entity;
             }
         }
 
-        if (toDismount != null && !level().isClientSide()) {
-            Vec3 transformedVector = getPassengerPosition(toDismount, 1);
+        if (toDismount != null && !getEntityWorld().isClient()) {
+            Vec3d transformedVector = getPassengerPosition(toDismount, 1);
             toDismount.stopRiding();
-            if (transformedVector != null) {
-                toDismount.teleportTo(transformedVector.x, transformedVector.y, transformedVector.z);
-            }
+            if (transformedVector != null)
+                toDismount.requestTeleport(transformedVector.x, transformedVector.y, transformedVector.z);
         }
 
-        if (level().isClientSide()) {
+        if (getEntityWorld().isClient())
             return true;
-        }
-        addSittingPassenger(SeatBlock.getLeashed(level(), player).or(player), indexOfSeat);
+        addSittingPassenger(SeatBlock.getLeashed(getEntityWorld(), player).or(player), indexOfSeat);
         return true;
     }
 
-    public Vec3 toGlobalVector(Vec3 localVec, float partialTicks) {
+    public Vec3d toGlobalVector(Vec3d localVec, float partialTicks) {
         return toGlobalVector(localVec, partialTicks, false);
     }
 
-    public Vec3 toGlobalVector(Vec3 localVec, float partialTicks, boolean prevAnchor) {
-        Vec3 anchor = prevAnchor ? getPrevAnchorVec() : getAnchorVec();
-        Vec3 rotationOffset = VecHelper.getCenterOf(BlockPos.ZERO);
+    public Vec3d toGlobalVector(Vec3d localVec, float partialTicks, boolean prevAnchor) {
+        Vec3d anchor = prevAnchor ? getPrevAnchorVec() : getAnchorVec();
+        Vec3d rotationOffset = VecHelper.getCenterOf(BlockPos.ZERO);
         localVec = localVec.subtract(rotationOffset);
         localVec = applyRotation(localVec, partialTicks);
         localVec = localVec.add(rotationOffset).add(anchor);
         return localVec;
     }
 
-    public Vec3 toLocalVector(Vec3 localVec, float partialTicks) {
+    public Vec3d toLocalVector(Vec3d localVec, float partialTicks) {
         return toLocalVector(localVec, partialTicks, false);
     }
 
-    public Vec3 toLocalVector(Vec3 globalVec, float partialTicks, boolean prevAnchor) {
-        Vec3 anchor = prevAnchor ? getPrevAnchorVec() : getAnchorVec();
-        Vec3 rotationOffset = VecHelper.getCenterOf(BlockPos.ZERO);
+    public Vec3d toLocalVector(Vec3d globalVec, float partialTicks, boolean prevAnchor) {
+        Vec3d anchor = prevAnchor ? getPrevAnchorVec() : getAnchorVec();
+        Vec3d rotationOffset = VecHelper.getCenterOf(BlockPos.ZERO);
         globalVec = globalVec.subtract(anchor).subtract(rotationOffset);
         globalVec = reverseRotation(globalVec, partialTicks);
         globalVec = globalVec.add(rotationOffset);
@@ -377,70 +332,62 @@ public abstract class AbstractContraptionEntity extends Entity {
 
         collidingEntities.entrySet().removeIf(e -> e.getValue().incrementAndGet() > 3);
 
-        xo = getX();
-        yo = getY();
-        zo = getZ();
+        lastX = getX();
+        lastY = getY();
+        lastZ = getZ();
         prevPosInvalid = false;
 
-        if (!initialized) {
+        if (!initialized)
             contraptionInitialize();
-        }
 
         contraption.tickStorage(this);
         tickContraption();
         super.tick();
 
-        if (!(level() instanceof ServerLevel sl)) {
+        if (!(getEntityWorld() instanceof ServerWorld sl))
             return;
-        }
 
-        for (Entity entity : getPassengers()) {
-            if (entity instanceof Player) {
+        for (Entity entity : getPassengerList()) {
+            if (entity instanceof PlayerEntity)
                 continue;
-            }
-            if (entity.isAlwaysTicking()) {
+            if (entity.isPlayer())
                 continue;
-            }
-            if (sl.entityTickList.contains(entity)) {
+            if (sl.entityList.has(entity))
                 continue;
-            }
-            positionRider(entity);
+            updatePassengerPosition(entity);
         }
     }
 
     public void alignPassenger(Entity passenger) {
-        Vec3 motion = getContactPointMotion(passenger.getEyePosition());
-        if (Mth.equal(motion.length(), 0)) {
+        Vec3d motion = getContactPointMotion(passenger.getEyePos());
+        if (MathHelper.approximatelyEquals(motion.length(), 0))
             return;
-        }
-        if (passenger instanceof ArmorStand) {
+        if (passenger instanceof ArmorStandEntity)
             return;
-        }
-        if (!(passenger instanceof LivingEntity living)) {
+        if (!(passenger instanceof LivingEntity living))
             return;
-        }
-        float prevAngle = living.getYRot();
-        float angle = AngleHelper.deg(-Mth.atan2(motion.x, motion.z));
+        float prevAngle = living.getYaw();
+        float angle = AngleHelper.deg(-MathHelper.atan2(motion.x, motion.z));
         angle = AngleHelper.angleLerp(0.4f, prevAngle, angle);
-        if (level().isClientSide()) {
-            InterpolationHandler interpolator = living.getInterpolation();
+        if (getEntityWorld().isClient()) {
+            PositionInterpolator interpolator = living.getInterpolator();
             if (interpolator != null) {
-                interpolator.interpolationData.steps = 0;
+                interpolator.data.step = 0;
             }
-            living.lerpHeadTo(0, 0);
-            living.setYRot(angle);
-            living.setXRot(0);
-            living.setOldRot();
-            living.yBodyRot = angle;
-            living.yHeadRot = angle;
+            living.updateTrackedHeadRotation(0, 0);
+            living.setYaw(angle);
+            living.setPitch(0);
+            living.updateLastAngles();
+            living.bodyYaw = angle;
+            living.headYaw = angle;
         } else {
-            living.setYRot(angle);
+            living.setYaw(angle);
         }
     }
 
     public void setBlock(BlockPos localPos, StructureBlockInfo newInfo) {
         contraption.blocks.put(localPos, newInfo);
-        ((ServerChunkCache) level().getChunkSource()).sendToTrackingPlayers(
+        ((ServerChunkManager) getEntityWorld().getChunkManager()).sendToOtherNearbyPlayers(
             this,
             new ContraptionBlockChangedPacket(getId(), localPos, newInfo.state())
         );
@@ -448,16 +395,15 @@ public abstract class AbstractContraptionEntity extends Entity {
 
     protected abstract void tickContraption();
 
-    public abstract Vec3 applyRotation(Vec3 localPos, float partialTicks);
+    public abstract Vec3d applyRotation(Vec3d localPos, float partialTicks);
 
-    public abstract Vec3 reverseRotation(Vec3 localPos, float partialTicks);
+    public abstract Vec3d reverseRotation(Vec3d localPos, float partialTicks);
 
     public void tickActors() {
         boolean stalledPreviously = contraption.stalled;
 
-        if (!level().isClientSide()) {
+        if (!getEntityWorld().isClient())
             contraption.stalled = false;
-        }
 
         skipActorStop = true;
         for (MutablePair<StructureBlockInfo, MovementContext> pair : contraption.getActors()) {
@@ -465,70 +411,55 @@ public abstract class AbstractContraptionEntity extends Entity {
             StructureBlockInfo blockInfo = pair.left;
             MovementBehaviour actor = MovementBehaviour.REGISTRY.get(blockInfo.state());
 
-            if (actor == null) {
+            if (actor == null)
                 continue;
-            }
 
-            Vec3 oldMotion = context.motion;
-            Vec3 actorPosition = toGlobalVector(
-                VecHelper.getCenterOf(blockInfo.pos()).add(actor.getActiveAreaOffset(context)), 1);
-            BlockPos gridPosition = BlockPos.containing(actorPosition);
-            boolean newPosVisited = !context.stall && shouldActorTrigger(
-                context,
-                blockInfo,
-                actor,
-                actorPosition,
-                gridPosition
-            );
+            Vec3d oldMotion = context.motion;
+            Vec3d actorPosition = toGlobalVector(VecHelper.getCenterOf(blockInfo.pos()).add(actor.getActiveAreaOffset(context)), 1);
+            BlockPos gridPosition = BlockPos.ofFloored(actorPosition);
+            boolean newPosVisited = !context.stall && shouldActorTrigger(context, blockInfo, actor, actorPosition, gridPosition);
 
             context.rotation = v -> applyRotation(v, 1);
             context.position = actorPosition;
-            if (!isActorActive(context, actor) && !actor.mustTickWhileDisabled()) {
+            if (!isActorActive(context, actor) && !actor.mustTickWhileDisabled())
                 continue;
-            }
             if (newPosVisited && !context.stall) {
                 actor.visitNewPosition(context, gridPosition);
-                if (!isAlive()) {
+                if (!isAlive())
                     break;
-                }
                 context.firstMovement = false;
             }
             if (!oldMotion.equals(context.motion)) {
                 actor.onSpeedChanged(context, oldMotion, context.motion);
-                if (!isAlive()) {
+                if (!isAlive())
                     break;
-                }
             }
             actor.tick(context);
-            if (!isAlive()) {
+            if (!isAlive())
                 break;
-            }
             contraption.stalled |= context.stall;
         }
         if (!isAlive()) {
-            contraption.stop(level());
+            contraption.stop(getEntityWorld());
             return;
         }
         skipActorStop = false;
 
-        for (Entity entity : getPassengers()) {
-            if (!(entity instanceof OrientedContraptionEntity orientedCE)) {
+        for (Entity entity : getPassengerList()) {
+            if (!(entity instanceof OrientedContraptionEntity orientedCE))
                 continue;
-            }
-            if (!contraption.stabilizedSubContraptions.containsKey(entity.getUUID())) {
+            if (!contraption.stabilizedSubContraptions.containsKey(entity.getUuid()))
                 continue;
-            }
             if (orientedCE.contraption != null && orientedCE.contraption.stalled) {
                 contraption.stalled = true;
                 break;
             }
         }
 
-        if (!level().isClientSide()) {
-            if (!stalledPreviously && contraption.stalled) {
+        if (!getEntityWorld().isClient()) {
+            if (!stalledPreviously && contraption.stalled)
                 onContraptionStalled();
-            }
-            entityData.set(STALLED, contraption.stalled);
+            dataTracker.set(STALLED, contraption.stalled);
             return;
         }
 
@@ -540,11 +471,9 @@ public abstract class AbstractContraptionEntity extends Entity {
             MovementContext context = pair.right;
             StructureBlockInfo blockInfo = pair.left;
             MovementBehaviour actor = MovementBehaviour.REGISTRY.get(blockInfo.state());
-            if (actor instanceof PortableStorageInterfaceMovement && isActorActive(context, actor)) {
-                if (context.position != null) {
-                    actor.visitNewPosition(context, BlockPos.containing(context.position));
-                }
-            }
+            if (actor instanceof PortableStorageInterfaceMovement && isActorActive(context, actor))
+                if (context.position != null)
+                    actor.visitNewPosition(context, BlockPos.ofFloored(context.position));
         }
     }
 
@@ -553,7 +482,7 @@ public abstract class AbstractContraptionEntity extends Entity {
     }
 
     protected void onContraptionStalled() {
-        ((ServerChunkCache) level().getChunkSource()).sendToTrackingPlayers(
+        ((ServerChunkManager) getEntityWorld().getChunkManager()).sendToOtherNearbyPlayers(
             this,
             new ContraptionStallPacket(getId(), getX(), getY(), getZ(), getStalledAngle())
         );
@@ -563,41 +492,40 @@ public abstract class AbstractContraptionEntity extends Entity {
         MovementContext context,
         StructureBlockInfo blockInfo,
         MovementBehaviour actor,
-        Vec3 actorPosition,
+        Vec3d actorPosition,
         BlockPos gridPosition
     ) {
-        Vec3 previousPosition = context.position;
-        if (previousPosition == null) {
+        Vec3d previousPosition = context.position;
+        if (previousPosition == null)
             return false;
-        }
 
         context.motion = actorPosition.subtract(previousPosition);
 
-        if (!level().isClientSide() && context.contraption.entity instanceof CarriageContraptionEntity cce && cce.getCarriage() != null) {
+        if (!getEntityWorld().isClient() && context.contraption.entity instanceof CarriageContraptionEntity cce && cce.getCarriage() != null) {
             Train train = cce.getCarriage().train;
             double actualSpeed = train.speedBeforeStall != null ? train.speedBeforeStall : train.speed;
-            context.motion = context.motion.normalize().scale(Math.abs(actualSpeed));
+            context.motion = context.motion.normalize().multiply(Math.abs(actualSpeed));
         }
 
-        Vec3 relativeMotion = context.motion;
+        Vec3d relativeMotion = context.motion;
         relativeMotion = reverseRotation(relativeMotion, 1);
         context.relativeMotion = relativeMotion;
 
         boolean ignoreMotionForFirstMovement = context.contraption instanceof CarriageContraption || actor instanceof PortableStorageInterfaceMovement;
 
-        return !BlockPos.containing(previousPosition)
+        return !BlockPos.ofFloored(previousPosition)
             .equals(gridPosition) || (context.relativeMotion.length() > 0 || ignoreMotionForFirstMovement) && context.firstMovement;
     }
 
     public void move(double x, double y, double z) {
-        setPos(getX() + x, getY() + y, getZ() + z);
+        setPosition(getX() + x, getY() + y, getZ() + z);
     }
 
-    public Vec3 getAnchorVec() {
-        return position();
+    public Vec3d getAnchorVec() {
+        return getEntityPos();
     }
 
-    public Vec3 getPrevAnchorVec() {
+    public Vec3d getPrevAnchorVec() {
         return getPrevPositionVec();
     }
 
@@ -606,177 +534,162 @@ public abstract class AbstractContraptionEntity extends Entity {
     }
 
     @Override
-    public void setPos(double x, double y, double z) {
-        super.setPos(x, y, z);
-        if (contraption == null) {
+    public void setPosition(double x, double y, double z) {
+        super.setPosition(x, y, z);
+        if (contraption == null)
             return;
-        }
-        AABB cbox = contraption.bounds;
-        if (cbox == null) {
+        Box cbox = contraption.bounds;
+        if (cbox == null)
             return;
-        }
-        Vec3 actualVec = getAnchorVec();
-        setBoundingBox(cbox.move(actualVec));
+        Vec3d actualVec = getAnchorVec();
+        setBoundingBox(cbox.offset(actualVec));
     }
 
-    public static float yawFromVector(Vec3 vec) {
+    public static float yawFromVector(Vec3d vec) {
         return (float) ((3 * Math.PI / 2 + Math.atan2(vec.z, vec.x)) / Math.PI * 180);
     }
 
-    public static float pitchFromVector(Vec3 vec) {
+    public static float pitchFromVector(Vec3d vec) {
         return (float) ((Math.acos(vec.y)) / Math.PI * 180);
     }
 
     public static EntityType.Builder<?> build(EntityType.Builder<?> builder) {
         @SuppressWarnings("unchecked") EntityType.Builder<AbstractContraptionEntity> entityBuilder = (EntityType.Builder<AbstractContraptionEntity>) builder;
-        return entityBuilder.sized(1, 1);
+        return entityBuilder.dimensions(1, 1);
     }
 
     @Override
-    protected void defineSynchedData(SynchedEntityData.Builder builder) {
-        builder.define(STALLED, false);
-        builder.define(CONTROLLED_BY, Optional.empty());
+    protected void initDataTracker(DataTracker.Builder builder) {
+        builder.add(STALLED, false);
+        builder.add(CONTROLLED_BY, Optional.empty());
     }
 
     @Override
-    public Packet<ClientGamePacketListener> getAddEntityPacket(ServerEntity entityTrackerEntry) {
-        try (ProblemReporter.ScopedCollector logging = new ProblemReporter.ScopedCollector(
-            problemPath(),
-            Create.LOGGER
-        )) {
-            TagValueOutput view = TagValueOutput.createWithContext(logging, registryAccess());
+    public Packet<ClientPlayPacketListener> createSpawnPacket(EntityTrackerEntry entityTrackerEntry) {
+        try (ErrorReporter.Logging logging = new ErrorReporter.Logging(getErrorReporterContext(), Create.LOGGER)) {
+            NbtWriteView view = NbtWriteView.create(logging, getRegistryManager());
             writeAdditional(view, true);
-            return new NbtSpawnPacket(this, entityTrackerEntry, view.buildResult());
+            return new NbtSpawnPacket(this, entityTrackerEntry, view.getNbt());
         }
     }
 
     @Override
-    protected final void addAdditionalSaveData(ValueOutput view) {
+    protected final void writeCustomData(WriteView view) {
         writeAdditional(view, false);
     }
 
-    protected void writeAdditional(ValueOutput view, boolean spawnPacket) {
-        if (contraption != null) {
-            contraption.write(view.child("Contraption"), spawnPacket);
-        }
+    protected void writeAdditional(WriteView view, boolean spawnPacket) {
+        if (contraption != null)
+            contraption.write(view.get("Contraption"), spawnPacket);
         view.putBoolean("Stalled", isStalled());
         view.putBoolean("Initialized", initialized);
     }
 
     @Override
-    public void recreateFromPacket(ClientboundAddEntityPacket packet) {
-        super.recreateFromPacket(packet);
-        CompoundTag nbt = ((NbtSpawnPacket) packet).getNbt();
+    public void onSpawnPacket(EntitySpawnS2CPacket packet) {
+        super.onSpawnPacket(packet);
+        NbtCompound nbt = ((NbtSpawnPacket) packet).getNbt();
         if (nbt == null) {
             return;
         }
-        try (ProblemReporter.ScopedCollector logging = new ProblemReporter.ScopedCollector(
-            problemPath(),
-            Create.LOGGER
-        )) {
-            readAdditional(TagValueInput.create(logging, registryAccess(), nbt), true);
+        try (ErrorReporter.Logging logging = new ErrorReporter.Logging(getErrorReporterContext(), Create.LOGGER)) {
+            readAdditional(NbtReadView.create(logging, getRegistryManager(), nbt), true);
         }
     }
 
     @Override
-    protected final void readAdditionalSaveData(ValueInput view) {
+    protected final void readCustomData(ReadView view) {
         readAdditional(view, false);
     }
 
     @Nullable
-    private static CompoundTag readAnySizeNbt(RegistryFriendlyByteBuf buf) {
-        Tag tag = buf.readNbt(NbtAccounter.unlimitedHeap());
-        if (tag != null && !(tag instanceof CompoundTag)) {
+    private static NbtCompound readAnySizeNbt(RegistryByteBuf buf) {
+        NbtElement tag = buf.readNbt(NbtSizeTracker.ofUnlimitedBytes());
+        if (tag != null && !(tag instanceof NbtCompound)) {
             throw new DecoderException("Not a compound tag: " + tag);
         } else {
-            return (CompoundTag) tag;
+            return (NbtCompound) tag;
         }
     }
 
-    protected void readAdditional(ValueInput view, boolean spawnData) {
-        initialized = view.getBooleanOr("Initialized", false);
-        view.child("Contraption").ifPresent(child -> {
-            contraption = Contraption.fromData(level(), child, spawnData);
+    protected void readAdditional(ReadView view, boolean spawnData) {
+        initialized = view.getBoolean("Initialized", false);
+        view.getOptionalReadView("Contraption").ifPresent(child -> {
+            contraption = Contraption.fromData(getEntityWorld(), child, spawnData);
             contraption.entity = this;
         });
-        entityData.set(STALLED, view.getBooleanOr("Stalled", false));
+        dataTracker.set(STALLED, view.getBoolean("Stalled", false));
     }
 
     public void disassemble() {
-        if (!isAlive()) {
+        if (!isAlive())
             return;
-        }
-        if (contraption == null) {
+        if (contraption == null)
             return;
-        }
 
         StructureTransform transform = makeStructureTransform();
 
-        contraption.stop(level());
-        if (level().getChunkSource() instanceof ServerChunkCache manager) {
-            manager.sendToTrackingPlayers(this, new ContraptionDisassemblyPacket(this.getId(), transform));
+        contraption.stop(getEntityWorld());
+        if (getEntityWorld().getChunkManager() instanceof ServerChunkManager manager) {
+            manager.sendToOtherNearbyPlayers(this, new ContraptionDisassemblyPacket(this.getId(), transform));
         }
 
-        contraption.addBlocksToWorld(level(), transform);
-        contraption.addPassengersToWorld(level(), transform, getPassengers());
+        contraption.addBlocksToWorld(getEntityWorld(), transform);
+        contraption.addPassengersToWorld(getEntityWorld(), transform, getPassengerList());
 
-        for (Entity entity : getPassengers()) {
-            if (!(entity instanceof OrientedContraptionEntity)) {
+        for (Entity entity : getPassengerList()) {
+            if (!(entity instanceof OrientedContraptionEntity))
                 continue;
-            }
-            UUID id = entity.getUUID();
-            if (!contraption.stabilizedSubContraptions.containsKey(id)) {
+            UUID id = entity.getUuid();
+            if (!contraption.stabilizedSubContraptions.containsKey(id))
                 continue;
-            }
             BlockPos transformed = transform.apply(contraption.stabilizedSubContraptions.get(id).getConnectedPos());
-            entity.setPos(transformed.getX(), transformed.getY(), transformed.getZ());
+            entity.setPosition(transformed.getX(), transformed.getY(), transformed.getZ());
             ((AbstractContraptionEntity) entity).disassemble();
         }
 
         skipActorStop = true;
         discard();
 
-        ejectPassengers();
+        removeAllPassengers();
         moveCollidedEntitiesOnDisassembly(transform);
-        AllSoundEvents.CONTRAPTION_DISASSEMBLE.playOnServer(level(), blockPosition());
+        AllSoundEvents.CONTRAPTION_DISASSEMBLE.playOnServer(getEntityWorld(), getBlockPos());
     }
 
     public void moveCollidedEntitiesOnDisassembly(StructureTransform transform) {
         for (Entity entity : collidingEntities.keySet()) {
-            Vec3 localVec = toLocalVector(entity.position(), 0);
-            Vec3 transformed = transform.apply(localVec);
-            if (level().isClientSide()) {
-                entity.setPos(transformed.x, transformed.y + 1 / 16f, transformed.z);
-            } else {
-                entity.teleportTo(transformed.x, transformed.y + 1 / 16f, transformed.z);
-            }
+            Vec3d localVec = toLocalVector(entity.getEntityPos(), 0);
+            Vec3d transformed = transform.apply(localVec);
+            if (getEntityWorld().isClient())
+                entity.setPosition(transformed.x, transformed.y + 1 / 16f, transformed.z);
+            else
+                entity.requestTeleport(transformed.x, transformed.y + 1 / 16f, transformed.z);
         }
     }
 
     @Override
     public void remove(RemovalReason p_146834_) {
-        if (!level().isClientSide() && !isRemoved() && contraption != null && !skipActorStop) {
-            contraption.stop(level());
-        }
+        if (!getEntityWorld().isClient() && !isRemoved() && contraption != null && !skipActorStop)
+            contraption.stop(getEntityWorld());
         super.remove(p_146834_);
     }
 
     protected abstract StructureTransform makeStructureTransform();
 
     @Override
-    public void kill(ServerLevel world) {
-        ejectPassengers();
+    public void kill(ServerWorld world) {
+        removeAllPassengers();
         super.kill(world);
     }
 
     @Override
-    protected void onBelowWorld() {
-        ejectPassengers();
-        super.onBelowWorld();
+    protected void tickInVoid() {
+        removeAllPassengers();
+        super.tickInVoid();
     }
 
     @Override
-    protected void doWaterSplashEffect() {
+    protected void onSwimmingStart() {
     }
 
     public Contraption getContraption() {
@@ -784,7 +697,7 @@ public abstract class AbstractContraptionEntity extends Entity {
     }
 
     public boolean isStalled() {
-        return entityData.get(STALLED);
+        return dataTracker.get(STALLED);
     }
 
     protected abstract float getStalledAngle();
@@ -792,107 +705,97 @@ public abstract class AbstractContraptionEntity extends Entity {
     public abstract void handleStallInformation(double x, double y, double z, float angle);
 
     @Override
-    public void saveWithoutId(ValueOutput view) {
-        Vec3 vec = position();
-        List<Entity> passengers = getPassengers();
+    public void writeData(WriteView view) {
+        Vec3d vec = getEntityPos();
+        List<Entity> passengers = getPassengerList();
 
         for (Entity entity : passengers) {
             // setPos has world accessing side-effects when removed == null
             entity.removalReason = RemovalReason.UNLOADED_TO_CHUNK;
 
             // Gather passengers into same chunk when saving
-            Vec3 prevVec = entity.position();
-            entity.setPosRaw(vec.x, prevVec.y, vec.z);
+            Vec3d prevVec = entity.getEntityPos();
+            entity.setPos(vec.x, prevVec.y, vec.z);
 
             // Super requires all passengers to not be removed in order to write them to the
             // tag
             entity.removalReason = null;
         }
 
-        super.saveWithoutId(view);
+        super.writeData(view);
     }
 
     @Override
     // Make sure nothing can move contraptions out of the way
-    public void setDeltaMovement(Vec3 motionIn) {
+    public void setVelocity(Vec3d motionIn) {
     }
 
     @Override
-    public PushReaction getPistonPushReaction() {
-        return PushReaction.IGNORE;
+    public PistonBehavior getPistonBehavior() {
+        return PistonBehavior.IGNORE;
     }
 
-    public void setContraptionMotion(Vec3 vec) {
-        super.setDeltaMovement(vec);
+    public void setContraptionMotion(Vec3d vec) {
+        super.setVelocity(vec);
     }
 
     @Override
-    public boolean isPickable() {
+    public boolean canHit() {
         return false;
     }
 
     @Override
-    public boolean hurtServer(ServerLevel world, DamageSource source, float amount) {
+    public boolean damage(ServerWorld world, DamageSource source, float amount) {
         return false;
     }
 
-    public Vec3 getPrevPositionVec() {
-        return prevPosInvalid ? position() : new Vec3(xo, yo, zo);
+    public Vec3d getPrevPositionVec() {
+        return prevPosInvalid ? getEntityPos() : new Vec3d(lastX, lastY, lastZ);
     }
 
     public abstract ContraptionRotationState getRotationState();
 
-    public Vec3 getContactPointMotion(Vec3 globalContactPoint) {
-        if (prevPosInvalid) {
-            return Vec3.ZERO;
-        }
+    public Vec3d getContactPointMotion(Vec3d globalContactPoint) {
+        if (prevPosInvalid)
+            return Vec3d.ZERO;
 
-        Vec3 contactPoint = toGlobalVector(toLocalVector(globalContactPoint, 0, true), 1, true);
-        Vec3 contraptionLocalMovement = contactPoint.subtract(globalContactPoint);
-        Vec3 contraptionAnchorMovement = position().subtract(getPrevPositionVec());
+        Vec3d contactPoint = toGlobalVector(toLocalVector(globalContactPoint, 0, true), 1, true);
+        Vec3d contraptionLocalMovement = contactPoint.subtract(globalContactPoint);
+        Vec3d contraptionAnchorMovement = getEntityPos().subtract(getPrevPositionVec());
         return contraptionLocalMovement.add(contraptionAnchorMovement);
     }
 
     @Override
-    public boolean canCollideWith(Entity e) {
-        if (e instanceof Player && e.isSpectator()) {
+    public boolean collidesWith(Entity e) {
+        if (e instanceof PlayerEntity && e.isSpectator())
             return false;
-        }
-        if (e.noPhysics) {
+        if (e.noClip)
             return false;
-        }
-        if (e instanceof HangingEntity) {
+        if (e instanceof AbstractDecorationEntity)
             return false;
-        }
-        if (e instanceof AbstractMinecart) {
+        if (e instanceof AbstractMinecartEntity)
             return !(contraption instanceof MountedContraption);
-        }
-        if (e instanceof SuperGlueEntity) {
+        if (e instanceof SuperGlueEntity)
             return false;
-        }
-        if (e instanceof SeatEntity) {
+        if (e instanceof SeatEntity)
             return false;
-        }
-        if (e instanceof Projectile) {
+        if (e instanceof ProjectileEntity)
             return false;
-        }
-        if (e.getVehicle() != null) {
+        if (e.getVehicle() != null)
             return false;
-        }
 
         Entity riding = this.getVehicle();
         while (riding != null) {
-            if (riding == e) {
+            if (riding == e)
                 return false;
-            }
             riding = riding.getVehicle();
         }
 
-        return e.getPistonPushReaction() == PushReaction.NORMAL;
+        return e.getPistonBehavior() == PistonBehavior.NORMAL;
     }
 
     @Override
-    public boolean hasExactlyOnePlayerPassenger() {
+    public boolean hasPlayerRider() {
         return false;
     }
 
@@ -907,20 +810,16 @@ public abstract class AbstractContraptionEntity extends Entity {
         Matrix3d matrix;
 
         public Matrix3d asMatrix() {
-            if (matrix != null) {
+            if (matrix != null)
                 return matrix;
-            }
 
             matrix = new Matrix3d().asIdentity();
-            if (xRotation != 0) {
+            if (xRotation != 0)
                 matrix.multiply(new Matrix3d().asXRotation(AngleHelper.rad(-xRotation)));
-            }
-            if (yRotation != 0) {
+            if (yRotation != 0)
                 matrix.multiply(new Matrix3d().asYRotation(AngleHelper.rad(-yRotation)));
-            }
-            if (zRotation != 0) {
+            if (zRotation != 0)
                 matrix.multiply(new Matrix3d().asZRotation(AngleHelper.rad(-zRotation)));
-            }
             return matrix;
         }
 
@@ -935,7 +834,7 @@ public abstract class AbstractContraptionEntity extends Entity {
     }
 
     @Override
-    protected boolean updateInWaterStateAndDoFluidPushing() {
+    protected boolean updateWaterState() {
         /*
          * Override this with an empty method to reduce enormous calculation time when
          * contraptions are in water WARNING: THIS HAS A BUNCH OF SIDE EFFECTS! - Fluids
@@ -950,18 +849,18 @@ public abstract class AbstractContraptionEntity extends Entity {
     }
 
     @Override
-    public void igniteForTicks(int ticks) {
+    public void setOnFireForTicks(int ticks) {
         // Contraptions no longer catch fire
     }
 
     @Override
-    public boolean fireImmune() {
+    public boolean isFireImmune() {
         return true;
     }
 
     // Contraptions shouldn't activate pressure plates and tripwires
     @Override
-    public boolean isIgnoringBlockTriggers() {
+    public boolean canAvoidTraps() {
         return true;
     }
 
@@ -970,7 +869,7 @@ public abstract class AbstractContraptionEntity extends Entity {
     }
 
     public boolean isAliveOrStale() {
-        return isAlive() || level().isClientSide() ? staleTicks > 0 : false;
+        return isAlive() || getEntityWorld().isClient() ? staleTicks > 0 : false;
     }
 
     public boolean isPrevPosInvalid() {

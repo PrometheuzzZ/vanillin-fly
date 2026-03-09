@@ -1,7 +1,7 @@
 package com.zurrtum.create.client.catnip.render;
 
-import com.mojang.blaze3d.vertex.MeshData;
-import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.minecraft.client.render.BuiltBuffer;
+import net.minecraft.client.render.OverlayTexture;
 
 import java.nio.ByteBuffer;
 
@@ -19,7 +19,7 @@ public class MutableTemplateMesh extends TemplateMesh {
         copyFrom(0, template);
     }
 
-    public MutableTemplateMesh(MeshData data) {
+    public MutableTemplateMesh(BuiltBuffer data) {
         super(0);
         copyFrom(0, data);
     }
@@ -74,16 +74,16 @@ public class MutableTemplateMesh extends TemplateMesh {
             color(dstIndex + i, vertexBuffer.getInt(srcIndex + i * stride + 12));
             u(dstIndex + i, vertexBuffer.getFloat(srcIndex + i * stride + 16));
             v(dstIndex + i, vertexBuffer.getFloat(srcIndex + i * stride + 20));
-            overlay(dstIndex + i, OverlayTexture.NO_OVERLAY);
+            overlay(dstIndex + i, OverlayTexture.DEFAULT_UV);
             light(dstIndex + i, vertexBuffer.getInt(srcIndex + i * stride + 24));
             normal(dstIndex + i, vertexBuffer.getInt(srcIndex + i * stride + 28));
         }
     }
 
-    public void copyFrom(int index, MeshData data) {
-        MeshData.DrawState parameters = data.drawState();
+    public void copyFrom(int index, BuiltBuffer data) {
+        BuiltBuffer.DrawParameters parameters = data.getDrawParameters();
         int vertexCount = parameters.vertexCount();
-        ByteBuffer vertexBuffer = data.vertexBuffer();
+        ByteBuffer vertexBuffer = data.getBuffer();
         int stride = parameters.format().getVertexSize();
 
         copyFrom(0, index, vertexCount, vertexBuffer, stride);

@@ -2,30 +2,30 @@ package com.zurrtum.create.infrastructure.packet.s2c;
 
 import com.zurrtum.create.AllClientHandle;
 import com.zurrtum.create.AllPackets;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.PacketType;
-import net.minecraft.network.protocol.game.ClientGamePacketListener;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.item.ItemStack;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.listener.ClientPlayPacketListener;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.PacketType;
+import net.minecraft.util.math.Vec3d;
 
-public record PackageDestroyPacket(Vec3 location, ItemStack box) implements Packet<ClientGamePacketListener> {
-    public static final StreamCodec<RegistryFriendlyByteBuf, PackageDestroyPacket> CODEC = StreamCodec.composite(
-        Vec3.STREAM_CODEC,
+public record PackageDestroyPacket(Vec3d location, ItemStack box) implements Packet<ClientPlayPacketListener> {
+    public static final PacketCodec<RegistryByteBuf, PackageDestroyPacket> CODEC = PacketCodec.tuple(
+        Vec3d.PACKET_CODEC,
         PackageDestroyPacket::location,
-        ItemStack.STREAM_CODEC,
+        ItemStack.PACKET_CODEC,
         PackageDestroyPacket::box,
         PackageDestroyPacket::new
     );
 
     @Override
-    public void handle(ClientGamePacketListener listener) {
+    public void apply(ClientPlayPacketListener listener) {
         AllClientHandle.INSTANCE.onPackageDestroy(listener, this);
     }
 
     @Override
-    public PacketType<PackageDestroyPacket> type() {
+    public PacketType<PackageDestroyPacket> getPacketType() {
         return AllPackets.PACKAGE_DESTROYED;
     }
 }

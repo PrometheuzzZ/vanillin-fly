@@ -1,13 +1,13 @@
 package com.zurrtum.create.content.kinetics.belt.behaviour;
 
-import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.content.kinetics.belt.transport.TransportedItemStack;
 import com.zurrtum.create.content.logistics.funnel.AbstractFunnelBlock;
 import com.zurrtum.create.foundation.blockEntity.SmartBlockEntity;
 import com.zurrtum.create.foundation.blockEntity.behaviour.BehaviourType;
-import net.minecraft.core.BlockPos;
-import net.minecraft.world.level.BlockGetter;
-import net.minecraft.world.level.block.state.BlockState;
+import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
+import net.minecraft.block.BlockState;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.BlockView;
 
 /**
  * Behaviour for BlockEntities which can process items on belts or depots beneath
@@ -19,7 +19,9 @@ public class BeltProcessingBehaviour extends BlockEntityBehaviour<SmartBlockEnti
     public static final BehaviourType<BeltProcessingBehaviour> TYPE = new BehaviourType<>();
 
     public enum ProcessingResult {
-        PASS, HOLD, REMOVE;
+        PASS,
+        HOLD,
+        REMOVE;
     }
 
     private ProcessingCallback onItemEnter;
@@ -41,12 +43,11 @@ public class BeltProcessingBehaviour extends BlockEntityBehaviour<SmartBlockEnti
         return this;
     }
 
-    public static boolean isBlocked(BlockGetter world, BlockPos processingSpace) {
-        BlockState blockState = world.getBlockState(processingSpace.above());
-        if (AbstractFunnelBlock.isFunnel(blockState)) {
+    public static boolean isBlocked(BlockView world, BlockPos processingSpace) {
+        BlockState blockState = world.getBlockState(processingSpace.up());
+        if (AbstractFunnelBlock.isFunnel(blockState))
             return false;
-        }
-        return !blockState.getCollisionShape(world, processingSpace.above()).isEmpty();
+        return !blockState.getCollisionShape(world, processingSpace.up()).isEmpty();
     }
 
     @Override
@@ -54,10 +55,7 @@ public class BeltProcessingBehaviour extends BlockEntityBehaviour<SmartBlockEnti
         return TYPE;
     }
 
-    public ProcessingResult handleReceivedItem(
-        TransportedItemStack stack,
-        TransportedItemStackHandlerBehaviour inventory
-    ) {
+    public ProcessingResult handleReceivedItem(TransportedItemStack stack, TransportedItemStackHandlerBehaviour inventory) {
         return onItemEnter.apply(stack, inventory);
     }
 

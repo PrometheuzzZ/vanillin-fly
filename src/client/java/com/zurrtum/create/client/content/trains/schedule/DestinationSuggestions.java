@@ -3,32 +3,32 @@ package com.zurrtum.create.client.content.trains.schedule;
 import com.mojang.brigadier.context.StringRange;
 import com.mojang.brigadier.suggestion.Suggestion;
 import com.zurrtum.create.catnip.data.IntAttached;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.components.CommandSuggestions;
-import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.util.Mth;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.font.TextRenderer;
+import net.minecraft.client.gui.screen.ChatInputSuggestor;
+import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.gui.widget.TextFieldWidget;
+import net.minecraft.util.math.MathHelper;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public class DestinationSuggestions extends CommandSuggestions {
+public class DestinationSuggestions extends ChatInputSuggestor {
 
-    private final EditBox textBox;
+    private final TextFieldWidget textBox;
     private final List<IntAttached<String>> viableStations;
     private String previous = "<>";
-    private final Font font;
+    private final TextRenderer font;
     private boolean active;
 
     List<Suggestion> currentSuggestions;
     private final int yOffset;
 
     public DestinationSuggestions(
-        Minecraft pMinecraft,
+        MinecraftClient pMinecraft,
         Screen pScreen,
-        EditBox pInput,
-        Font pFont,
+        TextFieldWidget pInput,
+        TextRenderer pFont,
         List<IntAttached<String>> viableStations,
         boolean anchorToBottom,
         int yOffset
@@ -43,35 +43,30 @@ public class DestinationSuggestions extends CommandSuggestions {
     }
 
     public void tick() {
-        if (suggestions == null) {
+        if (window == null)
             textBox.setSuggestion("");
-        }
-        if (active == textBox.isFocused()) {
+        if (active == textBox.isFocused())
             return;
-        }
         active = textBox.isFocused();
-        updateCommandInfo();
+        refresh();
     }
 
     @Override
-    public void updateCommandInfo() {
-        if (textBox.getValue().length() < textBox.getCursorPosition()) {
+    public void refresh() {
+        if (textBox.getText().length() < textBox.getCursor())
             return;
-        }
 
-        String trimmed = textBox.getValue().substring(0, textBox.getCursorPosition());
+        String trimmed = textBox.getText().substring(0, textBox.getCursor());
 
-        if (!textBox.getHighlighted().isBlank()) {
-            trimmed = trimmed.replace(textBox.getHighlighted(), "");
-        }
+        if (!textBox.getSelectedText().isBlank())
+            trimmed = trimmed.replace(textBox.getSelectedText(), "");
 
         final String value = trimmed;
 
-        if (value.equals(previous)) {
+        if (value.equals(previous))
             return;
-        }
         if (!active) {
-            suggestions = null;
+            window = null;
             return;
         }
 
@@ -86,16 +81,15 @@ public class DestinationSuggestions extends CommandSuggestions {
 
     public void showSuggestions(boolean pNarrateFirstSuggestion) {
         if (currentSuggestions.isEmpty()) {
-            suggestions = null;
+            window = null;
             return;
         }
 
         int width = 0;
-        for (Suggestion suggestion : currentSuggestions) {
-            width = Math.max(width, font.width(suggestion.getText()));
-        }
-        int x = Mth.clamp(textBox.getScreenX(0), 0, textBox.getScreenX(0) + textBox.getInnerWidth() - width);
-        suggestions = new CommandSuggestions.SuggestionsList(x, 72 + yOffset, width, currentSuggestions, false);
+        for (Suggestion suggestion : currentSuggestions)
+            width = Math.max(width, font.getWidth(suggestion.getText()));
+        int x = MathHelper.clamp(textBox.getCharacterX(0), 0, textBox.getCharacterX(0) + textBox.getInnerWidth() - width);
+        window = new ChatInputSuggestor.SuggestionWindow(x, 72 + yOffset, width, currentSuggestions, false);
     }
 
     public boolean isEmpty() {

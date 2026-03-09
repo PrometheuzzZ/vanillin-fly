@@ -11,10 +11,10 @@ import com.zurrtum.create.content.trains.display.FlapDisplaySection;
 import com.zurrtum.create.content.trains.display.GlobalTrainDisplayData;
 import com.zurrtum.create.content.trains.station.GlobalStation;
 import com.zurrtum.create.content.trains.station.StationBlockEntity;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.util.Mth;
+import net.minecraft.nbt.NbtCompound;
+import net.minecraft.text.MutableText;
+import net.minecraft.text.Text;
+import net.minecraft.util.math.MathHelper;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -23,34 +23,23 @@ import static com.zurrtum.create.content.trains.display.FlapDisplaySection.MONOS
 
 public class StationSummaryDisplaySource extends DisplaySource {
 
-    protected static final MutableComponent UNPREDICTABLE = Component.literal(" ~ ");
-    protected static final List<MutableComponent> EMPTY_ENTRY_4 = ImmutableList.of(
-        WHITESPACE,
-        Component.literal(" . "),
-        WHITESPACE,
-        WHITESPACE
-    );
-    protected static final List<MutableComponent> EMPTY_ENTRY_5 = ImmutableList.of(
-        WHITESPACE,
-        Component.literal(" . "),
-        WHITESPACE,
-        WHITESPACE,
-        WHITESPACE
-    );
+    protected static final MutableText UNPREDICTABLE = Text.literal(" ~ ");
+    protected static final List<MutableText> EMPTY_ENTRY_4 = ImmutableList.of(WHITESPACE, Text.literal(" . "), WHITESPACE, WHITESPACE);
+    protected static final List<MutableText> EMPTY_ENTRY_5 = ImmutableList.of(WHITESPACE, Text.literal(" . "), WHITESPACE, WHITESPACE, WHITESPACE);
 
     @Override
-    public List<MutableComponent> provideText(DisplayLinkContext context, DisplayTargetStats stats) {
+    public List<MutableText> provideText(DisplayLinkContext context, DisplayTargetStats stats) {
         return EMPTY;
     }
 
     @Override
-    public List<List<MutableComponent>> provideFlapDisplayText(DisplayLinkContext context, DisplayTargetStats stats) {
-        String filter = context.sourceConfig().getStringOr("Filter", "");
+    public List<List<MutableText>> provideFlapDisplayText(DisplayLinkContext context, DisplayTargetStats stats) {
+        String filter = context.sourceConfig().getString("Filter", "");
         boolean hasPlatform = filter.contains("*");
 
-        List<List<MutableComponent>> list = new ArrayList<>();
+        List<List<MutableText>> list = new ArrayList<>();
         GlobalTrainDisplayData.prepare(filter, stats.maxRows()).forEach(prediction -> {
-            List<MutableComponent> lines = new ArrayList<>();
+            List<MutableText> lines = new ArrayList<>();
 
             if (prediction.ticks == -1 || prediction.ticks >= 12000 - 15 * 20) {
                 lines.add(WHITESPACE);
@@ -58,18 +47,18 @@ public class StationSummaryDisplaySource extends DisplaySource {
 
             } else if (prediction.ticks < 200) {
                 lines.add(WHITESPACE);
-                lines.add(Component.translatable("create.display_source.station_summary.now"));
+                lines.add(Text.translatable("create.display_source.station_summary.now"));
 
             } else {
                 int min = prediction.ticks / 1200;
                 int sec = (prediction.ticks / 20) % 60;
-                sec = Mth.ceil(sec / 15f) * 15;
+                sec = MathHelper.ceil(sec / 15f) * 15;
                 if (sec == 60) {
                     min++;
                     sec = 0;
                 }
-                lines.add(min > 0 ? Component.literal(String.valueOf(min)) : WHITESPACE);
-                lines.add(min > 0 ? Component.translatable("create.display_source.station_summary.minutes") : Component.translatable("create.display_source.station_summary.seconds",
+                lines.add(min > 0 ? Text.literal(String.valueOf(min)) : WHITESPACE);
+                lines.add(min > 0 ? Text.translatable("create.display_source.station_summary.minutes") : Text.translatable("create.display_source.station_summary.seconds",
                     sec
                 ));
             }
@@ -83,45 +72,36 @@ public class StationSummaryDisplaySource extends DisplaySource {
             }
 
             String platform = prediction.destination;
-            for (String string : filter.split("\\*")) {
-                if (!string.isEmpty()) {
+            for (String string : filter.split("\\*"))
+                if (!string.isEmpty())
                     platform = platform.replace(string, "");
-                }
-            }
             platform = platform.replace("*", "?");
 
-            lines.add(Component.literal(platform.trim()));
+            lines.add(Text.literal(platform.trim()));
             list.add(lines);
         });
 
-        if (!list.isEmpty()) {
+        if (!list.isEmpty())
             context.blockEntity().award(AllAdvancements.DISPLAY_BOARD);
-        }
 
         int toPad = stats.maxRows() - list.size();
-        for (int padding = 0; padding < toPad; padding++) {
+        for (int padding = 0; padding < toPad; padding++)
             list.add(hasPlatform ? EMPTY_ENTRY_5 : EMPTY_ENTRY_4);
-        }
 
         return list;
     }
 
     @Override
-    public void loadFlapDisplayLayout(
-        DisplayLinkContext context,
-        FlapDisplayBlockEntity flapDisplay,
-        FlapDisplayLayout layout
-    ) {
-        CompoundTag conf = context.sourceConfig();
-        int columnWidth = conf.getIntOr("NameColumn", 0);
-        int columnWidth2 = conf.getIntOr("PlatformColumn", 0);
-        boolean hasPlatform = conf.getStringOr("Filter", "").contains("*");
+    public void loadFlapDisplayLayout(DisplayLinkContext context, FlapDisplayBlockEntity flapDisplay, FlapDisplayLayout layout) {
+        NbtCompound conf = context.sourceConfig();
+        int columnWidth = conf.getInt("NameColumn", 0);
+        int columnWidth2 = conf.getInt("PlatformColumn", 0);
+        boolean hasPlatform = conf.getString("Filter", "").contains("*");
 
         String layoutName = "StationSummary" + columnWidth + hasPlatform + columnWidth2;
 
-        if (layout.isLayout(layoutName)) {
+        if (layout.isLayout(layoutName))
             return;
-        }
 
         ArrayList<FlapDisplaySection> list = new ArrayList<>();
 
@@ -138,22 +118,15 @@ public class StationSummaryDisplaySource extends DisplaySource {
         platformWidth = Math.min(platformWidth, totalSize - gapSize);
         platformWidth = (int) (platformWidth / MONOSPACE) * MONOSPACE;
 
-        if (hasPlatform) {
+        if (hasPlatform)
             totalSize = totalSize - gapSize - platformWidth;
-        }
-        if (platformWidth == 0 && hasPlatform) {
+        if (platformWidth == 0 && hasPlatform)
             totalSize += gapSize;
-        }
 
         int trainNameWidth = (int) ((columnWidth / 100f) * totalSize / MONOSPACE);
         int destinationWidth = (int) Math.round((1 - columnWidth / 100f) * totalSize / MONOSPACE);
 
-        FlapDisplaySection trainName = new FlapDisplaySection(
-            trainNameWidth * MONOSPACE,
-            "alphabet",
-            false,
-            trainNameWidth > 0
-        );
+        FlapDisplaySection trainName = new FlapDisplaySection(trainNameWidth * MONOSPACE, "alphabet", false, trainNameWidth > 0);
         FlapDisplaySection destination = new FlapDisplaySection(
             destinationWidth * MONOSPACE,
             "alphabet",
@@ -168,9 +141,8 @@ public class StationSummaryDisplaySource extends DisplaySource {
         list.add(trainName);
         list.add(destination);
 
-        if (hasPlatform) {
+        if (hasPlatform)
             list.add(platform);
-        }
 
         layout.configure(layoutName, list);
     }
@@ -182,25 +154,20 @@ public class StationSummaryDisplaySource extends DisplaySource {
 
     @Override
     public void populateData(DisplayLinkContext context) {
-        CompoundTag conf = context.sourceConfig();
+        NbtCompound conf = context.sourceConfig();
 
-        if (!conf.contains("PlatformColumn")) {
+        if (!conf.contains("PlatformColumn"))
             conf.putInt("PlatformColumn", 3);
-        }
-        if (!conf.contains("NameColumn")) {
+        if (!conf.contains("NameColumn"))
             conf.putInt("NameColumn", 50);
-        }
 
-        if (conf.contains("Filter")) {
+        if (conf.contains("Filter"))
             return;
-        }
-        if (!(context.getSourceBlockEntity() instanceof StationBlockEntity stationBe)) {
+        if (!(context.getSourceBlockEntity() instanceof StationBlockEntity stationBe))
             return;
-        }
         GlobalStation station = stationBe.getStation();
-        if (station == null) {
+        if (station == null)
             return;
-        }
         conf.putString("Filter", station.name);
     }
 

@@ -4,30 +4,22 @@ import de.crafty.eiv.common.api.recipe.IEivRecipeViewType;
 import de.crafty.eiv.common.api.recipe.IEivViewRecipe;
 import de.crafty.eiv.common.recipe.inventory.RecipeViewMenu;
 import it.unimi.dsi.fastutil.ints.IntSet;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.components.Tooltip;
-import net.minecraft.network.chat.Component;
-import net.minecraft.world.inventory.Slot;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.tooltip.Tooltip;
+import net.minecraft.client.gui.widget.ButtonWidget;
+import net.minecraft.screen.slot.Slot;
+import net.minecraft.text.Text;
 import org.jetbrains.annotations.Nullable;
 
-public class RecipeButton extends Button.Plain {
+public class RecipeButton extends ButtonWidget {
     private IntSet missingIndices;
 
-    public RecipeButton(
-        int x,
-        int y,
-        int width,
-        int height,
-        Component message,
-        OnPress onPress,
-        CreateNarration narrationSupplier
-    ) {
+    public RecipeButton(int x, int y, int width, int height, Text message, PressAction onPress, NarrationSupplier narrationSupplier) {
         super(x, y, width, height, message, onPress, narrationSupplier);
     }
 
-    public static Button.Builder builder(Component message, RecipeTransferContext context, IEivViewRecipe view) {
+    public static ButtonWidget.Builder builder(Text message, RecipeTransferContext context, IEivViewRecipe view) {
         return new Builder(message, new RecipeTransferAction(context, view));
     }
 
@@ -40,13 +32,13 @@ public class RecipeButton extends Button.Plain {
         }
     }
 
-    public void setTooltip(Component tooltip) {
-        setTooltip(Tooltip.create(tooltip));
+    public void setTooltip(Text tooltip) {
+        setTooltip(Tooltip.of(tooltip));
     }
 
-    public void updateMissing(IntSet missingIndices, Component tooltip) {
+    public void updateMissing(IntSet missingIndices, Text tooltip) {
         this.missingIndices = missingIndices;
-        setTooltip(Tooltip.create(tooltip));
+        setTooltip(Tooltip.of(tooltip));
     }
 
     public void setSuccess() {
@@ -54,7 +46,7 @@ public class RecipeButton extends Button.Plain {
         setTooltip((Tooltip) null);
     }
 
-    public void renderInvalidSlots(GuiGraphics context, int displayId) {
+    public void renderInvalidSlots(DrawContext context, int displayId) {
         if (missingIndices == null) {
             return;
         }
@@ -72,73 +64,73 @@ public class RecipeButton extends Button.Plain {
         }
     }
 
-    public static class Builder extends Button.Builder {
-        private final Component message;
-        private final OnPress onPress;
+    public static class Builder extends ButtonWidget.Builder {
+        private final Text message;
+        private final PressAction onPress;
         @Nullable
         private Tooltip tooltip;
         private int x;
         private int y;
         private int width = 150;
         private int height = 20;
-        private CreateNarration narrationSupplier = Button.DEFAULT_NARRATION;
+        private NarrationSupplier narrationSupplier = ButtonWidget.DEFAULT_NARRATION_SUPPLIER;
 
-        public Builder(Component message, OnPress onPress) {
+        public Builder(Text message, PressAction onPress) {
             super(message, onPress);
             this.message = message;
             this.onPress = onPress;
         }
 
         @Override
-        public Button.Builder pos(int x, int y) {
+        public ButtonWidget.Builder position(int x, int y) {
             this.x = x;
             this.y = y;
             return this;
         }
 
         @Override
-        public Button.Builder width(int width) {
+        public ButtonWidget.Builder width(int width) {
             this.width = width;
             return this;
         }
 
         @Override
-        public Button.Builder size(int width, int height) {
+        public ButtonWidget.Builder size(int width, int height) {
             this.width = width;
             this.height = height;
             return this;
         }
 
         @Override
-        public Button.Builder bounds(int x, int y, int width, int height) {
-            return pos(x, y).size(width, height);
+        public ButtonWidget.Builder dimensions(int x, int y, int width, int height) {
+            return position(x, y).size(width, height);
         }
 
         @Override
-        public Button.Builder tooltip(@Nullable Tooltip tooltip) {
+        public ButtonWidget.Builder tooltip(@Nullable Tooltip tooltip) {
             this.tooltip = tooltip;
             return this;
         }
 
         @Override
-        public Button.Builder createNarration(CreateNarration narrationSupplier) {
+        public ButtonWidget.Builder narrationSupplier(NarrationSupplier narrationSupplier) {
             this.narrationSupplier = narrationSupplier;
             return this;
         }
 
         @Override
-        public Button build() {
-            Button buttonWidget = new RecipeButton(x, y, width, height, message, onPress, narrationSupplier);
+        public ButtonWidget build() {
+            ButtonWidget buttonWidget = new RecipeButton(x, y, width, height, message, onPress, narrationSupplier);
             buttonWidget.setTooltip(tooltip);
             return buttonWidget;
         }
     }
 
-    public record RecipeTransferAction(RecipeTransferContext context, IEivViewRecipe view) implements OnPress {
+    public record RecipeTransferAction(RecipeTransferContext context, IEivViewRecipe view) implements PressAction {
         @Override
-        public void onPress(Button button) {
+        public void onPress(ButtonWidget button) {
             if (context.handler().handle(context.screen(), view, (RecipeButton) button, true)) {
-                Minecraft.getInstance().setScreen(context.screen());
+                MinecraftClient.getInstance().setScreen(context.screen());
             }
         }
 

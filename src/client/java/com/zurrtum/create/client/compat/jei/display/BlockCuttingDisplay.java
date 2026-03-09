@@ -1,8 +1,8 @@
 package com.zurrtum.create.client.compat.jei.display;
 
-import net.minecraft.resources.Identifier;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.crafting.Ingredient;
+import net.minecraft.item.ItemStack;
+import net.minecraft.recipe.Ingredient;
+import net.minecraft.util.Identifier;
 
 import java.util.List;
 

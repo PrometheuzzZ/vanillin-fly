@@ -3,31 +3,30 @@ package com.zurrtum.create.infrastructure.packet.c2s;
 import com.zurrtum.create.AllHandle;
 import com.zurrtum.create.AllPackets;
 import com.zurrtum.create.content.logistics.packagePort.PackagePortTarget;
-import net.minecraft.core.BlockPos;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.PacketType;
-import net.minecraft.network.protocol.game.ServerGamePacketListener;
-import net.minecraft.server.network.ServerGamePacketListenerImpl;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.listener.ServerPlayPacketListener;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.PacketType;
+import net.minecraft.server.network.ServerPlayNetworkHandler;
+import net.minecraft.util.math.BlockPos;
 
-public record PackagePortPlacementPacket(PackagePortTarget target,
-                                         BlockPos pos) implements Packet<ServerGamePacketListener> {
-    public static final StreamCodec<RegistryFriendlyByteBuf, PackagePortPlacementPacket> CODEC = StreamCodec.composite(
+public record PackagePortPlacementPacket(PackagePortTarget target, BlockPos pos) implements Packet<ServerPlayPacketListener> {
+    public static final PacketCodec<RegistryByteBuf, PackagePortPlacementPacket> CODEC = PacketCodec.tuple(
         PackagePortTarget.PACKET_CODEC,
         PackagePortPlacementPacket::target,
-        BlockPos.STREAM_CODEC,
+        BlockPos.PACKET_CODEC,
         PackagePortPlacementPacket::pos,
         PackagePortPlacementPacket::new
     );
 
     @Override
-    public void handle(ServerGamePacketListener listener) {
-        AllHandle.onPackagePortPlacement((ServerGamePacketListenerImpl) listener, this);
+    public void apply(ServerPlayPacketListener listener) {
+        AllHandle.onPackagePortPlacement((ServerPlayNetworkHandler) listener, this);
     }
 
     @Override
-    public PacketType<PackagePortPlacementPacket> type() {
+    public PacketType<PackagePortPlacementPacket> getPacketType() {
         return AllPackets.PLACE_PACKAGE_PORT;
     }
 }

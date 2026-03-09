@@ -11,9 +11,9 @@ import com.zurrtum.create.client.flywheel.lib.instance.FlatLit;
 import com.zurrtum.create.client.flywheel.lib.model.Models;
 import com.zurrtum.create.client.foundation.render.AllInstanceTypes;
 import com.zurrtum.create.content.kinetics.gearbox.GearboxBlockEntity;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.state.property.Properties;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
 
 import java.util.EnumMap;
 import java.util.Map;
@@ -27,14 +27,11 @@ public class GearboxVisual extends KineticBlockEntityVisual<GearboxBlockEntity> 
     public GearboxVisual(VisualizationContext context, GearboxBlockEntity blockEntity, float partialTick) {
         super(context, blockEntity, partialTick);
 
-        final Direction.Axis boxAxis = blockState.getValue(BlockStateProperties.AXIS);
+        final Direction.Axis boxAxis = blockState.get(Properties.AXIS);
 
         updateSourceFacing();
 
-        var instancer = instancerProvider().instancer(
-            AllInstanceTypes.ROTATING,
-            Models.partial(AllPartialModels.SHAFT_HALF)
-        );
+        var instancer = instancerProvider().instancer(AllInstanceTypes.ROTATING, Models.partial(AllPartialModels.SHAFT_HALF));
 
         for (Direction direction : Iterate.directions) {
             final Direction.Axis axis = direction.getAxis();
@@ -44,8 +41,8 @@ public class GearboxVisual extends KineticBlockEntityVisual<GearboxBlockEntity> 
 
             RotatingInstance instance = instancer.createInstance();
 
-            instance.setup(blockEntity, axis, getSpeed(direction)).setPosition(getVisualPosition())
-                .rotateToFace(Direction.SOUTH, direction).setChanged();
+            instance.setup(blockEntity, axis, getSpeed(direction)).setPosition(getVisualPosition()).rotateToFace(Direction.SOUTH, direction)
+                .setChanged();
 
             keys.put(direction, instance);
         }
@@ -55,11 +52,10 @@ public class GearboxVisual extends KineticBlockEntityVisual<GearboxBlockEntity> 
         float speed = blockEntity.getSpeed();
 
         if (speed != 0 && sourceFacing != null) {
-            if (sourceFacing.getAxis() == direction.getAxis()) {
+            if (sourceFacing.getAxis() == direction.getAxis())
                 speed *= sourceFacing == direction ? 1 : -1;
-            } else if (sourceFacing.getAxisDirection() == direction.getAxisDirection()) {
+            else if (sourceFacing.getDirection() == direction.getDirection())
                 speed *= -1;
-            }
         }
         return speed;
     }
@@ -67,7 +63,7 @@ public class GearboxVisual extends KineticBlockEntityVisual<GearboxBlockEntity> 
     protected void updateSourceFacing() {
         if (blockEntity.hasSource()) {
             BlockPos source = blockEntity.source.subtract(pos);
-            sourceFacing = Direction.getApproximateNearest(source.getX(), source.getY(), source.getZ());
+            sourceFacing = Direction.getFacing(source.getX(), source.getY(), source.getZ());
         } else {
             sourceFacing = null;
         }

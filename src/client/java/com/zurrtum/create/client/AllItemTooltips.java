@@ -5,14 +5,13 @@ import com.zurrtum.create.client.catnip.lang.FontHelper;
 import com.zurrtum.create.client.foundation.item.ItemDescription;
 import com.zurrtum.create.client.foundation.item.KineticStats;
 import com.zurrtum.create.client.foundation.item.TooltipModifier;
-import net.minecraft.world.item.Item;
+import net.minecraft.item.Item;
 
 public class AllItemTooltips {
     public static void register(Item item) {
         TooltipModifier.REGISTRY.register(
             item,
-            new ItemDescription.Modifier(item, FontHelper.Palette.STANDARD_CREATE).andThen(TooltipModifier.mapNull(
-                KineticStats.create(item)))
+            new ItemDescription.Modifier(item, FontHelper.Palette.STANDARD_CREATE).andThen(TooltipModifier.mapNull(KineticStats.create(item)))
         );
     }
 

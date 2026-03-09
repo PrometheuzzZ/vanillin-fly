@@ -4,14 +4,14 @@ import com.google.common.collect.ImmutableList;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import com.zurrtum.create.catnip.data.Couple;
-import net.minecraft.tags.BlockTags;
-import net.minecraft.util.RandomSource;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.levelgen.feature.configurations.OreConfiguration;
-import net.minecraft.world.level.levelgen.structure.templatesystem.RuleTest;
-import net.minecraft.world.level.levelgen.structure.templatesystem.TagMatchTest;
+import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.Blocks;
+import net.minecraft.registry.tag.BlockTags;
+import net.minecraft.structure.rule.RuleTest;
+import net.minecraft.structure.rule.TagMatchRuleTest;
+import net.minecraft.util.math.random.Random;
+import net.minecraft.world.gen.feature.OreFeatureConfig;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -21,8 +21,7 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 public class LayerPattern {
-    public static final Codec<LayerPattern> CODEC = Codec.list(Layer.CODEC)
-        .xmap(LayerPattern::new, pattern -> pattern.layers);
+    public static final Codec<LayerPattern> CODEC = Codec.list(Layer.CODEC).xmap(LayerPattern::new, pattern -> pattern.layers);
 
     public final List<Layer> layers;
 
@@ -30,23 +29,19 @@ public class LayerPattern {
         this.layers = layers;
     }
 
-    public Layer rollNext(@Nullable Layer previous, RandomSource random) {
+    public Layer rollNext(@Nullable Layer previous, Random random) {
         int totalWeight = 0;
-        for (Layer layer : layers) {
-            if (layer != previous) {
+        for (Layer layer : layers)
+            if (layer != previous)
                 totalWeight += layer.weight;
-            }
-        }
         int rolled = random.nextInt(totalWeight);
 
         for (Layer layer : layers) {
-            if (layer == previous) {
+            if (layer == previous)
                 continue;
-            }
             rolled -= layer.weight;
-            if (rolled < 0) {
+            if (rolled < 0)
                 return layer;
-            }
         }
         return null;
     }
@@ -79,38 +74,36 @@ public class LayerPattern {
 
     public static class Layer {
         public static final Codec<Layer> CODEC = RecordCodecBuilder.create(instance -> instance.group(
-            Codec.list(Codec.list(OreConfiguration.TargetBlockState.CODEC)).fieldOf("targets")
-                .forGetter(layer -> layer.targets),
+            Codec.list(Codec.list(OreFeatureConfig.Target.CODEC)).fieldOf("targets").forGetter(layer -> layer.targets),
             Codec.intRange(0, Integer.MAX_VALUE).fieldOf("min_size").forGetter(layer -> layer.minSize),
             Codec.intRange(0, Integer.MAX_VALUE).fieldOf("max_size").forGetter(layer -> layer.maxSize),
             Codec.intRange(0, Integer.MAX_VALUE).fieldOf("weight").forGetter(layer -> layer.weight)
         ).apply(instance, Layer::new));
 
-        public final List<List<OreConfiguration.TargetBlockState>> targets;
+        public final List<List<OreFeatureConfig.Target>> targets;
         public final int minSize;
         public final int maxSize;
         public final int weight;
 
-        public Layer(List<List<OreConfiguration.TargetBlockState>> targets, int minSize, int maxSize, int weight) {
+        public Layer(List<List<OreFeatureConfig.Target>> targets, int minSize, int maxSize, int weight) {
             this.targets = targets;
             this.minSize = minSize;
             this.maxSize = maxSize;
             this.weight = weight;
         }
 
-        public List<OreConfiguration.TargetBlockState> rollBlock(RandomSource random) {
-            if (targets.size() == 1) {
+        public List<OreFeatureConfig.Target> rollBlock(Random random) {
+            if (targets.size() == 1)
                 return targets.getFirst();
-            }
             return targets.get(random.nextInt(targets.size()));
         }
 
         public static class Builder {
-            private static final RuleTest STONE_ORE_REPLACEABLES = new TagMatchTest(BlockTags.STONE_ORE_REPLACEABLES);
-            private static final RuleTest DEEPSLATE_ORE_REPLACEABLES = new TagMatchTest(BlockTags.DEEPSLATE_ORE_REPLACEABLES);
-            private static final RuleTest NETHER_ORE_REPLACEABLES = new TagMatchTest(BlockTags.BASE_STONE_NETHER);
+            private static final RuleTest STONE_ORE_REPLACEABLES = new TagMatchRuleTest(BlockTags.STONE_ORE_REPLACEABLES);
+            private static final RuleTest DEEPSLATE_ORE_REPLACEABLES = new TagMatchRuleTest(BlockTags.DEEPSLATE_ORE_REPLACEABLES);
+            private static final RuleTest NETHER_ORE_REPLACEABLES = new TagMatchRuleTest(BlockTags.BASE_STONE_NETHER);
 
-            private final List<List<OreConfiguration.TargetBlockState>> targets = new ArrayList<>();
+            private final List<List<OreFeatureConfig.Target>> targets = new ArrayList<>();
             private int minSize = 1;
             private int maxSize = 1;
             private int weight = 1;
@@ -121,35 +114,29 @@ public class LayerPattern {
             }
 
             public Builder passiveBlock() {
-                return blocks(Blocks.STONE.defaultBlockState(), Blocks.DEEPSLATE.defaultBlockState());
+                return blocks(Blocks.STONE.getDefaultState(), Blocks.DEEPSLATE.getDefaultState());
             }
 
             public Builder block(Block block) {
                 if (netherMode) {
-                    this.targets.add(ImmutableList.of(OreConfiguration.target(
-                        NETHER_ORE_REPLACEABLES,
-                        block.defaultBlockState()
-                    )));
+                    this.targets.add(ImmutableList.of(OreFeatureConfig.createTarget(NETHER_ORE_REPLACEABLES, block.getDefaultState())));
                     return this;
                 }
-                return blocks(block.defaultBlockState(), block.defaultBlockState());
+                return blocks(block.getDefaultState(), block.getDefaultState());
             }
 
             public Builder blocks(Block block, Block deepblock) {
-                return blocks(block.defaultBlockState(), deepblock.defaultBlockState());
+                return blocks(block.getDefaultState(), deepblock.getDefaultState());
             }
 
             public Builder blocks(Couple<Supplier<? extends Block>> blocksByDepth) {
-                return blocks(
-                    blocksByDepth.getFirst().get().defaultBlockState(),
-                    blocksByDepth.getSecond().get().defaultBlockState()
-                );
+                return blocks(blocksByDepth.getFirst().get().getDefaultState(), blocksByDepth.getSecond().get().getDefaultState());
             }
 
             private Builder blocks(BlockState stone, BlockState deepslate) {
                 this.targets.add(ImmutableList.of(
-                    OreConfiguration.target(STONE_ORE_REPLACEABLES, stone),
-                    OreConfiguration.target(DEEPSLATE_ORE_REPLACEABLES, deepslate)
+                    OreFeatureConfig.createTarget(STONE_ORE_REPLACEABLES, stone),
+                    OreFeatureConfig.createTarget(DEEPSLATE_ORE_REPLACEABLES, deepslate)
                 ));
                 return this;
             }

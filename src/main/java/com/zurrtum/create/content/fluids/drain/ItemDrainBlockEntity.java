@@ -2,7 +2,6 @@ package com.zurrtum.create.content.fluids.drain;
 
 import com.zurrtum.create.AllAdvancements;
 import com.zurrtum.create.AllBlockEntityTypes;
-import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.catnip.data.Iterate;
 import com.zurrtum.create.catnip.data.Pair;
 import com.zurrtum.create.catnip.math.VecHelper;
@@ -11,19 +10,20 @@ import com.zurrtum.create.content.kinetics.belt.behaviour.DirectBeltInputBehavio
 import com.zurrtum.create.content.kinetics.belt.transport.TransportedItemStack;
 import com.zurrtum.create.foundation.advancement.CreateTrigger;
 import com.zurrtum.create.foundation.blockEntity.SmartBlockEntity;
+import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.foundation.blockEntity.behaviour.fluid.SmartFluidTankBehaviour;
 import com.zurrtum.create.foundation.utility.BlockHelper;
 import com.zurrtum.create.infrastructure.fluids.BucketFluidInventory;
 import com.zurrtum.create.infrastructure.fluids.FluidStack;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.world.Containers;
-import net.minecraft.world.entity.item.ItemEntity;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.block.BlockState;
+import net.minecraft.entity.ItemEntity;
+import net.minecraft.item.ItemStack;
+import net.minecraft.storage.ReadView;
+import net.minecraft.storage.WriteView;
+import net.minecraft.util.ItemScatterer;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Vec3d;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.IdentityHashMap;
@@ -49,23 +49,18 @@ public class ItemDrainBlockEntity extends SmartBlockEntity {
     }
 
     @Override
-    public void preRemoveSideEffects(BlockPos pos, BlockState oldState) {
-        super.preRemoveSideEffects(pos, oldState);
+    public void onBlockReplaced(BlockPos pos, BlockState oldState) {
+        super.onBlockReplaced(pos, oldState);
         ItemStack heldItemStack = getHeldItemStack();
-        if (!heldItemStack.isEmpty()) {
-            Containers.dropItemStack(level, pos.getX(), pos.getY(), pos.getZ(), heldItemStack);
-        }
+        if (!heldItemStack.isEmpty())
+            ItemScatterer.spawn(world, pos.getX(), pos.getY(), pos.getZ(), heldItemStack);
     }
 
     @Override
     public void addBehaviours(List<BlockEntityBehaviour<?>> behaviours) {
-        behaviours.add(new DirectBeltInputBehaviour(this).allowingBeltFunnels()
-            .setInsertionHandler(this::tryInsertingFromSide));
-        behaviours.add(internalTank = SmartFluidTankBehaviour.single(
-            this,
-            (int) (1.5 * BucketFluidInventory.CAPACITY),
-            ItemDrainFluidHandler::new
-        ).allowExtraction().forbidInsertion());
+        behaviours.add(new DirectBeltInputBehaviour(this).allowingBeltFunnels().setInsertionHandler(this::tryInsertingFromSide));
+        behaviours.add(internalTank = SmartFluidTankBehaviour.single(this, (int) (1.5 * BucketFluidInventory.CAPACITY), ItemDrainFluidHandler::new)
+            .allowExtraction().forbidInsertion());
     }
 
     @Override
@@ -77,18 +72,16 @@ public class ItemDrainBlockEntity extends SmartBlockEntity {
         ItemStack inserted = transportedStack.stack;
         ItemStack returned = ItemStack.EMPTY;
 
-        if (!getHeldItemStack().isEmpty()) {
+        if (!getHeldItemStack().isEmpty())
             return inserted;
-        }
 
-        if (inserted.getCount() > 1 && GenericItemEmptying.canItemBeEmptied(level, inserted)) {
+        if (inserted.getCount() > 1 && GenericItemEmptying.canItemBeEmptied(world, inserted)) {
             returned = inserted.copyWithCount(inserted.getCount() - 1);
             inserted = inserted.copyWithCount(1);
         }
 
-        if (simulate) {
+        if (simulate)
             return returned;
-        }
 
         transportedStack = transportedStack.copy();
         transportedStack.stack = inserted.copy();
@@ -96,7 +89,7 @@ public class ItemDrainBlockEntity extends SmartBlockEntity {
         transportedStack.prevSideOffset = transportedStack.sideOffset;
         transportedStack.prevBeltPosition = transportedStack.beltPosition;
         setHeldItem(transportedStack, side);
-        setChanged();
+        markDirty();
         sendData();
 
         return returned;
@@ -115,22 +108,20 @@ public class ItemDrainBlockEntity extends SmartBlockEntity {
             return;
         }
 
-        boolean onClient = level.isClientSide() && !isVirtual();
+        boolean onClient = world.isClient() && !isVirtual();
 
         if (processingTicks > 0) {
             heldItem.prevBeltPosition = .5f;
             boolean wasAtBeginning = processingTicks == FILLING_TIME;
-            if (!onClient || processingTicks < FILLING_TIME) {
+            if (!onClient || processingTicks < FILLING_TIME)
                 processingTicks--;
-            }
             if (!continueProcessing()) {
                 processingTicks = 0;
                 notifyUpdate();
                 return;
             }
-            if (wasAtBeginning != (processingTicks == FILLING_TIME)) {
+            if (wasAtBeginning != (processingTicks == FILLING_TIME))
                 sendData();
-            }
             return;
         }
 
@@ -141,55 +132,43 @@ public class ItemDrainBlockEntity extends SmartBlockEntity {
         if (heldItem.beltPosition > 1) {
             heldItem.beltPosition = 1;
 
-            if (onClient) {
+            if (onClient)
                 return;
-            }
 
             Direction side = heldItem.insertedFrom;
 
-            ItemStack tryExportingToBeltFunnel = getBehaviour(DirectBeltInputBehaviour.TYPE).tryExportingToBeltFunnel(heldItem.stack,
+            ItemStack tryExportingToBeltFunnel = getBehaviour(DirectBeltInputBehaviour.TYPE).tryExportingToBeltFunnel(
+                heldItem.stack,
                 side.getOpposite(),
                 false
             );
             if (tryExportingToBeltFunnel != null) {
                 if (tryExportingToBeltFunnel.getCount() != heldItem.stack.getCount()) {
-                    if (tryExportingToBeltFunnel.isEmpty()) {
+                    if (tryExportingToBeltFunnel.isEmpty())
                         heldItem = null;
-                    } else {
+                    else
                         heldItem.stack = tryExportingToBeltFunnel;
-                    }
                     notifyUpdate();
                     return;
                 }
-                if (!tryExportingToBeltFunnel.isEmpty()) {
+                if (!tryExportingToBeltFunnel.isEmpty())
                     return;
-                }
             }
 
-            BlockPos nextPosition = worldPosition.relative(side);
-            DirectBeltInputBehaviour directBeltInputBehaviour = BlockEntityBehaviour.get(
-                level,
-                nextPosition,
-                DirectBeltInputBehaviour.TYPE
-            );
+            BlockPos nextPosition = pos.offset(side);
+            DirectBeltInputBehaviour directBeltInputBehaviour = BlockEntityBehaviour.get(world, nextPosition, DirectBeltInputBehaviour.TYPE);
             if (directBeltInputBehaviour == null) {
-                if (!BlockHelper.hasBlockSolidSide(
-                    level.getBlockState(nextPosition),
-                    level,
-                    nextPosition,
-                    side.getOpposite()
-                )) {
+                if (!BlockHelper.hasBlockSolidSide(world.getBlockState(nextPosition), world, nextPosition, side.getOpposite())) {
                     ItemStack ejected = heldItem.stack;
-                    Vec3 outPos = VecHelper.getCenterOf(worldPosition)
-                        .add(Vec3.atLowerCornerOf(side.getUnitVec3i()).scale(.75));
+                    Vec3d outPos = VecHelper.getCenterOf(pos).add(Vec3d.of(side.getVector()).multiply(.75));
                     float movementSpeed = itemMovementPerTick();
-                    Vec3 outMotion = Vec3.atLowerCornerOf(side.getUnitVec3i()).scale(movementSpeed).add(0, 1 / 8f, 0);
+                    Vec3d outMotion = Vec3d.of(side.getVector()).multiply(movementSpeed).add(0, 1 / 8f, 0);
                     outPos.add(outMotion.normalize());
-                    ItemEntity entity = new ItemEntity(level, outPos.x, outPos.y + 6 / 16f, outPos.z, ejected);
-                    entity.setDeltaMovement(outMotion);
-                    entity.setDefaultPickUpDelay();
-                    entity.hurtMarked = true;
-                    level.addFreshEntity(entity);
+                    ItemEntity entity = new ItemEntity(world, outPos.x, outPos.y + 6 / 16f, outPos.z, ejected);
+                    entity.setVelocity(outMotion);
+                    entity.setToDefaultPickupDelay();
+                    entity.velocityModified = true;
+                    world.spawnEntity(entity);
 
                     heldItem = null;
                     notifyUpdate();
@@ -197,16 +176,14 @@ public class ItemDrainBlockEntity extends SmartBlockEntity {
                 return;
             }
 
-            if (!directBeltInputBehaviour.canInsertFromSide(side)) {
+            if (!directBeltInputBehaviour.canInsertFromSide(side))
                 return;
-            }
 
             ItemStack returned = directBeltInputBehaviour.handleInsertion(heldItem.copy(), side, false);
 
             if (returned.isEmpty()) {
-                if (level.getBlockEntity(nextPosition) instanceof ItemDrainBlockEntity) {
+                if (world.getBlockEntity(nextPosition) instanceof ItemDrainBlockEntity)
                     award(AllAdvancements.CHAINED_DRAIN);
-                }
                 heldItem = null;
                 notifyUpdate();
                 return;
@@ -222,13 +199,11 @@ public class ItemDrainBlockEntity extends SmartBlockEntity {
         }
 
         if (heldItem.prevBeltPosition < .5f && heldItem.beltPosition >= .5f) {
-            if (!GenericItemEmptying.canItemBeEmptied(level, heldItem.stack)) {
+            if (!GenericItemEmptying.canItemBeEmptied(world, heldItem.stack))
                 return;
-            }
             heldItem.beltPosition = .5f;
-            if (onClient) {
+            if (onClient)
                 return;
-            }
             processingTicks = FILLING_TIME;
             sendData();
         }
@@ -236,17 +211,14 @@ public class ItemDrainBlockEntity extends SmartBlockEntity {
     }
 
     protected boolean continueProcessing() {
-        if (level.isClientSide() && !isVirtual()) {
+        if (world.isClient() && !isVirtual())
             return true;
-        }
-        if (processingTicks < 5) {
+        if (processingTicks < 5)
             return true;
-        }
-        if (!GenericItemEmptying.canItemBeEmptied(level, heldItem.stack)) {
+        if (!GenericItemEmptying.canItemBeEmptied(world, heldItem.stack))
             return false;
-        }
 
-        Pair<FluidStack, ItemStack> emptyItem = GenericItemEmptying.emptyItem(level, heldItem.stack, true);
+        Pair<FluidStack, ItemStack> emptyItem = GenericItemEmptying.emptyItem(world, heldItem.stack, true);
         FluidStack fluidFromItem = emptyItem.getFirst();
 
         if (processingTicks > 5) {
@@ -261,16 +233,15 @@ public class ItemDrainBlockEntity extends SmartBlockEntity {
             return true;
         }
 
-        emptyItem = GenericItemEmptying.emptyItem(level, heldItem.stack.copy(), false);
+        emptyItem = GenericItemEmptying.emptyItem(world, heldItem.stack.copy(), false);
         award(AllAdvancements.DRAIN);
 
         // Process finished
         ItemStack out = emptyItem.getSecond();
-        if (!out.isEmpty()) {
+        if (!out.isEmpty())
             heldItem.stack = out;
-        } else {
+        else
             heldItem = null;
-        }
         internalTank.allowInsertion();
         internalTank.getPrimaryHandler().insert(fluidFromItem);
         internalTank.forbidInsertion();
@@ -288,18 +259,17 @@ public class ItemDrainBlockEntity extends SmartBlockEntity {
     }
 
     @Override
-    public void write(ValueOutput view, boolean clientPacket) {
+    public void write(WriteView view, boolean clientPacket) {
         view.putInt("ProcessingTicks", processingTicks);
-        if (heldItem != null) {
-            view.store("HeldItem", TransportedItemStack.CODEC, heldItem);
-        }
+        if (heldItem != null)
+            view.put("HeldItem", TransportedItemStack.CODEC, heldItem);
         super.write(view, clientPacket);
     }
 
     @Override
-    protected void read(ValueInput view, boolean clientPacket) {
+    protected void read(ReadView view, boolean clientPacket) {
         heldItem = null;
-        processingTicks = view.getIntOr("ProcessingTicks", 0);
+        processingTicks = view.getInt("ProcessingTicks", 0);
         heldItem = view.read("HeldItem", TransportedItemStack.CODEC).orElse(null);
         super.read(view, clientPacket);
     }

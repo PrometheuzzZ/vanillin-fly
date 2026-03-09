@@ -1,10 +1,8 @@
 package com.zurrtum.create.client.content.redstone.link.controller;
 
-import com.mojang.blaze3d.platform.InputConstants;
 import com.zurrtum.create.AllBlocks;
 import com.zurrtum.create.AllItems;
 import com.zurrtum.create.AllSoundEvents;
-import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.client.catnip.lang.FontHelper.Palette;
 import com.zurrtum.create.client.catnip.outliner.Outliner;
 import com.zurrtum.create.client.foundation.item.TooltipHelper;
@@ -12,22 +10,24 @@ import com.zurrtum.create.client.foundation.utility.ControlsUtil;
 import com.zurrtum.create.client.foundation.utility.CreateLang;
 import com.zurrtum.create.client.infrastructure.model.LinkedControllerModel;
 import com.zurrtum.create.content.redstone.link.ServerLinkBehaviour;
+import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.infrastructure.packet.c2s.LinkedControllerBindPacket;
 import com.zurrtum.create.infrastructure.packet.c2s.LinkedControllerInputPacket;
 import com.zurrtum.create.infrastructure.packet.c2s.LinkedControllerStopLecternPacket;
-import net.minecraft.ChatFormatting;
-import net.minecraft.client.KeyMapping;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipComponent;
-import net.minecraft.client.gui.screens.inventory.tooltip.DefaultTooltipPositioner;
-import net.minecraft.client.multiplayer.ClientLevel;
-import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.core.BlockPos;
-import net.minecraft.network.chat.Component;
-import net.minecraft.world.InteractionHand;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.phys.shapes.VoxelShape;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.tooltip.HoveredTooltipPositioner;
+import net.minecraft.client.gui.tooltip.TooltipComponent;
+import net.minecraft.client.network.ClientPlayerEntity;
+import net.minecraft.client.option.KeyBinding;
+import net.minecraft.client.util.InputUtil;
+import net.minecraft.client.world.ClientWorld;
+import net.minecraft.item.ItemStack;
+import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
+import net.minecraft.util.Hand;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.shape.VoxelShape;
 import org.joml.Matrix3x2fStack;
 import org.lwjgl.glfw.GLFW;
 
@@ -42,10 +42,10 @@ public class LinkedControllerClientHandler {
     public static int PACKET_RATE = 5;
     public static Collection<Integer> currentlyPressed = new HashSet<>();
     private static BlockPos lecternPos;
-    private static BlockPos selectedLocation = BlockPos.ZERO;
+    private static BlockPos selectedLocation = BlockPos.ORIGIN;
     private static int packetCooldown;
 
-    public static void toggleBindMode(LocalPlayer player, BlockPos location) {
+    public static void toggleBindMode(ClientPlayerEntity player, BlockPos location) {
         if (MODE == Mode.IDLE) {
             MODE = Mode.BIND;
             selectedLocation = location;
@@ -55,7 +55,7 @@ public class LinkedControllerClientHandler {
         }
     }
 
-    public static void toggle(LocalPlayer player) {
+    public static void toggle(ClientPlayerEntity player) {
         if (MODE == Mode.IDLE) {
             MODE = Mode.ACTIVE;
             lecternPos = null;
@@ -72,7 +72,7 @@ public class LinkedControllerClientHandler {
         }
     }
 
-    public static boolean deactivateInLectern(LocalPlayer player) {
+    public static boolean deactivateInLectern(ClientPlayerEntity player) {
         if (MODE == Mode.ACTIVE && inLectern()) {
             MODE = Mode.IDLE;
             onReset(player);
@@ -85,19 +85,17 @@ public class LinkedControllerClientHandler {
         return lecternPos != null;
     }
 
-    protected static void onReset(LocalPlayer player) {
-        ControlsUtil.getControls().forEach(kb -> kb.setDown(ControlsUtil.isActuallyPressed(kb)));
+    protected static void onReset(ClientPlayerEntity player) {
+        ControlsUtil.getControls().forEach(kb -> kb.setPressed(ControlsUtil.isActuallyPressed(kb)));
         packetCooldown = 0;
-        selectedLocation = BlockPos.ZERO;
+        selectedLocation = BlockPos.ORIGIN;
 
-        if (inLectern()) {
-            player.connection.send(new LinkedControllerStopLecternPacket(lecternPos));
-        }
+        if (inLectern())
+            player.networkHandler.sendPacket(new LinkedControllerStopLecternPacket(lecternPos));
         lecternPos = null;
 
-        if (!currentlyPressed.isEmpty()) {
-            player.connection.send(new LinkedControllerInputPacket(currentlyPressed, false));
-        }
+        if (!currentlyPressed.isEmpty())
+            player.networkHandler.sendPacket(new LinkedControllerInputPacket(currentlyPressed, false));
         currentlyPressed.clear();
 
         LinkedControllerModel.resetButtons();
@@ -106,31 +104,29 @@ public class LinkedControllerClientHandler {
         }
     }
 
-    private static void updateUsingItem(LocalPlayer player, InteractionHand hand) {
+    private static void updateUsingItem(ClientPlayerEntity player, Hand hand) {
         if (player.isUsingItem()) {
-            if (player.getUsedItemHand() != hand) {
+            if (player.getActiveHand() != hand) {
                 player.stopUsingItem();
-                player.startUsingItem(hand);
+                player.setCurrentHand(hand);
             }
         } else {
-            player.startUsingItem(hand);
+            player.setCurrentHand(hand);
         }
     }
 
-    public static void tick(Minecraft mc) {
+    public static void tick(MinecraftClient mc) {
         LinkedControllerModel.tick(mc);
 
-        if (MODE == Mode.IDLE) {
+        if (MODE == Mode.IDLE)
             return;
-        }
-        if (packetCooldown > 0) {
+        if (packetCooldown > 0)
             packetCooldown--;
-        }
 
-        LocalPlayer player = mc.player;
-        ClientLevel world = mc.level;
-        InteractionHand hand = null;
-        ItemStack heldItem = player.getMainHandItem();
+        ClientPlayerEntity player = mc.player;
+        ClientWorld world = mc.world;
+        Hand hand = null;
+        ItemStack heldItem = player.getMainHandStack();
 
         if (player.isSpectator()) {
             MODE = Mode.IDLE;
@@ -139,18 +135,17 @@ public class LinkedControllerClientHandler {
         }
 
         if (inLectern()) {
-            if (AllBlocks.LECTERN_CONTROLLER.getBlockEntityOptional(world, lecternPos)
-                .map(be -> !be.isUsedBy(mc.player)).orElse(true)) {
+            if (AllBlocks.LECTERN_CONTROLLER.getBlockEntityOptional(world, lecternPos).map(be -> !be.isUsedBy(mc.player)).orElse(true)) {
                 deactivateInLectern(player);
                 return;
             }
         } else {
-            if (heldItem.is(AllItems.LINKED_CONTROLLER)) {
-                hand = InteractionHand.MAIN_HAND;
+            if (heldItem.isOf(AllItems.LINKED_CONTROLLER)) {
+                hand = Hand.MAIN_HAND;
             } else {
-                heldItem = player.getOffhandItem();
-                if (heldItem.is(AllItems.LINKED_CONTROLLER)) {
-                    hand = InteractionHand.OFF_HAND;
+                heldItem = player.getOffHandStack();
+                if (heldItem.isOf(AllItems.LINKED_CONTROLLER)) {
+                    hand = Hand.OFF_HAND;
                 } else {
                     MODE = Mode.IDLE;
                     onReset(player);
@@ -159,18 +154,17 @@ public class LinkedControllerClientHandler {
             }
         }
 
-        if (mc.screen != null || InputConstants.isKeyDown(mc.getWindow(), GLFW.GLFW_KEY_ESCAPE)) {
+        if (mc.currentScreen != null || InputUtil.isKeyPressed(mc.getWindow(), GLFW.GLFW_KEY_ESCAPE)) {
             MODE = Mode.IDLE;
             onReset(player);
             return;
         }
 
-        List<KeyMapping> controls = ControlsUtil.getControls();
+        List<KeyBinding> controls = ControlsUtil.getControls();
         Collection<Integer> pressedKeys = new HashSet<>();
         for (int i = 0; i < controls.size(); i++) {
-            if (ControlsUtil.isActuallyPressed(controls.get(i))) {
+            if (ControlsUtil.isActuallyPressed(controls.get(i)))
                 pressedKeys.add(i);
-            }
         }
 
         Collection<Integer> newKeys = new HashSet<>(pressedKeys);
@@ -181,21 +175,21 @@ public class LinkedControllerClientHandler {
         if (MODE == Mode.ACTIVE) {
             // Released Keys
             if (!releasedKeys.isEmpty()) {
-                player.connection.send(new LinkedControllerInputPacket(releasedKeys, false, lecternPos));
-                AllSoundEvents.CONTROLLER_CLICK.playAt(player.level(), player.blockPosition(), 1f, .5f, true);
+                player.networkHandler.sendPacket(new LinkedControllerInputPacket(releasedKeys, false, lecternPos));
+                AllSoundEvents.CONTROLLER_CLICK.playAt(player.getEntityWorld(), player.getBlockPos(), 1f, .5f, true);
             }
 
             // Newly Pressed Keys
             if (!newKeys.isEmpty()) {
-                player.connection.send(new LinkedControllerInputPacket(newKeys, true, lecternPos));
+                player.networkHandler.sendPacket(new LinkedControllerInputPacket(newKeys, true, lecternPos));
                 packetCooldown = PACKET_RATE;
-                AllSoundEvents.CONTROLLER_CLICK.playAt(player.level(), player.blockPosition(), 1f, .75f, true);
+                AllSoundEvents.CONTROLLER_CLICK.playAt(player.getEntityWorld(), player.getBlockPos(), 1f, .75f, true);
             }
 
             // Keepalive Pressed Keys
             if (packetCooldown == 0) {
                 if (!pressedKeys.isEmpty()) {
-                    player.connection.send(new LinkedControllerInputPacket(pressedKeys, true, lecternPos));
+                    player.networkHandler.sendPacket(new LinkedControllerInputPacket(pressedKeys, true, lecternPos));
                     packetCooldown = PACKET_RATE;
                 }
             }
@@ -203,11 +197,9 @@ public class LinkedControllerClientHandler {
                 updateUsingItem(player, hand);
             }
         } else {
-            VoxelShape shape = world.getBlockState(selectedLocation).getShape(world, selectedLocation);
-            if (!shape.isEmpty()) {
-                Outliner.getInstance().showAABB("controller", shape.bounds().move(selectedLocation)).colored(0xB73C2D)
-                    .lineWidth(1 / 16f);
-            }
+            VoxelShape shape = world.getBlockState(selectedLocation).getOutlineShape(world, selectedLocation);
+            if (!shape.isEmpty())
+                Outliner.getInstance().showAABB("controller", shape.getBoundingBox().offset(selectedLocation)).colored(0xB73C2D).lineWidth(1 / 16f);
 
             if (newKeys.isEmpty()) {
                 if (hand != null) {
@@ -215,17 +207,11 @@ public class LinkedControllerClientHandler {
                 }
             } else {
                 for (Integer integer : newKeys) {
-                    ServerLinkBehaviour linkBehaviour = BlockEntityBehaviour.get(
-                        world,
-                        selectedLocation,
-                        ServerLinkBehaviour.TYPE
-                    );
+                    ServerLinkBehaviour linkBehaviour = BlockEntityBehaviour.get(world, selectedLocation, ServerLinkBehaviour.TYPE);
                     if (linkBehaviour != null) {
-                        player.connection.send(new LinkedControllerBindPacket(integer, selectedLocation));
-                        CreateLang.translate(
-                            "linked_controller.key_bound",
-                            controls.get(integer).getTranslatedKeyMessage().getString()
-                        ).sendStatus(mc.player);
+                        player.networkHandler.sendPacket(new LinkedControllerBindPacket(integer, selectedLocation));
+                        CreateLang.translate("linked_controller.key_bound", controls.get(integer).getBoundKeyLocalizedText().getString())
+                            .sendStatus(mc.player);
                     }
                     MODE = Mode.IDLE;
                     break;
@@ -237,49 +223,43 @@ public class LinkedControllerClientHandler {
         }
 
         currentlyPressed = pressedKeys;
-        controls.forEach(kb -> kb.setDown(false));
+        controls.forEach(kb -> kb.setPressed(false));
     }
 
-    public static void renderOverlay(Minecraft mc, GuiGraphics guiGraphics) {
-        if (MODE != Mode.BIND) {
+    public static void renderOverlay(MinecraftClient mc, DrawContext guiGraphics) {
+        if (MODE != Mode.BIND)
             return;
-        }
-        int width1 = guiGraphics.guiWidth();
-        int height1 = guiGraphics.guiHeight();
+        int width1 = guiGraphics.getScaledWindowWidth();
+        int height1 = guiGraphics.getScaledWindowHeight();
 
-        Matrix3x2fStack poseStack = guiGraphics.pose();
+        Matrix3x2fStack poseStack = guiGraphics.getMatrices();
         poseStack.pushMatrix();
 
         Object[] keys = new Object[6];
-        List<KeyMapping> controls = ControlsUtil.getControls();
+        List<KeyBinding> controls = ControlsUtil.getControls();
         for (int i = 0; i < controls.size(); i++) {
-            KeyMapping keyBinding = controls.get(i);
-            keys[i] = keyBinding.getTranslatedKeyMessage().getString();
+            KeyBinding keyBinding = controls.get(i);
+            keys[i] = keyBinding.getBoundKeyLocalizedText().getString();
         }
 
-        List<Component> list = new ArrayList<>();
-        list.add(CreateLang.translateDirect("linked_controller.bind_mode").withStyle(ChatFormatting.GOLD));
-        list.addAll(TooltipHelper.cutTextComponent(
-            CreateLang.translateDirect("linked_controller.press_keybind", keys),
-            Palette.ALL_GRAY
-        ));
+        List<Text> list = new ArrayList<>();
+        list.add(CreateLang.translateDirect("linked_controller.bind_mode").formatted(Formatting.GOLD));
+        list.addAll(TooltipHelper.cutTextComponent(CreateLang.translateDirect("linked_controller.press_keybind", keys), Palette.ALL_GRAY));
 
         int width = 0;
-        int height = list.size() * mc.font.lineHeight;
-        for (Component iTextComponent : list) {
-            width = Math.max(width, mc.font.width(iTextComponent));
-        }
+        int height = list.size() * mc.textRenderer.fontHeight;
+        for (Text iTextComponent : list)
+            width = Math.max(width, mc.textRenderer.getWidth(iTextComponent));
         int x = (width1 / 3) - width / 2;
         int y = height1 - height - 24;
 
         // TODO
-        guiGraphics.renderTooltip(
-            mc.font,
-            list.stream().map(Component::getVisualOrderText).map(ClientTooltipComponent::create)
-                .collect(Collectors.toList()),
+        guiGraphics.drawTooltipImmediately(
+            mc.textRenderer,
+            list.stream().map(Text::asOrderedText).map(TooltipComponent::of).collect(Collectors.toList()),
             x,
             y,
-            DefaultTooltipPositioner.INSTANCE,
+            HoveredTooltipPositioner.INSTANCE,
             null
         );
 
@@ -287,7 +267,9 @@ public class LinkedControllerClientHandler {
     }
 
     public enum Mode {
-        IDLE, ACTIVE, BIND
+        IDLE,
+        ACTIVE,
+        BIND
     }
 
 }

@@ -8,20 +8,20 @@ import com.zurrtum.create.catnip.data.Couple;
 import com.zurrtum.create.content.contraptions.AbstractContraptionEntity;
 import com.zurrtum.create.content.contraptions.OrientedContraptionEntity;
 import com.zurrtum.create.content.contraptions.minecart.CouplingHandler;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.UUIDUtil;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.tags.BlockTags;
-import net.minecraft.util.Mth;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.vehicle.minecart.AbstractMinecart;
-import net.minecraft.world.entity.vehicle.minecart.Minecart;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.Blocks;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.vehicle.AbstractMinecartEntity;
+import net.minecraft.entity.vehicle.MinecartEntity;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.registry.tag.BlockTags;
+import net.minecraft.util.Uuids;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.World;
 import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.jetbrains.annotations.Nullable;
 
@@ -39,15 +39,15 @@ public class MinecartController {
         Couple.optionalCodec(StallData.CODEC).fieldOf("stallData").forGetter(i -> i.stallData),
         Couple.optionalCodec(CouplingData.CODEC).fieldOf("couplings").forGetter(i -> i.couplings)
     ).apply(instance, MinecartController::new));
-    public static final StreamCodec<RegistryFriendlyByteBuf, MinecartController> PACKET_CODEC = StreamCodec.composite(
-        Couple.streamCodec(StallData.PACKET_CODEC.apply(ByteBufCodecs::optional)),
+    public static final PacketCodec<RegistryByteBuf, MinecartController> PACKET_CODEC = PacketCodec.tuple(
+        Couple.streamCodec(StallData.PACKET_CODEC.collect(PacketCodecs::optional)),
         i -> i.stallData,
-        Couple.streamCodec(CouplingData.PACKET_CODEC.apply(ByteBufCodecs::optional)),
+        Couple.streamCodec(CouplingData.PACKET_CODEC.collect(PacketCodecs::optional)),
         i -> i.couplings,
         MinecartController::new
     );
     private boolean needsEntryRefresh;
-    private AbstractMinecart cart;
+    private AbstractMinecartEntity cart;
 
     /*
      * Stall information, <Internal (waiting couplings), External (stalled
@@ -61,7 +61,7 @@ public class MinecartController {
      */
     private Couple<Optional<CouplingData>> couplings;
 
-    public MinecartController(AbstractMinecart minecart) {
+    public MinecartController(AbstractMinecartEntity minecart) {
         cart = minecart;
         stallData = Couple.create(Optional::empty);
         couplings = Couple.create(Optional::empty);
@@ -74,13 +74,13 @@ public class MinecartController {
         needsEntryRefresh = true;
     }
 
-    public AbstractMinecart cart() {
+    public AbstractMinecartEntity cart() {
         return cart;
     }
 
     public void coupleWith(boolean isLeading, UUID coupled, float length, boolean contraption) {
-        UUID mainID = isLeading ? cart().getUUID() : coupled;
-        UUID connectedID = isLeading ? coupled : cart().getUUID();
+        UUID mainID = isLeading ? cart().getUuid() : coupled;
+        UUID connectedID = isLeading ? coupled : cart().getUuid();
         couplings.set(isLeading, Optional.of(new CouplingData(mainID, connectedID, length, contraption)));
         needsEntryRefresh |= isLeading;
         sendData();
@@ -89,43 +89,42 @@ public class MinecartController {
     public void decouple() {
         couplings.forEachWithContext((opt, main) -> opt.ifPresent(cd -> {
             UUID idOfOther = cd.idOfCart(!main);
-            MinecartController otherCart = CapabilityMinecartController.getIfPresent(cart.level(), idOfOther);
-            if (otherCart == null) {
+            MinecartController otherCart = CapabilityMinecartController.getIfPresent(cart.getEntityWorld(), idOfOther);
+            if (otherCart == null)
                 return;
-            }
 
             removeConnection(main);
             otherCart.removeConnection(!main);
         }));
     }
 
-    private void disassemble(AbstractMinecart cart) {
-        if (cart instanceof Minecart) {
+    private void disassemble(AbstractMinecartEntity cart) {
+        if (cart instanceof MinecartEntity) {
             return;
         }
-        List<Entity> passengers = cart.getPassengers();
+        List<Entity> passengers = cart.getPassengerList();
         if (passengers.isEmpty() || !(passengers.getFirst() instanceof AbstractContraptionEntity)) {
             return;
         }
-        Level world = cart.level();
-        int i = Mth.floor(cart.getX());
-        int j = Mth.floor(cart.getY());
-        int k = Mth.floor(cart.getZ());
-        if (world.getBlockState(new BlockPos(i, j - 1, k)).is(BlockTags.RAILS)) {
+        World world = cart.getEntityWorld();
+        int i = MathHelper.floor(cart.getX());
+        int j = MathHelper.floor(cart.getY());
+        int k = MathHelper.floor(cart.getZ());
+        if (world.getBlockState(new BlockPos(i, j - 1, k)).isIn(BlockTags.RAILS)) {
             --j;
         }
         BlockPos blockpos = new BlockPos(i, j, k);
         BlockState blockstate = world.getBlockState(blockpos);
-        if (blockstate.is(BlockTags.RAILS) && blockstate.getBlock() == Blocks.ACTIVATOR_RAIL) {
-            if (cart.isVehicle()) {
-                cart.ejectPassengers();
+        if (blockstate.isIn(BlockTags.RAILS) && blockstate.getBlock() == Blocks.ACTIVATOR_RAIL) {
+            if (cart.hasPassengers()) {
+                cart.removeAllPassengers();
             }
 
-            if (cart.getHurtTime() == 0) {
-                cart.setHurtDir(-cart.getHurtDir());
-                cart.setHurtTime(10);
-                cart.setDamage(50.0F);
-                cart.hurtMarked = true;
+            if (cart.getDamageWobbleTicks() == 0) {
+                cart.setDamageWobbleSide(-cart.getDamageWobbleSide());
+                cart.setDamageWobbleTicks(10);
+                cart.setDamageWobbleStrength(50.0F);
+                cart.velocityModified = true;
             }
         }
     }
@@ -133,9 +132,8 @@ public class MinecartController {
     @Nullable
     public UUID getCoupledCart(boolean asMain) {
         Optional<CouplingData> optional = couplings.get(asMain);
-        if (optional.isEmpty()) {
+        if (optional.isEmpty())
             return null;
-        }
         CouplingData couplingData = optional.get();
         return asMain ? couplingData.connectedCartID : couplingData.mainCartID;
     }
@@ -188,7 +186,7 @@ public class MinecartController {
             boolean forward = current.isLeadingCoupling();
             int safetyCount = 1000;
 
-            Level world = cart.level();
+            World world = cart.getEntityWorld();
             while (safetyCount-- > 0) {
                 Optional<MinecartController> next = CouplingHandler.getNextInCouplingChain(world, current, forward);
                 if (next.isEmpty()) {
@@ -205,17 +203,14 @@ public class MinecartController {
             for (MinecartController minecartController : cartsToFlip) {
                 minecartController.couplings.forEachWithContext((opt, leading) -> opt.ifPresent(cd -> {
                     cd.flip();
-                    if (!cd.contraption) {
+                    if (!cd.contraption)
                         return;
-                    }
-                    List<Entity> passengers = minecartController.cart().getPassengers();
-                    if (passengers.isEmpty()) {
+                    List<Entity> passengers = minecartController.cart().getPassengerList();
+                    if (passengers.isEmpty())
                         return;
-                    }
                     Entity entity = passengers.getFirst();
-                    if (!(entity instanceof OrientedContraptionEntity contraption)) {
+                    if (!(entity instanceof OrientedContraptionEntity contraption))
                         return;
-                    }
                     UUID couplingId = contraption.getCouplingId();
                     if (couplingId == cd.mainCartID) {
                         contraption.setCouplingId(cd.connectedCartID);
@@ -227,9 +222,8 @@ public class MinecartController {
                 }));
                 minecartController.couplings = minecartController.couplings.swap();
                 minecartController.needsEntryRefresh = true;
-                if (minecartController == this) {
+                if (minecartController == this)
                     continue;
-                }
                 minecartController.sendData();
             }
         }
@@ -237,14 +231,13 @@ public class MinecartController {
 
     public void removeConnection(boolean main) {
         if (hasContraptionCoupling(main)) {
-            Level world = cart.level();
-            if (world != null && !world.isClientSide()) {
-                List<Entity> passengers = cart().getPassengers();
+            World world = cart.getEntityWorld();
+            if (world != null && !world.isClient()) {
+                List<Entity> passengers = cart().getPassengerList();
                 if (!passengers.isEmpty()) {
                     Entity entity = passengers.getFirst();
-                    if (entity instanceof AbstractContraptionEntity abstractContraptionEntity) {
+                    if (entity instanceof AbstractContraptionEntity abstractContraptionEntity)
                         abstractContraptionEntity.disassemble();
-                    }
                 }
             }
         }
@@ -258,25 +251,24 @@ public class MinecartController {
         sendData(null);
     }
 
-    public void sendData(@Nullable AbstractMinecart cart) {
+    public void sendData(@Nullable AbstractMinecartEntity cart) {
         if (cart != null) {
             this.cart = cart;
             needsEntryRefresh = true;
         }
-        if (this.cart.level().isClientSide()) {
+        if (this.cart.getEntityWorld().isClient()) {
             return;
         }
         AllSynchedDatas.MINECART_CONTROLLER.set(this.cart, Optional.of(this), true);
     }
 
-    public void setCart(AbstractMinecart cart) {
+    public void setCart(AbstractMinecartEntity cart) {
         this.cart = cart;
     }
 
     private void setStalled(boolean stall, boolean internal) {
-        if (isStalled(internal) == stall || cart == null) {
+        if (isStalled(internal) == stall || cart == null)
             return;
-        }
 
         if (stall) {
             stallData.set(internal, Optional.of(new StallData(cart)));
@@ -284,9 +276,8 @@ public class MinecartController {
             return;
         }
 
-        if (!isStalled(!internal)) {
+        if (!isStalled(!internal))
             stallData.get(internal).ifPresent(data -> data.release(cart));
-        }
         stallData.set(internal, Optional.empty());
 
         sendData();
@@ -300,7 +291,7 @@ public class MinecartController {
         if (cart == null) {
             return;
         }
-        Level world = cart.level();
+        World world = cart.getEntityWorld();
         if (world == null) {
             return;
         }
@@ -317,11 +308,10 @@ public class MinecartController {
 
             UUID idOfOther = cd.idOfCart(!main);
             MinecartController otherCart = CapabilityMinecartController.getIfPresent(world, idOfOther);
-            internalStall.setValue(internalStall.booleanValue() || otherCart == null || !otherCart.isPresent() || otherCart.isStalled(
-                false));
+            internalStall.setValue(internalStall.booleanValue() || otherCart == null || !otherCart.isPresent() || otherCart.isStalled(false));
 
         }));
-        if (!world.isClientSide()) {
+        if (!world.isClient()) {
             setStalled(internalStall.booleanValue(), true);
             disassemble(cart);
         }
@@ -329,19 +319,19 @@ public class MinecartController {
 
     private static class CouplingData {
         public static final Codec<CouplingData> CODEC = RecordCodecBuilder.create(instance -> instance.group(
-            UUIDUtil.CODEC.fieldOf("mainCartID").forGetter(i -> i.mainCartID),
-            UUIDUtil.CODEC.fieldOf("connectedCartID").forGetter(i -> i.connectedCartID),
+            Uuids.CODEC.fieldOf("mainCartID").forGetter(i -> i.mainCartID),
+            Uuids.CODEC.fieldOf("connectedCartID").forGetter(i -> i.connectedCartID),
             Codec.FLOAT.fieldOf("length").forGetter(i -> i.length),
             Codec.BOOL.fieldOf("contraption").forGetter(i -> i.contraption)
         ).apply(instance, CouplingData::new));
-        public static final StreamCodec<RegistryFriendlyByteBuf, CouplingData> PACKET_CODEC = StreamCodec.composite(
-            UUIDUtil.STREAM_CODEC,
+        public static final PacketCodec<RegistryByteBuf, CouplingData> PACKET_CODEC = PacketCodec.tuple(
+            Uuids.PACKET_CODEC,
             i -> i.mainCartID,
-            UUIDUtil.STREAM_CODEC,
+            Uuids.PACKET_CODEC,
             i -> i.connectedCartID,
-            ByteBufCodecs.FLOAT,
+            PacketCodecs.FLOAT,
             i -> i.length,
-            ByteBufCodecs.BOOL,
+            PacketCodecs.BOOLEAN,
             i -> i.contraption,
             CouplingData::new
         );
@@ -372,38 +362,38 @@ public class MinecartController {
         }
     }
 
-    private record StallData(Vec3 position, Vec3 motion, float yaw, float pitch) {
+    private record StallData(Vec3d position, Vec3d motion, float yaw, float pitch) {
         public static final Codec<StallData> CODEC = RecordCodecBuilder.create(instance -> instance.group(
-            Vec3.CODEC.fieldOf("position").forGetter(StallData::position),
-            Vec3.CODEC.fieldOf("motion").forGetter(StallData::motion),
+            Vec3d.CODEC.fieldOf("position").forGetter(StallData::position),
+            Vec3d.CODEC.fieldOf("motion").forGetter(StallData::motion),
             Codec.FLOAT.fieldOf("yaw").forGetter(StallData::yaw),
             Codec.FLOAT.fieldOf("pitch").forGetter(StallData::pitch)
         ).apply(instance, StallData::new));
-        public static final StreamCodec<RegistryFriendlyByteBuf, StallData> PACKET_CODEC = StreamCodec.composite(
-            Vec3.STREAM_CODEC,
+        public static final PacketCodec<RegistryByteBuf, StallData> PACKET_CODEC = PacketCodec.tuple(
+            Vec3d.PACKET_CODEC,
             StallData::position,
-            Vec3.STREAM_CODEC,
+            Vec3d.PACKET_CODEC,
             StallData::motion,
-            ByteBufCodecs.FLOAT,
+            PacketCodecs.FLOAT,
             StallData::yaw,
-            ByteBufCodecs.FLOAT,
+            PacketCodecs.FLOAT,
             StallData::pitch,
             StallData::new
         );
 
-        public StallData(AbstractMinecart entity) {
-            this(entity.position(), entity.getDeltaMovement(), entity.getYRot(), entity.getXRot());
+        public StallData(AbstractMinecartEntity entity) {
+            this(entity.getEntityPos(), entity.getVelocity(), entity.getYaw(), entity.getPitch());
             tick(entity);
         }
 
-        public void release(AbstractMinecart entity) {
-            entity.setDeltaMovement(motion);
+        public void release(AbstractMinecartEntity entity) {
+            entity.setVelocity(motion);
         }
 
-        public void tick(AbstractMinecart entity) {
-            entity.setDeltaMovement(Vec3.ZERO);
-            entity.setYRot(yaw);
-            entity.setXRot(pitch);
+        public void tick(AbstractMinecartEntity entity) {
+            entity.setVelocity(Vec3d.ZERO);
+            entity.setYaw(yaw);
+            entity.setPitch(pitch);
         }
     }
 }

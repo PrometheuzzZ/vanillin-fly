@@ -18,19 +18,19 @@ import com.zurrtum.create.api.contraption.storage.item.MountedItemStorageWrapper
 import com.zurrtum.create.foundation.codec.CreateCodecs;
 import com.zurrtum.create.infrastructure.items.CombinedInvWrapper;
 import com.zurrtum.create.infrastructure.packet.s2c.MountedStorageSyncPacket;
-import net.minecraft.core.BlockPos;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.game.ClientGamePacketListener;
-import net.minecraft.server.level.ServerChunkCache;
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.Container;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate.StructureBlockInfo;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.inventory.Inventory;
+import net.minecraft.network.listener.ClientPlayPacketListener;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.world.ServerChunkManager;
+import net.minecraft.storage.ReadView;
+import net.minecraft.storage.WriteView;
+import net.minecraft.structure.StructureTemplate.StructureBlockInfo;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
@@ -55,7 +55,7 @@ public class MountedStorageManager {
     private ImmutableMap<BlockPos, SyncedMountedStorage> syncedItems;
     private ImmutableMap<BlockPos, SyncedMountedStorage> syncedFluids;
 
-    private List<Container> externalHandlers;
+    private List<Inventory> externalHandlers;
     protected CombinedInvWrapper allItems;
 
     // ticks until storage can sync again
@@ -130,13 +130,7 @@ public class MountedStorageManager {
         // interactablePositions intentionally not reset
     }
 
-    public void addBlock(
-        Level level,
-        BlockState state,
-        BlockPos globalPos,
-        BlockPos localPos,
-        @Nullable BlockEntity be
-    ) {
+    public void addBlock(World level, BlockState state, BlockPos globalPos, BlockPos localPos, @Nullable BlockEntity be) {
         MountedItemStorageType<?> itemType = MountedItemStorageType.REGISTRY.get(state.getBlock());
         if (itemType != null) {
             MountedItemStorage storage = itemType.mount(level, state, globalPos, be);
@@ -154,7 +148,7 @@ public class MountedStorageManager {
         }
     }
 
-    public void unmount(Level level, StructureBlockInfo info, BlockPos globalPos, @Nullable BlockEntity be) {
+    public void unmount(World level, StructureBlockInfo info, BlockPos globalPos, @Nullable BlockEntity be) {
         BlockPos localPos = info.pos();
         BlockState state = info.state();
 
@@ -197,8 +191,8 @@ public class MountedStorageManager {
         });
 
         if (!items.isEmpty() || !fluids.isEmpty()) {
-            Packet<ClientGamePacketListener> packet = new MountedStorageSyncPacket(entity.getId(), items, fluids);
-            ((ServerChunkCache) entity.level().getChunkSource()).sendToTrackingPlayers(entity, packet);
+            Packet<ClientPlayPacketListener> packet = new MountedStorageSyncPacket(entity.getId(), items, fluids);
+            ((ServerChunkManager) entity.getEntityWorld().getChunkManager()).sendToOtherNearbyPlayers(entity, packet);
             syncCooldown = 8;
         }
     }
@@ -238,24 +232,23 @@ public class MountedStorageManager {
     }
 
     // contraption is provided on the client for initial afterSync storage callbacks
-    public void read(ValueInput view, boolean clientPacket, @Nullable Contraption contraption) {
+    public void read(ReadView view, boolean clientPacket, @Nullable Contraption contraption) {
         reset();
 
         try {
-            view.childrenListOrEmpty("items").forEach(item -> {
+            view.getListReadView("items").forEach(item -> {
                 BlockPos pos = item.read("pos", BlockPos.CODEC).orElseThrow();
                 MountedItemStorage storage = item.read("storage", MountedItemStorage.CODEC).orElseThrow();
                 addStorage(storage, pos);
             });
 
-            view.childrenListOrEmpty("fluids").forEach(fluid -> {
+            view.getListReadView("fluids").forEach(fluid -> {
                 BlockPos pos = fluid.read("pos", BlockPos.CODEC).orElseThrow();
                 MountedFluidStorage storage = fluid.read("storage", MountedFluidStorage.CODEC).orElseThrow();
                 addStorage(storage, pos);
             });
 
-            view.read("interactable_positions", CreateCodecs.BLOCK_POS_LIST_CODEC)
-                .ifPresent(list -> interactablePositions = new HashSet<>(list));
+            view.read("interactable_positions", CreateCodecs.BLOCK_POS_LIST_CODEC).ifPresent(list -> interactablePositions = new HashSet<>(list));
         } catch (Throwable t) {
             Create.LOGGER.error("Error deserializing mounted storage", t);
             // an exception will leave the manager in an invalid state, initialize must be called
@@ -265,12 +258,7 @@ public class MountedStorageManager {
         afterSync(clientPacket, contraption);
     }
 
-    public <T> void read(
-        final DynamicOps<T> ops,
-        MapLike<T> map,
-        boolean clientPacket,
-        @Nullable Contraption contraption
-    ) {
+    public <T> void read(final DynamicOps<T> ops, MapLike<T> map, boolean clientPacket, @Nullable Contraption contraption) {
         reset();
 
         try {
@@ -301,9 +289,8 @@ public class MountedStorageManager {
 
     private void afterSync(boolean clientPacket, @Nullable Contraption contraption) {
         // for client sync, run initial afterSync callbacks
-        if (!clientPacket || contraption == null) {
+        if (!clientPacket || contraption == null)
             return;
-        }
 
         getAllItemStorages().forEach((pos, storage) -> {
             if (storage instanceof SyncedMountedStorage synced) {
@@ -317,30 +304,29 @@ public class MountedStorageManager {
         });
     }
 
-    public void write(ValueOutput view, boolean clientPacket) {
-        ValueOutput.ValueOutputList items = view.childrenList("items");
+    public void write(WriteView view, boolean clientPacket) {
+        WriteView.ListView items = view.getList("items");
         getAllItemStorages().forEach((pos, storage) -> {
             if (!clientPacket || storage instanceof SyncedMountedStorage) {
-                ValueOutput item = items.addChild();
-                item.store("pos", BlockPos.CODEC, pos);
-                item.store("storage", MountedItemStorage.CODEC, storage);
+                WriteView item = items.add();
+                item.put("pos", BlockPos.CODEC, pos);
+                item.put("storage", MountedItemStorage.CODEC, storage);
             }
         });
 
-        ValueOutput.ValueOutputList fluids = view.childrenList("fluids");
+        WriteView.ListView fluids = view.getList("fluids");
         getFluids().storages.forEach((pos, storage) -> {
             if (!clientPacket || storage instanceof SyncedMountedStorage) {
-                ValueOutput fluid = fluids.addChild();
-                fluid.store("pos", BlockPos.CODEC, pos);
-                fluid.store("storage", MountedFluidStorage.CODEC, storage);
+                WriteView fluid = fluids.add();
+                fluid.put("pos", BlockPos.CODEC, pos);
+                fluid.put("storage", MountedFluidStorage.CODEC, storage);
             }
         });
 
         if (clientPacket) {
             // let the client know of all non-synced ones too
-            List<BlockPos> list = Sets.union(this.getAllItemStorages().keySet(), getFluids().storages.keySet()).stream()
-                .toList();
-            view.store("interactable_positions", CreateCodecs.BLOCK_POS_LIST_CODEC, list);
+            List<BlockPos> list = Sets.union(this.getAllItemStorages().keySet(), getFluids().storages.keySet()).stream().toList();
+            view.put("interactable_positions", CreateCodecs.BLOCK_POS_LIST_CODEC, list);
         }
     }
 
@@ -369,16 +355,15 @@ public class MountedStorageManager {
 
         if (clientPacket) {
             // let the client know of all non-synced ones too
-            List<BlockPos> list = Sets.union(this.getAllItemStorages().keySet(), getFluids().storages.keySet()).stream()
-                .toList();
+            List<BlockPos> list = Sets.union(this.getAllItemStorages().keySet(), getFluids().storages.keySet()).stream().toList();
             map.add("interactable_positions", list, CreateCodecs.BLOCK_POS_LIST_CODEC);
         }
     }
 
-    public void attachExternal(Container externalStorage) {
+    public void attachExternal(Inventory externalStorage) {
         this.externalHandlers.add(externalStorage);
         int size = externalHandlers.size();
-        Container[] all = new Container[size + 1];
+        Inventory[] all = new Inventory[size + 1];
         all[0] = this.items;
         for (int i = 0; i < size; i++) {
             all[i + 1] = externalHandlers.get(i);
@@ -432,15 +417,14 @@ public class MountedStorageManager {
         return this.fluids;
     }
 
-    public boolean handlePlayerStorageInteraction(Contraption contraption, Player player, BlockPos localPos) {
-        if (!(player instanceof ServerPlayer serverPlayer)) {
+    public boolean handlePlayerStorageInteraction(Contraption contraption, PlayerEntity player, BlockPos localPos) {
+        if (!(player instanceof ServerPlayerEntity serverPlayer)) {
             return this.interactablePositions != null && this.interactablePositions.contains(localPos);
         }
 
         StructureBlockInfo info = contraption.getBlocks().get(localPos);
-        if (info == null) {
+        if (info == null)
             return false;
-        }
 
         MountedStorageManager storageManager = contraption.getStorage();
         MountedItemStorage storage = storageManager.getAllItemStorages().get(localPos);
@@ -454,16 +438,14 @@ public class MountedStorageManager {
 
     private void addStorage(MountedItemStorage storage, BlockPos pos) {
         this.itemsBuilder.put(pos, storage);
-        if (storage instanceof SyncedMountedStorage synced) {
+        if (storage instanceof SyncedMountedStorage synced)
             this.syncedItemsBuilder.put(pos, synced);
-        }
     }
 
     private void addStorage(MountedFluidStorage storage, BlockPos pos) {
         this.fluidsBuilder.put(pos, storage);
-        if (storage instanceof SyncedMountedStorage synced) {
+        if (storage instanceof SyncedMountedStorage synced)
             this.syncedFluidsBuilder.put(pos, synced);
-        }
     }
 
     private static <K, V> ImmutableMap<K, V> subMap(Map<K, V> map, Predicate<V> predicate) {

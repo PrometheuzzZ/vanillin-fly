@@ -3,12 +3,12 @@ package com.zurrtum.create.content.equipment.armor;
 import com.zurrtum.create.AllBlocks;
 import com.zurrtum.create.AllDataComponents;
 import com.zurrtum.create.foundation.item.LayeredArmorItem;
-import net.minecraft.resources.Identifier;
-import net.minecraft.util.Mth;
-import net.minecraft.world.entity.EquipmentSlot;
-import net.minecraft.world.item.BlockItem;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.block.Block;
+import net.minecraft.block.Block;
+import net.minecraft.entity.EquipmentSlot;
+import net.minecraft.item.BlockItem;
+import net.minecraft.item.ItemStack;
+import net.minecraft.util.Identifier;
+import net.minecraft.util.math.MathHelper;
 
 import static com.zurrtum.create.Create.MOD_ID;
 
@@ -16,37 +16,37 @@ public class BacktankItem extends BlockItem {
     public static final EquipmentSlot SLOT = EquipmentSlot.CHEST;
     public static final int BAR_COLOR = 0xEFEFEF;
 
-    public BacktankItem(Block block, Properties settings) {
+    public BacktankItem(Block block, Settings settings) {
         super(block, settings);
     }
 
-    public static BacktankItem copper(Properties settings) {
+    public static BacktankItem copper(Settings settings) {
         return new BacktankItem(AllBlocks.COPPER_BACKTANK, settings);
     }
 
-    public static BacktankItem netherite(Properties settings) {
-        Identifier layer = Identifier.fromNamespaceAndPath(MOD_ID, "textures/models/armor/netherite_diving_layer.png");
+    public static BacktankItem netherite(Settings settings) {
+        Identifier layer = Identifier.of(MOD_ID, "textures/models/armor/netherite_diving_layer.png");
         return new Layered(AllBlocks.NETHERITE_BACKTANK, settings, layer);
     }
 
     public ItemStack getMaxAirStack() {
-        ItemStack stack = getDefaultInstance();
+        ItemStack stack = getDefaultStack();
         stack.set(AllDataComponents.BACKTANK_AIR, BacktankUtil.maxAirWithoutEnchants());
         return stack;
     }
 
     @Override
-    public boolean isBarVisible(ItemStack stack) {
+    public boolean isItemBarVisible(ItemStack stack) {
         return true;
     }
 
     @Override
-    public int getBarWidth(ItemStack stack) {
-        return Math.round(13.0F * Mth.clamp(getRemainingAir(stack) / ((float) BacktankUtil.maxAir(stack)), 0, 1));
+    public int getItemBarStep(ItemStack stack) {
+        return Math.round(13.0F * MathHelper.clamp(getRemainingAir(stack) / ((float) BacktankUtil.maxAir(stack)), 0, 1));
     }
 
     @Override
-    public int getBarColor(ItemStack stack) {
+    public int getItemBarColor(ItemStack stack) {
         return BAR_COLOR;
     }
 
@@ -57,7 +57,7 @@ public class BacktankItem extends BlockItem {
     public static class Layered extends BacktankItem implements LayeredArmorItem {
         private final Identifier layer;
 
-        public Layered(Block block, Properties settings, Identifier layer) {
+        public Layered(Block block, Settings settings, Identifier layer) {
             super(block, settings);
             this.layer = layer;
         }

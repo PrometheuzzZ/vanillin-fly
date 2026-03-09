@@ -1,7 +1,5 @@
 package com.zurrtum.create.client.content.trains.track;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.PoseStack.Pose;
 import com.zurrtum.create.catnip.data.Couple;
 import com.zurrtum.create.catnip.data.Iterate;
 import com.zurrtum.create.client.AllPartialModels;
@@ -21,9 +19,11 @@ import com.zurrtum.create.content.trains.track.BezierConnection;
 import com.zurrtum.create.content.trains.track.TrackBlockEntity;
 import it.unimi.dsi.fastutil.longs.LongArraySet;
 import it.unimi.dsi.fastutil.longs.LongSet;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.SectionPos;
-import net.minecraft.util.Mth;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.client.util.math.MatrixStack.Entry;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.ChunkSectionPos;
+import net.minecraft.util.math.MathHelper;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.UnknownNullability;
 
@@ -44,9 +44,9 @@ public class TrackVisual extends AbstractVisual implements BlockEntityVisual<Tra
     protected SectionCollector lightSections;
 
     public TrackVisual(VisualizationContext context, TrackBlockEntity track, float partialTick) {
-        super(context, track.getLevel(), partialTick);
+        super(context, track.getWorld(), partialTick);
         this.blockEntity = track;
-        this.pos = blockEntity.getBlockPos();
+        this.pos = blockEntity.getPos();
         this.visualPos = pos.subtract(context.renderOrigin());
 
         collectConnections();
@@ -60,9 +60,8 @@ public class TrackVisual extends AbstractVisual implements BlockEntityVisual<Tra
 
     @Override
     public void update(float pt) {
-        if (blockEntity.getConnections().isEmpty()) {
+        if (blockEntity.getConnections().isEmpty())
             return;
-        }
 
         _delete();
 
@@ -72,15 +71,13 @@ public class TrackVisual extends AbstractVisual implements BlockEntityVisual<Tra
     }
 
     private void collectConnections() {
-        blockEntity.getConnections().values().stream().map(this::createInstance).filter(Objects::nonNull)
-            .forEach(visuals::add);
+        blockEntity.getConnections().values().stream().map(this::createInstance).filter(Objects::nonNull).forEach(visuals::add);
     }
 
     @Nullable
     private BezierTrackVisual createInstance(BezierConnection bc) {
-        if (!bc.isPrimary()) {
+        if (!bc.isPrimary())
             return null;
-        }
         return new BezierTrackVisual(bc);
     }
 
@@ -104,27 +101,27 @@ public class TrackVisual extends AbstractVisual implements BlockEntityVisual<Tra
             // The start and end positions are not enough to enclose the entire curve.
             // Check the computed bounds but expand by one for safety.
             var bounds = connection.getBounds();
-            minX = Math.min(minX, Mth.floor(bounds.minX) - 1);
-            minY = Math.min(minY, Mth.floor(bounds.minY) - 1);
-            minZ = Math.min(minZ, Mth.floor(bounds.minZ) - 1);
-            maxX = Math.max(maxX, Mth.ceil(bounds.maxX) + 1);
-            maxY = Math.max(maxY, Mth.ceil(bounds.maxY) + 1);
-            maxZ = Math.max(maxZ, Mth.ceil(bounds.maxZ) + 1);
+            minX = Math.min(minX, MathHelper.floor(bounds.minX) - 1);
+            minY = Math.min(minY, MathHelper.floor(bounds.minY) - 1);
+            minZ = Math.min(minZ, MathHelper.floor(bounds.minZ) - 1);
+            maxX = Math.max(maxX, MathHelper.ceil(bounds.maxX) + 1);
+            maxY = Math.max(maxY, MathHelper.ceil(bounds.maxY) + 1);
+            maxZ = Math.max(maxZ, MathHelper.ceil(bounds.maxZ) + 1);
         }
 
-        var minSectionX = SectionPos.blockToSectionCoord(minX);
-        var minSectionY = SectionPos.blockToSectionCoord(minY);
-        var minSectionZ = SectionPos.blockToSectionCoord(minZ);
-        int maxSectionX = SectionPos.blockToSectionCoord(maxX);
-        int maxSectionY = SectionPos.blockToSectionCoord(maxY);
-        int maxSectionZ = SectionPos.blockToSectionCoord(maxZ);
+        var minSectionX = ChunkSectionPos.getSectionCoord(minX);
+        var minSectionY = ChunkSectionPos.getSectionCoord(minY);
+        var minSectionZ = ChunkSectionPos.getSectionCoord(minZ);
+        int maxSectionX = ChunkSectionPos.getSectionCoord(maxX);
+        int maxSectionY = ChunkSectionPos.getSectionCoord(maxY);
+        int maxSectionZ = ChunkSectionPos.getSectionCoord(maxZ);
 
         LongSet out = new LongArraySet();
 
         for (int x = minSectionX; x <= maxSectionX; x++) {
             for (int y = minSectionY; y <= maxSectionY; y++) {
                 for (int z = minSectionZ; z <= maxSectionZ; z++) {
-                    out.add(SectionPos.asLong(x, y, z));
+                    out.add(ChunkSectionPos.asLong(x, y, z));
                 }
             }
         }
@@ -150,7 +147,7 @@ public class TrackVisual extends AbstractVisual implements BlockEntityVisual<Tra
         private BezierTrackVisual(BezierConnection bc) {
             girder = bc.hasGirder ? new GirderVisual(bc) : null;
 
-            PoseStack pose = new PoseStack();
+            MatrixStack pose = new MatrixStack();
             TransformStack.of(pose).translate(visualPos);
 
             int segCount = bc.getSegmentCount();
@@ -160,14 +157,9 @@ public class TrackVisual extends AbstractVisual implements BlockEntityVisual<Tra
 
             TrackModelHolder modelHolder = bc.getMaterial().getModelHolder();
 
-            instancerProvider().instancer(InstanceTypes.TRANSFORMED, SpecialModels.flatChunk(modelHolder.tie()))
-                .createInstances(ties);
-            instancerProvider().instancer(InstanceTypes.TRANSFORMED, SpecialModels.flatChunk(modelHolder.leftSegment()))
-                .createInstances(left);
-            instancerProvider().instancer(
-                InstanceTypes.TRANSFORMED,
-                SpecialModels.flatChunk(modelHolder.rightSegment())
-            ).createInstances(right);
+            instancerProvider().instancer(InstanceTypes.TRANSFORMED, SpecialModels.flatChunk(modelHolder.tie())).createInstances(ties);
+            instancerProvider().instancer(InstanceTypes.TRANSFORMED, SpecialModels.flatChunk(modelHolder.leftSegment())).createInstances(left);
+            instancerProvider().instancer(InstanceTypes.TRANSFORMED, SpecialModels.flatChunk(modelHolder.rightSegment())).createInstances(right);
 
             SegmentAngles segment = bc.getBakedSegments(SegmentAngles::new);
             for (int i = 1; i < segment.length; i++) {
@@ -176,40 +168,32 @@ public class TrackVisual extends AbstractVisual implements BlockEntityVisual<Tra
                 ties[modelIndex].setTransform(pose).mul(segment.tieTransform[i]).setChanged();
 
                 for (boolean first : Iterate.trueAndFalse) {
-                    Pose transform = segment.railTransforms[i].get(first);
+                    Entry transform = segment.railTransforms[i].get(first);
                     (first ? this.left : this.right)[modelIndex].setTransform(pose).mul(transform).setChanged();
                 }
             }
         }
 
         void delete() {
-            for (var d : ties) {
+            for (var d : ties)
                 d.delete();
-            }
-            for (var d : left) {
+            for (var d : left)
                 d.delete();
-            }
-            for (var d : right) {
+            for (var d : right)
                 d.delete();
-            }
-            if (girder != null) {
+            if (girder != null)
                 girder.delete();
-            }
         }
 
         public void collectCrumblingInstances(Consumer<Instance> consumer) {
-            for (var d : ties) {
+            for (var d : ties)
                 consumer.accept(d);
-            }
-            for (var d : left) {
+            for (var d : left)
                 consumer.accept(d);
-            }
-            for (var d : right) {
+            for (var d : right)
                 consumer.accept(d);
-            }
-            if (girder != null) {
+            if (girder != null)
                 girder.collectCrumblingInstances(consumer);
-            }
         }
 
         private class GirderVisual {
@@ -218,7 +202,7 @@ public class TrackVisual extends AbstractVisual implements BlockEntityVisual<Tra
             private final Couple<Couple<TransformedInstance[]>> beamCaps;
 
             private GirderVisual(BezierConnection bc) {
-                PoseStack pose = new PoseStack();
+                MatrixStack pose = new MatrixStack();
                 TransformStack.of(pose).translate(visualPos).nudge((int) bc.bePositions.getFirst().asLong());
 
                 int segCount = bc.getSegmentCount();
@@ -238,12 +222,11 @@ public class TrackVisual extends AbstractVisual implements BlockEntityVisual<Tra
                     var modelIndex = i - 1;
 
                     for (boolean first : Iterate.trueAndFalse) {
-                        Pose beamTransform = segment.beams[i].get(first);
+                        Entry beamTransform = segment.beams[i].get(first);
                         beams.get(first)[modelIndex].setTransform(pose).mul(beamTransform).setChanged();
                         for (boolean top : Iterate.trueAndFalse) {
-                            Pose beamCapTransform = segment.beamCaps[i].get(top).get(first);
-                            beamCaps.get(top).get(first)[modelIndex].setTransform(pose).mul(beamCapTransform)
-                                .setChanged();
+                            Entry beamCapTransform = segment.beamCaps[i].get(top).get(first);
+                            beamCaps.get(top).get(first)[modelIndex].setTransform(pose).mul(beamCapTransform).setChanged();
                         }
                     }
                 }
@@ -251,27 +234,23 @@ public class TrackVisual extends AbstractVisual implements BlockEntityVisual<Tra
 
             void delete() {
                 beams.forEach(arr -> {
-                    for (var d : arr) {
+                    for (var d : arr)
                         d.delete();
-                    }
                 });
                 beamCaps.forEach(c -> c.forEach(arr -> {
-                    for (var d : arr) {
+                    for (var d : arr)
                         d.delete();
-                    }
                 }));
             }
 
             public void collectCrumblingInstances(Consumer<Instance> consumer) {
                 beams.forEach(arr -> {
-                    for (var d : arr) {
+                    for (var d : arr)
                         consumer.accept(d);
-                    }
                 });
                 beamCaps.forEach(c -> c.forEach(arr -> {
-                    for (var d : arr) {
+                    for (var d : arr)
                         consumer.accept(d);
-                    }
                 }));
             }
         }

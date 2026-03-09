@@ -8,34 +8,33 @@ import me.shedaniel.rei.api.common.display.Display;
 import me.shedaniel.rei.api.common.display.DisplaySerializer;
 import me.shedaniel.rei.api.common.entry.EntryIngredient;
 import me.shedaniel.rei.api.common.util.EntryIngredients;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.resources.Identifier;
-import net.minecraft.world.item.crafting.RecipeHolder;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.recipe.RecipeEntry;
+import net.minecraft.util.Identifier;
 
 import java.util.List;
 import java.util.Optional;
 
-public record SandpaperPolishingDisplay(EntryIngredient input, EntryIngredient output,
-                                        Optional<Identifier> location) implements Display {
+public record SandpaperPolishingDisplay(EntryIngredient input, EntryIngredient output, Optional<Identifier> location) implements Display {
     public static final DisplaySerializer<SandpaperPolishingDisplay> SERIALIZER = DisplaySerializer.of(
         RecordCodecBuilder.mapCodec(instance -> instance.group(
             EntryIngredient.codec().fieldOf("input").forGetter(SandpaperPolishingDisplay::input),
             EntryIngredient.codec().fieldOf("output").forGetter(SandpaperPolishingDisplay::output),
             Identifier.CODEC.optionalFieldOf("location").forGetter(SandpaperPolishingDisplay::location)
-        ).apply(instance, SandpaperPolishingDisplay::new)), StreamCodec.composite(
+        ).apply(instance, SandpaperPolishingDisplay::new)), PacketCodec.tuple(
             EntryIngredient.streamCodec(),
             SandpaperPolishingDisplay::input,
             EntryIngredient.streamCodec(),
             SandpaperPolishingDisplay::output,
-            ByteBufCodecs.optional(Identifier.STREAM_CODEC),
+            PacketCodecs.optional(Identifier.PACKET_CODEC),
             SandpaperPolishingDisplay::location,
             SandpaperPolishingDisplay::new
         )
     );
 
-    public SandpaperPolishingDisplay(RecipeHolder<SandPaperPolishingRecipe> entry) {
-        this(entry.id().identifier(), entry.value());
+    public SandpaperPolishingDisplay(RecipeEntry<SandPaperPolishingRecipe> entry) {
+        this(entry.id().getValue(), entry.value());
     }
 
     public SandpaperPolishingDisplay(Identifier id, SandPaperPolishingRecipe recipe) {

@@ -12,15 +12,15 @@ import com.zurrtum.create.client.flywheel.lib.material.StandardMaterialShaders;
 import com.zurrtum.create.client.flywheel.lib.memory.MemoryBlock;
 import com.zurrtum.create.client.flywheel.lib.vertex.FullVertexView;
 import com.zurrtum.create.client.flywheel.lib.vertex.VertexView;
-import net.minecraft.client.renderer.LightTexture;
-import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.minecraft.client.render.LightmapTextureManager;
+import net.minecraft.client.render.OverlayTexture;
 import org.jetbrains.annotations.UnknownNullability;
 import org.joml.Vector4fc;
 import org.lwjgl.system.MemoryUtil;
 
 public final class LineModelBuilder {
-    private static final Material MATERIAL = SimpleMaterial.builder().shaders(StandardMaterialShaders.LINE)
-        .backfaceCulling(false).cardinalLightingMode(CardinalLightingMode.OFF).build();
+    private static final Material MATERIAL = SimpleMaterial.builder().shaders(StandardMaterialShaders.LINE).backfaceCulling(false)
+        .cardinalLightingMode(CardinalLightingMode.OFF).build();
 
     @UnknownNullability
     private VertexView vertexView;
@@ -86,8 +86,8 @@ public final class LineModelBuilder {
             vertexView.a(vertexCount + i, 1);
             vertexView.u(vertexCount + i, 0);
             vertexView.v(vertexCount + i, 0);
-            vertexView.overlay(vertexCount + i, OverlayTexture.NO_OVERLAY);
-            vertexView.light(vertexCount + i, LightTexture.FULL_BRIGHT);
+            vertexView.overlay(vertexCount + i, OverlayTexture.DEFAULT_UV);
+            vertexView.light(vertexCount + i, LightmapTextureManager.MAX_LIGHT_COORDINATE);
             vertexView.normalX(vertexCount + i, normalX);
             vertexView.normalY(vertexCount + i, normalY);
             vertexView.normalZ(vertexCount + i, normalZ);

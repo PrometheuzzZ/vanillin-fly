@@ -3,21 +3,21 @@ package com.zurrtum.create.infrastructure.packet.s2c;
 import com.zurrtum.create.AllClientHandle;
 import com.zurrtum.create.AllPackets;
 import com.zurrtum.create.content.trains.entity.Train;
-import net.minecraft.core.UUIDUtil;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.PacketType;
-import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.network.listener.ClientPlayPacketListener;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.PacketType;
+import net.minecraft.util.Uuids;
 
 import java.util.UUID;
 
-public record HonkReturnPacket(UUID trainId, boolean isHonk) implements Packet<ClientGamePacketListener> {
-    public static final StreamCodec<RegistryFriendlyByteBuf, HonkReturnPacket> CODEC = StreamCodec.composite(
-        UUIDUtil.STREAM_CODEC,
+public record HonkReturnPacket(UUID trainId, boolean isHonk) implements Packet<ClientPlayPacketListener> {
+    public static final PacketCodec<RegistryByteBuf, HonkReturnPacket> CODEC = PacketCodec.tuple(
+        Uuids.PACKET_CODEC,
         HonkReturnPacket::trainId,
-        ByteBufCodecs.BOOL,
+        PacketCodecs.BOOLEAN,
         HonkReturnPacket::isHonk,
         HonkReturnPacket::new
     );
@@ -27,12 +27,12 @@ public record HonkReturnPacket(UUID trainId, boolean isHonk) implements Packet<C
     }
 
     @Override
-    public void handle(ClientGamePacketListener listener) {
+    public void apply(ClientPlayPacketListener listener) {
         AllClientHandle.INSTANCE.onTrainHonkReturn(this);
     }
 
     @Override
-    public PacketType<HonkReturnPacket> type() {
+    public PacketType<HonkReturnPacket> getPacketType() {
         return AllPackets.S_TRAIN_HONK;
     }
 }

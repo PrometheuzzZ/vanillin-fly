@@ -1,11 +1,11 @@
 package com.zurrtum.create.client.catnip.lang;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.renderer.LightTexture;
-import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.font.TextRenderer;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.render.LightmapTextureManager;
+import net.minecraft.client.render.VertexConsumerProvider;
+import net.minecraft.client.util.math.MatrixStack;
 import org.joml.Matrix4f;
 
 import java.text.BreakIterator;
@@ -15,10 +15,10 @@ import java.util.Locale;
 
 public class ClientFontHelper {
 
-    public static List<String> cutString(Font font, String text, int maxWidthPerLine) {
+    public static List<String> cutString(TextRenderer font, String text, int maxWidthPerLine) {
         // Split words
         List<String> words = new LinkedList<>();
-        String selected = Minecraft.getInstance().getLanguageManager().getSelected();
+        String selected = MinecraftClient.getInstance().getLanguageManager().getLanguage();
         final String[] langSplit = selected.split("_", 2);
         Locale locale = langSplit.length == 1 ? Locale.of(langSplit[0]) : Locale.of(langSplit[0], langSplit[1]);
         BreakIterator iterator = BreakIterator.getLineInstance(locale);
@@ -33,7 +33,7 @@ public class ClientFontHelper {
         StringBuilder currentLine = new StringBuilder();
         int width = 0;
         for (String word : words) {
-            int newWidth = font.width(word);
+            int newWidth = font.getWidth(word);
             if (width + newWidth > maxWidthPerLine) {
                 if (width > 0) {
                     String line = currentLine.toString();
@@ -54,22 +54,14 @@ public class ClientFontHelper {
         return lines;
     }
 
-    public static void drawSplitString(
-        GuiGraphics graphics,
-        Font font,
-        String text,
-        int x,
-        int y,
-        int width,
-        int color
-    ) {
+    public static void drawSplitString(DrawContext graphics, TextRenderer font, String text, int x, int y, int width, int color) {
         List<String> list = cutString(font, text, width);
 
-        boolean rightToLeft = font.isBidirectional();
+        boolean rightToLeft = font.isRightToLeft();
         for (String s : list) {
             int f = x;
             if (rightToLeft) {
-                int i = font.width(font.bidirectionalShaping(s));
+                int i = font.getWidth(font.mirror(s));
                 f += width - i;
             }
 
@@ -78,16 +70,16 @@ public class ClientFontHelper {
         }
     }
 
-    private static void draw(GuiGraphics graphics, Font font, String text, int x, int y, int color) {
+    private static void draw(DrawContext graphics, TextRenderer font, String text, int x, int y, int color) {
         if (text != null) {
-            graphics.drawString(font, text, x, y, color, false);
+            graphics.drawText(font, text, x, y, color, false);
         }
     }
 
     public static void drawSplitString(
-        MultiBufferSource buffer,
-        PoseStack matrixStack,
-        Font font,
+        VertexConsumerProvider buffer,
+        MatrixStack matrixStack,
+        TextRenderer font,
         String text,
         int x,
         int y,
@@ -95,13 +87,13 @@ public class ClientFontHelper {
         int color
     ) {
         List<String> list = cutString(font, text, width);
-        Matrix4f matrix4f = matrixStack.last().pose();
+        Matrix4f matrix4f = matrixStack.peek().getPositionMatrix();
 
-        boolean rightToLeft = font.isBidirectional();
+        boolean rightToLeft = font.isRightToLeft();
         for (String s : list) {
             int f = x;
             if (rightToLeft) {
-                int i = font.width(font.bidirectionalShaping(s));
+                int i = font.getWidth(font.mirror(s));
                 f += width - i;
             }
 
@@ -110,26 +102,7 @@ public class ClientFontHelper {
         }
     }
 
-    private static void draw(
-        MultiBufferSource buffer,
-        Font font,
-        String text,
-        int x,
-        int y,
-        int color,
-        Matrix4f matrix4f
-    ) {
-        font.drawInBatch(
-            text,
-            x,
-            y,
-            color,
-            false,
-            matrix4f,
-            buffer,
-            Font.DisplayMode.NORMAL,
-            0,
-            LightTexture.FULL_BRIGHT
-        );
+    private static void draw(VertexConsumerProvider buffer, TextRenderer font, String text, int x, int y, int color, Matrix4f matrix4f) {
+        font.draw(text, x, y, color, false, matrix4f, buffer, TextRenderer.TextLayerType.NORMAL, 0, LightmapTextureManager.MAX_LIGHT_COORDINATE);
     }
 }

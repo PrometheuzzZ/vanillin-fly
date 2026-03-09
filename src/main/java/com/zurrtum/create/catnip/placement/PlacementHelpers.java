@@ -15,9 +15,8 @@ public class PlacementHelpers {
     }
 
     public static IPlacementHelper get(int id) {
-        if (id < 0 || id >= HELPERS.size()) {
+        if (id < 0 || id >= HELPERS.size())
             throw new ArrayIndexOutOfBoundsException("id " + id + " for placement helper not known");
-        }
 
         return HELPERS.get(id);
     }

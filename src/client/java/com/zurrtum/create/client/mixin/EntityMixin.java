@@ -12,21 +12,21 @@ import com.zurrtum.create.content.contraptions.Contraption;
 import com.zurrtum.create.content.contraptions.ContraptionCollider;
 import com.zurrtum.create.content.contraptions.ContraptionHandler;
 import com.zurrtum.create.infrastructure.fluids.FlowableFluid;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.particles.BlockParticleOption;
-import net.minecraft.core.particles.ParticleTypes;
-import net.minecraft.tags.TagKey;
-import net.minecraft.util.RandomSource;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntityDimensions;
-import net.minecraft.world.entity.MoverType;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.RenderShape;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
-import net.minecraft.world.level.material.Fluid;
-import net.minecraft.world.level.material.FluidState;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.block.BlockRenderType;
+import net.minecraft.block.BlockState;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.EntityDimensions;
+import net.minecraft.entity.MovementType;
+import net.minecraft.fluid.Fluid;
+import net.minecraft.fluid.FluidState;
+import net.minecraft.particle.BlockStateParticleEffect;
+import net.minecraft.particle.ParticleTypes;
+import net.minecraft.registry.tag.TagKey;
+import net.minecraft.structure.StructureTemplate;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.util.math.random.Random;
+import net.minecraft.world.World;
 import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.apache.logging.log4j.util.TriConsumer;
 import org.spongepowered.asm.mixin.Final;
@@ -46,14 +46,14 @@ import java.util.stream.Stream;
 @Mixin(Entity.class)
 public abstract class EntityMixin {
     @Shadow
-    private Level level;
+    private World world;
     @Shadow
-    private Vec3 position;
+    private Vec3d pos;
     @Shadow
-    private float nextStep;
+    private float nextStepSoundDistance;
     @Shadow
     @Final
-    protected RandomSource random;
+    protected Random random;
     @Shadow
     private EntityDimensions dimensions;
     @Unique
@@ -63,26 +63,21 @@ public abstract class EntityMixin {
     protected abstract void playStepSound(BlockPos pos, BlockState state);
 
     @Shadow
-    protected abstract float nextStep();
+    protected abstract float calculateNextStepSoundDistance();
 
-    @Inject(method = "updateFluidHeightAndDoFluidPushing(Lnet/minecraft/tags/TagKey;D)Z", at = @At("HEAD"))
+    @Inject(method = "updateMovementInFluid(Lnet/minecraft/registry/tag/TagKey;D)Z", at = @At("HEAD"))
     private void clear(TagKey<Fluid> tag, double speed, CallbackInfoReturnable<Boolean> cir) {
         inModFluid = false;
     }
 
-    @Inject(method = "updateFluidHeightAndDoFluidPushing(Lnet/minecraft/tags/TagKey;D)Z", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/material/FluidState;getHeight(Lnet/minecraft/world/level/BlockGetter;Lnet/minecraft/core/BlockPos;)F"))
-    private void checkFluid(
-        TagKey<Fluid> tag,
-        double speed,
-        CallbackInfoReturnable<Boolean> cir,
-        @Local FluidState state
-    ) {
+    @Inject(method = "updateMovementInFluid(Lnet/minecraft/registry/tag/TagKey;D)Z", at = @At(value = "INVOKE", target = "Lnet/minecraft/fluid/FluidState;getHeight(Lnet/minecraft/world/BlockView;Lnet/minecraft/util/math/BlockPos;)F"))
+    private void checkFluid(TagKey<Fluid> tag, double speed, CallbackInfoReturnable<Boolean> cir, @Local FluidState state) {
         if (!inModFluid) {
-            inModFluid = state.getType() instanceof FlowableFluid;
+            inModFluid = state.getFluid() instanceof FlowableFluid;
         }
     }
 
-    @Inject(method = "doWaterSplashEffect()V", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/Level;addParticle(Lnet/minecraft/core/particles/ParticleOptions;DDDDDD)V"), cancellable = true)
+    @Inject(method = "onSwimmingStart()V", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/World;addParticleClient(Lnet/minecraft/particle/ParticleEffect;DDDDDD)V"), cancellable = true)
     private void cancelEffect(CallbackInfo ci) {
         if (inModFluid) {
             ci.cancel();
@@ -91,28 +86,24 @@ public abstract class EntityMixin {
 
     @Unique
     private Stream<AbstractContraptionEntity> create$getIntersectionContraptionsStream() {
-        return (level.isClientSide() ? ContraptionHandlerClient.loadedContraptions : ContraptionHandler.loadedContraptions).get(
-                level).values().stream().map(Reference::get)
-            .filter(cEntity -> cEntity != null && cEntity.collidingEntities.containsKey((Entity) (Object) this));
+        return (world.isClient() ? ContraptionHandlerClient.loadedContraptions : ContraptionHandler.loadedContraptions).get(world).values().stream()
+            .map(Reference::get).filter(cEntity -> cEntity != null && cEntity.collidingEntities.containsKey((Entity) (Object) this));
     }
 
     @Unique
     private Set<AbstractContraptionEntity> create$getIntersectingContraptions() {
         Set<AbstractContraptionEntity> contraptions = create$getIntersectionContraptionsStream().collect(Collectors.toSet());
 
-        contraptions.addAll(level.getEntitiesOfClass(
-            AbstractContraptionEntity.class,
-            ((Entity) (Object) this).getBoundingBox().inflate(1f)
-        ));
+        contraptions.addAll(world.getNonSpectatingEntities(AbstractContraptionEntity.class, ((Entity) (Object) this).getBoundingBox().expand(1f)));
         return contraptions;
     }
 
     @Unique
-    private void create$forCollision(Vec3 worldPos, TriConsumer<Contraption, BlockState, BlockPos> action) {
+    private void create$forCollision(Vec3d worldPos, TriConsumer<Contraption, BlockState, BlockPos> action) {
         create$getIntersectingContraptions().forEach(cEntity -> {
-            Vec3 localPos = ContraptionCollider.worldToLocalPos(worldPos, cEntity);
+            Vec3d localPos = ContraptionCollider.worldToLocalPos(worldPos, cEntity);
 
-            BlockPos blockPos = BlockPos.containing(localPos);
+            BlockPos blockPos = BlockPos.ofFloored(localPos);
             Contraption contraption = cEntity.getContraption();
             StructureTemplate.StructureBlockInfo info = contraption.getBlocks().get(blockPos);
 
@@ -126,15 +117,15 @@ public abstract class EntityMixin {
     // involves block step sounds on contraptions
     // injecting before `!blockstate1.isAir(this.world, blockpos)`
     // `if (this.moveDist > this.nextStep && !blockstate1.isAir())
-    @Inject(method = "applyMovementEmissionAndPlaySound(Lnet/minecraft/world/entity/Entity$MovementEmission;Lnet/minecraft/world/phys/Vec3;Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/state/BlockState;)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/block/state/BlockState;isAir()Z", ordinal = 0))
+    @Inject(method = "applyMoveEffect(Lnet/minecraft/entity/Entity$MoveEffect;Lnet/minecraft/util/math/Vec3d;Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/block/BlockState;)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/block/BlockState;isAir()Z", ordinal = 0))
     private void create$contraptionStepSounds(
-        Entity.MovementEmission moveEffect,
-        Vec3 movement,
+        Entity.MoveEffect moveEffect,
+        Vec3d movement,
         BlockPos landingPos,
         BlockState landingState,
         CallbackInfo ci
     ) {
-        Vec3 worldPos = position.add(0, -0.2, 0);
+        Vec3d worldPos = pos.add(0, -0.2, 0);
         MutableBoolean stepped = new MutableBoolean(false);
 
         create$forCollision(
@@ -144,60 +135,54 @@ public abstract class EntityMixin {
             }
         );
 
-        if (stepped.booleanValue()) {
-            nextStep = nextStep();
-        }
+        if (stepped.booleanValue())
+            nextStepSoundDistance = calculateNextStepSoundDistance();
     }
 
     // involves client-side view bobbing animation on contraptions
-    @Inject(method = "move(Lnet/minecraft/world/entity/MoverType;Lnet/minecraft/world/phys/Vec3;)V", at = @At(value = "TAIL"))
-    private void create$onMove(MoverType type, Vec3 movement, CallbackInfo ci) {
-        if (!level.isClientSide()) {
+    @Inject(method = "move(Lnet/minecraft/entity/MovementType;Lnet/minecraft/util/math/Vec3d;)V", at = @At(value = "TAIL"))
+    private void create$onMove(MovementType type, Vec3d movement, CallbackInfo ci) {
+        if (!world.isClient())
             return;
-        }
         Entity self = (Entity) (Object) this;
-        if (self.onGround()) {
+        if (self.isOnGround())
             return;
-        }
-        if (self.isPassenger()) {
+        if (self.hasVehicle())
             return;
-        }
 
-        Vec3 worldPos = position.add(0, -0.2, 0);
+        Vec3d worldPos = pos.add(0, -0.2, 0);
         boolean onAtLeastOneContraption = create$getIntersectionContraptionsStream().anyMatch(cEntity -> {
-            Vec3 localPos = ContraptionCollider.worldToLocalPos(worldPos, cEntity);
+            Vec3d localPos = ContraptionCollider.worldToLocalPos(worldPos, cEntity);
 
-            BlockPos blockPos = BlockPos.containing(localPos);
+            BlockPos blockPos = BlockPos.ofFloored(localPos);
             Contraption contraption = cEntity.getContraption();
             StructureTemplate.StructureBlockInfo info = contraption.getBlocks().get(blockPos);
 
-            if (info == null) {
+            if (info == null)
                 return false;
-            }
 
             cEntity.registerColliding(self);
             return true;
         });
 
-        if (!onAtLeastOneContraption) {
+        if (!onAtLeastOneContraption)
             return;
-        }
 
         self.setOnGround(true);
         AllSynchedDatas.CONTRAPTION_GROUNDED.set(self, true);
     }
 
-    @Inject(method = "spawnSprintParticle()V", at = @At(value = "TAIL"))
+    @Inject(method = "spawnSprintingParticles()V", at = @At(value = "TAIL"))
     private void create$onSpawnSprintParticle(CallbackInfo ci) {
         Entity self = (Entity) (Object) this;
-        Vec3 worldPos = position.add(0, -0.2, 0);
+        Vec3d worldPos = pos.add(0, -0.2, 0);
 
         create$forCollision(
             worldPos, (contraption, state, pos) -> {
-                if (state.getRenderShape() != RenderShape.INVISIBLE) {
-                    Vec3 speed = self.getDeltaMovement();
-                    level.addParticle(
-                        new BlockParticleOption(ParticleTypes.BLOCK, state),
+                if (state.getRenderType() != BlockRenderType.INVISIBLE) {
+                    Vec3d speed = self.getVelocity();
+                    world.addParticleClient(
+                        new BlockStateParticleEffect(ParticleTypes.BLOCK, state),
                         self.getX() + ((double) random.nextFloat() - 0.5D) * (double) dimensions.width(),
                         self.getY() + 0.1D,
                         self.getZ() + ((double) random.nextFloat() - 0.5D) * (double) dimensions.height(),
@@ -210,25 +195,20 @@ public abstract class EntityMixin {
         );
     }
 
-    @WrapOperation(method = "move(Lnet/minecraft/world/entity/MoverType;Lnet/minecraft/world/phys/Vec3;)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/Entity;canSimulateMovement()Z"))
+    @WrapOperation(method = "move(Lnet/minecraft/entity/MovementType;Lnet/minecraft/util/math/Vec3d;)V", at = @At(value = "INVOKE", target = "Lnet/minecraft/entity/Entity;canMoveVoluntarily()Z"))
     private boolean move(Entity instance, Operation<Boolean> original) {
         if (original.call(instance)) {
             return true;
         }
-        return level instanceof PonderLevel;
+        return world instanceof PonderLevel;
     }
 
-    @Inject(method = "startRiding(Lnet/minecraft/world/entity/Entity;ZZ)Z", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/Entity;isPassenger()Z"))
-    private void onMount(
-        Entity entity,
-        boolean force,
-        boolean sendEventAndTriggers,
-        CallbackInfoReturnable<Boolean> cir
-    ) {
+    @Inject(method = "startRiding(Lnet/minecraft/entity/Entity;ZZ)Z", at = @At(value = "INVOKE", target = "Lnet/minecraft/entity/Entity;hasVehicle()Z"))
+    private void onMount(Entity entity, boolean force, boolean sendEventAndTriggers, CallbackInfoReturnable<Boolean> cir) {
         CameraDistanceModifier.onMount((Entity) (Object) this, entity, true);
     }
 
-    @WrapOperation(method = "removeVehicle()V", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/entity/Entity;removePassenger(Lnet/minecraft/world/entity/Entity;)V"))
+    @WrapOperation(method = "dismountVehicle()V", at = @At(value = "INVOKE", target = "Lnet/minecraft/entity/Entity;removePassenger(Lnet/minecraft/entity/Entity;)V"))
     private void onDismount(Entity instance, Entity entity, Operation<Void> original) {
         CameraDistanceModifier.onMount(entity, instance, false);
         original.call(instance, entity);

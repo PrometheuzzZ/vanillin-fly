@@ -4,16 +4,16 @@
   "compatibilityLevel": "JAVA_21",
   "client": [
     "BlockEntityMixin",
-    "BlockEntityRenderDispatcherMixin",
+    "BlockEntityRenderManagerMixin",
     "BlockEntityTypeMixin",
     "EntityTypeMixin",
-    "FlywheelLevelRendererMixin",
+    "DiffuseLightingMixin",
+    "FlywheelWorldRendererMixin",
     "FogRendererMixin",
     "GlStateManagerMixin",
-    "LevelChunkMixin",
-    "LightingMixin",
-    "PoseStackMixin",
-    "RenderSystemMixin"
+    "MatrixStackMixin",
+    "RenderSystemMixin",
+    "WorldChunkMixin"
   ],
   "injectors": {
     "defaultRequire": 1

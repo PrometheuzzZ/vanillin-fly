@@ -1,77 +1,77 @@
 package com.zurrtum.create.client.foundation.gui.render;
 
-import com.mojang.blaze3d.platform.Lighting;
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
-import com.mojang.math.Axis;
 import com.zurrtum.create.AllBlocks;
 import com.zurrtum.create.client.AllPartialModels;
 import com.zurrtum.create.client.catnip.animation.AnimationTickHolder;
 import com.zurrtum.create.client.flywheel.lib.model.baked.SinglePosVirtualBlockGetter;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.render.pip.PictureInPictureRenderer;
-import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.Sheets;
-import net.minecraft.client.renderer.block.BlockRenderDispatcher;
-import net.minecraft.client.renderer.block.model.BlockModelPart;
-import net.minecraft.core.BlockPos;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.Blocks;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.render.SpecialGuiElementRenderer;
+import net.minecraft.client.render.DiffuseLighting;
+import net.minecraft.client.render.TexturedRenderLayers;
+import net.minecraft.client.render.VertexConsumer;
+import net.minecraft.client.render.VertexConsumerProvider;
+import net.minecraft.client.render.block.BlockRenderManager;
+import net.minecraft.client.render.model.BlockModelPart;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.state.property.Properties;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction.Axis;
+import net.minecraft.util.math.RotationAxis;
 
 import java.util.List;
 
-public class PressBasinRenderer extends PictureInPictureRenderer<PressBasinRenderState> {
-    public PressBasinRenderer(MultiBufferSource.BufferSource vertexConsumers) {
+public class PressBasinRenderer extends SpecialGuiElementRenderer<PressBasinRenderState> {
+    public PressBasinRenderer(VertexConsumerProvider.Immediate vertexConsumers) {
         super(vertexConsumers);
     }
 
     @Override
-    protected void renderToTexture(PressBasinRenderState state, PoseStack matrices) {
-        Minecraft mc = Minecraft.getInstance();
-        mc.gameRenderer.getLighting().setupFor(Lighting.Entry.ENTITY_IN_UI);
+    protected void render(PressBasinRenderState state, MatrixStack matrices) {
+        MinecraftClient mc = MinecraftClient.getInstance();
+        mc.gameRenderer.getDiffuseLighting().setShaderLights(DiffuseLighting.Type.ENTITY_IN_UI);
         matrices.scale(1, 1, -1);
-        matrices.mulPose(Axis.XP.rotationDegrees(-15.5f));
-        matrices.mulPose(Axis.YP.rotationDegrees(22.5f));
+        matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(-15.5f));
+        matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(22.5f));
         matrices.translate(-0.5f, -1.8f, -0.5f);
         matrices.scale(1, -1, 1);
 
         BlockState blockState;
         List<BlockModelPart> parts;
-        BlockRenderDispatcher blockRenderManager = mc.getBlockRenderer();
+        BlockRenderManager blockRenderManager = mc.getBlockRenderManager();
         SinglePosVirtualBlockGetter world = SinglePosVirtualBlockGetter.createFullBright();
-        VertexConsumer buffer = bufferSource.getBuffer(Sheets.cutoutBlockSheet());
+        VertexConsumer buffer = vertexConsumers.getBuffer(TexturedRenderLayers.getEntityCutout());
         float time = AnimationTickHolder.getRenderTime();
 
-        blockState = AllBlocks.MECHANICAL_PRESS.defaultBlockState();
+        blockState = AllBlocks.MECHANICAL_PRESS.getDefaultState();
         world.blockState(blockState);
-        parts = blockRenderManager.getBlockModel(blockState).collectParts(mc.level.random);
-        blockRenderManager.renderBatched(blockState, BlockPos.ZERO, world, matrices, buffer, false, parts);
+        parts = blockRenderManager.getModel(blockState).getParts(mc.world.random);
+        blockRenderManager.renderBlock(blockState, BlockPos.ORIGIN, world, matrices, buffer, false, parts);
 
-        matrices.pushPose();
-        blockState = AllBlocks.SHAFT.defaultBlockState()
-            .setValue(BlockStateProperties.AXIS, net.minecraft.core.Direction.Axis.Z);
+        matrices.push();
+        blockState = AllBlocks.SHAFT.getDefaultState().with(Properties.AXIS, Axis.Z);
         world.blockState(blockState);
-        parts = blockRenderManager.getBlockModel(blockState).collectParts(mc.level.random);
+        parts = blockRenderManager.getModel(blockState).getParts(mc.world.random);
         matrices.translate(0.5f, 0.5f, 0.5f);
-        matrices.mulPose(Axis.ZP.rotationDegrees(getShaftAngle(time)));
+        matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(getShaftAngle(time)));
         matrices.translate(-0.5f, -0.5f, -0.5f);
-        blockRenderManager.renderBatched(blockState, BlockPos.ZERO, world, matrices, buffer, false, parts);
-        matrices.popPose();
+        blockRenderManager.renderBlock(blockState, BlockPos.ORIGIN, world, matrices, buffer, false, parts);
+        matrices.pop();
 
-        matrices.pushPose();
-        blockState = Blocks.AIR.defaultBlockState();
+        matrices.push();
+        blockState = Blocks.AIR.getDefaultState();
         world.blockState(blockState);
         parts = List.of(AllPartialModels.MECHANICAL_PRESS_HEAD.get());
         matrices.translate(0, getAnimatedHeadOffset(time), 0);
-        blockRenderManager.renderBatched(blockState, BlockPos.ZERO, world, matrices, buffer, false, parts);
-        matrices.popPose();
+        blockRenderManager.renderBlock(blockState, BlockPos.ORIGIN, world, matrices, buffer, false, parts);
+        matrices.pop();
 
         matrices.translate(0, -1.65f, 0);
-        blockState = AllBlocks.BASIN.defaultBlockState();
+        blockState = AllBlocks.BASIN.getDefaultState();
         world.blockState(blockState);
-        parts = blockRenderManager.getBlockModel(blockState).collectParts(mc.level.random);
-        blockRenderManager.renderBatched(blockState, BlockPos.ZERO, world, matrices, buffer, false, parts);
+        parts = blockRenderManager.getModel(blockState).getParts(mc.world.random);
+        blockRenderManager.renderBlock(blockState, BlockPos.ORIGIN, world, matrices, buffer, false, parts);
     }
 
     private static float getShaftAngle(float time) {
@@ -84,22 +84,20 @@ public class PressBasinRenderer extends PictureInPictureRenderer<PressBasinRende
             float progress = cycle / 10;
             return -(progress * progress * progress);
         }
-        if (cycle < 15) {
+        if (cycle < 15)
             return -1;
-        }
-        if (cycle < 20) {
+        if (cycle < 20)
             return -1 + (1 - ((20 - cycle) / 5));
-        }
         return 0;
     }
 
     @Override
-    protected String getTextureLabel() {
+    protected String getName() {
         return "Press Basin";
     }
 
     @Override
-    public Class<PressBasinRenderState> getRenderStateClass() {
+    public Class<PressBasinRenderState> getElementClass() {
         return PressBasinRenderState.class;
     }
 }

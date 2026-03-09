@@ -5,9 +5,9 @@ import com.zurrtum.create.client.flywheel.api.instance.InstanceHandle;
 import com.zurrtum.create.client.flywheel.api.instance.InstanceType;
 import com.zurrtum.create.client.flywheel.lib.instance.ColoredLitOverlayInstance;
 import com.zurrtum.create.content.kinetics.base.KineticBlockEntity;
-import net.minecraft.core.Direction;
-import net.minecraft.core.Direction.Axis;
-import net.minecraft.core.Vec3i;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Direction.Axis;
+import net.minecraft.util.math.Vec3i;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 
@@ -39,14 +39,13 @@ public class RotatingInstance extends ColoredLitOverlayInstance {
     }
 
     public static int colorFromBE(KineticBlockEntity be) {
-        if (be.hasNetwork()) {
+        if (be.hasNetwork())
             return Color.generateFromLong(be.network).getRGB();
-        }
         return 0xFFFFFF;
     }
 
     public RotatingInstance setup(KineticBlockEntity blockEntity) {
-        var blockState = blockEntity.getBlockState();
+        var blockState = blockEntity.getCachedState();
         var axis = KineticBlockEntityVisual.rotationAxis(blockState);
         return setup(blockEntity, axis, blockEntity.getSpeed());
     }
@@ -56,20 +55,16 @@ public class RotatingInstance extends ColoredLitOverlayInstance {
     }
 
     public RotatingInstance setup(KineticBlockEntity blockEntity, float speed) {
-        var blockState = blockEntity.getBlockState();
+        var blockState = blockEntity.getCachedState();
         var axis = KineticBlockEntityVisual.rotationAxis(blockState);
         return setup(blockEntity, axis, speed);
     }
 
     public RotatingInstance setup(KineticBlockEntity blockEntity, Axis axis, float speed) {
-        var blockState = blockEntity.getBlockState();
-        var pos = blockEntity.getBlockPos();
+        var blockState = blockEntity.getCachedState();
+        var pos = blockEntity.getPos();
         return setRotationAxis(axis).setRotationalSpeed(speed * RotatingInstance.SPEED_MULTIPLIER)
-            .setRotationOffset(KineticBlockEntityVisual.rotationOffset(
-                blockState,
-                axis,
-                pos
-            ) + blockEntity.getRotationAngleOffset(axis));
+            .setRotationOffset(KineticBlockEntityVisual.rotationOffset(blockState, axis, pos) + blockEntity.getRotationAngleOffset(axis));
     }
 
     public RotatingInstance rotateToFace(Direction.Axis axis) {
@@ -83,17 +78,17 @@ public class RotatingInstance extends ColoredLitOverlayInstance {
     }
 
     public RotatingInstance rotateToFace(Direction orientation) {
-        return rotateToFace(orientation.getStepX(), orientation.getStepY(), orientation.getStepZ());
+        return rotateToFace(orientation.getOffsetX(), orientation.getOffsetY(), orientation.getOffsetZ());
     }
 
     public RotatingInstance rotateToFace(Direction from, Direction orientation) {
         return rotateTo(
-            from.getStepX(),
-            from.getStepY(),
-            from.getStepZ(),
-            orientation.getStepX(),
-            orientation.getStepY(),
-            orientation.getStepZ()
+            from.getOffsetX(),
+            from.getOffsetY(),
+            from.getOffsetZ(),
+            orientation.getOffsetX(),
+            orientation.getOffsetY(),
+            orientation.getOffsetZ()
         );
     }
 
@@ -108,7 +103,7 @@ public class RotatingInstance extends ColoredLitOverlayInstance {
 
     public RotatingInstance setRotationAxis(Direction.Axis axis) {
         Direction orientation = Direction.get(Direction.AxisDirection.POSITIVE, axis);
-        return setRotationAxis(orientation.step());
+        return setRotationAxis(orientation.getUnitVector());
     }
 
     public RotatingInstance setRotationAxis(Vector3f axis) {

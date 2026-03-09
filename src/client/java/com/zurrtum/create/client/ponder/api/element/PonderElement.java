@@ -15,7 +15,4 @@ public interface PonderElement {
     boolean isVisible();
 
     void setVisible(boolean visible);
-
-    default void clear() {
-    }
 }

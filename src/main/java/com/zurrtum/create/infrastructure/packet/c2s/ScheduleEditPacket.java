@@ -3,25 +3,26 @@ package com.zurrtum.create.infrastructure.packet.c2s;
 import com.zurrtum.create.AllHandle;
 import com.zurrtum.create.AllPackets;
 import com.zurrtum.create.content.trains.schedule.Schedule;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.PacketType;
-import net.minecraft.network.protocol.game.ServerGamePacketListener;
-import net.minecraft.server.network.ServerGamePacketListenerImpl;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.listener.ServerPlayPacketListener;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.PacketType;
+import net.minecraft.server.network.ServerPlayNetworkHandler;
 
-public record ScheduleEditPacket(Schedule schedule) implements Packet<ServerGamePacketListener> {
-    public static final StreamCodec<RegistryFriendlyByteBuf, ScheduleEditPacket> CODEC = Schedule.STREAM_CODEC.map(ScheduleEditPacket::new,
+public record ScheduleEditPacket(Schedule schedule) implements Packet<ServerPlayPacketListener> {
+    public static final PacketCodec<RegistryByteBuf, ScheduleEditPacket> CODEC = Schedule.STREAM_CODEC.xmap(
+        ScheduleEditPacket::new,
         ScheduleEditPacket::schedule
     );
 
     @Override
-    public void handle(ServerGamePacketListener listener) {
-        AllHandle.onScheduleEdit((ServerGamePacketListenerImpl) listener, this);
+    public void apply(ServerPlayPacketListener listener) {
+        AllHandle.onScheduleEdit((ServerPlayNetworkHandler) listener, this);
     }
 
     @Override
-    public PacketType<ScheduleEditPacket> type() {
+    public PacketType<ScheduleEditPacket> getPacketType() {
         return AllPackets.CONFIGURE_SCHEDULE;
     }
 }

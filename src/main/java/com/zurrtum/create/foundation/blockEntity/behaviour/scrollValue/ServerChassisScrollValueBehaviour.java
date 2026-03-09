@@ -7,10 +7,7 @@ import java.util.List;
 import java.util.function.Function;
 
 public class ServerChassisScrollValueBehaviour extends ServerBulkScrollValueBehaviour {
-    public ServerChassisScrollValueBehaviour(
-        SmartBlockEntity be,
-        Function<SmartBlockEntity, List<? extends SmartBlockEntity>> groupGetter
-    ) {
+    public ServerChassisScrollValueBehaviour(SmartBlockEntity be, Function<SmartBlockEntity, List<? extends SmartBlockEntity>> groupGetter) {
         super(be, groupGetter);
     }
 

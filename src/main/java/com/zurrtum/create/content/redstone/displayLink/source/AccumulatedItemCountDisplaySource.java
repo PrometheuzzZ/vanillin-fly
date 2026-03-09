@@ -4,21 +4,20 @@ import com.zurrtum.create.content.redstone.displayLink.DisplayLinkBlock;
 import com.zurrtum.create.content.redstone.displayLink.DisplayLinkBlockEntity;
 import com.zurrtum.create.content.redstone.displayLink.DisplayLinkContext;
 import com.zurrtum.create.content.redstone.displayLink.target.DisplayTargetStats;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.text.MutableText;
+import net.minecraft.text.Text;
 
 public class AccumulatedItemCountDisplaySource extends NumericSingleLineDisplaySource {
     @Override
-    protected MutableComponent provideLine(DisplayLinkContext context, DisplayTargetStats stats) {
-        return Component.literal(String.valueOf(context.sourceConfig().getInt("Collected")));
+    protected MutableText provideLine(DisplayLinkContext context, DisplayTargetStats stats) {
+        return Text.literal(String.valueOf(context.sourceConfig().getInt("Collected")));
     }
 
     public void itemReceived(DisplayLinkBlockEntity be, int amount) {
-        if (be.getBlockState().getValueOrElse(DisplayLinkBlock.POWERED, true)) {
+        if (be.getCachedState().get(DisplayLinkBlock.POWERED, true))
             return;
-        }
 
-        int collected = be.getSourceConfig().getIntOr("Collected", 0);
+        int collected = be.getSourceConfig().getInt("Collected", 0);
         be.getSourceConfig().putInt("Collected", collected + amount);
         be.updateGatheredData();
     }

@@ -1,6 +1,6 @@
 package com.zurrtum.create.client.foundation.block.render;
 
-import net.minecraft.core.BlockPos;
+import net.minecraft.util.math.BlockPos;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Set;

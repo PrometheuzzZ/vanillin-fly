@@ -2,12 +2,12 @@ package com.zurrtum.create;
 
 import com.zurrtum.create.infrastructure.fluids.FlowableFluid;
 import com.zurrtum.create.infrastructure.fluids.FluidEntry;
-import net.minecraft.core.Registry;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.Identifier;
-import net.minecraft.resources.ResourceKey;
-import net.minecraft.world.level.material.Fluid;
+import net.minecraft.fluid.Fluid;
+import net.minecraft.registry.Registries;
+import net.minecraft.registry.Registry;
+import net.minecraft.registry.RegistryKey;
+import net.minecraft.registry.RegistryKeys;
+import net.minecraft.util.Identifier;
 
 import static com.zurrtum.create.Create.MOD_ID;
 
@@ -19,14 +19,14 @@ public class AllFluids {
     public static final FlowableFluid CHOCOLATE = register("chocolate");
 
     private static FlowableFluid register(String name) {
-        Identifier id = Identifier.fromNamespaceAndPath(MOD_ID, name);
-        ResourceKey<Fluid> still_key = ResourceKey.create(Registries.FLUID, id);
-        ResourceKey<Fluid> flowing_key = ResourceKey.create(Registries.FLUID, id.withPrefix("flowing_"));
+        Identifier id = Identifier.of(MOD_ID, name);
+        RegistryKey<Fluid> still_key = RegistryKey.of(RegistryKeys.FLUID, id);
+        RegistryKey<Fluid> flowing_key = RegistryKey.of(RegistryKeys.FLUID, id.withPrefixedPath("flowing_"));
         FluidEntry entry = new FluidEntry();
         entry.still = new FlowableFluid.Still(entry);
         entry.flowing = new FlowableFluid.Flowing(entry);
-        Registry.register(BuiltInRegistries.FLUID, still_key, entry.still);
-        Registry.register(BuiltInRegistries.FLUID, flowing_key, entry.flowing);
+        Registry.register(Registries.FLUID, still_key, entry.still);
+        Registry.register(Registries.FLUID, flowing_key, entry.flowing);
         return entry.still;
     }
 

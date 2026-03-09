@@ -14,17 +14,17 @@ import com.zurrtum.create.content.trains.entity.Train;
 import com.zurrtum.create.infrastructure.config.AllConfigs;
 import com.zurrtum.create.infrastructure.packet.c2s.HonkPacket;
 import com.zurrtum.create.infrastructure.packet.c2s.TrainHUDUpdatePacket;
-import net.minecraft.client.DeltaTracker;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.renderer.RenderPipelines;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.network.chat.Component;
-import net.minecraft.util.Mth;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate.StructureBlockInfo;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.font.TextRenderer;
+import net.minecraft.client.gl.RenderPipelines;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.render.RenderTickCounter;
+import net.minecraft.entity.Entity;
+import net.minecraft.structure.StructureTemplate.StructureBlockInfo;
+import net.minecraft.text.Text;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.MathHelper;
 import org.joml.Matrix3x2fStack;
 
 public class TrainHUD {
@@ -36,96 +36,88 @@ public class TrainHUD {
     static int hudPacketCooldown = 5;
     static int honkPacketCooldown = 5;
 
-    public static Component currentPrompt;
+    public static Text currentPrompt;
     public static boolean currentPromptShadow;
     public static int promptKeepAlive = 0;
 
     static boolean usedToHonk;
 
-    public static void tick(Minecraft mc) {
-        if (promptKeepAlive > 0) {
+    public static void tick(MinecraftClient mc) {
+        if (promptKeepAlive > 0)
             promptKeepAlive--;
-        } else {
+        else
             currentPrompt = null;
-        }
 
-        displayedPromptSize.chase(currentPrompt != null ? mc.font.width(currentPrompt) + 17 : 0, .5f, Chaser.EXP);
+        displayedPromptSize.chase(currentPrompt != null ? mc.textRenderer.getWidth(currentPrompt) + 17 : 0, .5f, Chaser.EXP);
         displayedPromptSize.tickChaser();
 
         Carriage carriage = getCarriage();
-        if (carriage == null) {
+        if (carriage == null)
             return;
-        }
 
         Train train = carriage.train;
         double value = Math.abs(train.speed) / (train.maxSpeed() * AllConfigs.server().trains.manualTrainSpeedModifier.getF());
-        value = Mth.clamp(value + 0.05f, 0, 1);
+        value = MathHelper.clamp(value + 0.05f, 0, 1);
 
         displayedSpeed.chase((int) (value * 18) / 18f, .5f, Chaser.EXP);
         displayedSpeed.tickChaser();
         displayedThrottle.chase(editedThrottle != null ? editedThrottle : train.throttle, .75f, Chaser.EXP);
         displayedThrottle.tickChaser();
 
-        boolean isSprintKeyPressed = ControlsUtil.isActuallyPressed(mc.options.keySprint);
+        boolean isSprintKeyPressed = ControlsUtil.isActuallyPressed(mc.options.sprintKey);
 
         if (isSprintKeyPressed && honkPacketCooldown-- <= 0) {
-            train.determineHonk(mc.level);
+            train.determineHonk(mc.world);
             if (train.lowHonk != null) {
-                mc.player.connection.send(new HonkPacket(train, true));
+                mc.player.networkHandler.sendPacket(new HonkPacket(train, true));
                 honkPacketCooldown = 5;
                 usedToHonk = true;
             }
         }
 
         if (!isSprintKeyPressed && usedToHonk) {
-            mc.player.connection.send(new HonkPacket(train, false));
+            mc.player.networkHandler.sendPacket(new HonkPacket(train, false));
             honkPacketCooldown = 0;
             usedToHonk = false;
         }
 
-        if (editedThrottle == null) {
+        if (editedThrottle == null)
             return;
-        }
-        if (Mth.equal(editedThrottle, train.throttle)) {
+        if (MathHelper.approximatelyEquals(editedThrottle, train.throttle)) {
             editedThrottle = null;
             hudPacketCooldown = 5;
             return;
         }
 
         if (hudPacketCooldown-- <= 0) {
-            mc.player.connection.send(new TrainHUDUpdatePacket(train, editedThrottle));
+            mc.player.networkHandler.sendPacket(new TrainHUDUpdatePacket(train, editedThrottle));
             hudPacketCooldown = 5;
         }
     }
 
     private static Carriage getCarriage() {
-        if (!(ControlsHandler.getContraption() instanceof CarriageContraptionEntity cce)) {
+        if (!(ControlsHandler.getContraption() instanceof CarriageContraptionEntity cce))
             return null;
-        }
         return cce.getCarriage();
     }
 
-    public static boolean renderOverlay(Minecraft mc, GuiGraphics guiGraphics, DeltaTracker deltaTracker) {
-        float partialTicks = deltaTracker.getGameTimeDeltaPartialTick(false);
-        if (!(ControlsHandler.getContraption() instanceof CarriageContraptionEntity cce)) {
+    public static boolean renderOverlay(MinecraftClient mc, DrawContext guiGraphics, RenderTickCounter deltaTracker) {
+        float partialTicks = deltaTracker.getTickProgress(false);
+        if (!(ControlsHandler.getContraption() instanceof CarriageContraptionEntity cce))
             return false;
-        }
         Carriage carriage = cce.getCarriage();
-        if (carriage == null) {
+        if (carriage == null)
             return false;
-        }
         Entity cameraEntity = mc.getCameraEntity();
-        if (cameraEntity == null) {
+        if (cameraEntity == null)
             return false;
-        }
         BlockPos localPos = ControlsHandler.getControlsPos();
-        if (localPos == null) {
+        if (localPos == null)
             return false;
-        }
 
-        Matrix3x2fStack poseStack = guiGraphics.pose();
+        Matrix3x2fStack poseStack = guiGraphics.getMatrices();
         poseStack.pushMatrix();
-        poseStack.translate(guiGraphics.guiWidth() / 2 - 91, guiGraphics.guiHeight() - 29);
+        poseStack.translate(guiGraphics.getScaledWindowWidth() / 2 - 91, guiGraphics.getScaledWindowHeight() - 29);
 
         // Speed, Throttle
 
@@ -135,7 +127,7 @@ public class TrainHUD {
         int w = (int) (AllGuiTextures.TRAIN_HUD_SPEED.getWidth() * displayedSpeed.getValue(partialTicks));
         int h = AllGuiTextures.TRAIN_HUD_SPEED.getHeight();
 
-        guiGraphics.blit(
+        guiGraphics.drawTexture(
             RenderPipelines.GUI_TEXTURED,
             AllGuiTextures.TRAIN_HUD_SPEED.location,
             0,
@@ -156,7 +148,7 @@ public class TrainHUD {
 
             AllGuiTextures.TRAIN_PROMPT_L.render(guiGraphics, -3, 0);
             AllGuiTextures.TRAIN_PROMPT_R.render(guiGraphics, promptSize, 0);
-            guiGraphics.blit(
+            guiGraphics.drawTexture(
                 RenderPipelines.GUI_TEXTURED,
                 AllGuiTextures.TRAIN_PROMPT.location,
                 0,
@@ -171,11 +163,11 @@ public class TrainHUD {
 
             poseStack.popMatrix();
 
-            Font font = mc.font;
-            if (currentPrompt != null && font.width(currentPrompt) < promptSize - 10) {
+            TextRenderer font = mc.textRenderer;
+            if (currentPrompt != null && font.getWidth(currentPrompt) < promptSize - 10) {
                 poseStack.pushMatrix();
-                poseStack.translate(font.width(currentPrompt) / -2f + 82, -27);
-                guiGraphics.drawString(font, currentPrompt, 9, 4, 0xFF544D45, currentPromptShadow);
+                poseStack.translate(font.getWidth(currentPrompt) / -2f + 82, -27);
+                guiGraphics.drawText(font, currentPrompt, 9, 4, 0xFF544D45, currentPromptShadow);
                 poseStack.popMatrix();
             }
         }
@@ -184,7 +176,7 @@ public class TrainHUD {
 
         w = (int) (AllGuiTextures.TRAIN_HUD_THROTTLE.getWidth() * (1 - displayedThrottle.getValue(partialTicks)));
         int invW = AllGuiTextures.TRAIN_HUD_THROTTLE.getWidth() - w;
-        guiGraphics.blit(
+        guiGraphics.drawTexture(
             RenderPipelines.GUI_TEXTURED,
             AllGuiTextures.TRAIN_HUD_THROTTLE.location,
             invW,
@@ -196,34 +188,26 @@ public class TrainHUD {
             256,
             256
         );
-        AllGuiTextures.TRAIN_HUD_THROTTLE_POINTER.render(
-            guiGraphics,
-            Math.max(1, AllGuiTextures.TRAIN_HUD_THROTTLE.getWidth() - w) - 3,
-            -2
-        );
+        AllGuiTextures.TRAIN_HUD_THROTTLE_POINTER.render(guiGraphics, Math.max(1, AllGuiTextures.TRAIN_HUD_THROTTLE.getWidth() - w) - 3, -2);
 
         // Direction
 
         StructureBlockInfo info = cce.getContraption().getBlocks().get(localPos);
-        Direction initialOrientation = cce.getInitialOrientation().getCounterClockWise();
+        Direction initialOrientation = cce.getInitialOrientation().rotateYCounterclockwise();
         boolean inverted = false;
-        if (info != null && info.state().hasProperty(ControlsBlock.FACING)) {
-            inverted = !info.state().getValue(ControlsBlock.FACING).equals(initialOrientation);
-        }
+        if (info != null && info.state().contains(ControlsBlock.FACING))
+            inverted = !info.state().get(ControlsBlock.FACING).equals(initialOrientation);
 
         boolean reversing = ControlsHandler.currentlyPressed.contains(1);
         inverted ^= reversing;
-        int angleOffset = (ControlsHandler.currentlyPressed.contains(2) ? -45 : 0) + (ControlsHandler.currentlyPressed.contains(
-            3) ? 45 : 0);
-        if (reversing) {
+        int angleOffset = (ControlsHandler.currentlyPressed.contains(2) ? -45 : 0) + (ControlsHandler.currentlyPressed.contains(3) ? 45 : 0);
+        if (reversing)
             angleOffset *= -1;
-        }
 
         float snapSize = 22.5f;
-        float diff = AngleHelper.getShortestAngleDiff(cameraEntity.getYRot(), cce.yaw) + (inverted ? -90 : 90);
-        if (Math.abs(diff) < 60) {
+        float diff = AngleHelper.getShortestAngleDiff(cameraEntity.getYaw(), cce.yaw) + (inverted ? -90 : 90);
+        if (Math.abs(diff) < 60)
             diff = 0;
-        }
 
         float angle = diff + angleOffset;
         float snappedAngle = (snapSize * Math.round(angle / snapSize)) % 360f;
@@ -238,12 +222,11 @@ public class TrainHUD {
 
     public static boolean onScroll(double delta) {
         Carriage carriage = getCarriage();
-        if (carriage == null) {
+        if (carriage == null)
             return false;
-        }
 
         double prevThrottle = editedThrottle == null ? carriage.train.throttle : editedThrottle;
-        editedThrottle = Mth.clamp(prevThrottle + (delta > 0 ? 1 : -1) / 18f, 1 / 18f, 1);
+        editedThrottle = MathHelper.clamp(prevThrottle + (delta > 0 ? 1 : -1) / 18f, 1 / 18f, 1);
         return true;
     }
 

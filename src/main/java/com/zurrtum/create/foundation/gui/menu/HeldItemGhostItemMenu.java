@@ -1,36 +1,35 @@
 package com.zurrtum.create.foundation.gui.menu;
 
-import net.minecraft.world.entity.player.Inventory;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.inventory.ClickType;
-import net.minecraft.world.inventory.Slot;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.entity.player.PlayerInventory;
+import net.minecraft.item.ItemStack;
+import net.minecraft.screen.slot.Slot;
+import net.minecraft.screen.slot.SlotActionType;
 
 /**
  * A {@link GhostItemMenu} that is linked to the item in a player's main hand. Prevents its owner item from being manipulated.
  */
 public abstract class HeldItemGhostItemMenu extends GhostItemMenu<ItemStack> {
-    protected HeldItemGhostItemMenu(MenuType<ItemStack> type, int id, Inventory inv, ItemStack contentHolder) {
+    protected HeldItemGhostItemMenu(MenuType<ItemStack> type, int id, PlayerInventory inv, ItemStack contentHolder) {
         super(type, id, inv, contentHolder);
     }
 
     @Override
-    public void clicked(int slotId, int dragType, ClickType clickTypeIn, Player player) {
-        if (slotId == playerInventory.getSelectedSlot() && clickTypeIn != ClickType.THROW) {
+    public void onSlotClick(int slotId, int dragType, SlotActionType clickTypeIn, PlayerEntity player) {
+        if (slotId == playerInventory.getSelectedSlot() && clickTypeIn != SlotActionType.THROW)
             return;
-        }
-        super.clicked(slotId, dragType, clickTypeIn, player);
+        super.onSlotClick(slotId, dragType, clickTypeIn, player);
     }
 
     @Override
-    public boolean canTakeItemForPickAll(ItemStack stack, Slot slot) {
+    public boolean canInsertIntoSlot(ItemStack stack, Slot slot) {
         // prevent pick-all from taking the owner item out of its slot
-        return super.canTakeItemForPickAll(stack, slot) && !this.isInSlot(slot.index);
+        return super.canInsertIntoSlot(stack, slot) && !this.isInSlot(slot.id);
     }
 
     @Override
-    public boolean stillValid(Player player) {
-        return playerInventory.getSelectedItem() == contentHolder;
+    public boolean canUse(PlayerEntity player) {
+        return playerInventory.getSelectedStack() == contentHolder;
     }
 
     protected boolean isInSlot(int index) {

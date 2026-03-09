@@ -5,13 +5,13 @@ import com.zurrtum.create.api.behaviour.movement.MovementBehaviour;
 import com.zurrtum.create.catnip.math.VecHelper;
 import com.zurrtum.create.content.contraptions.AbstractContraptionEntity;
 import com.zurrtum.create.content.contraptions.behaviour.MovementContext;
-import net.minecraft.core.BlockPos;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.level.block.SlabBlock;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.properties.SlabType;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.SlabBlock;
+import net.minecraft.block.enums.SlabType;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.LivingEntity;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Vec3d;
 
 import java.util.Map;
 import java.util.Optional;
@@ -30,44 +30,37 @@ public class SeatMovementBehaviour extends MovementBehaviour {
         super.visitNewPosition(context, pos);
 
         AbstractContraptionEntity contraptionEntity = context.contraption.entity;
-        if (contraptionEntity == null) {
+        if (contraptionEntity == null)
             return;
-        }
-        int index = context.data.getIntOr("SeatIndex", 0);
-        if (index == -1) {
+        int index = context.data.getInt("SeatIndex", 0);
+        if (index == -1)
             return;
-        }
 
         Map<UUID, Integer> seatMapping = context.contraption.getSeatMapping();
         BlockState blockState = context.world.getBlockState(pos);
-        boolean slab = blockState.getBlock() instanceof SlabBlock && blockState.getValue(SlabBlock.TYPE) == SlabType.BOTTOM;
-        boolean solid = blockState.canOcclude() || slab;
+        boolean slab = blockState.getBlock() instanceof SlabBlock && blockState.get(SlabBlock.TYPE) == SlabType.BOTTOM;
+        boolean solid = blockState.isOpaque() || slab;
 
         // Occupied
-        if (!seatMapping.containsValue(index)) {
+        if (!seatMapping.containsValue(index))
             return;
-        }
-        if (!solid) {
+        if (!solid)
             return;
-        }
         Entity toDismount = null;
         for (Map.Entry<UUID, Integer> entry : seatMapping.entrySet()) {
-            if (entry.getValue() != index) {
+            if (entry.getValue() != index)
                 continue;
-            }
-            for (Entity entity : contraptionEntity.getPassengers()) {
-                if (!entry.getKey().equals(entity.getUUID())) {
+            for (Entity entity : contraptionEntity.getPassengerList()) {
+                if (!entry.getKey().equals(entity.getUuid()))
                     continue;
-                }
                 toDismount = entity;
             }
         }
-        if (toDismount == null) {
+        if (toDismount == null)
             return;
-        }
         toDismount.stopRiding();
-        Vec3 position = VecHelper.getCenterOf(pos).add(0, slab ? .5f : 1f, 0);
-        toDismount.teleportTo(position.x, position.y, position.z);
+        Vec3d position = VecHelper.getCenterOf(pos).add(0, slab ? .5f : 1f, 0);
+        toDismount.requestTeleport(position.x, position.y, position.z);
         if (toDismount instanceof LivingEntity entity) {
             AllSynchedDatas.CONTRAPTION_DISMOUNT_LOCATION.set(entity, Optional.empty());
         }

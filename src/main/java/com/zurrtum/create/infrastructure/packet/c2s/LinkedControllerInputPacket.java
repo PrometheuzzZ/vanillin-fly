@@ -4,23 +4,24 @@ import com.zurrtum.create.AllHandle;
 import com.zurrtum.create.AllPackets;
 import com.zurrtum.create.catnip.codecs.stream.CatnipStreamCodecs;
 import io.netty.buffer.ByteBuf;
-import net.minecraft.core.BlockPos;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.PacketType;
-import net.minecraft.network.protocol.game.ServerGamePacketListener;
-import net.minecraft.server.network.ServerGamePacketListenerImpl;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.network.listener.ServerPlayPacketListener;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.PacketType;
+import net.minecraft.server.network.ServerPlayNetworkHandler;
+import net.minecraft.util.math.BlockPos;
 
 import java.util.Collection;
 import java.util.List;
 
-public record LinkedControllerInputPacket(List<Integer> activatedButtons, boolean press,
-                                          BlockPos lecternPos) implements Packet<ServerGamePacketListener> {
-    public static final StreamCodec<ByteBuf, LinkedControllerInputPacket> CODEC = StreamCodec.composite(
-        ByteBufCodecs.INT.apply(ByteBufCodecs.list()),
+public record LinkedControllerInputPacket(
+    List<Integer> activatedButtons, boolean press, BlockPos lecternPos
+) implements Packet<ServerPlayPacketListener> {
+    public static final PacketCodec<ByteBuf, LinkedControllerInputPacket> CODEC = PacketCodec.tuple(
+        PacketCodecs.INTEGER.collect(PacketCodecs.toList()),
         LinkedControllerInputPacket::activatedButtons,
-        ByteBufCodecs.BOOL,
+        PacketCodecs.BOOLEAN,
         LinkedControllerInputPacket::press,
         CatnipStreamCodecs.NULLABLE_BLOCK_POS,
         LinkedControllerInputPacket::lecternPos,
@@ -36,12 +37,12 @@ public record LinkedControllerInputPacket(List<Integer> activatedButtons, boolea
     }
 
     @Override
-    public void handle(ServerGamePacketListener listener) {
-        AllHandle.onLinkedControllerInput((ServerGamePacketListenerImpl) listener, this);
+    public void apply(ServerPlayPacketListener listener) {
+        AllHandle.onLinkedControllerInput((ServerPlayNetworkHandler) listener, this);
     }
 
     @Override
-    public PacketType<LinkedControllerInputPacket> type() {
+    public PacketType<LinkedControllerInputPacket> getPacketType() {
         return AllPackets.LINKED_CONTROLLER_INPUT;
     }
 }

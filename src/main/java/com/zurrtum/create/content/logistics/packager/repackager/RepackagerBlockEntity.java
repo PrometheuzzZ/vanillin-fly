@@ -8,10 +8,10 @@ import com.zurrtum.create.content.logistics.crate.BottomlessItemHandler;
 import com.zurrtum.create.content.logistics.packager.PackagerBlockEntity;
 import com.zurrtum.create.content.logistics.packager.PackagerItemHandler;
 import com.zurrtum.create.content.logistics.packager.PackagingRequest;
-import net.minecraft.core.BlockPos;
-import net.minecraft.world.Container;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.block.BlockState;
+import net.minecraft.inventory.Inventory;
+import net.minecraft.item.ItemStack;
+import net.minecraft.util.math.BlockPos;
 
 import java.util.Collection;
 import java.util.List;
@@ -26,14 +26,12 @@ public class RepackagerBlockEntity extends PackagerBlockEntity {
     }
 
     public boolean unwrapBox(ItemStack box, boolean simulate) {
-        if (animationTicks > 0) {
+        if (animationTicks > 0)
             return false;
-        }
 
-        Container targetInv = targetInventory.getInventory();
-        if (targetInv == null || targetInv instanceof PackagerItemHandler) {
+        Inventory targetInv = targetInventory.getInventory();
+        if (targetInv == null || targetInv instanceof PackagerItemHandler)
             return false;
-        }
 
         boolean targetIsCreativeCrate = targetInv instanceof BottomlessItemHandler;
         boolean anySpace;
@@ -44,12 +42,10 @@ public class RepackagerBlockEntity extends PackagerBlockEntity {
             anySpace = targetInv.preciseInsert(box);
         }
 
-        if (!targetIsCreativeCrate && !anySpace) {
+        if (!targetIsCreativeCrate && !anySpace)
             return false;
-        }
-        if (simulate) {
+        if (simulate)
             return true;
-        }
 
         AbstractComputerBehaviour computer = AbstractComputerBehaviour.get(this);
         if (computer != null) {
@@ -78,37 +74,31 @@ public class RepackagerBlockEntity extends PackagerBlockEntity {
 
     @Override
     public void attemptToSend() {
-        if (!heldBox.isEmpty() || animationTicks != 0 || buttonCooldown > 0) {
+        if (!heldBox.isEmpty() || animationTicks != 0 || buttonCooldown > 0)
             return;
-        }
-        if (!queuedExitingPackages.isEmpty()) {
+        if (!queuedExitingPackages.isEmpty())
             return;
-        }
 
-        Container targetInv = targetInventory.getInventory();
-        if (targetInv == null || targetInv instanceof PackagerItemHandler) {
+        Inventory targetInv = targetInventory.getInventory();
+        if (targetInv == null || targetInv instanceof PackagerItemHandler)
             return;
-        }
 
         attemptToRepackage(targetInv);
-        if (heldBox.isEmpty()) {
+        if (heldBox.isEmpty())
             return;
-        }
 
         updateSignAddress();
-        if (!signBasedAddress.isBlank()) {
+        if (!signBasedAddress.isBlank())
             PackageItem.addAddress(heldBox, signBasedAddress);
-        }
     }
 
-    protected void attemptToRepackage(Container targetInv) {
+    protected void attemptToRepackage(Inventory targetInv) {
         repackageHelper.clear();
         int completedOrderId = -1;
 
         for (ItemStack stack : targetInv) {
-            if (stack.isEmpty() || !PackageItem.isPackage(stack)) {
+            if (stack.isEmpty() || !PackageItem.isPackage(stack))
                 continue;
-            }
 
             if (!repackageHelper.isFragmented(stack)) {
                 targetInv.extract(stack, 1);
@@ -120,19 +110,16 @@ public class RepackagerBlockEntity extends PackagerBlockEntity {
             }
 
             completedOrderId = repackageHelper.addPackageFragment(stack);
-            if (completedOrderId != -1) {
+            if (completedOrderId != -1)
                 break;
-            }
         }
 
-        if (completedOrderId == -1) {
+        if (completedOrderId == -1)
             return;
-        }
 
-        List<BigItemStack> boxesToExport = repackageHelper.repack(completedOrderId, level.getRandom());
-        if (boxesToExport.isEmpty()) {
+        List<BigItemStack> boxesToExport = repackageHelper.repack(completedOrderId, world.getRandom());
+        if (boxesToExport.isEmpty())
             return;
-        }
 
         AbstractComputerBehaviour computer = AbstractComputerBehaviour.get(this);
         if (computer != null) {

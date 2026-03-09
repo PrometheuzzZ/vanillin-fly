@@ -1,13 +1,13 @@
 package com.zurrtum.create.client.catnip.gui.element;
 
-import com.mojang.blaze3d.vertex.PoseStack;
 import com.zurrtum.create.client.catnip.gui.render.*;
 import com.zurrtum.create.client.flywheel.lib.model.baked.PartialModel;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.util.Mth;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.block.BlockState;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
+import net.minecraft.util.math.MathHelper;
 import org.joml.Matrix3x2fStack;
 
 import java.util.function.BiConsumer;
@@ -18,7 +18,7 @@ public class GuiGameElement {
     }
 
     public static GuiItemRenderBuilder of(Item item) {
-        return new GuiItemRenderBuilder(item.getDefaultInstance());
+        return new GuiItemRenderBuilder(item.getDefaultStack());
     }
 
     public static GuiBlockStateRenderBuilder of(BlockState block) {
@@ -46,9 +46,9 @@ public class GuiGameElement {
         }
 
         public T rotate(float x, float y, float z) {
-            xRot = Mth.DEG_TO_RAD * x;
-            yRot = Mth.DEG_TO_RAD * y;
-            zRot = Mth.DEG_TO_RAD * z;
+            xRot = MathHelper.RADIANS_PER_DEGREE * x;
+            yRot = MathHelper.RADIANS_PER_DEGREE * y;
+            zRot = MathHelper.RADIANS_PER_DEGREE * z;
             return self();
         }
 
@@ -59,10 +59,11 @@ public class GuiGameElement {
     }
 
     public static class GuiItemRenderBuilder extends GuiRenderBuilder<GuiItemRenderBuilder> {
-        private final ItemTransformRenderKey key;
+        private final ItemStack stack;
+        private Object key;
 
         public GuiItemRenderBuilder(ItemStack stack) {
-            key = new ItemTransformRenderKey(stack);
+            this.stack = stack;
         }
 
         @Override
@@ -71,46 +72,57 @@ public class GuiGameElement {
         }
 
         @Override
-        public void render(GuiGraphics graphics) {
+        public void render(DrawContext graphics) {
             if (scale <= 1 && xRot == 0 && yRot == 0 && zRot == 0) {
                 if (scale == 1) {
-                    graphics.renderItem(key.stack, (int) x, (int) y);
+                    graphics.drawItem(stack, (int) x, (int) y);
                 } else {
-                    Matrix3x2fStack matrices = graphics.pose();
+                    Matrix3x2fStack matrices = graphics.getMatrices();
                     matrices.pushMatrix();
                     matrices.scale(scale);
-                    graphics.renderItem(key.stack, (int) x, (int) y);
+                    graphics.drawItem(stack, (int) x, (int) y);
                     matrices.popMatrix();
                 }
                 return;
             }
-            key.update(scale, padding, xRot, yRot, zRot);
-            graphics.guiRenderState.submitPicturesInPictureState(ItemTransformRenderState.create(graphics, key, x, y));
+            ItemTransformRenderState state = ItemTransformRenderState.create(graphics, stack, x, y, scale, padding, xRot, yRot, zRot);
+            key = state.getKey();
+            graphics.state.addSpecialElement(state);
+        }
+
+        @Override
+        public GuiItemRenderBuilder scale(float scale) {
+            clear();
+            return super.scale(scale);
+        }
+
+        @Override
+        public GuiItemRenderBuilder padding(int padding) {
+            clear();
+            return super.padding(padding);
+        }
+
+        @Override
+        public GuiItemRenderBuilder rotate(float x, float y, float z) {
+            clear();
+            return super.rotate(x, y, z);
         }
 
         @Override
         public void clear() {
-            ItemTransformElementRenderer.clear(key);
-        }
-
-        public GuiItemRenderBuilder copy() {
-            GuiItemRenderBuilder builder = new GuiItemRenderBuilder(key.stack);
-            builder.scale = scale;
-            builder.padding = padding;
-            builder.xRot = xRot;
-            builder.yRot = yRot;
-            builder.zRot = zRot;
-            builder.x = x;
-            builder.y = y;
-            return builder;
+            if (key != null) {
+                ItemTransformElementRenderer.clear(key);
+                key = null;
+            }
         }
     }
 
     public static class GuiBlockStateRenderBuilder extends GuiRenderBuilder<GuiBlockStateRenderBuilder> {
-        private final BlockTransformRenderKey key;
+        private final BlockState block;
+        boolean rendering = false;
 
         public GuiBlockStateRenderBuilder(BlockState block) {
-            key = new BlockTransformRenderKey(block);
+            this.block = block;
         }
 
         @Override
@@ -119,14 +131,35 @@ public class GuiGameElement {
         }
 
         @Override
-        public void render(GuiGraphics graphics) {
-            key.update(scale, padding, xRot, yRot, zRot);
-            graphics.guiRenderState.submitPicturesInPictureState(BlockTransformRenderState.create(graphics, key, x, y));
+        public void render(DrawContext graphics) {
+            graphics.state.addSpecialElement(BlockTransformRenderState.create(graphics, block, x, y, scale, padding, xRot, yRot, zRot));
+            rendering = true;
+        }
+
+        @Override
+        public GuiBlockStateRenderBuilder scale(float scale) {
+            clear();
+            return super.scale(scale);
+        }
+
+        @Override
+        public GuiBlockStateRenderBuilder padding(int padding) {
+            clear();
+            return super.padding(padding);
+        }
+
+        @Override
+        public GuiBlockStateRenderBuilder rotate(float x, float y, float z) {
+            clear();
+            return super.rotate(x, y, z);
         }
 
         @Override
         public void clear() {
-            BlockTransformElementRenderer.clear(key);
+            if (rendering) {
+                BlockTransformElementRenderer.clear(BlockTransformRenderState.getKey(block, scale, padding, xRot, yRot, zRot));
+                rendering = false;
+            }
         }
     }
 
@@ -134,7 +167,7 @@ public class GuiGameElement {
         private final PartialRenderState state = new PartialRenderState();
         private PartialModel model;
         private float scale = 1;
-        private BiConsumer<PoseStack, Float> transform;
+        private BiConsumer<MatrixStack, Float> transform;
         private float partialTicks;
         private int padding;
         private float xLocal, yLocal;
@@ -147,12 +180,12 @@ public class GuiGameElement {
         }
 
         @Override
-        public void render(GuiGraphics graphics) {
+        public void render(DrawContext graphics) {
             if (model == null) {
                 return;
             }
             state.update(graphics, model, x, y, xLocal, yLocal, scale, padding, partialTicks, transform);
-            graphics.guiRenderState.submitPicturesInPictureState(state);
+            graphics.state.addSpecialElement(state);
         }
 
         public GuiPartialRenderBuilder scale(float scale) {
@@ -160,7 +193,7 @@ public class GuiGameElement {
             return this;
         }
 
-        public GuiPartialRenderBuilder transform(BiConsumer<PoseStack, Float> transform) {
+        public GuiPartialRenderBuilder transform(BiConsumer<MatrixStack, Float> transform) {
             this.transform = transform;
             return this;
         }

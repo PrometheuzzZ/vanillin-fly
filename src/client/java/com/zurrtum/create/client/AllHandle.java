@@ -115,40 +115,36 @@ import com.zurrtum.create.infrastructure.packet.s2c.*;
 import com.zurrtum.create.infrastructure.particle.AirFlowParticleData;
 import com.zurrtum.create.infrastructure.particle.FluidParticleData;
 import io.netty.buffer.Unpooled;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.multiplayer.ClientLevel;
-import net.minecraft.client.multiplayer.ClientPacketListener;
-import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.core.Direction.Axis;
-import net.minecraft.core.Direction.AxisDirection;
-import net.minecraft.core.component.DataComponentMap;
-import net.minecraft.core.particles.ItemParticleOption;
-import net.minecraft.core.particles.ParticleOptions;
-import net.minecraft.core.particles.ParticleTypes;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.PacketUtils;
-import net.minecraft.network.protocol.game.ClientGamePacketListener;
-import net.minecraft.network.protocol.game.ServerGamePacketListener;
-import net.minecraft.util.Mth;
-import net.minecraft.util.RandomSource;
-import net.minecraft.world.InteractionHand;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.entity.vehicle.minecart.AbstractMinecart;
-import net.minecraft.world.item.DyeColor;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.context.BlockPlaceContext;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
-import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.Vec3;
-import net.minecraft.world.phys.shapes.Shapes;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.network.ClientPlayNetworkHandler;
+import net.minecraft.client.network.ClientPlayerEntity;
+import net.minecraft.client.world.ClientWorld;
+import net.minecraft.component.ComponentMap;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.entity.vehicle.AbstractMinecartEntity;
+import net.minecraft.item.ItemPlacementContext;
+import net.minecraft.item.ItemStack;
+import net.minecraft.network.NetworkThreadUtils;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.network.listener.ClientPlayPacketListener;
+import net.minecraft.network.listener.ServerPlayPacketListener;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.particle.ItemStackParticleEffect;
+import net.minecraft.particle.ParticleEffect;
+import net.minecraft.particle.ParticleTypes;
+import net.minecraft.structure.StructureTemplate;
+import net.minecraft.text.Text;
+import net.minecraft.util.DyeColor;
+import net.minecraft.util.Hand;
+import net.minecraft.util.math.*;
+import net.minecraft.util.math.Direction.Axis;
+import net.minecraft.util.math.Direction.AxisDirection;
+import net.minecraft.util.math.random.Random;
+import net.minecraft.util.shape.VoxelShapes;
+import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.opengl.GL11;
 
@@ -159,18 +155,13 @@ import java.util.function.Consumer;
 import static com.zurrtum.create.Create.LOGGER;
 
 public class AllHandle extends AllClientHandle {
-
     public static void register() {
         AllClientHandle.INSTANCE = new AllHandle();
     }
 
-    protected void forceMainThread(
-        ClientGamePacketListener listener,
-        Minecraft mc,
-        Packet<ClientGamePacketListener> packet
-    ) {
-        if (listener instanceof ClientPacketListener) {
-            PacketUtils.ensureRunningOnSameThread(packet, listener, mc.packetProcessor());
+    protected void forceMainThread(ClientPlayPacketListener listener, MinecraftClient mc, Packet<ClientPlayPacketListener> packet) {
+        if (listener instanceof ClientPlayNetworkHandler) {
+            NetworkThreadUtils.forceMainThread(packet, listener, mc.getPacketApplyBatcher());
         }
     }
 
@@ -185,23 +176,21 @@ public class AllHandle extends AllClientHandle {
     }
 
     @Override
-    public void onSymmetryEffect(ClientGamePacketListener listener, SymmetryEffectPacket packet) {
-        Minecraft mc = Minecraft.getInstance();
+    public void onSymmetryEffect(ClientPlayPacketListener listener, SymmetryEffectPacket packet) {
+        MinecraftClient mc = MinecraftClient.getInstance();
         forceMainThread(listener, mc, packet);
         BlockPos mirror = packet.mirror();
-        if (mc.player.position().distanceTo(Vec3.atLowerCornerOf(mirror)) > 100) {
+        if (mc.player.getEntityPos().distanceTo(Vec3d.of(mirror)) > 100)
             return;
-        }
-        for (BlockPos to : packet.positions()) {
+        for (BlockPos to : packet.positions())
             SymmetryHandlerClient.drawEffect(mc, mirror, to);
-        }
     }
 
     @Override
-    public void onLogisticalStockResponse(ClientGamePacketListener listener, LogisticalStockResponsePacket packet) {
-        Minecraft mc = Minecraft.getInstance();
+    public void onLogisticalStockResponse(ClientPlayPacketListener listener, LogisticalStockResponsePacket packet) {
+        MinecraftClient mc = MinecraftClient.getInstance();
         forceMainThread(listener, mc, packet);
-        if (mc.level.getBlockEntity(packet.pos()) instanceof StockTickerBlockEntity stbe) {
+        if (mc.world.getBlockEntity(packet.pos()) instanceof StockTickerBlockEntity stbe) {
             stbe.receiveStockPacket(packet.items(), packet.lastPacket());
         }
     }
@@ -209,11 +198,10 @@ public class AllHandle extends AllClientHandle {
     @Override
     public void onTrainEditReturn(TrainEditReturnPacket packet) {
         Train train = Create.RAILWAYS.trains.get(packet.id());
-        if (train == null) {
+        if (train == null)
             return;
-        }
         if (!packet.name().isBlank()) {
-            train.name = Component.literal(packet.name());
+            train.name = Text.literal(packet.name());
         }
         train.icon = TrainIconType.byId(packet.iconType());
         train.mapColorIndex = packet.mapColor();
@@ -222,9 +210,8 @@ public class AllHandle extends AllClientHandle {
     @Override
     public void onTrainHUDControlUpdate(TrainHUDControlUpdatePacket packet) {
         Train train = Create.RAILWAYS.trains.get(packet.trainId());
-        if (train == null) {
+        if (train == null)
             return;
-        }
 
         if (packet.throttle() != null) {
             train.throttle = packet.throttle();
@@ -237,28 +224,24 @@ public class AllHandle extends AllClientHandle {
     @Override
     public void onTrainHonkReturn(HonkReturnPacket packet) {
         Train train = Create.RAILWAYS.trains.get(packet.trainId());
-        if (train == null) {
+        if (train == null)
             return;
-        }
 
-        if (packet.isHonk()) {
+        if (packet.isHonk())
             train.honkTicks = train.honkTicks == 0 ? 20 : 13;
-        } else {
+        else
             train.honkTicks = train.honkTicks > 5 ? 6 : 0;
-        }
     }
 
     @Override
-    public void onElevatorFloorList(ClientGamePacketListener listener, ElevatorFloorListPacket packet) {
-        Minecraft mc = Minecraft.getInstance();
+    public void onElevatorFloorList(ClientPlayPacketListener listener, ElevatorFloorListPacket packet) {
+        MinecraftClient mc = MinecraftClient.getInstance();
         forceMainThread(listener, mc, packet);
-        Entity entityByID = mc.level.getEntity(packet.entityId());
-        if (!(entityByID instanceof AbstractContraptionEntity ace)) {
+        Entity entityByID = mc.world.getEntityById(packet.entityId());
+        if (!(entityByID instanceof AbstractContraptionEntity ace))
             return;
-        }
-        if (!(ace.getContraption() instanceof ElevatorContraption ec)) {
+        if (!(ace.getContraption() instanceof ElevatorContraption ec))
             return;
-        }
 
         ec.namesList = packet.floors();
         ec.syncControlDisplays();
@@ -270,21 +253,19 @@ public class AllHandle extends AllClientHandle {
     }
 
     @Override
-    public void onWiFiEffect(ClientGamePacketListener listener, WiFiEffectPacket packet) {
-        Minecraft mc = Minecraft.getInstance();
+    public void onWiFiEffect(ClientPlayPacketListener listener, WiFiEffectPacket packet) {
+        MinecraftClient mc = MinecraftClient.getInstance();
         forceMainThread(listener, mc, packet);
-        BlockEntity blockEntity = mc.level.getBlockEntity(packet.pos());
-        if (blockEntity instanceof PackagerLinkBlockEntity plbe) {
+        BlockEntity blockEntity = mc.world.getBlockEntity(packet.pos());
+        if (blockEntity instanceof PackagerLinkBlockEntity plbe)
             plbe.playEffect();
-        }
-        if (blockEntity instanceof StockTickerBlockEntity plbe) {
+        if (blockEntity instanceof StockTickerBlockEntity plbe)
             plbe.playEffect();
-        }
     }
 
     @Override
     public void onControlsStopControlling() {
-        ControlsHandler.stopControlling(Minecraft.getInstance().player);
+        ControlsHandler.stopControlling(MinecraftClient.getInstance().player);
     }
 
     @Override
@@ -304,54 +285,41 @@ public class AllHandle extends AllClientHandle {
 
     private <T extends ShootableGadgetRenderHandler> void onShootGadget(
         Entity renderViewEntity,
-        Vec3 location,
-        InteractionHand hand,
+        Vec3d location,
+        Hand hand,
         boolean self,
         T handler,
         Consumer<T> handleAdditional
     ) {
-        if (renderViewEntity == null) {
+        if (renderViewEntity == null)
             return;
-        }
-        if (renderViewEntity.position().distanceTo(location) > 100) {
+        if (renderViewEntity.getEntityPos().distanceTo(location) > 100)
             return;
-        }
 
         handleAdditional.accept(handler);
-        if (self) {
+        if (self)
             handler.shoot(hand, location);
-        } else {
+        else
             handler.playSound(hand, location);
-        }
     }
 
     @Override
-    public void onZapperBeam(ClientGamePacketListener listener, ZapperBeamPacket packet) {
-        Minecraft mc = Minecraft.getInstance();
+    public void onZapperBeam(ClientPlayPacketListener listener, ZapperBeamPacket packet) {
+        MinecraftClient mc = MinecraftClient.getInstance();
         forceMainThread(listener, mc, packet);
         onShootGadget(
-            mc.getCameraEntity(),
-            packet.location(),
-            packet.hand(),
-            packet.self(),
-            Create.ZAPPER_RENDER_HANDLER,
-            handler -> {
-                handler.addBeam(mc, new LaserBeam(packet.location(), packet.target()));
+            mc.getCameraEntity(), packet.location(), packet.hand(), packet.self(), Create.ZAPPER_RENDER_HANDLER, handler -> {
+                handler.addBeam(MinecraftClient.getInstance(), new LaserBeam(packet.location(), packet.target()));
             }
         );
     }
 
     @Override
-    public void onPotatoCannon(ClientGamePacketListener listener, PotatoCannonPacket packet) {
-        Minecraft mc = Minecraft.getInstance();
+    public void onPotatoCannon(ClientPlayPacketListener listener, PotatoCannonPacket packet) {
+        MinecraftClient mc = MinecraftClient.getInstance();
         forceMainThread(listener, mc, packet);
         onShootGadget(
-            mc.getCameraEntity(),
-            packet.location(),
-            packet.hand(),
-            packet.self(),
-            Create.POTATO_CANNON_RENDER_HANDLER,
-            handler -> {
+            mc.getCameraEntity(), packet.location(), packet.hand(), packet.self(), Create.POTATO_CANNON_RENDER_HANDLER, handler -> {
                 handler.beforeShoot(packet.pitch(), packet.location(), packet.motion(), packet.item());
             }
         );
@@ -359,21 +327,21 @@ public class AllHandle extends AllClientHandle {
 
     @Override
     public void onContraptionStall(ContraptionStallPacket packet) {
-        if (Minecraft.getInstance().level.getEntity(packet.entityId()) instanceof AbstractContraptionEntity ce) {
+        if (MinecraftClient.getInstance().world.getEntityById(packet.entityId()) instanceof AbstractContraptionEntity ce) {
             ce.handleStallInformation(packet.x(), packet.y(), packet.z(), packet.angle());
         }
     }
 
     @Override
     public void onContraptionDisassembly(ContraptionDisassemblyPacket packet) {
-        if (Minecraft.getInstance().level.getEntity(packet.entityId()) instanceof AbstractContraptionEntity ce) {
+        if (MinecraftClient.getInstance().world.getEntityById(packet.entityId()) instanceof AbstractContraptionEntity ce) {
             ce.moveCollidedEntitiesOnDisassembly(packet.transform());
         }
     }
 
     @Override
     public void onContraptionBlockChanged(ContraptionBlockChangedPacket packet) {
-        if (Minecraft.getInstance().level.getEntity(packet.entityId()) instanceof AbstractContraptionEntity ce) {
+        if (MinecraftClient.getInstance().world.getEntityById(packet.entityId()) instanceof AbstractContraptionEntity ce) {
             Contraption contraption = ce.getContraption();
             if (contraption == null) {
                 return;
@@ -394,53 +362,49 @@ public class AllHandle extends AllClientHandle {
     }
 
     @Override
-    public void onGlueEffect(ClientGamePacketListener listener, GlueEffectPacket packet) {
-        Minecraft mc = Minecraft.getInstance();
+    public void onGlueEffect(ClientPlayPacketListener listener, GlueEffectPacket packet) {
+        MinecraftClient mc = MinecraftClient.getInstance();
         forceMainThread(listener, mc, packet);
-        LocalPlayer player = mc.player;
-        if (!player.blockPosition().closerThan(packet.pos(), 100)) {
+        ClientPlayerEntity player = mc.player;
+        if (!player.getBlockPos().isWithinDistance(packet.pos(), 100))
             return;
-        }
-        SuperGlueSelectionHandler.spawnParticles(player.level(), packet.pos(), packet.direction(), packet.fullBlock());
+        SuperGlueSelectionHandler.spawnParticles(player.getEntityWorld(), packet.pos(), packet.direction(), packet.fullBlock());
     }
 
     @Override
     public void onContraptionSeatMapping(ContraptionSeatMappingPacket packet) {
-        LocalPlayer player = Minecraft.getInstance().player;
-        Entity entityByID = player.level().getEntity(packet.entityId());
-        if (!(entityByID instanceof AbstractContraptionEntity contraptionEntity)) {
+        ClientPlayerEntity player = MinecraftClient.getInstance().player;
+        Entity entityByID = player.getEntityWorld().getEntityById(packet.entityId());
+        if (!(entityByID instanceof AbstractContraptionEntity contraptionEntity))
             return;
-        }
 
         if (packet.dismountedId() == player.getId()) {
-            Vec3 transformedVector = contraptionEntity.getPassengerPosition(player, 1);
-            if (transformedVector != null) {
+            Vec3d transformedVector = contraptionEntity.getPassengerPosition(player, 1);
+            if (transformedVector != null)
                 AllSynchedDatas.CONTRAPTION_DISMOUNT_LOCATION.set(player, Optional.of(transformedVector));
-            }
         }
 
         contraptionEntity.getContraption().setSeatMapping(packet.mapping());
     }
 
     @Override
-    public void onLimbSwingUpdate(ClientGamePacketListener listener, LimbSwingUpdatePacket packet) {
-        Minecraft mc = Minecraft.getInstance();
+    public void onLimbSwingUpdate(ClientPlayPacketListener listener, LimbSwingUpdatePacket packet) {
+        MinecraftClient mc = MinecraftClient.getInstance();
         forceMainThread(listener, mc, packet);
-        ClientLevel world = mc.level;
-        Entity entity = world.getEntity(packet.entityId());
-        if (!(entity instanceof Player player)) {
+        ClientWorld world = mc.world;
+        Entity entity = world.getEntityById(packet.entityId());
+        if (!(entity instanceof PlayerEntity player))
             return;
-        }
         AllSynchedDatas.LAST_OVERRIDE_LIMB_SWING_UPDATE.set(player, 0);
         AllSynchedDatas.OVERRIDE_LIMB_SWING.set(player, packet.limbSwing());
-        Vec3 position = packet.position();
-        player.moveOrInterpolateTo(position, player.getYRot(), player.getXRot());
+        Vec3d position = packet.position();
+        player.updateTrackedPositionAndAngles(position, player.getYaw(), player.getPitch());
     }
 
     @Override
     public void onFluidSplash(FluidSplashPacket packet) {
         BlockPos pos = packet.pos();
-        if (Minecraft.getInstance().player.position().distanceTo(new Vec3(pos.getX(), pos.getY(), pos.getZ())) > 100) {
+        if (MinecraftClient.getInstance().player.getEntityPos().distanceTo(new Vec3d(pos.getX(), pos.getY(), pos.getZ())) > 100) {
             return;
         }
         FluidFX.splash(pos, packet.fluid());
@@ -448,17 +412,16 @@ public class AllHandle extends AllClientHandle {
 
     @Override
     public void onMountedStorageSync(MountedStorageSyncPacket packet) {
-        Entity entity = Minecraft.getInstance().level.getEntity(packet.contraptionId());
-        if (!(entity instanceof AbstractContraptionEntity contraption)) {
+        Entity entity = MinecraftClient.getInstance().world.getEntityById(packet.contraptionId());
+        if (!(entity instanceof AbstractContraptionEntity contraption))
             return;
-        }
 
         contraption.getContraption().getStorage().handleSync(packet, contraption);
     }
 
     @Override
     public void onGantryContraptionUpdate(GantryContraptionUpdatePacket packet) {
-        Entity entity = Minecraft.getInstance().level.getEntity(packet.entityID());
+        Entity entity = MinecraftClient.getInstance().world.getEntityById(packet.entityID());
         if (!(entity instanceof GantryContraptionEntity ce)) {
             return;
         }
@@ -469,19 +432,19 @@ public class AllHandle extends AllClientHandle {
 
     @Override
     public void onHighlight(HighlightPacket packet) {
-        if (!Minecraft.getInstance().level.isLoaded(packet.pos())) {
+        if (!MinecraftClient.getInstance().world.isPosLoaded(packet.pos())) {
             return;
         }
 
-        Outliner.getInstance().showAABB("highlightCommand", Shapes.block().bounds().move(packet.pos()), 200)
-            .lineWidth(1 / 32f).colored(0xEeEeEe)
+        Outliner.getInstance().showAABB("highlightCommand", VoxelShapes.fullCube().getBoundingBox().offset(packet.pos()), 200).lineWidth(1 / 32f)
+            .colored(0xEeEeEe)
             // .colored(0x243B50)
             .withFaceTexture(AllSpecialTextures.SELECTION);
     }
 
     @Override
     public void onTunnelFlap(TunnelFlapPacket packet) {
-        if (Minecraft.getInstance().level.getBlockEntity(packet.pos()) instanceof BeltTunnelBlockEntity blockEntity) {
+        if (MinecraftClient.getInstance().world.getBlockEntity(packet.pos()) instanceof BeltTunnelBlockEntity blockEntity) {
             packet.flaps().forEach(flap -> {
                 blockEntity.flap(flap.getFirst(), flap.getSecond());
             });
@@ -489,21 +452,17 @@ public class AllHandle extends AllClientHandle {
     }
 
     @Override
-    public void onFunnelFlap(ClientGamePacketListener listener, FunnelFlapPacket packet) {
-        Minecraft mc = Minecraft.getInstance();
+    public void onFunnelFlap(ClientPlayPacketListener listener, FunnelFlapPacket packet) {
+        MinecraftClient mc = MinecraftClient.getInstance();
         forceMainThread(listener, mc, packet);
-        if (mc.level.getBlockEntity(packet.pos()) instanceof FunnelBlockEntity blockEntity) {
+        if (mc.world.getBlockEntity(packet.pos()) instanceof FunnelBlockEntity blockEntity) {
             blockEntity.flap(packet.inwards());
         }
     }
 
     @Override
     public void onSoulPulseEffect(SoulPulseEffectPacket packet) {
-        Create.SOUL_PULSE_EFFECT_HANDLER.addPulse(new SoulPulseEffect(
-            packet.pos(),
-            packet.distance(),
-            packet.canOverlap()
-        ));
+        Create.SOUL_PULSE_EFFECT_HANDLER.addPulse(new SoulPulseEffect(packet.pos(), packet.distance(), packet.canOverlap()));
     }
 
     @Override
@@ -519,9 +478,8 @@ public class AllHandle extends AllClientHandle {
 
             SignalEdgeGroup group = new SignalEdgeGroup(id);
             signalEdgeGroups.put(id, group);
-            if (i < packet.colors().size()) {
+            if (i < packet.colors().size())
                 group.color = packet.colors().get(i);
-            }
         }
     }
 
@@ -531,16 +489,16 @@ public class AllHandle extends AllClientHandle {
     }
 
     @Override
-    public void onRemoveBlockEntity(ClientGamePacketListener listener, RemoveBlockEntityPacket packet) {
-        Minecraft mc = Minecraft.getInstance();
+    public void onRemoveBlockEntity(ClientPlayPacketListener listener, RemoveBlockEntityPacket packet) {
+        MinecraftClient mc = MinecraftClient.getInstance();
         forceMainThread(listener, mc, packet);
-        if (mc.level.getBlockEntity(packet.pos()) instanceof SyncedBlockEntity be) {
-            if (!be.hasLevel()) {
-                be.setRemoved();
+        if (mc.world.getBlockEntity(packet.pos()) instanceof SyncedBlockEntity be) {
+            if (!be.hasWorld()) {
+                be.markRemoved();
                 return;
             }
 
-            be.getLevel().removeBlockEntity(packet.pos());
+            be.getWorld().removeBlockEntity(packet.pos());
         }
     }
 
@@ -553,7 +511,7 @@ public class AllHandle extends AllClientHandle {
 
     @Override
     public void onContraptionRelocation(ContraptionRelocationPacket packet) {
-        if (Minecraft.getInstance().level.getEntity(packet.entityId()) instanceof OrientedContraptionEntity oce) {
+        if (MinecraftClient.getInstance().world.getEntityById(packet.entityId()) instanceof OrientedContraptionEntity oce) {
             oce.nonDamageTicks = 10;
         }
     }
@@ -574,25 +532,22 @@ public class AllHandle extends AllClientHandle {
             }
             unusedIds.remove(uuid);
             TrackGraph trackGraph = manager.trackNetworks.get(uuid);
-            if (trackGraph.getChecksum() == entry.checksum()) {
+            if (trackGraph.getChecksum() == entry.checksum())
                 continue;
-            }
             LOGGER.warn("Track network: {} failed its checksum; Requesting refresh", uuid.toString().substring(0, 6));
             failedIds.add(entry.netId());
         }
 
-        ClientPacketListener networkHandler = Minecraft.getInstance().player.connection;
-        for (Integer failed : failedIds) {
-            networkHandler.send(new TrackGraphRequestPacket(failed));
-        }
-        for (UUID unused : unusedIds) {
+        ClientPlayNetworkHandler networkHandler = MinecraftClient.getInstance().player.networkHandler;
+        for (Integer failed : failedIds)
+            networkHandler.sendPacket(new TrackGraphRequestPacket(failed));
+        for (UUID unused : unusedIds)
             manager.trackNetworks.remove(unused);
-        }
     }
 
     @Override
     public void onArmPlacementRequest(ArmPlacementRequestPacket packet) {
-        ArmInteractionPointHandler.flushSettings(Minecraft.getInstance().player, packet.pos());
+        ArmInteractionPointHandler.flushSettings(MinecraftClient.getInstance().player, packet.pos());
     }
 
     @Override
@@ -602,24 +557,22 @@ public class AllHandle extends AllClientHandle {
 
     @Override
     public void onPackagePortPlacementRequest(PackagePortPlacementRequestPacket packet) {
-        PackagePortTargetSelectionHandler.flushSettings(Minecraft.getInstance().player, packet.pos());
+        PackagePortTargetSelectionHandler.flushSettings(MinecraftClient.getInstance().player, packet.pos());
     }
 
     @Override
-    public void onContraptionDisableActor(ClientGamePacketListener listener, ContraptionDisableActorPacket packet) {
-        Minecraft mc = Minecraft.getInstance();
+    public void onContraptionDisableActor(ClientPlayPacketListener listener, ContraptionDisableActorPacket packet) {
+        MinecraftClient mc = MinecraftClient.getInstance();
         forceMainThread(listener, mc, packet);
-        Entity entityByID = mc.level.getEntity(packet.entityId());
-        if (!(entityByID instanceof AbstractContraptionEntity ace)) {
+        Entity entityByID = mc.world.getEntityById(packet.entityId());
+        if (!(entityByID instanceof AbstractContraptionEntity ace))
             return;
-        }
 
         Contraption contraption = ace.getContraption();
         List<ItemStack> disabledActors = contraption.getDisabledActors();
         ItemStack filter = packet.filter();
-        if (filter.isEmpty()) {
+        if (filter.isEmpty())
             disabledActors.clear();
-        }
 
         if (!packet.enable()) {
             disabledActors.add(filter);
@@ -633,10 +586,10 @@ public class AllHandle extends AllClientHandle {
     }
 
     @Override
-    public void onAttachedComputer(ClientGamePacketListener listener, AttachedComputerPacket packet) {
-        Minecraft mc = Minecraft.getInstance();
+    public void onAttachedComputer(ClientPlayPacketListener listener, AttachedComputerPacket packet) {
+        MinecraftClient mc = MinecraftClient.getInstance();
         forceMainThread(listener, mc, packet);
-        if (mc.level.getBlockEntity(packet.pos()) instanceof SmartBlockEntity be) {
+        if (mc.world.getBlockEntity(packet.pos()) instanceof SmartBlockEntity be) {
             AbstractComputerBehaviour computer = be.getBehaviour(AbstractComputerBehaviour.TYPE);
             if (computer != null) {
                 computer.setHasAttachedComputer(packet.hasAttachedComputer());
@@ -649,61 +602,51 @@ public class AllHandle extends AllClientHandle {
         StringBuilder output = new StringBuilder();
         List<DebugInfoSection> clientInfo = DebugInformation.getClientInfo();
 
-        Minecraft mc = Minecraft.getInstance();
+        MinecraftClient mc = MinecraftClient.getInstance();
         ServerDebugInfoPacket.printInfo("Client", mc.player, clientInfo, output);
         output.append("\n\n");
         output.append(packet.serverInfo());
 
         String text = output.toString();
-        mc.keyboardHandler.setClipboard(text);
-        mc.player.displayClientMessage(
-            Component.translatable("create.command.debuginfo.saved_to_clipboard")
+        mc.keyboard.setClipboard(text);
+        mc.player.sendMessage(
+            Text.translatable("create.command.debuginfo.saved_to_clipboard")
                 .withColor(DyeHelper.getDyeColors(DyeColor.LIME).getFirst()), false
         );
     }
 
     @Override
-    public void onPackageDestroy(ClientGamePacketListener listener, PackageDestroyPacket packet) {
-        Minecraft mc = Minecraft.getInstance();
+    public void onPackageDestroy(ClientPlayPacketListener listener, PackageDestroyPacket packet) {
+        MinecraftClient mc = MinecraftClient.getInstance();
         forceMainThread(listener, mc, packet);
-        ClientLevel world = mc.level;
-        Vec3 motion = VecHelper.offsetRandomly(Vec3.ZERO, world.getRandom(), .125f);
-        Vec3 pos = packet.location().add(motion.scale(4));
-        world.addParticle(
-            new ItemParticleOption(ParticleTypes.ITEM, packet.box()),
-            pos.x,
-            pos.y,
-            pos.z,
-            motion.x,
-            motion.y,
-            motion.z
-        );
+        ClientWorld world = mc.world;
+        Vec3d motion = VecHelper.offsetRandomly(Vec3d.ZERO, world.getRandom(), .125f);
+        Vec3d pos = packet.location().add(motion.multiply(4));
+        world.addParticleClient(new ItemStackParticleEffect(ParticleTypes.ITEM, packet.box()), pos.x, pos.y, pos.z, motion.x, motion.y, motion.z);
     }
 
     @Override
-    public void onFactoryPanelEffect(ClientGamePacketListener listener, FactoryPanelEffectPacket packet) {
-        Minecraft mc = Minecraft.getInstance();
+    public void onFactoryPanelEffect(ClientPlayPacketListener listener, FactoryPanelEffectPacket packet) {
+        MinecraftClient mc = MinecraftClient.getInstance();
         forceMainThread(listener, mc, packet);
-        ClientLevel world = mc.level;
+        ClientWorld world = mc.world;
         BlockState blockState = world.getBlockState(packet.fromPos().pos());
-        if (!blockState.is(AllBlocks.FACTORY_GAUGE)) {
+        if (!blockState.isOf(AllBlocks.FACTORY_GAUGE))
             return;
-        }
         ServerFactoryPanelBehaviour panelBehaviour = ServerFactoryPanelBehaviour.at(world, packet.toPos());
         if (panelBehaviour != null) {
             panelBehaviour.bulb.setValue(1);
             FactoryPanelConnection connection = panelBehaviour.targetedBy.get(packet.fromPos());
-            if (connection != null) {
+            if (connection != null)
                 connection.success = packet.success();
-            }
         }
     }
 
     @Override
-    public void onRedstoneRequesterEffect(ClientGamePacketListener listener, RedstoneRequesterEffectPacket packet) {
-        Minecraft mc = Minecraft.getInstance();
+    public void onRedstoneRequesterEffect(ClientPlayPacketListener listener, RedstoneRequesterEffectPacket packet) {
+        MinecraftClient mc = MinecraftClient.getInstance();
         forceMainThread(listener, mc, packet);
-        if (mc.level.getBlockEntity(packet.pos()) instanceof RedstoneRequesterBlockEntity plbe) {
+        if (mc.world.getBlockEntity(packet.pos()) instanceof RedstoneRequesterBlockEntity plbe) {
             plbe.playEffect(packet.success());
         }
     }
@@ -714,11 +657,11 @@ public class AllHandle extends AllClientHandle {
     }
 
     @Override
-    public void onShopUpdate(ClientGamePacketListener listener, ShopUpdatePacket packet) {
-        Minecraft mc = Minecraft.getInstance();
+    public void onShopUpdate(ClientPlayPacketListener listener, ShopUpdatePacket packet) {
+        MinecraftClient mc = MinecraftClient.getInstance();
         forceMainThread(listener, mc, packet);
-        if (mc.level.getBlockEntity(packet.pos()) instanceof TableClothBlockEntity blockEntity) {
-            if (!blockEntity.hasLevel()) {
+        if (mc.world.getBlockEntity(packet.pos()) instanceof TableClothBlockEntity blockEntity) {
+            if (!blockEntity.hasWorld()) {
                 return;
             }
 
@@ -744,14 +687,13 @@ public class AllHandle extends AllClientHandle {
 
         for (int nodeId : packet.removedNodes) {
             TrackNode node = graph.getNode(nodeId);
-            if (node != null) {
+            if (node != null)
                 graph.removeNode(null, node.getLocation());
-            }
         }
 
-        for (Map.Entry<Integer, Pair<TrackNodeLocation, Vec3>> entry : packet.addedNodes.entrySet()) {
+        for (Map.Entry<Integer, Pair<TrackNodeLocation, Vec3d>> entry : packet.addedNodes.entrySet()) {
             Integer nodeId = entry.getKey();
-            Pair<TrackNodeLocation, Vec3> nodeLocation = entry.getValue();
+            Pair<TrackNodeLocation, Vec3d> nodeLocation = entry.getValue();
             graph.loadNode(nodeLocation.getFirst(), nodeId, nodeLocation.getSecond());
         }
 
@@ -759,30 +701,21 @@ public class AllHandle extends AllClientHandle {
             Couple<TrackNode> nodes = pair.getFirst().getFirst().map(graph::getNode);
             TrackNode node1 = nodes.getFirst();
             TrackNode node2 = nodes.getSecond();
-            if (node1 != null && node2 != null) {
-                graph.putConnection(
-                    node1,
-                    node2,
-                    new TrackEdge(node1, node2, pair.getSecond(), pair.getFirst().getSecond())
-                );
-            }
+            if (node1 != null && node2 != null)
+                graph.putConnection(node1, node2, new TrackEdge(node1, node2, pair.getSecond(), pair.getFirst().getSecond()));
         }
 
-        for (TrackEdgePoint edgePoint : packet.addedEdgePoints) {
+        for (TrackEdgePoint edgePoint : packet.addedEdgePoints)
             graph.edgePoints.put(edgePoint.getType(), edgePoint);
-        }
 
-        for (UUID uuid : packet.removedEdgePoints) {
-            for (EdgePointType<?> type : EdgePointType.TYPES.values()) {
+        for (UUID uuid : packet.removedEdgePoints)
+            for (EdgePointType<?> type : EdgePointType.TYPES.values())
                 graph.edgePoints.remove(type, uuid);
-            }
-        }
 
         handleEdgeData(packet.updatedEdgeData, graph);
 
-        if (!packet.splitSubGraphs.isEmpty()) {
+        if (!packet.splitSubGraphs.isEmpty())
             graph.findDisconnectedGraphs(null, packet.splitSubGraphs).forEach(manager::putGraph);
-        }
     }
 
     private void handleEdgeData(Map<Couple<Integer>, Pair<Integer, List<UUID>>> updatedEdgeData, TrackGraph graph) {
@@ -791,22 +724,19 @@ public class AllHandle extends AllClientHandle {
             int groupType = entry.getValue().getFirst();
 
             Couple<TrackNode> nodes = entry.getKey().map(graph::getNode);
-            if (nodes.either(Objects::isNull)) {
+            if (nodes.either(Objects::isNull))
                 continue;
-            }
             TrackEdge edge = graph.getConnectionsFrom(nodes.getFirst()).get(nodes.getSecond());
-            if (edge == null) {
+            if (edge == null)
                 continue;
-            }
 
             EdgeData edgeData = new EdgeData(edge);
-            if (groupType == TrackGraphSyncPacket.NULL_GROUP) {
+            if (groupType == TrackGraphSyncPacket.NULL_GROUP)
                 edgeData.setSingleSignalGroup(null, null, null);
-            } else if (groupType == TrackGraphSyncPacket.PASSIVE_GROUP) {
+            else if (groupType == TrackGraphSyncPacket.PASSIVE_GROUP)
                 edgeData.setSingleSignalGroup(null, null, EdgeData.passiveGroup);
-            } else {
+            else
                 edgeData.setSingleSignalGroup(null, null, idList.getFirst());
-            }
 
             List<TrackEdgePoint> points = edgeData.getPoints();
             edge.edgeData = edgeData;
@@ -815,9 +745,8 @@ public class AllHandle extends AllClientHandle {
                 UUID uuid = idList.get(i);
                 for (EdgePointType<?> type : EdgePointType.TYPES.values()) {
                     TrackEdgePoint point = graph.edgePoints.get(type, uuid);
-                    if (point == null) {
+                    if (point == null)
                         continue;
-                    }
                     points.add(point);
                     break;
                 }
@@ -832,15 +761,11 @@ public class AllHandle extends AllClientHandle {
     }
 
     @Override
-    public void onOpenScreen(ClientGamePacketListener listener, OpenScreenPacket packet) {
-        if (listener instanceof ClientPacketListener handler) {
-            Minecraft mc = Minecraft.getInstance();
-            PacketUtils.ensureRunningOnSameThread(packet, handler, mc.packetProcessor());
-            RegistryFriendlyByteBuf extraData = new RegistryFriendlyByteBuf(
-                Unpooled.wrappedBuffer(packet.data()),
-                handler.registryAccess()
-            );
-            AllMenuScreens.open(mc, packet.menu(), packet.id(), packet.name(), extraData);
+    public void onOpenScreen(ClientPlayPacketListener listener, OpenScreenPacket packet) {
+        if (listener instanceof ClientPlayNetworkHandler handler) {
+            NetworkThreadUtils.forceMainThread(packet, handler, MinecraftClient.getInstance().getPacketApplyBatcher());
+            RegistryByteBuf extraData = new RegistryByteBuf(Unpooled.wrappedBuffer(packet.data()), handler.getRegistryManager());
+            AllMenuScreens.open(MinecraftClient.getInstance(), packet.type(), packet.id(), packet.name(), extraData);
             extraData.release();
         }
     }
@@ -854,16 +779,14 @@ public class AllHandle extends AllClientHandle {
     public void buildDebugInfo() {
         DebugInfoSection.builder("Graphics").put("Flywheel Version", DebugInformation.getVersionOfMod(Flywheel.MOD_ID))
             .put("Flywheel Backend", () -> Backend.REGISTRY.getIdOrThrow(BackendManager.currentBackend()).toString())
-            .put("OpenGL Renderer", GlStateManager._getString(GL11.GL_RENDERER))
-            .put("OpenGL Version", GlStateManager._getString(GL11.GL_VERSION)).put(
-                "Transparency",
-                () -> Minecraft.getInstance().options.improvedTransparency().get() ? "shader" : "regular"
-            ).buildTo(DebugInformation::registerClientInfo);
+            .put("OpenGL Renderer", GlStateManager._getString(GL11.GL_RENDERER)).put("OpenGL Version", GlStateManager._getString(GL11.GL_VERSION))
+            .put("Graphics Mode", () -> MinecraftClient.getInstance().options.getGraphicsMode().getValue().name().toLowerCase(Locale.ROOT))
+            .buildTo(DebugInformation::registerClientInfo);
     }
 
     @Override
-    public Player getPlayer() {
-        return Minecraft.getInstance().player;
+    public PlayerEntity getPlayer() {
+        return MinecraftClient.getInstance().player;
     }
 
     @Override
@@ -872,10 +795,9 @@ public class AllHandle extends AllClientHandle {
     }
 
     @Override
-    public void addAirFlowParticle(Level world, BlockPos airCurrentPos, double x, double y, double z) {
-        if (world.random.nextFloat() < AllConfigs.client().fanParticleDensity.get()) {
-            world.addParticle(new AirFlowParticleData(airCurrentPos), x, y, z, 0, 0, 0);
-        }
+    public void addAirFlowParticle(World world, BlockPos airCurrentPos, double x, double y, double z) {
+        if (world.random.nextFloat() < AllConfigs.client().fanParticleDensity.get())
+            world.addParticleClient(new AirFlowParticleData(airCurrentPos), x, y, z, 0, 0, 0);
     }
 
     @Override
@@ -884,11 +806,10 @@ public class AllHandle extends AllClientHandle {
     }
 
     @Override
-    public void showWaterBounds(Axis axis, BlockPlaceContext context) {
-        BlockPos pos = context.getClickedPos();
-        Vec3 contract = Vec3.atLowerCornerOf(Direction.get(AxisDirection.POSITIVE, axis).getUnitVec3i());
-        Outliner.getInstance()
-            .showAABB(Pair.of("waterwheel", pos), new AABB(pos).inflate(1).deflate(contract.x, contract.y, contract.z))
+    public void showWaterBounds(Axis axis, ItemPlacementContext context) {
+        BlockPos pos = context.getBlockPos();
+        Vec3d contract = Vec3d.of(Direction.get(AxisDirection.POSITIVE, axis).getVector());
+        Outliner.getInstance().showAABB(Pair.of("waterwheel", pos), new Box(pos).expand(1).contract(contract.x, contract.y, contract.z))
             .colored(0xFF_ff5d6c);
         CreateLang.translate("large_water_wheel.not_enough_space").color(0xFF_ff5d6c).sendStatus(context.getPlayer());
     }
@@ -915,50 +836,33 @@ public class AllHandle extends AllClientHandle {
     }
 
     @Override
-    public void spawnPipeParticles(
-        Level world,
-        BlockPos pos,
-        PipeConnection.Flow flow,
-        boolean openEnd,
-        Direction side,
-        int amount
-    ) {
-        Minecraft mc = Minecraft.getInstance();
-        if (world == mc.level) {
-            if (isRenderEntityWithoutDistance(mc, pos)) {
+    public void spawnPipeParticles(World world, BlockPos pos, PipeConnection.Flow flow, boolean openEnd, Direction side, int amount) {
+        MinecraftClient mc = MinecraftClient.getInstance();
+        if (world == mc.world)
+            if (isRenderEntityWithoutDistance(mc, pos))
                 return;
-            }
-        }
-        if (openEnd) {
+        if (openEnd)
             spawnPouringLiquid(world, pos, flow, side, amount);
-        } else if (world.random.nextFloat() < PipeConnection.IDLE_PARTICLE_SPAWN_CHANCE) {
+        else if (world.random.nextFloat() < PipeConnection.IDLE_PARTICLE_SPAWN_CHANCE)
             spawnRimParticles(world, pos, flow.fluid, side, amount);
-        }
     }
 
-    private static boolean isRenderEntityWithoutDistance(Minecraft mc, BlockPos pos) {
+    private static boolean isRenderEntityWithoutDistance(MinecraftClient mc, BlockPos pos) {
         Entity renderViewEntity = mc.getCameraEntity();
-        if (renderViewEntity == null) {
+        if (renderViewEntity == null)
             return true;
-        }
-        Vec3 center = VecHelper.getCenterOf(pos);
-        return renderViewEntity.position().distanceTo(center) > PipeConnection.MAX_PARTICLE_RENDER_DISTANCE;
+        Vec3d center = VecHelper.getCenterOf(pos);
+        return renderViewEntity.getEntityPos().distanceTo(center) > PipeConnection.MAX_PARTICLE_RENDER_DISTANCE;
     }
 
-    private static void spawnRimParticles(Level world, BlockPos pos, FluidStack fluid, Direction side, int amount) {
-        ParticleOptions particle = FluidFX.getDrippingParticle(fluid);
+    private static void spawnRimParticles(World world, BlockPos pos, FluidStack fluid, Direction side, int amount) {
+        ParticleEffect particle = FluidFX.getDrippingParticle(fluid);
         FluidFX.spawnRimParticles(world, pos, side, amount, particle, PipeConnection.RIM_RADIUS);
     }
 
-    private static void spawnPouringLiquid(
-        Level world,
-        BlockPos pos,
-        PipeConnection.Flow flow,
-        Direction side,
-        int amount
-    ) {
-        ParticleOptions particle = FluidFX.getFluidParticle(flow.fluid);
-        Vec3 directionVec = Vec3.atLowerCornerOf(side.getUnitVec3i());
+    private static void spawnPouringLiquid(World world, BlockPos pos, PipeConnection.Flow flow, Direction side, int amount) {
+        ParticleEffect particle = FluidFX.getFluidParticle(flow.fluid);
+        Vec3d directionVec = Vec3d.of(side.getVector());
         FluidFX.spawnPouringLiquid(world, pos, amount, particle, PipeConnection.RIM_RADIUS, directionVec, flow.inbound);
     }
 
@@ -966,24 +870,20 @@ public class AllHandle extends AllClientHandle {
     public void spawnSteamEngineParticles(SteamEngineBlockEntity be) {
         Float targetAngle = SteamEngineRenderer.getTargetAngle(be);
         PoweredShaftBlockEntity ste = be.target.get();
-        if (ste == null) {
+        if (ste == null)
             return;
-        }
-        if (!ste.isPoweredBy(be.getBlockPos()) || ste.engineEfficiency == 0) {
+        if (!ste.isPoweredBy(be.getPos()) || ste.engineEfficiency == 0)
             return;
-        }
-        if (targetAngle == null) {
+        if (targetAngle == null)
             return;
-        }
 
         float angle = AngleHelper.deg(targetAngle);
         angle += (angle < 0) ? -180 + 75 : 360 - 75;
         angle %= 360;
 
         PoweredShaftBlockEntity shaft = be.getShaft();
-        if (shaft == null || shaft.getSpeed() == 0) {
+        if (shaft == null || shaft.getSpeed() == 0)
             return;
-        }
 
         if (angle >= 0 && !(be.prevAngle > 180 && angle < 180)) {
             be.prevAngle = angle;
@@ -998,87 +898,81 @@ public class AllHandle extends AllClientHandle {
         if (sourceBE != null) {
             FluidTankBlockEntity controller = sourceBE.getControllerBE();
             if (controller != null && controller.boiler != null) {
-                controller.boiler.queueSoundOnSide(be.getBlockPos(), SteamEngineBlock.getFacing(be.getBlockState()));
+                controller.boiler.queueSoundOnSide(be.getPos(), SteamEngineBlock.getFacing(be.getCachedState()));
             }
         }
 
-        Direction facing = SteamEngineBlock.getFacing(be.getBlockState());
+        Direction facing = SteamEngineBlock.getFacing(be.getCachedState());
 
-        Level world = be.getLevel();
-        Vec3 offset = VecHelper.rotate(
-            new Vec3(0, 0, 1).add(VecHelper.offsetRandomly(Vec3.ZERO, world.random, 1)
-                .multiply(1, 1, 0).normalize().scale(.5f)), AngleHelper.verticalAngle(facing), Axis.X
+        World world = be.getWorld();
+        Vec3d offset = VecHelper.rotate(
+            new Vec3d(0, 0, 1).add(VecHelper.offsetRandomly(Vec3d.ZERO, world.random, 1).multiply(1, 1, 0).normalize().multiply(.5f)),
+            AngleHelper.verticalAngle(facing),
+            Axis.X
         );
         offset = VecHelper.rotate(offset, AngleHelper.horizontalAngle(facing), Axis.Y);
-        Vec3 v = offset.scale(.5f).add(Vec3.atCenterOf(be.getBlockPos()));
-        Vec3 m = offset.subtract(Vec3.atLowerCornerOf(facing.getUnitVec3i()).scale(.75f));
-        world.addParticle(AllParticleTypes.STEAM_JET, v.x, v.y, v.z, m.x, m.y, m.z);
+        Vec3d v = offset.multiply(.5f).add(Vec3d.ofCenter(be.getPos()));
+        Vec3d m = offset.subtract(Vec3d.of(facing.getVector()).multiply(.75f));
+        world.addParticleClient(AllParticleTypes.STEAM_JET, v.x, v.y, v.z, m.x, m.y, m.z);
 
         be.prevAngle = angle;
     }
 
     @Override
-    public void spawnSuperGlueParticles(Level world, BlockPos pos, Direction direction, boolean fullBlock) {
+    public void spawnSuperGlueParticles(World world, BlockPos pos, Direction direction, boolean fullBlock) {
         SuperGlueSelectionHandler.spawnParticles(world, pos, direction, fullBlock);
     }
 
     @Override
     public void tickBlazeBurnerAnimation(BlazeBurnerBlockEntity be) {
-        if (!VisualizationManager.supportsVisualization(be.getLevel())) {
+        if (!VisualizationManager.supportsVisualization(be.getWorld())) {
             BlazeBurnerRenderer.tickAnimation(be);
         }
     }
 
     @Override
-    public void sendPacket(Packet<ServerGamePacketListener> packet) {
-        LocalPlayer player = Minecraft.getInstance().player;
+    public void sendPacket(Packet<ServerPlayPacketListener> packet) {
+        ClientPlayerEntity player = MinecraftClient.getInstance().player;
         if (player != null) {
-            player.connection.send(packet);
+            player.networkHandler.sendPacket(packet);
         }
     }
 
     @Override
-    public void sendPacket(Player player, Packet<ServerGamePacketListener> packet) {
-        if (player instanceof LocalPlayer clientPlayer) {
-            clientPlayer.connection.send(packet);
+    public void sendPacket(PlayerEntity player, Packet<ServerPlayPacketListener> packet) {
+        if (player instanceof ClientPlayerEntity clientPlayer) {
+            clientPlayer.networkHandler.sendPacket(packet);
         }
     }
 
     @Override
-    public void createBasinFluidParticles(Level world, BasinBlockEntity blockEntity) {
-        RandomSource r = world.random;
+    public void createBasinFluidParticles(World world, BasinBlockEntity blockEntity) {
+        Random r = world.random;
 
-        if (!blockEntity.visualizedOutputFluids.isEmpty()) {
+        if (!blockEntity.visualizedOutputFluids.isEmpty())
             createBasinOutputFluidParticles(world, blockEntity, r);
-        }
 
-        if (!blockEntity.areFluidsMoving && r.nextFloat() > 1 / 8f) {
+        if (!blockEntity.areFluidsMoving && r.nextFloat() > 1 / 8f)
             return;
-        }
 
         int segments = 0;
         for (SmartFluidTankBehaviour behaviour : blockEntity.getTanks()) {
-            if (behaviour == null) {
+            if (behaviour == null)
                 continue;
-            }
-            for (SmartFluidTankBehaviour.TankSegment tankSegment : behaviour.getTanks()) {
-                if (!tankSegment.isEmpty(0)) {
+            for (SmartFluidTankBehaviour.TankSegment tankSegment : behaviour.getTanks())
+                if (!tankSegment.isEmpty(0))
                     segments++;
-                }
-            }
         }
-        if (segments < 2) {
+        if (segments < 2)
             return;
-        }
 
         float totalUnits = blockEntity.getTotalFluidUnits(0);
-        if (totalUnits == 0) {
+        if (totalUnits == 0)
             return;
-        }
-        float fluidLevel = Mth.clamp(totalUnits / 162000, 0, 1);
+        float fluidLevel = MathHelper.clamp(totalUnits / 162000, 0, 1);
         float rim = 2 / 16f;
         float space = 12 / 16f;
-        BlockPos pos = blockEntity.getBlockPos();
+        BlockPos pos = blockEntity.getPos();
         float surface = pos.getY() + rim + space * fluidLevel + 1 / 32f;
 
         if (blockEntity.areFluidsMoving) {
@@ -1087,17 +981,15 @@ public class AllHandle extends AllClientHandle {
         }
 
         for (SmartFluidTankBehaviour behaviour : blockEntity.getTanks()) {
-            if (behaviour == null) {
+            if (behaviour == null)
                 continue;
-            }
             for (SmartFluidTankBehaviour.TankSegment tankSegment : behaviour.getTanks()) {
-                if (tankSegment.isEmpty(0)) {
+                if (tankSegment.isEmpty(0))
                     continue;
-                }
                 float x = pos.getX() + rim + space * r.nextFloat();
                 float z = pos.getZ() + rim + space * r.nextFloat();
                 FluidStack stack = tankSegment.getRenderedFluid();
-                world.addAlwaysVisibleParticle(
+                world.addImportantParticleClient(
                     new FluidParticleData(AllParticleTypes.BASIN_FLUID, stack.getFluid(), stack.getComponentChanges()),
                     x,
                     surface,
@@ -1110,58 +1002,48 @@ public class AllHandle extends AllClientHandle {
         }
     }
 
-    private static void createBasinOutputFluidParticles(Level world, BasinBlockEntity blockEntity, RandomSource r) {
-        BlockState blockState = blockEntity.getBlockState();
-        if (!(blockState.getBlock() instanceof BasinBlock)) {
+    private static void createBasinOutputFluidParticles(World world, BasinBlockEntity blockEntity, Random r) {
+        BlockState blockState = blockEntity.getCachedState();
+        if (!(blockState.getBlock() instanceof BasinBlock))
             return;
-        }
-        Direction direction = blockState.getValue(BasinBlock.FACING);
-        if (direction == Direction.DOWN) {
+        Direction direction = blockState.get(BasinBlock.FACING);
+        if (direction == Direction.DOWN)
             return;
-        }
-        Vec3 directionVec = Vec3.atLowerCornerOf(direction.getUnitVec3i());
-        Vec3 outVec = VecHelper.getCenterOf(blockEntity.getBlockPos())
-            .add(directionVec.scale(.65).subtract(0, 1 / 4f, 0));
-        Vec3 outMotion = directionVec.scale(1 / 16f).add(0, -1 / 16f, 0);
+        Vec3d directionVec = Vec3d.of(direction.getVector());
+        Vec3d outVec = VecHelper.getCenterOf(blockEntity.getPos()).add(directionVec.multiply(.65).subtract(0, 1 / 4f, 0));
+        Vec3d outMotion = directionVec.multiply(1 / 16f).add(0, -1 / 16f, 0);
 
         for (int i = 0; i < 2; i++) {
             blockEntity.visualizedOutputFluids.forEach(ia -> {
                 FluidStack fluidStack = ia.getValue();
-                ParticleOptions fluidParticle = FluidFX.getFluidParticle(fluidStack);
-                Vec3 m = VecHelper.offsetRandomly(outMotion, r, 1 / 16f);
-                world.addAlwaysVisibleParticle(fluidParticle, outVec.x, outVec.y, outVec.z, m.x, m.y, m.z);
+                ParticleEffect fluidParticle = FluidFX.getFluidParticle(fluidStack);
+                Vec3d m = VecHelper.offsetRandomly(outMotion, r, 1 / 16f);
+                world.addImportantParticleClient(fluidParticle, outVec.x, outVec.y, outVec.z, m.x, m.y, m.z);
             });
         }
     }
 
-    private static void createBasinMovingFluidParticles(
-        Level world,
-        BasinBlockEntity blockEntity,
-        float surface,
-        int segments
-    ) {
-        Vec3 pointer = new Vec3(1, 0, 0).scale(1 / 16f);
+    private static void createBasinMovingFluidParticles(World world, BasinBlockEntity blockEntity, float surface, int segments) {
+        Vec3d pointer = new Vec3d(1, 0, 0).multiply(1 / 16f);
         float interval = 360f / segments;
-        Vec3 centerOf = VecHelper.getCenterOf(blockEntity.getBlockPos());
+        Vec3d centerOf = VecHelper.getCenterOf(blockEntity.getPos());
         float intervalOffset = (AnimationTickHolder.getTicks() * 18) % 360;
 
         int currentSegment = 0;
         for (SmartFluidTankBehaviour behaviour : blockEntity.getTanks()) {
-            if (behaviour == null) {
+            if (behaviour == null)
                 continue;
-            }
             for (SmartFluidTankBehaviour.TankSegment tankSegment : behaviour.getTanks()) {
-                if (tankSegment.isEmpty(0)) {
+                if (tankSegment.isEmpty(0))
                     continue;
-                }
                 float angle = interval * (1 + currentSegment) + intervalOffset;
-                Vec3 vec = centerOf.add(VecHelper.rotate(pointer, angle, Axis.Y));
+                Vec3d vec = centerOf.add(VecHelper.rotate(pointer, angle, Axis.Y));
                 FluidStack stack = tankSegment.getRenderedFluid();
-                world.addAlwaysVisibleParticle(
+                world.addImportantParticleClient(
                     new FluidParticleData(AllParticleTypes.BASIN_FLUID, stack.getFluid(), stack.getComponentChanges()),
-                    vec.x(),
+                    vec.getX(),
                     surface,
-                    vec.z(),
+                    vec.getZ(),
                     1,
                     0,
                     0
@@ -1172,8 +1054,8 @@ public class AllHandle extends AllClientHandle {
     }
 
     @Override
-    public void cartClicked(Player player, AbstractMinecart minecart) {
-        CouplingHandlerClient.onCartClicked((LocalPlayer) player, minecart);
+    public void cartClicked(PlayerEntity player, AbstractMinecartEntity minecart) {
+        CouplingHandlerClient.onCartClicked((ClientPlayerEntity) player, minecart);
     }
 
     @Override
@@ -1183,16 +1065,13 @@ public class AllHandle extends AllClientHandle {
 
     @Override
     public void updateClipboardScreen(UUID lastEdit, BlockPos pos, ClipboardContent content) {
-        Minecraft mc = Minecraft.getInstance();
-        if (!(mc.screen instanceof ClipboardScreen cs)) {
+        MinecraftClient mc = MinecraftClient.getInstance();
+        if (!(mc.currentScreen instanceof ClipboardScreen cs))
             return;
-        }
-        if (lastEdit != null && mc.player.getUUID().equals(lastEdit)) {
+        if (lastEdit != null && mc.player.getUuid().equals(lastEdit))
             return;
-        }
-        if (!pos.equals(cs.targetedBlock)) {
+        if (!pos.equals(cs.targetedBlock))
             return;
-        }
         cs.reopenWith(content);
     }
 
@@ -1226,8 +1105,8 @@ public class AllHandle extends AllClientHandle {
     }
 
     @Override
-    public void startControlling(Player player, AbstractContraptionEntity be, BlockPos pos) {
-        ControlsHandler.startControlling((LocalPlayer) player, be, pos);
+    public void startControlling(PlayerEntity player, AbstractContraptionEntity be, BlockPos pos) {
+        ControlsHandler.startControlling((ClientPlayerEntity) player, be, pos);
     }
 
     @Override
@@ -1237,29 +1116,29 @@ public class AllHandle extends AllClientHandle {
     }
 
     @Override
-    public void cannonDontAnimateItem(InteractionHand hand) {
+    public void cannonDontAnimateItem(Hand hand) {
         Create.POTATO_CANNON_RENDER_HANDLER.dontAnimateItem(hand);
     }
 
     @Override
     public void tryToggleActive(LecternControllerBlockEntity controller) {
-        LocalPlayer player = Minecraft.getInstance().player;
-        UUID uuid = player.getUUID();
+        ClientPlayerEntity player = MinecraftClient.getInstance().player;
+        UUID uuid = player.getUuid();
         if (controller.user == null && uuid.equals(controller.prevUser)) {
             LinkedControllerClientHandler.deactivateInLectern(player);
         } else if (controller.prevUser == null && uuid.equals(controller.user)) {
-            LinkedControllerClientHandler.activateInLectern(controller.getBlockPos());
+            LinkedControllerClientHandler.activateInLectern(controller.getPos());
         }
     }
 
     @Override
     public void toggleLinkedControllerBindMode(BlockPos pos) {
-        LinkedControllerClientHandler.toggleBindMode(Minecraft.getInstance().player, pos);
+        LinkedControllerClientHandler.toggleBindMode(MinecraftClient.getInstance().player, pos);
     }
 
     @Override
     public void toggleLinkedControllerActive() {
-        LinkedControllerClientHandler.toggle(Minecraft.getInstance().player);
+        LinkedControllerClientHandler.toggle(MinecraftClient.getInstance().player);
     }
 
     @Override
@@ -1271,12 +1150,12 @@ public class AllHandle extends AllClientHandle {
     }
 
     @Override
-    public boolean factoryPanelClicked(Level world, Player player, ServerFactoryPanelBehaviour behaviour) {
+    public boolean factoryPanelClicked(World world, PlayerEntity player, ServerFactoryPanelBehaviour behaviour) {
         return FactoryPanelConnectionHandler.panelClicked(world, player, behaviour);
     }
 
     @Override
-    public void zapperDontAnimateItem(InteractionHand hand) {
+    public void zapperDontAnimateItem(Hand hand) {
         Create.ZAPPER_RENDER_HANDLER.dontAnimateItem(hand);
     }
 
@@ -1286,68 +1165,57 @@ public class AllHandle extends AllClientHandle {
     }
 
     @Override
-    public void openClipboardScreen(Player player, DataComponentMap components, BlockPos pos) {
-        if (Minecraft.getInstance().player == player) {
+    public void openClipboardScreen(PlayerEntity player, ComponentMap components, BlockPos pos) {
+        if (MinecraftClient.getInstance().player == player)
             ScreenOpener.open(new ClipboardScreen(player.getInventory().getSelectedSlot(), components, pos));
-        }
     }
 
     @Override
-    public void openDisplayLinkScreen(DisplayLinkBlockEntity be, Player player) {
-        if (!(player instanceof LocalPlayer)) {
+    public void openDisplayLinkScreen(DisplayLinkBlockEntity be, PlayerEntity player) {
+        if (!(player instanceof ClientPlayerEntity))
             return;
-        }
         if (be.targetOffset.equals(BlockPos.ZERO)) {
-            player.displayClientMessage(CreateLang.translateDirect("display_link.invalid"), true);
+            player.sendMessage(CreateLang.translateDirect("display_link.invalid"), true);
             return;
         }
         ScreenOpener.open(new DisplayLinkScreen(be));
     }
 
     @Override
-    public void openThresholdSwitchScreen(ThresholdSwitchBlockEntity be, Player player) {
-        if (player instanceof LocalPlayer) {
+    public void openThresholdSwitchScreen(ThresholdSwitchBlockEntity be, PlayerEntity player) {
+        if (player instanceof ClientPlayerEntity)
             ScreenOpener.open(new ThresholdSwitchScreen(be));
-        }
     }
 
     @Override
-    public void openElevatorContactScreen(ElevatorContactBlockEntity be, Player player) {
-        if (player instanceof LocalPlayer) {
-            ScreenOpener.open(new ElevatorContactScreen(
-                be.getBlockPos(),
-                be.shortName,
-                be.longName,
-                be.doorControls.mode
-            ));
-        }
+    public void openElevatorContactScreen(ElevatorContactBlockEntity be, PlayerEntity player) {
+        if (player instanceof ClientPlayerEntity)
+            ScreenOpener.open(new ElevatorContactScreen(be.getPos(), be.shortName, be.longName, be.doorControls.mode));
     }
 
     @Override
-    public void openStationScreen(Level world, BlockPos pos, Player player) {
-        if (!(player instanceof LocalPlayer)) {
+    public void openStationScreen(World world, BlockPos pos, PlayerEntity player) {
+        if (!(player instanceof ClientPlayerEntity)) {
             return;
         }
         if (world.getBlockEntity(pos) instanceof StationBlockEntity be) {
             GlobalStation station = be.getStation();
-            BlockState blockState = be.getBlockState();
-            if (station == null || blockState == null) {
+            BlockState blockState = be.getCachedState();
+            if (station == null || blockState == null)
                 return;
-            }
-            boolean assembling = blockState.getBlock() == AllBlocks.TRACK_STATION && blockState.getValue(StationBlock.ASSEMBLING);
+            boolean assembling = blockState.getBlock() == AllBlocks.TRACK_STATION && blockState.get(StationBlock.ASSEMBLING);
             ScreenOpener.open(assembling ? new AssemblyScreen(be, station) : new StationScreen(be, station));
         }
     }
 
     @Override
-    public void openFactoryPanelScreen(ServerFactoryPanelBehaviour behaviour, Player player) {
-        if (player instanceof LocalPlayer) {
+    public void openFactoryPanelScreen(ServerFactoryPanelBehaviour behaviour, PlayerEntity player) {
+        if (player instanceof ClientPlayerEntity)
             ScreenOpener.open(new FactoryPanelScreen(behaviour));
-        }
     }
 
     @Override
-    public void openSymmetryWandScreen(ItemStack stack, InteractionHand hand) {
+    public void openSymmetryWandScreen(ItemStack stack, Hand hand) {
         ScreenOpener.open(new SymmetryWandScreen(stack, hand));
     }
 
@@ -1357,7 +1225,7 @@ public class AllHandle extends AllClientHandle {
     }
 
     @Override
-    public void openWorldshaperScreen(ItemStack item, InteractionHand hand) {
+    public void openWorldshaperScreen(ItemStack item, Hand hand) {
         ScreenOpener.open(new WorldshaperScreen(item, hand));
     }
 }

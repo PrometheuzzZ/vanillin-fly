@@ -3,8 +3,8 @@ package com.zurrtum.create.client.flywheel.backend.glsl;
 import com.mojang.datafixers.util.Pair;
 import com.zurrtum.create.client.flywheel.backend.glsl.error.ErrorBuilder;
 import com.zurrtum.create.client.flywheel.backend.glsl.span.Span;
-import net.minecraft.IdentifierException;
-import net.minecraft.resources.Identifier;
+import net.minecraft.util.Identifier;
+import net.minecraft.util.InvalidIdentifierException;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -16,8 +16,7 @@ sealed public interface LoadError {
 
     record CircularDependency(Identifier offender, List<Identifier> stack) implements LoadError {
         public String format() {
-            return stack.stream().dropWhile(l -> !l.equals(offender)).map(Identifier::toString)
-                .collect(Collectors.joining(" -> "));
+            return stack.stream().dropWhile(l -> !l.equals(offender)).map(Identifier::toString).collect(Collectors.joining(" -> "));
         }
 
         @Override
@@ -46,8 +45,7 @@ sealed public interface LoadError {
             if (exception instanceof FileNotFoundException) {
                 return ErrorBuilder.create().error("\"" + location + "\" was not found");
             } else {
-                return ErrorBuilder.create().error("could not load \"" + location + "\" due to an IO error")
-                    .note(exception.toString());
+                return ErrorBuilder.create().error("could not load \"" + location + "\" due to an IO error").note(exception.toString());
             }
         }
     }
@@ -59,7 +57,7 @@ sealed public interface LoadError {
         }
     }
 
-    record MalformedInclude(IdentifierException exception) implements LoadError {
+    record MalformedInclude(InvalidIdentifierException exception) implements LoadError {
         @Override
         public ErrorBuilder generateMessage() {
             return ErrorBuilder.create().error(exception.toString());

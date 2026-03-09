@@ -1,7 +1,7 @@
 package com.zurrtum.create.client.flywheel.impl.task;
 
 import com.zurrtum.create.client.flywheel.impl.FlwConfig;
-import net.minecraft.util.Mth;
+import net.minecraft.util.math.MathHelper;
 
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -24,7 +24,7 @@ public final class FlwTaskExecutor {
      * Returns the "optimal" number of threads to be used for tasks. This will always return at least one thread.
      */
     private static int getOptimalThreadCount() {
-        return Mth.clamp(Math.max(getMaxThreadCount() / 3, getMaxThreadCount() - 6), 1, 10);
+        return MathHelper.clamp(Math.max(getMaxThreadCount() / 3, getMaxThreadCount() - 6), 1, 10);
     }
 
     private static int getMaxThreadCount() {
@@ -59,7 +59,7 @@ public final class FlwTaskExecutor {
             } else if (threadCount < 0) {
                 threadCount = getOptimalThreadCount();
             } else {
-                threadCount = Mth.clamp(threadCount, 1, getMaxThreadCount());
+                threadCount = MathHelper.clamp(threadCount, 1, getMaxThreadCount());
             }
 
             ParallelTaskExecutor executor = new ParallelTaskExecutor("Flywheel", threadCount);

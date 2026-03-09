@@ -10,13 +10,13 @@ import com.zurrtum.create.content.trains.schedule.ScheduleRuntime;
 import com.zurrtum.create.content.trains.schedule.ScheduleRuntime.State;
 import com.zurrtum.create.content.trains.station.GlobalPackagePort;
 import com.zurrtum.create.content.trains.station.GlobalStation;
-import net.minecraft.core.BlockPos;
-import net.minecraft.resources.Identifier;
+import net.minecraft.inventory.Inventory;
+import net.minecraft.item.ItemStack;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.Container;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.Level;
+import net.minecraft.server.world.ServerWorld;
+import net.minecraft.util.Identifier;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.World;
 
 import java.util.ArrayList;
 import java.util.Map;
@@ -32,9 +32,8 @@ public class FetchPackagesInstruction extends TextScheduleInstruction {
     }
 
     public String getFilterForRegex() {
-        if (getFilter().isBlank()) {
+        if (getFilter().isBlank())
             return Glob.toRegexPattern("*", "");
-        }
         return Glob.toRegexPattern(getFilter(), "");
     }
 
@@ -44,11 +43,10 @@ public class FetchPackagesInstruction extends TextScheduleInstruction {
     }
 
     @Override
-    public DiscoveredPath start(ScheduleRuntime runtime, Level level) {
+    public DiscoveredPath start(ScheduleRuntime runtime, World level) {
         MinecraftServer server = level.getServer();
-        if (server == null) {
+        if (server == null)
             return null;
-        }
 
         String regex = getFilterForRegex();
         boolean anyMatch = false;
@@ -62,32 +60,27 @@ public class FetchPackagesInstruction extends TextScheduleInstruction {
         }
 
         for (GlobalStation globalStation : train.graph.getPoints(EdgePointType.STATION)) {
-            ServerLevel dimLevel = server.getLevel(globalStation.blockEntityDimension);
-            if (dimLevel == null) {
+            ServerWorld dimLevel = server.getWorld(globalStation.blockEntityDimension);
+            if (dimLevel == null)
                 continue;
-            }
 
             for (Map.Entry<BlockPos, GlobalPackagePort> entry : globalStation.connectedPorts.entrySet()) {
                 GlobalPackagePort port = entry.getValue();
                 BlockPos pos = entry.getKey();
 
-                Container postboxInventory = port.offlineBuffer;
-                if (dimLevel.isLoaded(pos) && dimLevel.getBlockEntity(pos) instanceof PostboxBlockEntity ppbe) {
+                Inventory postboxInventory = port.offlineBuffer;
+                if (dimLevel.isPosLoaded(pos) && dimLevel.getBlockEntity(pos) instanceof PostboxBlockEntity ppbe)
                     postboxInventory = ppbe.inventory;
-                }
 
-                for (int i = 0, size = postboxInventory.getContainerSize(); i < size; i++) {
-                    ItemStack stack = postboxInventory.getItem(i);
-                    if (!PackageItem.isPackage(stack)) {
+                for (int i = 0, size = postboxInventory.size(); i < size; i++) {
+                    ItemStack stack = postboxInventory.getStack(i);
+                    if (!PackageItem.isPackage(stack))
                         continue;
-                    }
-                    if (PackageItem.matchAddress(stack, port.address)) {
+                    if (PackageItem.matchAddress(stack, port.address))
                         continue;
-                    }
                     try {
-                        if (!PackageItem.getAddress(stack).matches(regex)) {
+                        if (!PackageItem.getAddress(stack).matches(regex))
                             continue;
-                        }
                         anyMatch = true;
                         validStations.add(globalStation);
                     } catch (PatternSyntaxException ignored) {
@@ -105,9 +98,8 @@ public class FetchPackagesInstruction extends TextScheduleInstruction {
 
         DiscoveredPath best = train.navigation.findPathTo(validStations, Double.MAX_VALUE);
         if (best == null) {
-            if (anyMatch) {
+            if (anyMatch)
                 train.status.failedNavigation();
-            }
             runtime.startCooldown();
             return null;
         }

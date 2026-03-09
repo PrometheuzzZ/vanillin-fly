@@ -5,10 +5,10 @@ import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import com.zurrtum.create.api.equipment.potatoCannon.PotatoProjectileRenderMode;
 import com.zurrtum.create.api.registry.CreateRegistries;
-import net.minecraft.core.Registry;
-import net.minecraft.resources.Identifier;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.entity.Entity;
+import net.minecraft.registry.Registry;
+import net.minecraft.util.Identifier;
+import net.minecraft.util.math.Vec3d;
 
 import static com.zurrtum.create.Create.MOD_ID;
 
@@ -21,11 +21,7 @@ public class AllPotatoProjectileRenderModes {
     }
 
     private static void register(String name, MapCodec<? extends PotatoProjectileRenderMode> codec) {
-        Registry.register(
-            CreateRegistries.POTATO_PROJECTILE_RENDER_MODE,
-            Identifier.fromNamespaceAndPath(MOD_ID, name),
-            codec
-        );
+        Registry.register(CreateRegistries.POTATO_PROJECTILE_RENDER_MODE, Identifier.of(MOD_ID, name), codec);
     }
 
     public enum Billboard implements PotatoProjectileRenderMode {
@@ -53,8 +49,7 @@ public class AllPotatoProjectileRenderModes {
     public record TowardMotion(int spriteAngleOffset, float spin) implements PotatoProjectileRenderMode {
         public static final MapCodec<TowardMotion> CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
             Codec.INT.fieldOf(
-                "sprite_angle_offset").forGetter(i -> i.spriteAngleOffset),
-            Codec.FLOAT.fieldOf("spin").forGetter(i -> i.spin)
+                "sprite_angle_offset").forGetter(i -> i.spriteAngleOffset), Codec.FLOAT.fieldOf("spin").forGetter(i -> i.spin)
         ).apply(instance, TowardMotion::new));
 
         @Override
@@ -63,9 +58,9 @@ public class AllPotatoProjectileRenderModes {
         }
     }
 
-    public record StuckToEntity(Vec3 offset) implements PotatoProjectileRenderMode {
-        public static final MapCodec<StuckToEntity> CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(Vec3.CODEC.fieldOf(
-            "offset").forGetter(i -> i.offset)).apply(instance, StuckToEntity::new));
+    public record StuckToEntity(Vec3d offset) implements PotatoProjectileRenderMode {
+        public static final MapCodec<StuckToEntity> CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(Vec3d.CODEC.fieldOf("offset")
+            .forGetter(i -> i.offset)).apply(instance, StuckToEntity::new));
 
         @Override
         public MapCodec<? extends PotatoProjectileRenderMode> codec() {

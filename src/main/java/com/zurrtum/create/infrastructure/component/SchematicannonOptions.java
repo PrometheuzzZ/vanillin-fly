@@ -2,9 +2,9 @@ package com.zurrtum.create.infrastructure.component;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.PacketByteBuf;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
 
 public record SchematicannonOptions(int replaceMode, boolean skipMissing, boolean replaceBlockEntities) {
     public static final Codec<SchematicannonOptions> CODEC = RecordCodecBuilder.create(i -> i.group(
@@ -13,12 +13,12 @@ public record SchematicannonOptions(int replaceMode, boolean skipMissing, boolea
         Codec.BOOL.fieldOf("replace_block_entities").forGetter(SchematicannonOptions::replaceBlockEntities)
     ).apply(i, SchematicannonOptions::new));
 
-    public static final StreamCodec<FriendlyByteBuf, SchematicannonOptions> STREAM_CODEC = StreamCodec.composite(
-        ByteBufCodecs.INT,
+    public static final PacketCodec<PacketByteBuf, SchematicannonOptions> STREAM_CODEC = PacketCodec.tuple(
+        PacketCodecs.INTEGER,
         SchematicannonOptions::replaceMode,
-        ByteBufCodecs.BOOL,
+        PacketCodecs.BOOLEAN,
         SchematicannonOptions::skipMissing,
-        ByteBufCodecs.BOOL,
+        PacketCodecs.BOOLEAN,
         SchematicannonOptions::replaceBlockEntities,
         SchematicannonOptions::new
     );

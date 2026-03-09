@@ -3,15 +3,15 @@ package com.zurrtum.create.content.logistics.filter;
 import com.zurrtum.create.AllDataComponents;
 import com.zurrtum.create.AllMenuTypes;
 import com.zurrtum.create.infrastructure.items.ItemStackHandler;
-import net.minecraft.world.entity.player.Inventory;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.entity.player.PlayerInventory;
+import net.minecraft.item.ItemStack;
 
 public class PackageFilterMenu extends AbstractFilterMenu {
 
     public String address;
 
-    public PackageFilterMenu(int id, Inventory inv, ItemStack stack) {
+    public PackageFilterMenu(int id, PlayerInventory inv, ItemStack stack) {
         super(AllMenuTypes.PACKAGE_FILTER, id, inv, stack);
     }
 
@@ -48,15 +48,14 @@ public class PackageFilterMenu extends AbstractFilterMenu {
     @Override
     protected void saveData(ItemStack filterItem) {
         super.saveData(filterItem);
-        if (address.isBlank()) {
+        if (address.isBlank())
             filterItem.remove(AllDataComponents.PACKAGE_ADDRESS);
-        } else {
+        else
             filterItem.set(AllDataComponents.PACKAGE_ADDRESS, address);
-        }
     }
 
     @Override
-    public ItemStack quickMoveStack(Player playerIn, int index) {
+    public ItemStack quickMove(PlayerEntity playerIn, int index) {
         return ItemStack.EMPTY;
     }
 

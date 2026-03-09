@@ -1,7 +1,7 @@
 package com.zurrtum.create.client.ponder.api.registration;
 
 import com.zurrtum.create.client.ponder.api.level.PonderLevel;
-import net.minecraft.resources.Identifier;
+import net.minecraft.util.Identifier;
 
 public interface PonderPlugin {
 

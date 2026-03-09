@@ -1,7 +1,7 @@
 package com.zurrtum.create.client.catnip.render;
 
-import net.minecraft.client.renderer.texture.TextureAtlasSprite;
-import net.minecraft.resources.Identifier;
+import net.minecraft.client.texture.Sprite;
+import net.minecraft.util.Identifier;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Objects;
@@ -17,41 +17,41 @@ public class SpriteShiftEntry {
         target = new StitchedSprite(targetLocation);
     }
 
-    public Identifier getOriginalIdentifier() {
+    public Identifier getOriginalResourceLocation() {
         Objects.requireNonNull(original);
         return original.getLocation();
     }
 
-    public Identifier getTargetIdentifier() {
+    public Identifier getTargetResourceLocation() {
         Objects.requireNonNull(target);
         return target.getLocation();
     }
 
-    public TextureAtlasSprite getOriginal() {
+    public Sprite getOriginal() {
         Objects.requireNonNull(original);
         return original.get();
     }
 
-    public TextureAtlasSprite getTarget() {
+    public Sprite getTarget() {
         Objects.requireNonNull(target);
         return target.get();
     }
 
     public float getTargetU(float localU) {
-        return getTarget().getU(getUnInterpolatedU(getOriginal(), localU));
+        return getTarget().getFrameU(getUnInterpolatedU(getOriginal(), localU));
     }
 
     public float getTargetV(float localV) {
-        return getTarget().getV(getUnInterpolatedV(getOriginal(), localV));
+        return getTarget().getFrameV(getUnInterpolatedV(getOriginal(), localV));
     }
 
-    public static float getUnInterpolatedU(TextureAtlasSprite sprite, float u) {
-        float f = sprite.getU1() - sprite.getU0();
-        return (u - sprite.getU0()) / f;
+    public static float getUnInterpolatedU(Sprite sprite, float u) {
+        float f = sprite.getMaxU() - sprite.getMinU();
+        return (u - sprite.getMinU()) / f;
     }
 
-    public static float getUnInterpolatedV(TextureAtlasSprite sprite, float v) {
-        float f = sprite.getV1() - sprite.getV0();
-        return (v - sprite.getV0()) / f;
+    public static float getUnInterpolatedV(Sprite sprite, float v) {
+        float f = sprite.getMaxV() - sprite.getMinV();
+        return (v - sprite.getMinV()) / f;
     }
 }

@@ -1,8 +1,8 @@
 package com.zurrtum.create.content.redstone.diodes;
 
 import com.zurrtum.create.AllBlockEntityTypes;
-import net.minecraft.core.BlockPos;
-import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.block.BlockState;
+import net.minecraft.util.math.BlockPos;
 
 import static com.zurrtum.create.content.redstone.diodes.BrassDiodeBlock.POWERING;
 
@@ -19,21 +19,18 @@ public class PulseTimerBlockEntity extends BrassDiodeBlockEntity {
 
     @Override
     protected void updateState(boolean powered, boolean powering, boolean atMax, boolean atMin) {
-        if (powered || state >= maxState.getValue() - 1) {
+        if (powered || state >= maxState.getValue() - 1)
             state = 0;
-        } else {
+        else
             state++;
-        }
 
-        if (level.isClientSide()) {
+        if (world.isClient())
             return;
-        }
 
         boolean shouldPower = !powered && (maxState.getValue() == 2 ? state == 0 : state <= 1);
-        BlockState blockState = getBlockState();
-        if (blockState.getValue(POWERING) != shouldPower) {
-            level.setBlockAndUpdate(worldPosition, blockState.setValue(POWERING, shouldPower));
-        }
+        BlockState blockState = getCachedState();
+        if (blockState.get(POWERING) != shouldPower)
+            world.setBlockState(pos, blockState.with(POWERING, shouldPower));
     }
 
 }

@@ -5,54 +5,49 @@ import com.zurrtum.create.catnip.math.VecHelper;
 import com.zurrtum.create.foundation.fluid.FluidHelper;
 import com.zurrtum.create.foundation.utility.CreateResourceReloader;
 import it.unimi.dsi.fastutil.objects.Object2BooleanOpenHashMap;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Vec3i;
-import net.minecraft.server.packs.resources.ResourceManager;
-import net.minecraft.server.packs.resources.ResourceManagerReloadListener;
-import net.minecraft.util.Mth;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.LevelAccessor;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
+import net.minecraft.resource.ResourceManager;
+import net.minecraft.resource.SynchronousResourceReloader;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.util.math.Vec3i;
+import net.minecraft.world.World;
+import net.minecraft.world.WorldAccess;
 
 import java.util.Map;
 
 public class BeltHelper {
 
     public static Map<Item, Boolean> uprightCache = new Object2BooleanOpenHashMap<>();
-    public static final ResourceManagerReloadListener LISTENER = new ReloadListener();
+    public static final SynchronousResourceReloader LISTENER = new ReloadListener();
 
     public static boolean isItemUpright(ItemStack stack) {
         return uprightCache.computeIfAbsent(
             stack.getItem(),
-            item -> (FluidHelper.hasFluidInventory(stack) || stack.is(AllItemTags.UPRIGHT_ON_BELT)) && !stack.is(
-                AllItemTags.NOT_UPRIGHT_ON_BELT)
+            item -> (FluidHelper.hasFluidInventory(stack) || stack.isIn(AllItemTags.UPRIGHT_ON_BELT)) && !stack.isIn(AllItemTags.NOT_UPRIGHT_ON_BELT)
         );
     }
 
-    public static BeltBlockEntity getSegmentBE(LevelAccessor world, BlockPos pos) {
-        if (world instanceof Level l && !l.isLoaded(pos)) {
+    public static BeltBlockEntity getSegmentBE(WorldAccess world, BlockPos pos) {
+        if (world instanceof World l && !l.isPosLoaded(pos))
             return null;
-        }
         BlockEntity blockEntity = world.getBlockEntity(pos);
-        if (!(blockEntity instanceof BeltBlockEntity)) {
+        if (!(blockEntity instanceof BeltBlockEntity))
             return null;
-        }
         return (BeltBlockEntity) blockEntity;
     }
 
-    public static BeltBlockEntity getControllerBE(LevelAccessor world, BlockPos pos) {
+    public static BeltBlockEntity getControllerBE(WorldAccess world, BlockPos pos) {
         BeltBlockEntity segment = getSegmentBE(world, pos);
-        if (segment == null) {
+        if (segment == null)
             return null;
-        }
         BlockPos controllerPos = segment.controller;
-        if (controllerPos == null) {
+        if (controllerPos == null)
             return null;
-        }
         return getSegmentBE(world, controllerPos);
     }
 
@@ -62,76 +57,59 @@ public class BeltHelper {
 
     public static BeltBlockEntity getBeltAtSegment(BeltBlockEntity controller, int segment) {
         BlockPos pos = getPositionForOffset(controller, segment);
-        BlockEntity be = controller.getLevel().getBlockEntity(pos);
-        if (be == null || !(be instanceof BeltBlockEntity)) {
+        BlockEntity be = controller.getWorld().getBlockEntity(pos);
+        if (be == null || !(be instanceof BeltBlockEntity))
             return null;
-        }
         return (BeltBlockEntity) be;
     }
 
     public static BlockPos getPositionForOffset(BeltBlockEntity controller, int offset) {
-        BlockPos pos = controller.getBlockPos();
-        Vec3i vec = controller.getBeltFacing().getUnitVec3i();
-        BeltSlope slope = controller.getBlockState().getValue(BeltBlock.SLOPE);
+        BlockPos pos = controller.getPos();
+        Vec3i vec = controller.getBeltFacing().getVector();
+        BeltSlope slope = controller.getCachedState().get(BeltBlock.SLOPE);
         int verticality = slope == BeltSlope.DOWNWARD ? -1 : slope == BeltSlope.UPWARD ? 1 : 0;
 
-        return pos.offset(
-            offset * vec.getX(),
-            Mth.clamp(offset, 0, controller.beltLength - 1) * verticality,
-            offset * vec.getZ()
-        );
+        return pos.add(offset * vec.getX(), MathHelper.clamp(offset, 0, controller.beltLength - 1) * verticality, offset * vec.getZ());
     }
 
-    public static Vec3 getVectorForOffset(BeltBlockEntity controller, float offset) {
-        BeltSlope slope = controller.getBlockState().getValue(BeltBlock.SLOPE);
+    public static Vec3d getVectorForOffset(BeltBlockEntity controller, float offset) {
+        BeltSlope slope = controller.getCachedState().get(BeltBlock.SLOPE);
         float verticalMovement = slope == BeltSlope.DOWNWARD ? -1 : slope == BeltSlope.UPWARD ? 1 : 0;
-        if (offset < .5) {
+        if (offset < .5)
             verticalMovement = 0;
-        }
         verticalMovement = verticalMovement * (Math.min(offset, controller.beltLength - .5f) - .5f);
-        Vec3 vec = VecHelper.getCenterOf(controller.getBlockPos());
-        Vec3 horizontalMovement = Vec3.atLowerCornerOf(controller.getBeltFacing().getUnitVec3i()).scale(offset - .5f);
+        Vec3d vec = VecHelper.getCenterOf(controller.getPos());
+        Vec3d horizontalMovement = Vec3d.of(controller.getBeltFacing().getVector()).multiply(offset - .5f);
 
-        if (slope == BeltSlope.VERTICAL) {
-            horizontalMovement = Vec3.ZERO;
-        }
+        if (slope == BeltSlope.VERTICAL)
+            horizontalMovement = Vec3d.ZERO;
 
         vec = vec.add(horizontalMovement).add(0, verticalMovement, 0);
         return vec;
     }
 
-    public static Vec3 getVectorForOffset(
-        BlockPos pos,
-        BeltSlope slope,
-        int verticality,
-        int beltLength,
-        Vec3i directionVec,
-        float offset
-    ) {
+    public static Vec3d getVectorForOffset(BlockPos pos, BeltSlope slope, int verticality, int beltLength, Vec3i directionVec, float offset) {
         float verticalMovement = verticality;
-        if (offset < .5) {
+        if (offset < .5)
             verticalMovement = 0;
-        }
         verticalMovement = verticalMovement * (Math.min(offset, beltLength - .5f) - .5f);
-        Vec3 vec = VecHelper.getCenterOf(pos);
-        Vec3 horizontalMovement = Vec3.atLowerCornerOf(directionVec).scale(offset - .5f);
+        Vec3d vec = VecHelper.getCenterOf(pos);
+        Vec3d horizontalMovement = Vec3d.of(directionVec).multiply(offset - .5f);
 
-        if (slope == BeltSlope.VERTICAL) {
-            horizontalMovement = Vec3.ZERO;
-        }
+        if (slope == BeltSlope.VERTICAL)
+            horizontalMovement = Vec3d.ZERO;
 
         vec = vec.add(horizontalMovement).add(0, verticalMovement, 0);
         return vec;
     }
 
-    public static Vec3 getBeltVector(BlockState state) {
-        BeltSlope slope = state.getValue(BeltBlock.SLOPE);
+    public static Vec3d getBeltVector(BlockState state) {
+        BeltSlope slope = state.get(BeltBlock.SLOPE);
         int verticality = slope == BeltSlope.DOWNWARD ? -1 : slope == BeltSlope.UPWARD ? 1 : 0;
-        Vec3 horizontalMovement = Vec3.atLowerCornerOf(state.getValue(BeltBlock.HORIZONTAL_FACING).getUnitVec3i());
-        if (slope == BeltSlope.VERTICAL) {
-            return new Vec3(0, state.getValue(BeltBlock.HORIZONTAL_FACING).getAxisDirection().getStep(), 0);
-        }
-        return new Vec3(0, verticality, 0).add(horizontalMovement);
+        Vec3d horizontalMovement = Vec3d.of(state.get(BeltBlock.HORIZONTAL_FACING).getVector());
+        if (slope == BeltSlope.VERTICAL)
+            return new Vec3d(0, state.get(BeltBlock.HORIZONTAL_FACING).getDirection().offset(), 0);
+        return new Vec3d(0, verticality, 0).add(horizontalMovement);
     }
 
     private static class ReloadListener extends CreateResourceReloader {
@@ -140,7 +118,7 @@ public class BeltHelper {
         }
 
         @Override
-        public void onResourceManagerReload(ResourceManager resourceManager) {
+        public void reload(ResourceManager resourceManager) {
             uprightCache.clear();
         }
     }

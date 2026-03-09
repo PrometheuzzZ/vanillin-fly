@@ -1,19 +1,19 @@
 package com.zurrtum.create.foundation.item;
 
-import net.minecraft.sounds.SoundEvent;
-import net.minecraft.sounds.SoundSource;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.level.Level;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.sound.SoundCategory;
+import net.minecraft.sound.SoundEvent;
+import net.minecraft.world.World;
 
 public interface CustomAttackSoundItem {
     void playSound(
-        Level world,
-        Player player,
+        World world,
+        PlayerEntity player,
         double x,
         double y,
         double z,
         SoundEvent sound,
-        SoundSource category,
+        SoundCategory category,
         float volume,
         float pitch
     );

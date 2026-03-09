@@ -3,15 +3,15 @@ package com.zurrtum.create.content.trains.bogey;
 import com.zurrtum.create.AllBogeyStyles;
 import com.zurrtum.create.catnip.animation.LerpedFloat;
 import com.zurrtum.create.foundation.blockEntity.CachedRenderBBBlockEntity;
-import net.minecraft.core.BlockPos;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.resources.Identifier;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.entity.BlockEntityType;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
-import net.minecraft.world.phys.AABB;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.entity.BlockEntityType;
+import net.minecraft.nbt.NbtCompound;
+import net.minecraft.storage.ReadView;
+import net.minecraft.storage.WriteView;
+import net.minecraft.util.Identifier;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Box;
+import net.minecraft.world.World;
 import org.jetbrains.annotations.NotNull;
 
 import static com.zurrtum.create.content.trains.entity.CarriageBogey.UPSIDE_DOWN_KEY;
@@ -20,7 +20,7 @@ public abstract class AbstractBogeyBlockEntity extends CachedRenderBBBlockEntity
     public static final String BOGEY_STYLE_KEY = "BogeyStyle";
     public static final String BOGEY_DATA_KEY = "BogeyData";
 
-    private CompoundTag bogeyData;
+    private NbtCompound bogeyData;
 
     public AbstractBogeyBlockEntity(BlockEntityType<?> type, BlockPos pos, BlockState state) {
         super(type, pos, state);
@@ -28,29 +28,28 @@ public abstract class AbstractBogeyBlockEntity extends CachedRenderBBBlockEntity
 
     public abstract BogeyStyle getDefaultStyle();
 
-    public CompoundTag getBogeyData() {
-        if (bogeyData == null || !bogeyData.contains(BOGEY_STYLE_KEY)) {
+    public NbtCompound getBogeyData() {
+        if (bogeyData == null || !bogeyData.contains(BOGEY_STYLE_KEY))
             bogeyData = createBogeyData();
-        }
         return bogeyData;
     }
 
-    public void setBogeyData(@NotNull CompoundTag newData) {
+    public void setBogeyData(@NotNull NbtCompound newData) {
         if (!newData.contains(BOGEY_STYLE_KEY)) {
-            newData.store(BOGEY_STYLE_KEY, Identifier.CODEC, getDefaultStyle().id);
+            newData.put(BOGEY_STYLE_KEY, Identifier.CODEC, getDefaultStyle().id);
         }
         bogeyData = newData;
     }
 
     public void setBogeyStyle(@NotNull BogeyStyle style) {
-        getBogeyData().store(BOGEY_STYLE_KEY, Identifier.CODEC, style.id);
+        getBogeyData().put(BOGEY_STYLE_KEY, Identifier.CODEC, style.id);
         markUpdated();
     }
 
     @NotNull
     public BogeyStyle getStyle() {
-        CompoundTag data = getBogeyData();
-        Identifier currentStyle = data.read(BOGEY_STYLE_KEY, Identifier.CODEC).orElseThrow();
+        NbtCompound data = getBogeyData();
+        Identifier currentStyle = data.get(BOGEY_STYLE_KEY, Identifier.CODEC).orElseThrow();
         BogeyStyle style = AllBogeyStyles.BOGEY_STYLES.get(currentStyle);
         if (style == null) {
             setBogeyStyle(getDefaultStyle());
@@ -60,34 +59,32 @@ public abstract class AbstractBogeyBlockEntity extends CachedRenderBBBlockEntity
     }
 
     @Override
-    protected void saveAdditional(ValueOutput view) {
-        CompoundTag data = this.getBogeyData();
-        if (data != null) {
-            view.store(BOGEY_DATA_KEY, CompoundTag.CODEC, data); // Now contains style
-        }
-        super.saveAdditional(view);
+    protected void writeData(WriteView view) {
+        NbtCompound data = this.getBogeyData();
+        if (data != null)
+            view.put(BOGEY_DATA_KEY, NbtCompound.CODEC, data); // Now contains style
+        super.writeData(view);
     }
 
     @Override
-    protected void loadAdditional(ValueInput view) {
-        bogeyData = view.read(BOGEY_DATA_KEY, CompoundTag.CODEC).orElseGet(this::createBogeyData);
-        super.loadAdditional(view);
+    protected void readData(ReadView view) {
+        bogeyData = view.read(BOGEY_DATA_KEY, NbtCompound.CODEC).orElseGet(this::createBogeyData);
+        super.readData(view);
     }
 
-    private CompoundTag createBogeyData() {
-        CompoundTag nbt = new CompoundTag();
-        nbt.store(BOGEY_STYLE_KEY, Identifier.CODEC, getDefaultStyle().id);
+    private NbtCompound createBogeyData() {
+        NbtCompound nbt = new NbtCompound();
+        nbt.put(BOGEY_STYLE_KEY, Identifier.CODEC, getDefaultStyle().id);
         boolean upsideDown = false;
-        if (getBlockState().getBlock() instanceof AbstractBogeyBlock<?> bogeyBlock) {
-            upsideDown = bogeyBlock.isUpsideDown(getBlockState());
-        }
+        if (getCachedState().getBlock() instanceof AbstractBogeyBlock<?> bogeyBlock)
+            upsideDown = bogeyBlock.isUpsideDown(getCachedState());
         nbt.putBoolean(UPSIDE_DOWN_KEY, upsideDown);
         return nbt;
     }
 
     @Override
-    protected AABB createRenderBoundingBox() {
-        return super.createRenderBoundingBox().inflate(2);
+    protected Box createRenderBoundingBox() {
+        return super.createRenderBoundingBox().expand(2);
     }
 
     // Ponder
@@ -98,20 +95,18 @@ public abstract class AbstractBogeyBlockEntity extends CachedRenderBBBlockEntity
     }
 
     public void animate(float distanceMoved) {
-        BlockState blockState = getBlockState();
-        if (!(blockState.getBlock() instanceof AbstractBogeyBlock<?> type)) {
+        BlockState blockState = getCachedState();
+        if (!(blockState.getBlock() instanceof AbstractBogeyBlock<?> type))
             return;
-        }
         double angleDiff = 360 * distanceMoved / (Math.PI * 2 * type.getWheelRadius());
         double newWheelAngle = (virtualAnimation.getValue() - angleDiff) % 360;
         virtualAnimation.setValue(newWheelAngle);
     }
 
     private void markUpdated() {
-        setChanged();
-        Level level = getLevel();
-        if (level != null) {
-            level.sendBlockUpdated(getBlockPos(), getBlockState(), getBlockState(), 3);
-        }
+        markDirty();
+        World level = getWorld();
+        if (level != null)
+            level.updateListeners(getPos(), getCachedState(), getCachedState(), 3);
     }
 }

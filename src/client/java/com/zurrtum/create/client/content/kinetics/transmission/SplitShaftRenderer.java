@@ -1,7 +1,5 @@
 package com.zurrtum.create.client.content.kinetics.transmission;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.zurrtum.create.catnip.theme.Color;
 import com.zurrtum.create.client.AllPartialModels;
 import com.zurrtum.create.client.catnip.animation.AnimationTickHolder;
@@ -10,22 +8,23 @@ import com.zurrtum.create.client.catnip.render.SuperByteBuffer;
 import com.zurrtum.create.client.content.kinetics.base.KineticBlockEntityRenderer;
 import com.zurrtum.create.content.kinetics.base.IRotate;
 import com.zurrtum.create.content.kinetics.transmission.SplitShaftBlockEntity;
-import net.minecraft.client.renderer.SubmitNodeCollector;
-import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
-import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
-import net.minecraft.client.renderer.blockentity.state.BlockEntityRenderState;
-import net.minecraft.client.renderer.feature.ModelFeatureRenderer;
-import net.minecraft.client.renderer.rendertype.RenderType;
-import net.minecraft.client.renderer.rendertype.RenderTypes;
-import net.minecraft.client.renderer.state.CameraRenderState;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.core.Direction.Axis;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.client.render.RenderLayer;
+import net.minecraft.client.render.VertexConsumer;
+import net.minecraft.client.render.block.entity.BlockEntityRenderer;
+import net.minecraft.client.render.block.entity.BlockEntityRendererFactory;
+import net.minecraft.client.render.block.entity.state.BlockEntityRenderState;
+import net.minecraft.client.render.command.ModelCommandRenderer;
+import net.minecraft.client.render.command.OrderedRenderCommandQueue;
+import net.minecraft.client.render.state.CameraRenderState;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Direction.Axis;
+import net.minecraft.util.math.Vec3d;
 import org.jetbrains.annotations.Nullable;
 
 public class SplitShaftRenderer implements BlockEntityRenderer<SplitShaftBlockEntity, SplitShaftRenderer.SplitShaftRenderState> {
-    public SplitShaftRenderer(BlockEntityRendererProvider.Context context) {
+    public SplitShaftRenderer(BlockEntityRendererFactory.Context context) {
     }
 
     @Override
@@ -34,19 +33,19 @@ public class SplitShaftRenderer implements BlockEntityRenderer<SplitShaftBlockEn
     }
 
     @Override
-    public void extractRenderState(
+    public void updateRenderState(
         SplitShaftBlockEntity be,
         SplitShaftRenderState state,
         float tickProgress,
-        Vec3 cameraPos,
-        @Nullable ModelFeatureRenderer.CrumblingOverlay crumblingOverlay
+        Vec3d cameraPos,
+        @Nullable ModelCommandRenderer.CrumblingOverlayCommand crumblingOverlay
     ) {
-        BlockEntityRenderState.extractBase(be, state, crumblingOverlay);
-        state.layer = RenderTypes.solidMovingBlock();
+        BlockEntityRenderState.updateBlockEntityRenderState(be, state, crumblingOverlay);
+        state.layer = RenderLayer.getSolid();
         state.color = KineticBlockEntityRenderer.getColor(be);
         Axis boxAxis = ((IRotate) state.blockState.getBlock()).getRotationAxis(state.blockState);
-        BlockPos pos = state.blockPos;
-        float time = AnimationTickHolder.getRenderTime(be.getLevel());
+        BlockPos pos = state.pos;
+        float time = AnimationTickHolder.getRenderTime(be.getWorld());
         float offset = KineticBlockEntityRenderer.getRotationOffsetForPosition(be, pos, boxAxis);
         float angle = (time * be.getSpeed() * 3f / 10) % 360;
         state.direction = switch (boxAxis) {
@@ -72,17 +71,12 @@ public class SplitShaftRenderer implements BlockEntityRenderer<SplitShaftBlockEn
     }
 
     @Override
-    public void submit(
-        SplitShaftRenderState state,
-        PoseStack matrices,
-        SubmitNodeCollector queue,
-        CameraRenderState cameraState
-    ) {
-        queue.submitCustomGeometry(matrices, state.layer, state);
+    public void render(SplitShaftRenderState state, MatrixStack matrices, OrderedRenderCommandQueue queue, CameraRenderState cameraState) {
+        queue.submitCustom(matrices, state.layer, state);
     }
 
-    public static class SplitShaftRenderState extends BlockEntityRenderState implements SubmitNodeCollector.CustomGeometryRenderer {
-        public RenderType layer;
+    public static class SplitShaftRenderState extends BlockEntityRenderState implements OrderedRenderCommandQueue.Custom {
+        public RenderLayer layer;
         public Color color;
         public Direction direction;
         public SuperByteBuffer top;
@@ -91,12 +85,12 @@ public class SplitShaftRenderer implements BlockEntityRenderer<SplitShaftBlockEn
         public float bottomAngle;
 
         @Override
-        public void render(PoseStack.Pose matricesEntry, VertexConsumer vertexConsumer) {
-            top.light(lightCoords);
+        public void render(MatrixStack.Entry matricesEntry, VertexConsumer vertexConsumer) {
+            top.light(lightmapCoordinates);
             top.rotateCentered(topAngle, direction);
             top.color(color);
             top.renderInto(matricesEntry, vertexConsumer);
-            bottom.light(lightCoords);
+            bottom.light(lightmapCoordinates);
             bottom.rotateCentered(bottomAngle, direction);
             bottom.color(color);
             bottom.renderInto(matricesEntry, vertexConsumer);

@@ -14,12 +14,11 @@ public class HandCrankAudioBehaviour extends KineticAudioBehaviour<HandCrankBloc
     public void tickAudio() {
         super.tickAudio();
         if (blockEntity.inUse > 0 && AnimationTickHolder.getTicks() % 10 == 0) {
-            if (!blockEntity.getBlockState().is(AllBlocks.HAND_CRANK)) {
+            if (!blockEntity.getCachedState().isOf(AllBlocks.HAND_CRANK))
                 return;
-            }
             AllSoundEvents.CRANKING.playAt(
-                blockEntity.getLevel(),
-                blockEntity.getBlockPos(),
+                blockEntity.getWorld(),
+                blockEntity.getPos(),
                 blockEntity.inUse / 2.5f,
                 .65f + (10 - blockEntity.inUse) / 10f,
                 true

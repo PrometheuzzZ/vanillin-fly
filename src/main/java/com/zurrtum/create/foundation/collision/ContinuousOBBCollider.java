@@ -2,23 +2,23 @@ package com.zurrtum.create.foundation.collision;
 
 import com.zurrtum.create.catnip.data.Iterate;
 import com.zurrtum.create.foundation.collision.CollisionList.Populate;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.util.math.Vec3d;
 
 import static java.lang.Math.abs;
 import static java.lang.Math.signum;
 
 public class ContinuousOBBCollider {
 
-    static final Vec3 uA0 = new Vec3(1, 0, 0);
-    static final Vec3 uA1 = new Vec3(0, 1, 0);
-    static final Vec3 uA2 = new Vec3(0, 0, 1);
+    static final Vec3d uA0 = new Vec3d(1, 0, 0);
+    static final Vec3d uA1 = new Vec3d(0, 1, 0);
+    static final Vec3d uA2 = new Vec3d(0, 0, 1);
     static int checkCount = 0;
 
     public static class CollisionResponse {
         public boolean surfaceCollision;
-        public Vec3 collisionResponse;
-        public Vec3 normal;
-        public Vec3 location;
+        public Vec3d collisionResponse;
+        public Vec3d normal;
+        public Vec3d location;
         public double temporalResponse;
     }
 
@@ -26,12 +26,12 @@ public class ContinuousOBBCollider {
         CollisionList collidableBBs,
         CollisionList denseViableColliders,
         OrientedBB obb,
-        Vec3 motion,
+        Vec3d motion,
         float entityMaxStep,
         boolean doHorizontalPass
     ) {
-        Vec3 obbCenter = obb.center;
-        Vec3 obbExtents = obb.extents;
+        Vec3d obbCenter = obb.center;
+        Vec3d obbExtents = obb.extents;
         Matrix3d rotation = obb.rotation;
 
         double a00 = abs(rotation.m00);
@@ -57,15 +57,12 @@ public class ContinuousOBBCollider {
         // space required for the actual collision pass and improve the cache locality of the colliders.
         denseViableColliders.size = 0;
         for (int bbIdx = 0; bbIdx < collidableBBs.size; ++bbIdx) {
-            if (Math.abs((obbCenter.x + motion.x) - collidableBBs.centerX[bbIdx]) > collidableBBs.extentsX[bbIdx] + aabbInLocalX) {
+            if (Math.abs((obbCenter.x + motion.x) - collidableBBs.centerX[bbIdx]) > collidableBBs.extentsX[bbIdx] + aabbInLocalX)
                 continue;
-            }
-            if (Math.abs((obbCenter.y + motion.y) - collidableBBs.centerY[bbIdx]) > collidableBBs.extentsY[bbIdx] + aabbInLocalY) {
+            if (Math.abs((obbCenter.y + motion.y) - collidableBBs.centerY[bbIdx]) > collidableBBs.extentsY[bbIdx] + aabbInLocalY)
                 continue;
-            }
-            if (Math.abs((obbCenter.z + motion.z) - collidableBBs.centerZ[bbIdx]) > collidableBBs.extentsZ[bbIdx] + aabbInLocalZ) {
+            if (Math.abs((obbCenter.z + motion.z) - collidableBBs.centerZ[bbIdx]) > collidableBBs.extentsZ[bbIdx] + aabbInLocalZ)
                 continue;
-            }
 
             populateDenseViableColliders.appendFrom(collidableBBs, bbIdx);
         }
@@ -74,9 +71,9 @@ public class ContinuousOBBCollider {
         if (denseViableColliders.size == 0) {
             CollisionResponse out = new CollisionResponse();
             out.surfaceCollision = false;
-            out.collisionResponse = Vec3.ZERO;
-            out.normal = Vec3.ZERO;
-            out.location = Vec3.ZERO;
+            out.collisionResponse = Vec3d.ZERO;
+            out.normal = Vec3d.ZERO;
+            out.location = Vec3d.ZERO;
             out.temporalResponse = 1;
             return out;
         }
@@ -96,12 +93,12 @@ public class ContinuousOBBCollider {
         boolean surfaceCollision = false;
         double temporalResponse = 1;
 
-        Vec3 uB0 = new Vec3(rotation.m00, rotation.m10, rotation.m20).normalize();
-        Vec3 uB1 = new Vec3(rotation.m01, rotation.m11, rotation.m21).normalize();
-        Vec3 uB2 = new Vec3(rotation.m02, rotation.m12, rotation.m22).normalize();
+        Vec3d uB0 = new Vec3d(rotation.m00, rotation.m10, rotation.m20).normalize();
+        Vec3d uB1 = new Vec3d(rotation.m01, rotation.m11, rotation.m21).normalize();
+        Vec3d uB2 = new Vec3d(rotation.m02, rotation.m12, rotation.m22).normalize();
 
         // Motion in the entity's frame.
-        Vec3 motion2 = rotation.transformTransposed(motion);
+        Vec3d motion2 = rotation.transformTransposed(motion);
 
         // Re-use the same manifold object per collider check.
         ContinuousSeparationManifold mf = new ContinuousSeparationManifold(uB1);
@@ -128,15 +125,7 @@ public class ContinuousOBBCollider {
                 double extentsZ = denseViableColliders.extentsZ[bbIdx];
 
                 // Separate along A's local axes (global XYZ)
-                if (mf.separate(
-                    uA0,
-                    deltaX,
-                    extentsX,
-                    a00 * obbExtents.x + a01 * obbExtents.y + a02 * obbExtents.z,
-                    motion.x,
-                    true
-                ) || mf.separate(
-                    uA1,
+                if (mf.separate(uA0, deltaX, extentsX, a00 * obbExtents.x + a01 * obbExtents.y + a02 * obbExtents.z, motion.x, true) || mf.separate(uA1,
                     deltaY,
                     extentsY,
                     a10 * obbExtents.x + a11 * obbExtents.y + a12 * obbExtents.z,
@@ -153,7 +142,7 @@ public class ContinuousOBBCollider {
                     continue;
                 }
 
-                Vec3 deltaEntityFrame = rotation.transformTransposed(deltaX, deltaY, deltaZ);
+                Vec3d deltaEntityFrame = rotation.transformTransposed(deltaX, deltaY, deltaZ);
 
                 // Separate along B's local axes
                 if (mf.separate(
@@ -183,9 +172,8 @@ public class ContinuousOBBCollider {
 
                 // If we reach here, the manifold has valid collision positions and normals.
 
-                if (verticalPass && !surfaceCollision) {
+                if (verticalPass && !surfaceCollision)
                     surfaceCollision = true;
-                }
 
                 double timeOfImpact = mf.getTimeOfImpact();
                 boolean isTemporal = timeOfImpact > 0 && timeOfImpact < 1;
@@ -221,15 +209,13 @@ public class ContinuousOBBCollider {
                 }
             }
 
-            if (verticalPass) {
+            if (verticalPass)
                 break;
-            }
 
             boolean noVerticalMotionResponse = temporalResponse == 1;
             boolean noVerticalCollision = collisionResponseY == 0;
-            if (noVerticalCollision && noVerticalMotionResponse) {
+            if (noVerticalCollision && noVerticalMotionResponse)
                 break;
-            }
 
             // Re-run collisions with horizontal offset
             collisionResponseX *= 129.0 / 128.0;
@@ -238,9 +224,9 @@ public class ContinuousOBBCollider {
 
         CollisionResponse out = new CollisionResponse();
         out.surfaceCollision = surfaceCollision;
-        out.collisionResponse = new Vec3(collisionResponseX, collisionResponseY, collisionResponseZ);
-        out.normal = new Vec3(normalX, normalY, normalZ);
-        out.location = new Vec3(locationX, locationY, locationZ);
+        out.collisionResponse = new Vec3d(collisionResponseX, collisionResponseY, collisionResponseZ);
+        out.normal = new Vec3d(normalX, normalY, normalZ);
+        out.location = new Vec3d(locationX, locationY, locationZ);
         out.temporalResponse = temporalResponse;
 
         return out;
@@ -257,30 +243,29 @@ public class ContinuousOBBCollider {
         double collisionY;
         double collisionZ;
 
-        final Vec3 stepSeparationAxis;
+        final Vec3d stepSeparationAxis;
         double stepSeparation;
 
-        Vec3 normalAxis = Vec3.ZERO;
+        Vec3d normalAxis;
         double normalSeparation;
-        Vec3 axis = Vec3.ZERO;
+        Vec3d axis;
         double separation;
 
-        public ContinuousSeparationManifold(Vec3 stepSeparationAxis) {
+        public ContinuousSeparationManifold(Vec3d stepSeparationAxis) {
             this.stepSeparationAxis = stepSeparationAxis;
         }
 
         /**
          * @return {@code true} if not colliding.
          */
-        boolean separate(Vec3 axis, double TL, double rA, double rB, double projectedMotion, boolean axisOfObjA) {
+        boolean separate(Vec3d axis, double TL, double rA, double rB, double projectedMotion, boolean axisOfObjA) {
             checkCount++;
             double distance = abs(TL);
             double diff = distance - (rA + rB);
 
             boolean discreteCollision = diff <= 0;
-            if (!discreteCollision && signum(projectedMotion) == signum(TL)) {
+            if (!discreteCollision && signum(projectedMotion) == signum(TL))
                 return true;
-            }
 
             double sTL = signum(TL);
             double separation = sTL * abs(diff);
@@ -289,9 +274,8 @@ public class ContinuousOBBCollider {
                 isDiscreteCollision = false;
 
                 // Missed on this axis, means we missed entirely.
-                if (abs(separation) > abs(projectedMotion)) {
+                if (abs(separation) > abs(projectedMotion))
                     return true;
-                }
 
                 double entryTime = abs(separation) / abs(projectedMotion);
                 double exitTime = (diff + abs(rA) + abs(rB)) / abs(projectedMotion);
@@ -304,27 +288,24 @@ public class ContinuousOBBCollider {
                 normalSeparation = separation;
             }
 
-            double dot = stepSeparationAxis.dot(axis);
+            double dot = stepSeparationAxis.dotProduct(axis);
             if (dot != 0 && discreteCollision) {
-                Vec3 cross = axis.cross(stepSeparationAxis);
+                Vec3d cross = axis.crossProduct(stepSeparationAxis);
                 double dotSeparation = signum(dot) * TL - (rA + rB);
                 double stepSeparation = -dotSeparation;
 
-                if (!cross.equals(Vec3.ZERO)) {
-                    Vec3 sepVec = axis.scale(dotSeparation);
-                    Vec3 axisPlane = axis.cross(cross);
-                    Vec3 stepPlane = stepSeparationAxis.cross(cross);
-                    Vec3 stepSeparationVec = sepVec.subtract(axisPlane.scale(sepVec.dot(stepPlane) / axisPlane.dot(
-                        stepPlane)));
+                if (!cross.equals(Vec3d.ZERO)) {
+                    Vec3d sepVec = axis.multiply(dotSeparation);
+                    Vec3d axisPlane = axis.crossProduct(cross);
+                    Vec3d stepPlane = stepSeparationAxis.crossProduct(cross);
+                    Vec3d stepSeparationVec = sepVec.subtract(axisPlane.multiply(sepVec.dotProduct(stepPlane) / axisPlane.dotProduct(stepPlane)));
                     stepSeparation = stepSeparationVec.length();
-                    if (abs(this.stepSeparation) > abs(stepSeparation) && stepSeparation != 0) {
+                    if (abs(this.stepSeparation) > abs(stepSeparation) && stepSeparation != 0)
                         this.stepSeparation = stepSeparation;
-                    }
 
                 } else {
-                    if (abs(this.stepSeparation) > stepSeparation) {
+                    if (abs(this.stepSeparation) > stepSeparation)
                         this.stepSeparation = stepSeparation;
-                    }
                 }
             }
 
@@ -342,12 +323,10 @@ public class ContinuousOBBCollider {
         }
 
         public double getTimeOfImpact() {
-            if (latestCollisionEntryTime == UNDEFINED) {
+            if (latestCollisionEntryTime == UNDEFINED)
                 return UNDEFINED;
-            }
-            if (latestCollisionEntryTime > earliestCollisionExitTime) {
+            if (latestCollisionEntryTime > earliestCollisionExitTime)
                 return UNDEFINED;
-            }
             return latestCollisionEntryTime;
         }
 
@@ -357,8 +336,8 @@ public class ContinuousOBBCollider {
 
         public void reset() {
             // Reset the manifold.
-            this.axis = Vec3.ZERO;
-            this.normalAxis = Vec3.ZERO;
+            this.axis = null;
+            this.normalAxis = null;
             this.separation = Double.MAX_VALUE;
             this.stepSeparation = Double.MAX_VALUE;
             this.normalSeparation = Double.MAX_VALUE;

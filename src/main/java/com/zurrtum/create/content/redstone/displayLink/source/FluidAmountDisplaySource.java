@@ -8,39 +8,35 @@ import com.zurrtum.create.foundation.blockEntity.behaviour.inventory.TankManipul
 import com.zurrtum.create.foundation.utility.FluidFormatter;
 import com.zurrtum.create.infrastructure.fluids.FluidInventory;
 import com.zurrtum.create.infrastructure.fluids.FluidStack;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.text.MutableText;
+import net.minecraft.text.Text;
 
 public class FluidAmountDisplaySource extends SingleLineDisplaySource {
     @Override
-    protected MutableComponent provideLine(DisplayLinkContext context, DisplayTargetStats stats) {
+    protected MutableText provideLine(DisplayLinkContext context, DisplayTargetStats stats) {
         BlockEntity sourceBE = context.getSourceBlockEntity();
-        if (!(sourceBE instanceof SmartObserverBlockEntity cobe)) {
+        if (!(sourceBE instanceof SmartObserverBlockEntity cobe))
             return EMPTY_LINE;
-        }
 
         TankManipulationBehaviour tankManipulationBehaviour = cobe.getBehaviour(TankManipulationBehaviour.OBSERVE);
         ServerFilteringBehaviour filteringBehaviour = cobe.getBehaviour(ServerFilteringBehaviour.TYPE);
         FluidInventory handler = tankManipulationBehaviour.getInventory();
 
-        if (handler == null) {
+        if (handler == null)
             return EMPTY_LINE;
-        }
 
         long collected = 0;
         for (int i = 0, size = handler.size(); i < size; i++) {
             FluidStack stack = handler.getStack(i);
-            if (stack.isEmpty()) {
+            if (stack.isEmpty())
                 continue;
-            }
-            if (!filteringBehaviour.test(stack)) {
+            if (!filteringBehaviour.test(stack))
                 continue;
-            }
             collected += stack.getAmount();
         }
 
-        return Component.literal(FluidFormatter.asString(collected, false));
+        return Text.literal(FluidFormatter.asString(collected, false));
     }
 
     @Override

@@ -1,44 +1,44 @@
 package com.zurrtum.create.client.foundation.gui.render;
 
-import com.mojang.blaze3d.platform.Lighting;
+import com.mojang.blaze3d.systems.ProjectionType;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.textures.FilterMode;
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
-import com.mojang.math.Axis;
 import com.zurrtum.create.client.catnip.gui.render.GpuTexture;
 import com.zurrtum.create.client.flywheel.lib.model.baked.SinglePosVirtualBlockGetter;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.render.TextureSetup;
-import net.minecraft.client.gui.render.pip.PictureInPictureRenderer;
-import net.minecraft.client.gui.render.state.BlitRenderState;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gl.RenderPipelines;
+import net.minecraft.client.gui.render.SpecialGuiElementRenderer;
 import net.minecraft.client.gui.render.state.GuiRenderState;
-import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.RenderPipelines;
-import net.minecraft.client.renderer.Sheets;
-import net.minecraft.client.renderer.block.BlockRenderDispatcher;
-import net.minecraft.client.renderer.block.model.BlockModelPart;
-import net.minecraft.core.BlockPos;
-import net.minecraft.util.RandomSource;
+import net.minecraft.client.gui.render.state.TexturedQuadGuiElementRenderState;
+import net.minecraft.client.render.DiffuseLighting;
+import net.minecraft.client.render.TexturedRenderLayers;
+import net.minecraft.client.render.VertexConsumer;
+import net.minecraft.client.render.VertexConsumerProvider;
+import net.minecraft.client.render.block.BlockRenderManager;
+import net.minecraft.client.render.model.BlockModelPart;
+import net.minecraft.client.texture.TextureSetup;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.RotationAxis;
+import net.minecraft.util.math.random.Random;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.List;
 
-public class ManualBlockRenderer extends PictureInPictureRenderer<ManualBlockRenderState> {
+public class ManualBlockRenderer extends SpecialGuiElementRenderer<ManualBlockRenderState> {
     public static int MAX = 6;
     private int allocate = MAX;
     private static final Deque<GpuTexture> TEXTURES = new ArrayDeque<>(MAX);
-    private static final RandomSource random = RandomSource.create();
-    private final PoseStack matrices = new PoseStack();
+    private static final Random random = Random.create();
+    private final MatrixStack matrices = new MatrixStack();
     private int windowScaleFactor;
 
-    public ManualBlockRenderer(MultiBufferSource.BufferSource vertexConsumers) {
+    public ManualBlockRenderer(VertexConsumerProvider.Immediate vertexConsumers) {
         super(vertexConsumers);
     }
 
     @Override
-    public void prepare(ManualBlockRenderState block, GuiRenderState state, int windowScaleFactor) {
+    public void render(ManualBlockRenderState block, GuiRenderState state, int windowScaleFactor) {
         if (this.windowScaleFactor != windowScaleFactor) {
             this.windowScaleFactor = windowScaleFactor;
             TEXTURES.forEach(GpuTexture::close);
@@ -54,40 +54,39 @@ public class ManualBlockRenderer extends PictureInPictureRenderer<ManualBlockRen
             texture = TEXTURES.poll();
             assert texture != null;
         }
-        texture.prepare(projectionMatrixBuffer);
-        matrices.pushPose();
+        RenderSystem.setProjectionMatrix(projectionMatrix.set(size, size), ProjectionType.ORTHOGRAPHIC);
+        texture.prepare();
+        matrices.push();
         matrices.translate(size / 2.0F, size, 0.0F);
         float scale = 20 * windowScaleFactor;
         matrices.scale(scale, scale, scale);
 
-        Minecraft mc = Minecraft.getInstance();
-        mc.gameRenderer.getLighting().setupFor(Lighting.Entry.ENTITY_IN_UI);
-        matrices.mulPose(Axis.XP.rotationDegrees(-15.5f));
-        matrices.mulPose(Axis.YP.rotationDegrees(22.5f));
+        MinecraftClient mc = MinecraftClient.getInstance();
+        mc.gameRenderer.getDiffuseLighting().setShaderLights(DiffuseLighting.Type.ENTITY_IN_UI);
+        matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(-15.5f));
+        matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(22.5f));
         matrices.translate(-0.5f, -0.2f, -0.5f);
         matrices.scale(1, -1, 1);
 
-        BlockRenderDispatcher blockRenderManager = mc.getBlockRenderer();
+        BlockRenderManager blockRenderManager = mc.getBlockRenderManager();
         SinglePosVirtualBlockGetter world = SinglePosVirtualBlockGetter.createFullBright();
-        VertexConsumer buffer = bufferSource.getBuffer(Sheets.cutoutBlockSheet());
+        VertexConsumer buffer = vertexConsumers.getBuffer(TexturedRenderLayers.getEntityCutout());
         world.blockState(block.state());
         random.setSeed(42L);
-        List<BlockModelPart> parts = blockRenderManager.getBlockModel(block.state()).collectParts(random);
-        blockRenderManager.renderBatched(block.state(), BlockPos.ZERO, world, matrices, buffer, false, parts);
+        List<BlockModelPart> parts = blockRenderManager.getModel(block.state()).getParts(random);
+        blockRenderManager.renderBlock(block.state(), BlockPos.ORIGIN, world, matrices, buffer, false, parts);
 
-        bufferSource.endBatch();
-        matrices.popPose();
+        vertexConsumers.draw();
+        matrices.pop();
         texture.clear();
-        state.submitBlitToCurrentLayer(new BlitRenderState(
+        state.addSimpleElementToCurrentLayer(new TexturedQuadGuiElementRenderState(
             RenderPipelines.GUI_TEXTURED_PREMULTIPLIED_ALPHA,
-            TextureSetup.singleTexture(texture.textureView(),
-                RenderSystem.getSamplerCache().getRepeat(FilterMode.NEAREST)
-            ),
+            TextureSetup.withoutGlTexture(texture.textureView()),
             block.pose(),
-            block.x0(),
-            block.y0(),
             block.x1(),
             block.y1(),
+            block.x2(),
+            block.y2(),
             0.0F,
             1.0F,
             1.0F,
@@ -100,16 +99,16 @@ public class ManualBlockRenderer extends PictureInPictureRenderer<ManualBlockRen
     }
 
     @Override
-    protected void renderToTexture(ManualBlockRenderState state, PoseStack matrices) {
+    protected void render(ManualBlockRenderState state, MatrixStack matrices) {
     }
 
     @Override
-    protected String getTextureLabel() {
+    protected String getName() {
         return "Manual Block";
     }
 
     @Override
-    public Class<ManualBlockRenderState> getRenderStateClass() {
+    public Class<ManualBlockRenderState> getElementClass() {
         return ManualBlockRenderState.class;
     }
 }

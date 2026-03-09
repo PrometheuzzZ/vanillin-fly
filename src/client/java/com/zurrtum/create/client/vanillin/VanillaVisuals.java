@@ -5,16 +5,16 @@ import com.zurrtum.create.client.vanillin.compose.*;
 import com.zurrtum.create.client.vanillin.config.*;
 import com.zurrtum.create.client.vanillin.elements.ShadowElement;
 import com.zurrtum.create.client.vanillin.visuals.*;
-import net.minecraft.client.model.geom.EntityModelSet;
-import net.minecraft.client.model.geom.ModelLayerLocation;
-import net.minecraft.client.model.geom.ModelLayers;
-import net.minecraft.client.model.geom.ModelPart;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.entity.decoration.ItemFrame;
-import net.minecraft.world.entity.vehicle.minecart.AbstractMinecart;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.block.entity.BlockEntityType;
+import net.minecraft.client.model.ModelPart;
+import net.minecraft.client.render.entity.model.EntityModelLayer;
+import net.minecraft.client.render.entity.model.EntityModelLayers;
+import net.minecraft.client.render.entity.model.LoadedEntityModels;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.EntityType;
+import net.minecraft.entity.decoration.ItemFrameEntity;
+import net.minecraft.entity.vehicle.AbstractMinecartEntity;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -42,67 +42,33 @@ public class VanillaVisuals {
         builder(EntityType.BLOCK_DISPLAY).factory(BlockDisplayVisual::new).apply(STABLE);
 
         composable(EntityType.ITEM_DISPLAY).with(element(VisualElements.ITEM_DISPLAY).build())
-            .shouldVisualize((ctx, e) -> ItemDisplayVisual.shouldVisualize(e)).build()
-            .skipVanillaRender(ItemDisplayVisual::shouldVisualize).apply(EXPERIMENTAL);
+            .shouldVisualize((ctx, e) -> ItemDisplayVisual.shouldVisualize(e)).build().skipVanillaRender(ItemDisplayVisual::shouldVisualize)
+            .apply(EXPERIMENTAL);
 
-        minecart(EntityType.CHEST_MINECART, ModelLayers.CHEST_MINECART).apply(STABLE);
-        minecart(EntityType.COMMAND_BLOCK_MINECART, ModelLayers.COMMAND_BLOCK_MINECART).apply(STABLE);
-        minecart(EntityType.FURNACE_MINECART, ModelLayers.FURNACE_MINECART).apply(STABLE);
-        minecart(EntityType.HOPPER_MINECART, ModelLayers.HOPPER_MINECART).apply(STABLE);
-        minecart(EntityType.MINECART, ModelLayers.MINECART).apply(STABLE);
-        minecart(EntityType.SPAWNER_MINECART, ModelLayers.SPAWNER_MINECART).apply(STABLE);
+        minecart(EntityType.CHEST_MINECART, EntityModelLayers.CHEST_MINECART).apply(STABLE);
+        minecart(EntityType.COMMAND_BLOCK_MINECART, EntityModelLayers.COMMAND_BLOCK_MINECART).apply(STABLE);
+        minecart(EntityType.FURNACE_MINECART, EntityModelLayers.FURNACE_MINECART).apply(STABLE);
+        minecart(EntityType.HOPPER_MINECART, EntityModelLayers.HOPPER_MINECART).apply(STABLE);
+        minecart(EntityType.MINECART, EntityModelLayers.MINECART).apply(STABLE);
+        minecart(EntityType.SPAWNER_MINECART, EntityModelLayers.SPAWNER_MINECART).apply(STABLE);
 
         composable(EntityType.TNT_MINECART).apply(VanillaVisuals::commonElements)
-            .with(element(VisualElements.SHADOW).configure(new ShadowElement.Config(
-                0.7f,
-                ShadowElement.Config.DEFAULT_STRENGTH
-            )).build()).with(element(VisualElements.FIRE).build()).with(element(VisualElements.TNT_MINECART).build())
-            .build().skipVanillaRender(MinecartVisual::shouldSkipRender).apply(STABLE);
+            .with(element(VisualElements.SHADOW).configure(new ShadowElement.Config(0.7f, ShadowElement.Config.DEFAULT_STRENGTH)).build())
+            .with(element(VisualElements.FIRE).build()).with(element(VisualElements.TNT_MINECART).build()).build()
+            .skipVanillaRender(MinecartVisual::shouldSkipRender).apply(STABLE);
 
         itemFrame(EntityType.ITEM_FRAME).apply(EXPERIMENTAL);
         itemFrame(EntityType.GLOW_ITEM_FRAME).apply(EXPERIMENTAL);
 
         composable(EntityType.ITEM).apply(VanillaVisuals::commonElements).with(element(VisualElements.FIRE).build())
             .with(element(VisualElements.SHADOW).configure(new ShadowElement.Config(0.15f, 0.75f)).build())
-            .with(element(VisualElements.ITEM_ENTITY).build())
-            .shouldVisualize(((ctx, entity) -> ItemVisual.isSupported(entity))).build()
+            .with(element(VisualElements.ITEM_ENTITY).build()).shouldVisualize(((ctx, entity) -> ItemVisual.isSupported(entity))).build()
             .skipVanillaRender(ItemVisual::isSupported).apply(EXPERIMENTAL);
 
     }
 
-    public static <T extends Entity> void commonElements(EntityBuilder<T> builder) {
-        builder.with(element(VisualElements.HITBOX).configure(false).build());
-    }
-
-    public static <T extends ItemFrame> EntityVisualizerBuilder<T> itemFrame(EntityType<T> type) {
-        return composable(type).apply(VanillaVisuals::commonElements).with(element(VisualElements.ITEM_FRAME).build())
-            .shouldVisualize((ctx, entity) -> ItemFrameVisual.shouldVisualize(entity)).build()
-            .skipVanillaRender(ItemFrameVisual::shouldVisualize);
-    }
-
-    public static <T extends AbstractMinecart> EntityVisualizerBuilder<T> minecart(
-        EntityType<T> type,
-        ModelLayerLocation variant
-    ) {
-        return composable(type).apply(VanillaVisuals::commonElements)
-            .with(element(VisualElements.SHADOW).configure(new ShadowElement.Config(
-                0.7f,
-                ShadowElement.Config.DEFAULT_STRENGTH
-            )).build()).with(element(VisualElements.FIRE).build())
-            .with(element(VisualElements.MINECART).configure(variant).build()).build()
-            .skipVanillaRender(MinecartVisual::shouldSkipRender);
-    }
-
-    public static <T extends Entity> EntityBuilder<T> composable(EntityType<T> entityType) {
-        return new EntityBuilder<>(entityType);
-    }
-
-    public static <T, C> ConfiguredElementImpl.ConfiguredElementBuilder<T, C> element(VisualElement<T, C> element) {
-        return new ConfiguredElementImpl.ConfiguredElementBuilder<>(element);
-    }
-
-    public static void onReloadModel(EntityModelSet models) {
-        boolean supportChest = models.bakeLayer(ModelLayers.CHEST).getClass() == ModelPart.class;
+    public static void onReloadModel(LoadedEntityModels models) {
+        boolean supportChest = models.getModelPart(EntityModelLayers.CHEST).getClass() == ModelPart.class;
         Map<BlockEntityType<?>, Configurator.ConfiguredBlockEntity<?>> configurator = CONFIGURATOR.blockEntities;
         Map<String, ConfigBase.ConfigEnum<VisualConfigValue>> blockEntities = VanillinConfig.client().blockEntities;
         Map<String, List<VisualOverride>> blockEntityOverrides = VanillinConfig.overrides().blockEntities();
@@ -124,6 +90,30 @@ public class VanillaVisuals {
         if (value == VisualConfigValue.DEFAULT) {
             configured.set(support ? value : VisualConfigValue.DISABLE, blockEntityOverrides.get(key));
         }
+    }
+
+    public static <T extends Entity> void commonElements(EntityBuilder<T> builder) {
+        builder.with(element(VisualElements.HITBOX).configure(false).build());
+    }
+
+    public static <T extends ItemFrameEntity> EntityVisualizerBuilder<T> itemFrame(EntityType<T> type) {
+        return composable(type).apply(VanillaVisuals::commonElements).with(element(VisualElements.ITEM_FRAME).build())
+            .shouldVisualize((ctx, entity) -> ItemFrameVisual.shouldVisualize(entity)).build().skipVanillaRender(ItemFrameVisual::shouldVisualize);
+    }
+
+    public static <T extends AbstractMinecartEntity> EntityVisualizerBuilder<T> minecart(EntityType<T> type, EntityModelLayer variant) {
+        return composable(type).apply(VanillaVisuals::commonElements)
+            .with(element(VisualElements.SHADOW).configure(new ShadowElement.Config(0.7f, ShadowElement.Config.DEFAULT_STRENGTH)).build())
+            .with(element(VisualElements.FIRE).build()).with(element(VisualElements.MINECART).configure(variant).build()).build()
+            .skipVanillaRender(MinecartVisual::shouldSkipRender);
+    }
+
+    public static <T extends Entity> EntityBuilder<T> composable(EntityType<T> entityType) {
+        return new EntityBuilder<>(entityType);
+    }
+
+    public static <T, C> ConfiguredElementImpl.ConfiguredElementBuilder<T, C> element(VisualElement<T, C> element) {
+        return new ConfiguredElementImpl.ConfiguredElementBuilder<>(element);
     }
 
     public static class EntityBuilder<T extends Entity> {
@@ -172,12 +162,7 @@ public class VanillaVisuals {
 
             var controller = new ComposableEntityVisual.Controller<T>(elementsArray, predicate);
 
-            return builder(entityType).factory((ctx, entity, partialTick) -> new ComposableEntityVisual<T>(
-                ctx,
-                entity,
-                partialTick,
-                controller
-            ));
+            return builder(entityType).factory((ctx, entity, partialTick) -> new ComposableEntityVisual<T>(ctx, entity, partialTick, controller));
         }
     }
 

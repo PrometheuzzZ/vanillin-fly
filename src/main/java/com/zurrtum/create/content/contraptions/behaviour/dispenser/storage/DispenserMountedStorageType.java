@@ -1,7 +1,7 @@
 package com.zurrtum.create.content.contraptions.behaviour.dispenser.storage;
 
 import com.zurrtum.create.api.contraption.storage.item.simple.SimpleMountedStorageType;
-import net.minecraft.world.Container;
+import net.minecraft.inventory.Inventory;
 
 public class DispenserMountedStorageType extends SimpleMountedStorageType<DispenserMountedStorage> {
     public DispenserMountedStorageType() {
@@ -9,7 +9,7 @@ public class DispenserMountedStorageType extends SimpleMountedStorageType<Dispen
     }
 
     @Override
-    protected DispenserMountedStorage createStorage(Container handler) {
+    protected DispenserMountedStorage createStorage(Inventory handler) {
         return new DispenserMountedStorage(handler);
     }
 }

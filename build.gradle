@@ -1,7 +1,7 @@
 import net.fabricmc.loom.task.RemapJarTask
 
 plugins {
-    id "net.fabricmc.fabric-loom-remap" version "${loom_version}"
+    id 'fabric-loom' version "${loom_version}"
 }
 
 repositories {
@@ -26,6 +26,13 @@ repositories {
         content {
             includeGroup "dev.onyxstudios.cardinal-components-api"
             includeGroup "org.ladysnake.cardinal-components-api"
+        }
+    }
+    maven {
+        url 'https://maven.wispforest.io/releases'
+        content {
+            includeGroup "io.wispforest"
+            includeGroup "io.wispforest.endec"
         }
     }
     exclusiveContent {
@@ -64,6 +71,7 @@ sourceSets {
         java {
             exclude 'com/zurrtum/create/compat/rei/**'
             exclude 'com/zurrtum/create/compat/trinkets/**'
+            exclude 'com/zurrtum/create/compat/accessories/**'
             exclude 'com/zurrtum/create/mixin/CreateIntegrationMixin.java'
             exclude 'com/zurrtum/create/mixin/ArchitecturyMixin.java'
             exclude 'com/zurrtum/create/mixin/JustEnoughItemsMixin.java'
@@ -73,12 +81,17 @@ sourceSets {
         java {
             exclude 'com/zurrtum/create/client/compat/rei/**'
             exclude 'com/zurrtum/create/client/compat/trinkets/**'
+            exclude 'com/zurrtum/create/client/compat/accessories/**'
             exclude 'com/zurrtum/create/client/mixin/FabricModelAccessMixin.java'
             exclude 'com/zurrtum/create/client/mixin/IrisPipelinesMixin.java'
-            exclude 'com/zurrtum/create/client/mixin/HoldMyItemsMixin.java'
-            exclude 'com/zurrtum/create/client/mixin/AnimationResourceLoaderMixin.java'
             exclude 'com/zurrtum/create/client/mixin/WrapperBlockStateModelMixin.java'
             exclude 'com/zurrtum/create/client/mixin/FabricBlockStateModelMixin.java'
+            exclude 'com/zurrtum/create/client/mixin/RecipeViewMenuMixin.java'
+            exclude 'com/zurrtum/create/client/mixin/RecipeViewScreenMixin.java'
+            exclude 'com/zurrtum/create/client/mixin/ViewTypeButtonMixin.java'
+            exclude 'com/zurrtum/create/client/mixin/DynamicBakerImplMixin.java'
+            exclude 'com/zurrtum/create/client/mixin/DynamicModelProviderAccessor.java'
+            exclude 'com/zurrtum/create/client/mixin/DynamicModelProviderMixin.java'
         }
     }
 }
@@ -105,16 +118,14 @@ tasks.build {
 
 dependencies {
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
-    mappings loom.officialMojangMappings()
+    mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
     modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
     if (project.compile_only_fabric_api.equals("true")) {
         modCompileOnly fabricApi.module("fabric-rendering-fluids-v1", project.fabric_version)
         modCompileOnly fabricApi.module("fabric-transfer-api-v1", project.fabric_version)
         modCompileOnly fabricApi.module("fabric-events-interaction-v0", project.fabric_version)
         modCompileOnly fabricApi.module("fabric-renderer-api-v1", project.fabric_version)
-        modCompileOnly fabricApi.module("fabric-renderer-indigo", project.fabric_version)
         modCompileOnly fabricApi.module("fabric-recipe-api-v1", project.fabric_version)
-        modCompileOnly fabricApi.module("fabric-model-loading-api-v1", project.fabric_version)
         modCompileOnly fabricApi.module("fabric-resource-loader-v1", project.fabric_version)
     } else {
         modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
@@ -128,8 +139,11 @@ dependencies {
     modCompileOnly "cc.tweaked:cc-tweaked-${project.cct_version}"
 //    modCompileOnly "maven.modrinth:trinkets-canary:${project.trinkets_version}"
 //    modCompileOnly "dev.onyxstudios.cardinal-components-api:cardinal-components-base:${project.cca_version}"
+//    modCompileOnly "io.wispforest:accessories-fabric:${project.accessories_version}"
     modClientCompileOnly "maven.modrinth:sodium:${project.sodium_version}"
     modClientCompileOnly "maven.modrinth:iris:${project.iris_version}"
+//    modClientCompileOnly "maven.modrinth:hold-my-items:${project.hmi_version}"
+//    modClientCompileOnly "maven.modrinth:modernfix-mvus:${project.modernfix_version}"
 }
 
 processResources {
@@ -139,14 +153,12 @@ processResources {
         expand "version": inputs.properties.version
     }
 
-    // Optimization-only build: strip all datapack content from Create.
     exclude "create.mixins.json"
     exclude "_data/**"
     exclude "data/**"
 }
 
 tasks.named("processClientResources", ProcessResources) {
-    // Keep engine/optimization assets, remove Create gameplay/content assets.
     exclude "assets/create/**"
     exclude "assets/fabric/**"
     exclude "assets/minecraft/**"

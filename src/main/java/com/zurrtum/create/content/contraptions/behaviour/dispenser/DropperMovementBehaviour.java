@@ -7,24 +7,22 @@ import com.zurrtum.create.api.contraption.storage.item.MountedItemStorage;
 import com.zurrtum.create.content.contraptions.behaviour.MovementContext;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
-import net.minecraft.core.BlockPos;
-import net.minecraft.util.RandomSource;
+import net.minecraft.inventory.Inventory;
+import net.minecraft.item.ItemStack;
 import net.minecraft.util.Util;
-import net.minecraft.world.Container;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.block.LevelEvent;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.random.Random;
+import net.minecraft.world.WorldEvents;
 
 public class DropperMovementBehaviour extends MovementBehaviour {
     @Override
     public void visitNewPosition(MovementContext context, BlockPos pos) {
-        if (context.world.isClientSide()) {
+        if (context.world.isClient())
             return;
-        }
 
         MountedItemStorage storage = context.getItemStorage();
-        if (storage == null) {
+        if (storage == null)
             return;
-        }
 
         int slot = getSlot(storage, context.world.random, context.contraption.getStorage().getAllItems());
         if (slot == -1) {
@@ -34,10 +32,10 @@ public class DropperMovementBehaviour extends MovementBehaviour {
         }
 
         // copy because dispense behaviors will modify it directly
-        ItemStack stack = storage.getItem(slot).copy();
+        ItemStack stack = storage.getStack(slot).copy();
         MountedDispenseBehavior behavior = getDispenseBehavior(context, pos, stack);
         ItemStack remainder = behavior.dispense(stack, context, pos);
-        storage.setItem(slot, remainder);
+        storage.setStack(slot, remainder);
     }
 
     protected MountedDispenseBehavior getDispenseBehavior(MovementContext context, BlockPos pos, ItemStack stack) {
@@ -47,18 +45,17 @@ public class DropperMovementBehaviour extends MovementBehaviour {
     /**
      * Finds a dispensable slot. Empty slots are skipped and nearly-empty slots are topped off.
      */
-    private static int getSlot(MountedItemStorage storage, RandomSource random, Container contraptionInventory) {
+    private static int getSlot(MountedItemStorage storage, Random random, Inventory contraptionInventory) {
         IntList filledSlots = new IntArrayList();
-        for (int i = 0, size = storage.getContainerSize(); i < size; i++) {
-            ItemStack stack = storage.getItem(i);
-            if (stack.isEmpty()) {
+        for (int i = 0, size = storage.size(); i < size; i++) {
+            ItemStack stack = storage.getStack(i);
+            if (stack.isEmpty())
                 continue;
-            }
 
-            if (stack.getCount() == 1 && stack.getMaxStackSize() != 1) {
-                storage.setItem(i, ItemStack.EMPTY);
+            if (stack.getCount() == 1 && stack.getMaxCount() != 1) {
+                storage.setStack(i, ItemStack.EMPTY);
                 boolean fill = tryTopOff(stack, contraptionInventory);
-                storage.setItem(i, stack);
+                storage.setStack(i, stack);
                 if (!fill) {
                     continue;
                 }
@@ -74,9 +71,9 @@ public class DropperMovementBehaviour extends MovementBehaviour {
         };
     }
 
-    private static boolean tryTopOff(ItemStack stack, Container from) {
+    private static boolean tryTopOff(ItemStack stack, Inventory from) {
         int count = stack.getCount();
-        int extract = from.extract(stack, stack.getMaxStackSize() - count);
+        int extract = from.extract(stack, stack.getMaxCount() - count);
         if (extract == 0) {
             return false;
         }
@@ -85,6 +82,6 @@ public class DropperMovementBehaviour extends MovementBehaviour {
     }
 
     private static void failDispense(MovementContext ctx, BlockPos pos) {
-        ctx.world.levelEvent(LevelEvent.SOUND_DISPENSER_FAIL, pos, 0);
+        ctx.world.syncWorldEvent(WorldEvents.DISPENSER_FAILS, pos, 0);
     }
 }

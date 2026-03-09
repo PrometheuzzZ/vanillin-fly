@@ -2,7 +2,7 @@ package com.zurrtum.create.content.redstone.link;
 
 import com.zurrtum.create.catnip.data.Couple;
 import com.zurrtum.create.content.redstone.link.RedstoneLinkNetworkHandler.Frequency;
-import net.minecraft.core.BlockPos;
+import net.minecraft.util.math.BlockPos;
 
 public interface IRedstoneLinkable {
 

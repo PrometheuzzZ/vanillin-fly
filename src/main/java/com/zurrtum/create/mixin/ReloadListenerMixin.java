@@ -1,9 +1,8 @@
 package com.zurrtum.create.mixin;
 
 import com.zurrtum.create.foundation.utility.CreateResourceReloader;
-import net.fabricmc.fabric.impl.resource.FabricResourceReloader;
-import net.minecraft.resources.Identifier;
-import org.jspecify.annotations.NonNull;
+import net.fabricmc.fabric.impl.resource.v1.FabricResourceReloader;
+import net.minecraft.util.Identifier;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 
@@ -14,7 +13,7 @@ public abstract class ReloadListenerMixin implements FabricResourceReloader {
     public abstract Identifier getId();
 
     @Override
-    public @NonNull Identifier fabric$getId() {
+    public Identifier fabric$getId() {
         return getId();
     }
 }

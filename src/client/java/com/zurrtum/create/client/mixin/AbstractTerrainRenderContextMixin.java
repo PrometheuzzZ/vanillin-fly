@@ -6,8 +6,8 @@ import com.zurrtum.create.foundation.block.SelfEmissiveLightingBlock;
 import net.fabricmc.fabric.impl.client.indigo.renderer.render.AbstractTerrainRenderContext;
 import net.fabricmc.fabric.impl.client.indigo.renderer.render.BlockRenderInfo;
 import net.fabricmc.fabric.impl.client.indigo.renderer.render.LightDataProvider;
-import net.minecraft.core.BlockPos;
-import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.block.BlockState;
+import net.minecraft.util.math.BlockPos;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -20,7 +20,7 @@ public class AbstractTerrainRenderContextMixin {
     @Final
     protected BlockRenderInfo blockInfo;
 
-    @WrapOperation(method = "flatLight(Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/MutableQuadViewImpl;)I", at = @At(value = "INVOKE", target = "Lnet/fabricmc/fabric/impl/client/indigo/renderer/render/LightDataProvider;light(Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/state/BlockState;)I"))
+    @WrapOperation(method = "flatLight(Lnet/fabricmc/fabric/impl/client/indigo/renderer/mesh/MutableQuadViewImpl;)I", at = @At(value = "INVOKE", target = "Lnet/fabricmc/fabric/impl/client/indigo/renderer/render/LightDataProvider;light(Lnet/minecraft/util/math/BlockPos;Lnet/minecraft/block/BlockState;)I"))
     private int light(LightDataProvider instance, BlockPos pos, BlockState blockState, Operation<Integer> original) {
         if (blockState.getBlock() instanceof SelfEmissiveLightingBlock) {
             pos = blockInfo.blockPos;

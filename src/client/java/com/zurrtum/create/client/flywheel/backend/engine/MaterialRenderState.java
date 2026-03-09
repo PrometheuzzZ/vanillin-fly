@@ -1,23 +1,20 @@
 package com.zurrtum.create.client.flywheel.backend.engine;
 
-import com.mojang.blaze3d.opengl.*;
-import com.mojang.blaze3d.pipeline.RenderTarget;
+import com.mojang.blaze3d.opengl.GlConst;
+import com.mojang.blaze3d.opengl.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.textures.FilterMode;
-import com.mojang.blaze3d.textures.GpuSampler;
-import com.mojang.blaze3d.textures.GpuTextureView;
 import com.zurrtum.create.client.flywheel.api.material.DepthTest;
 import com.zurrtum.create.client.flywheel.api.material.Material;
 import com.zurrtum.create.client.flywheel.api.material.Transparency;
 import com.zurrtum.create.client.flywheel.api.material.WriteMask;
 import com.zurrtum.create.client.flywheel.backend.Samplers;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.texture.AbstractTexture;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gl.Framebuffer;
+import net.minecraft.client.gl.GlBackend;
+import net.minecraft.client.texture.AbstractTexture;
+import net.minecraft.client.texture.GlTexture;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.opengl.GL11;
-import org.lwjgl.opengl.GL12;
-import org.lwjgl.opengl.GL13;
-import org.lwjgl.opengl.GL33C;
 
 import java.util.Comparator;
 
@@ -51,30 +48,13 @@ public final class MaterialRenderState {
 
     private static void setupTexture(Material material) {
         Samplers.DIFFUSE.makeActive();
-        AbstractTexture texture = Minecraft.getInstance().getTextureManager().getTexture(material.texture());
-        GlTexture glTexture = (GlTexture) texture.getTexture();
-        int target;
-        if ((glTexture.usage() & 16) != 0) {
-            target = GL13.GL_TEXTURE_CUBE_MAP;
-            GL11.glBindTexture(target, glTexture.glId());
-        } else {
-            target = GL_TEXTURE_2D;
-            GlStateManager._bindTexture(glTexture.glId());
-        }
-        GpuSampler textureSampler = texture.getSampler();
-        FilterMode filterMode = material.blur() ? FilterMode.LINEAR : FilterMode.NEAREST;
-        GlSampler sampler = (GlSampler) RenderSystem.getSamplerCache().getSampler(
-            textureSampler.getAddressModeU(),
-            textureSampler.getAddressModeV(),
-            filterMode,
-            filterMode,
-            material.mipmap()
-        );
-        GL33C.glBindSampler(Samplers.DIFFUSE.number, sampler.getId());
-        GpuTextureView textureView = texture.getTextureView();
-        int mipLevel = textureView.baseMipLevel();
-        GlStateManager._texParameter(target, GL12.GL_TEXTURE_BASE_LEVEL, mipLevel);
-        GlStateManager._texParameter(target, GL12.GL_TEXTURE_MAX_LEVEL, mipLevel + textureView.mipLevels() - 1);
+        AbstractTexture texture = MinecraftClient.getInstance().getTextureManager().getTexture(material.texture());
+        texture.setFilter(material.blur(), material.mipmap());
+        GlTexture glTexture = (GlTexture) texture.getGlTexture();
+        var textureId = glTexture.getGlId();
+        RenderSystem.setShaderTexture(0, texture.getGlTextureView());
+        GlStateManager._bindTexture(textureId);
+        glTexture.checkDirty(GlConst.GL_TEXTURE_2D);
     }
 
     private static void setupBackfaceCulling(boolean backfaceCulling) {
@@ -180,10 +160,10 @@ public final class MaterialRenderState {
     }
 
     public static void setupFrameBuffer() {
-        RenderTarget framebuffer = Minecraft.getInstance().getMainRenderTarget();
-        int i = ((GlTexture) framebuffer.getColorTexture()).getFbo(
-            ((GlDevice) RenderSystem.getDevice()).directStateAccess(),
-            framebuffer.useDepth ? framebuffer.getDepthTexture() : null
+        Framebuffer framebuffer = MinecraftClient.getInstance().getFramebuffer();
+        int i = ((GlTexture) framebuffer.getColorAttachment()).getOrCreateFramebuffer(
+            ((GlBackend) RenderSystem.getDevice()).getBufferManager(),
+            framebuffer.useDepthAttachment ? framebuffer.getDepthAttachment() : null
         );
         GlStateManager._glBindFramebuffer(GlConst.GL_FRAMEBUFFER, i);
     }
@@ -194,6 +174,7 @@ public final class MaterialRenderState {
 
     private static void resetTexture() {
         Samplers.DIFFUSE.makeActive();
+        RenderSystem.setShaderTexture(0, null);
     }
 
     private static void resetBackfaceCulling() {

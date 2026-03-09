@@ -2,9 +2,9 @@ package com.zurrtum.create.catnip.theme;
 
 import com.google.common.hash.Hashing;
 import com.zurrtum.create.catnip.data.Couple;
-import net.minecraft.network.chat.Style;
-import net.minecraft.util.Mth;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.text.Style;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.Vec3d;
 import org.jetbrains.annotations.NotNull;
 import org.joml.Vector3f;
 
@@ -33,10 +33,10 @@ public class Color {
 
     public Color(float r, float g, float b, float a) {
         this(
-            (int) (0.5 + 0xff * Mth.clamp(r, 0, 1)),
-            (int) (0.5 + 0xff * Mth.clamp(g, 0, 1)),
-            (int) (0.5 + 0xff * Mth.clamp(b, 0, 1)),
-            (int) (0.5 + 0xff * Mth.clamp(a, 0, 1))
+            (int) (0.5 + 0xff * MathHelper.clamp(r, 0, 1)),
+            (int) (0.5 + 0xff * MathHelper.clamp(g, 0, 1)),
+            (int) (0.5 + 0xff * MathHelper.clamp(b, 0, 1)),
+            (int) (0.5 + 0xff * MathHelper.clamp(a, 0, 1))
         );
     }
 
@@ -90,17 +90,14 @@ public class Color {
 
     private static int colorInPhase(int phase, int progress) {
         phase = phase % 6;
-        if (phase <= 1) {
+        if (phase <= 1)
             return 0;
-        }
-        if (phase == 2) {
+        if (phase == 2)
             return progress;
-        }
-        if (phase <= 4) {
+        if (phase <= 4)
             return 255;
-        } else {
+        else
             return 255 - progress;
-        }
     }
 
     public static Color generateFromLong(long l) {
@@ -112,11 +109,10 @@ public class Color {
     }
 
     public Color copy(boolean mutable) {
-        if (mutable) {
+        if (mutable)
             return new Color(value);
-        } else {
+        else
             return new Color(value).setImmutable();
-        }
     }
 
     /**
@@ -141,7 +137,7 @@ public class Color {
     }
 
     public Color setRed(float r) {
-        return ensureMutable().setRedUnchecked((int) (0xff * Mth.clamp(r, 0, 1)));
+        return ensureMutable().setRedUnchecked((int) (0xff * MathHelper.clamp(r, 0, 1)));
     }
 
     /**
@@ -157,7 +153,7 @@ public class Color {
     }
 
     public Color setGreen(float g) {
-        return ensureMutable().setGreenUnchecked((int) (0xff * Mth.clamp(g, 0, 1)));
+        return ensureMutable().setGreenUnchecked((int) (0xff * MathHelper.clamp(g, 0, 1)));
     }
 
     /**
@@ -173,7 +169,7 @@ public class Color {
     }
 
     public Color setBlue(float b) {
-        return ensureMutable().setBlueUnchecked((int) (0xff * Mth.clamp(b, 0, 1)));
+        return ensureMutable().setBlueUnchecked((int) (0xff * MathHelper.clamp(b, 0, 1)));
     }
 
     /**
@@ -189,7 +185,7 @@ public class Color {
     }
 
     public Color setAlpha(float a) {
-        return ensureMutable().setAlphaUnchecked((int) (0xff * Mth.clamp(a, 0, 1)));
+        return ensureMutable().setAlphaUnchecked((int) (0xff * MathHelper.clamp(a, 0, 1)));
     }
 
     /**
@@ -230,8 +226,8 @@ public class Color {
         return value;
     }
 
-    public Vec3 asVector() {
-        return new Vec3(getRedAsFloat(), getGreenAsFloat(), getBlueAsFloat());
+    public Vec3d asVector() {
+        return new Vec3d(getRedAsFloat(), getGreenAsFloat(), getBlueAsFloat());
     }
 
     public Vector3f asVectorF() {
@@ -243,7 +239,7 @@ public class Color {
     }
 
     public Color scaleAlpha(float factor) {
-        return ensureMutable().setAlphaUnchecked((int) (getAlpha() * Mth.clamp(factor, 0, 1)));
+        return ensureMutable().setAlphaUnchecked((int) (getAlpha() * MathHelper.clamp(factor, 0, 1)));
     }
 
     /**
@@ -251,7 +247,7 @@ public class Color {
      * This method prevents the scaling to go below this threshold
      */
     public Color scaleAlphaForText(float factor) {
-        return ensureMutable().setAlphaUnchecked(Math.max(0x05, (int) (getAlpha() * Mth.clamp(factor, 0, 1))));
+        return ensureMutable().setAlphaUnchecked(Math.max(0x05, (int) (getAlpha() * MathHelper.clamp(factor, 0, 1))));
     }
 
     // ********* //
@@ -279,9 +275,8 @@ public class Color {
 
     public Color modifyValue(UnaryOperator<Integer> function) {
         int newValue = function.apply(value);
-        if (newValue == value) {
+        if (newValue == value)
             return this;
-        }
 
         return ensureMutable().setValueUnchecked(newValue);
     }
@@ -289,9 +284,8 @@ public class Color {
     // ********* //
 
     public Color ensureMutable() {
-        if (this.mutable) {
+        if (this.mutable)
             return this;
-        }
 
         return new Color(this.value);
     }

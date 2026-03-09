@@ -3,13 +3,13 @@ package com.zurrtum.create.infrastructure.component;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import com.zurrtum.create.AllDataComponents;
-import net.minecraft.core.component.DataComponentMap;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.chat.ComponentSerialization;
-import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.component.ComponentMap;
+import net.minecraft.item.ItemStack;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.text.MutableText;
+import net.minecraft.text.TextCodecs;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -18,45 +18,43 @@ import java.util.List;
 public class ClipboardEntry {
     public static final Codec<ClipboardEntry> CODEC = RecordCodecBuilder.create(i -> i.group(
         Codec.BOOL.fieldOf("checked").forGetter(c -> c.checked),
-        ComponentSerialization.CODEC.fieldOf("text").forGetter(c -> c.text),
+        TextCodecs.CODEC.fieldOf("text").forGetter(c -> c.text),
         ItemStack.OPTIONAL_CODEC.fieldOf("icon").forGetter(c -> c.icon),
         Codec.INT.fieldOf("item_amount").forGetter(c -> c.itemAmount)
     ).apply(
         i, (checked, text, icon, itemAmount) -> {
             ClipboardEntry entry = new ClipboardEntry(checked, text.copy());
-            if (!icon.isEmpty()) {
+            if (!icon.isEmpty())
                 entry.displayItem(icon, itemAmount);
-            }
 
             return entry;
         }
     ));
 
-    public static final StreamCodec<RegistryFriendlyByteBuf, ClipboardEntry> STREAM_CODEC = StreamCodec.composite(
-        ByteBufCodecs.BOOL,
+    public static final PacketCodec<RegistryByteBuf, ClipboardEntry> STREAM_CODEC = PacketCodec.tuple(
+        PacketCodecs.BOOLEAN,
         c -> c.checked,
-        ComponentSerialization.TRUSTED_CONTEXT_FREE_STREAM_CODEC,
+        TextCodecs.PACKET_CODEC,
         c -> c.text,
-        ItemStack.OPTIONAL_STREAM_CODEC,
+        ItemStack.OPTIONAL_PACKET_CODEC,
         c -> c.icon,
-        ByteBufCodecs.INT,
+        PacketCodecs.INTEGER,
         c -> c.itemAmount,
         (checked, text, icon, itemAmount) -> {
             ClipboardEntry entry = new ClipboardEntry(checked, text.copy());
-            if (!icon.isEmpty()) {
+            if (!icon.isEmpty())
                 entry.displayItem(icon, itemAmount);
-            }
 
             return entry;
         }
     );
 
     public boolean checked;
-    public MutableComponent text;
+    public MutableText text;
     public ItemStack icon;
     public int itemAmount;
 
-    public ClipboardEntry(boolean checked, MutableComponent text) {
+    public ClipboardEntry(boolean checked, MutableText text) {
         this.checked = checked;
         this.text = text;
         this.icon = ItemStack.EMPTY;
@@ -72,22 +70,20 @@ public class ClipboardEntry {
         return readAll(clipboardItem.getComponents());
     }
 
-    public static List<List<ClipboardEntry>> readAll(DataComponentMap components) {
+    public static List<List<ClipboardEntry>> readAll(ComponentMap components) {
         return readAll(components.get(AllDataComponents.CLIPBOARD_CONTENT));
     }
 
     public static List<List<ClipboardEntry>> readAll(@Nullable ClipboardContent content) {
-        if (content == null) {
+        if (content == null)
             return new ArrayList<>();
-        }
 
         // Both these lists are immutable, so we unfortunately need to re-create them to make them mutable
         List<List<ClipboardEntry>> saved = content.pages();
 
         List<List<ClipboardEntry>> entries = new ArrayList<>(saved.size());
-        for (List<ClipboardEntry> inner : saved) {
+        for (List<ClipboardEntry> inner : saved)
             entries.add(new ArrayList<>(inner));
-        }
 
         return entries;
     }
@@ -97,29 +93,26 @@ public class ClipboardEntry {
         if (pages.isEmpty()) {
             return new ArrayList<>();
         }
-        int previouslyOpenedPage = heldItem.getOrDefault(AllDataComponents.CLIPBOARD_CONTENT, ClipboardContent.EMPTY)
-            .previouslyOpenedPage();
+        int previouslyOpenedPage = heldItem.getOrDefault(AllDataComponents.CLIPBOARD_CONTENT, ClipboardContent.EMPTY).previouslyOpenedPage();
         int page = Math.min(previouslyOpenedPage, pages.size() - 1);
         return pages.get(page);
     }
 
     @Override
     public final boolean equals(Object o) {
-        if (this == o) {
+        if (this == o)
             return true;
-        }
-        if (!(o instanceof ClipboardEntry that)) {
+        if (!(o instanceof ClipboardEntry that))
             return false;
-        }
 
-        return checked == that.checked && text.equals(that.text) && ItemStack.isSameItemSameComponents(icon, that.icon);
+        return checked == that.checked && text.equals(that.text) && ItemStack.areItemsAndComponentsEqual(icon, that.icon);
     }
 
     @Override
     public int hashCode() {
         int result = Boolean.hashCode(checked);
         result = 31 * result + text.hashCode();
-        result = 31 * result + ItemStack.hashItemAndComponents(icon);
+        result = 31 * result + ItemStack.hashCode(icon);
         return result;
     }
 }

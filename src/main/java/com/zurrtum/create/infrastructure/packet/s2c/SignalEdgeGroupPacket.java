@@ -6,24 +6,23 @@ import com.zurrtum.create.AllPackets;
 import com.zurrtum.create.catnip.codecs.stream.CatnipStreamCodecBuilders;
 import com.zurrtum.create.content.trains.signal.EdgeGroupColor;
 import io.netty.buffer.ByteBuf;
-import net.minecraft.core.UUIDUtil;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.PacketType;
-import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.network.listener.ClientPlayPacketListener;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.PacketType;
+import net.minecraft.util.Uuids;
 
 import java.util.List;
 import java.util.UUID;
 
-public record SignalEdgeGroupPacket(List<UUID> ids, List<EdgeGroupColor> colors,
-                                    boolean add) implements Packet<ClientGamePacketListener> {
-    public static final StreamCodec<ByteBuf, SignalEdgeGroupPacket> CODEC = StreamCodec.composite(
-        CatnipStreamCodecBuilders.list(UUIDUtil.STREAM_CODEC),
+public record SignalEdgeGroupPacket(List<UUID> ids, List<EdgeGroupColor> colors, boolean add) implements Packet<ClientPlayPacketListener> {
+    public static final PacketCodec<ByteBuf, SignalEdgeGroupPacket> CODEC = PacketCodec.tuple(
+        CatnipStreamCodecBuilders.list(Uuids.PACKET_CODEC),
         SignalEdgeGroupPacket::ids,
         CatnipStreamCodecBuilders.list(EdgeGroupColor.STREAM_CODEC),
         SignalEdgeGroupPacket::colors,
-        ByteBufCodecs.BOOL,
+        PacketCodecs.BOOLEAN,
         SignalEdgeGroupPacket::add,
         SignalEdgeGroupPacket::new
     );
@@ -33,12 +32,12 @@ public record SignalEdgeGroupPacket(List<UUID> ids, List<EdgeGroupColor> colors,
     }
 
     @Override
-    public void handle(ClientGamePacketListener listener) {
+    public void apply(ClientPlayPacketListener listener) {
         AllClientHandle.INSTANCE.onSignalEdgeGroup(this);
     }
 
     @Override
-    public PacketType<SignalEdgeGroupPacket> type() {
+    public PacketType<SignalEdgeGroupPacket> getPacketType() {
         return AllPackets.SYNC_EDGE_GROUP;
     }
 }

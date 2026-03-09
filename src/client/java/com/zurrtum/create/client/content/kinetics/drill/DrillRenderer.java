@@ -6,10 +6,10 @@ import com.zurrtum.create.client.catnip.render.SuperByteBuffer;
 import com.zurrtum.create.client.content.kinetics.base.KineticBlockEntityRenderer;
 import com.zurrtum.create.client.content.kinetics.base.KineticBlockEntityRenderer.KineticRenderState;
 import com.zurrtum.create.content.kinetics.drill.DrillBlockEntity;
-import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
+import net.minecraft.client.render.block.entity.BlockEntityRendererFactory;
 
 public class DrillRenderer extends KineticBlockEntityRenderer<DrillBlockEntity, KineticRenderState> {
-    public DrillRenderer(BlockEntityRendererProvider.Context context) {
+    public DrillRenderer(BlockEntityRendererFactory.Context context) {
         super(context);
     }
 

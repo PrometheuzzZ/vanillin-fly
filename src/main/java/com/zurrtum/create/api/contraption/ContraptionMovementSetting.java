@@ -1,11 +1,11 @@
 package com.zurrtum.create.api.contraption;
 
 import com.zurrtum.create.api.registry.SimpleRegistry;
-import net.minecraft.core.BlockPos;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
+import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
+import net.minecraft.structure.StructureTemplate;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Collection;
@@ -13,7 +13,7 @@ import java.util.function.Supplier;
 
 /**
  * Defines whether a block is movable by contraptions.
- * This is used as a fallback check for {@link BlockMovementChecks#isMovementAllowed(BlockState, Level, BlockPos)}.
+ * This is used as a fallback check for {@link BlockMovementChecks#isMovementAllowed(BlockState, World, BlockPos)}.
  * The registry uses suppliers, so the setting of a block can change. This is useful for config options.
  */
 public enum ContraptionMovementSetting {
@@ -45,9 +45,8 @@ public enum ContraptionMovementSetting {
      */
     @Nullable
     public static ContraptionMovementSetting get(Block block) {
-        if (block instanceof MovementSettingProvider provider) {
+        if (block instanceof MovementSettingProvider provider)
             return provider.getContraptionMovementSetting();
-        }
         Supplier<ContraptionMovementSetting> supplier = REGISTRY.get(block);
         return supplier == null ? null : supplier.get();
     }
@@ -55,10 +54,7 @@ public enum ContraptionMovementSetting {
     /**
      * Check if any of the blocks in the collection match the given setting.
      */
-    public static boolean anyAre(
-        Collection<StructureTemplate.StructureBlockInfo> blocks,
-        ContraptionMovementSetting setting
-    ) {
+    public static boolean anyAre(Collection<StructureTemplate.StructureBlockInfo> blocks, ContraptionMovementSetting setting) {
         return blocks.stream().anyMatch(b -> get(b.state().getBlock()) == setting);
     }
 

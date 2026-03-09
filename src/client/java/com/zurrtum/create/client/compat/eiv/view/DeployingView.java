@@ -10,7 +10,7 @@ import de.crafty.eiv.common.recipe.inventory.RecipeViewMenu.SlotDefinition;
 import de.crafty.eiv.common.recipe.inventory.RecipeViewMenu.SlotFillContext;
 import de.crafty.eiv.common.recipe.inventory.RecipeViewScreen;
 import de.crafty.eiv.common.recipe.inventory.SlotContent;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.DrawContext;
 import org.joml.Matrix3x2f;
 
 import java.util.List;
@@ -81,20 +81,9 @@ public class DeployingView extends CreateView {
     }
 
     @Override
-    public void renderRecipe(
-        RecipeViewScreen screen,
-        RecipePosition position,
-        GuiGraphics context,
-        int mouseX,
-        int mouseY,
-        float partialTicks
-    ) {
+    public void renderRecipe(RecipeViewScreen screen, RecipePosition position, DrawContext context, int mouseX, int mouseY, float partialTicks) {
         AllGuiTextures.JEI_SHADOW.render(context, 62, 59);
         AllGuiTextures.JEI_DOWN_ARROW.render(context, 126, results.size() <= 2 ? 31 : 12);
-        context.guiRenderState.submitPicturesInPictureState(new DeployerRenderState(
-            new Matrix3x2f(context.pose()),
-            75,
-            -8
-        ));
+        context.state.addSpecialElement(new DeployerRenderState(new Matrix3x2f(context.getMatrices()), 75, -8));
     }
 }

@@ -1,7 +1,5 @@
 package com.zurrtum.create.client.content.kinetics.clock;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.zurrtum.create.catnip.math.AngleHelper;
 import com.zurrtum.create.client.AllPartialModels;
 import com.zurrtum.create.client.catnip.render.CachedBuffers;
@@ -13,23 +11,24 @@ import com.zurrtum.create.client.foundation.blockEntity.behaviour.animation.Cuck
 import com.zurrtum.create.content.kinetics.clock.CuckooClockBlock;
 import com.zurrtum.create.content.kinetics.clock.CuckooClockBlockEntity;
 import com.zurrtum.create.content.kinetics.clock.CuckooClockBlockEntity.Animation;
-import net.minecraft.client.renderer.LevelRenderer;
-import net.minecraft.client.renderer.LightTexture;
-import net.minecraft.client.renderer.SubmitNodeCollector;
-import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
-import net.minecraft.client.renderer.feature.ModelFeatureRenderer;
-import net.minecraft.client.renderer.rendertype.RenderType;
-import net.minecraft.client.renderer.rendertype.RenderTypes;
-import net.minecraft.client.renderer.state.CameraRenderState;
-import net.minecraft.core.Direction;
-import net.minecraft.util.Mth;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.block.BlockState;
+import net.minecraft.client.render.LightmapTextureManager;
+import net.minecraft.client.render.RenderLayer;
+import net.minecraft.client.render.VertexConsumer;
+import net.minecraft.client.render.WorldRenderer;
+import net.minecraft.client.render.block.entity.BlockEntityRendererFactory;
+import net.minecraft.client.render.command.ModelCommandRenderer;
+import net.minecraft.client.render.command.OrderedRenderCommandQueue;
+import net.minecraft.client.render.state.CameraRenderState;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
 public class CuckooClockRenderer extends KineticBlockEntityRenderer<CuckooClockBlockEntity, CuckooClockRenderer.CuckooClockRenderState> {
-    public CuckooClockRenderer(BlockEntityRendererProvider.Context context) {
+    public CuckooClockRenderer(BlockEntityRendererFactory.Context context) {
         super(context);
     }
 
@@ -39,37 +38,32 @@ public class CuckooClockRenderer extends KineticBlockEntityRenderer<CuckooClockB
     }
 
     @Override
-    public void extractRenderState(
+    public void updateRenderState(
         CuckooClockBlockEntity be,
         CuckooClockRenderState state,
         float tickProgress,
-        Vec3 cameraPos,
-        @Nullable ModelFeatureRenderer.CrumblingOverlay crumblingOverlay
+        Vec3d cameraPos,
+        @Nullable ModelCommandRenderer.CrumblingOverlayCommand crumblingOverlay
     ) {
-        super.extractRenderState(be, state, tickProgress, cameraPos, crumblingOverlay);
+        super.updateRenderState(be, state, tickProgress, cameraPos, crumblingOverlay);
         if (state.support) {
-            state.blockPos = be.getBlockPos();
-            state.blockState = be.getBlockState();
-            state.blockEntityType = be.getType();
-            Level world = be.getLevel();
-            state.lightCoords = world != null ? LevelRenderer.getLightColor(
+            state.pos = be.getPos();
+            state.blockState = be.getCachedState();
+            state.type = be.getType();
+            World world = be.getWorld();
+            state.lightmapCoordinates = world != null ? WorldRenderer.getLightmapCoordinates(
                 world,
-                state.blockPos
-            ) : LightTexture.FULL_BRIGHT;
-            state.layer = RenderTypes.solidMovingBlock();
-            state.facing = state.blockState.getValue(CuckooClockBlock.HORIZONTAL_FACING);
+                state.pos
+            ) : LightmapTextureManager.MAX_LIGHT_COORDINATE;
+            state.layer = RenderLayer.getSolid();
+            state.facing = state.blockState.get(CuckooClockBlock.HORIZONTAL_FACING);
         }
         state.hourHand = CachedBuffers.partial(AllPartialModels.CUCKOO_HOUR_HAND, state.blockState);
         state.minuteHand = CachedBuffers.partial(AllPartialModels.CUCKOO_MINUTE_HAND, state.blockState);
         CuckooClockAnimationBehaviour behaviour = (CuckooClockAnimationBehaviour) be.getBehaviour(AnimationBehaviour.TYPE);
-        if (behaviour != null) {
-            state.hourAngle = AngleHelper.rad(behaviour.hourHand.getValue(tickProgress));
-            state.minuteAngle = AngleHelper.rad(behaviour.minuteHand.getValue(tickProgress));
-        } else {
-            state.hourAngle = 0;
-            state.minuteAngle = 0;
-        }
-        state.angle = AngleHelper.rad(AngleHelper.horizontalAngle(state.facing.getCounterClockWise()));
+        state.angle = AngleHelper.rad(AngleHelper.horizontalAngle(state.facing.rotateYCounterclockwise()));
+        state.hourAngle = AngleHelper.rad(behaviour.hourHand.getValue(tickProgress));
+        state.minuteAngle = AngleHelper.rad(behaviour.minuteHand.getValue(tickProgress));
         state.leftDoor = CachedBuffers.partial(AllPartialModels.CUCKOO_LEFT_DOOR, state.blockState);
         state.rightDoor = CachedBuffers.partial(AllPartialModels.CUCKOO_RIGHT_DOOR, state.blockState);
         float angle = 0;
@@ -78,15 +72,14 @@ public class CuckooClockRenderer extends KineticBlockEntityRenderer<CuckooClockB
             int step = be.animationType == Animation.SURPRISE ? 3 : 15;
             for (int phase = 30; phase <= 60; phase += step) {
                 float local = value - phase;
-                if (local < -step / 3) {
+                if (local < -step / 3)
                     continue;
-                } else if (local < 0) {
-                    angle = Mth.lerpInt(((value - (phase - 5)) / 5), 0, 135);
-                } else if (local < step / 3) {
+                else if (local < 0)
+                    angle = MathHelper.lerp(((value - (phase - 5)) / 5), 0, 135);
+                else if (local < step / 3)
                     angle = 135;
-                } else if (local < 2 * step / 3) {
-                    angle = Mth.lerpInt(((value - (phase + 5)) / 5), 135, 0);
-                }
+                else if (local < 2 * step / 3)
+                    angle = MathHelper.lerp(((value - (phase + 5)) / 5), 135, 0);
             }
         }
         state.doorAngle = AngleHelper.rad(angle);
@@ -101,26 +94,21 @@ public class CuckooClockRenderer extends KineticBlockEntityRenderer<CuckooClockB
     public void updateBaseRenderState(
         CuckooClockBlockEntity be,
         CuckooClockRenderState state,
-        Level world,
-        @Nullable ModelFeatureRenderer.CrumblingOverlay crumblingOverlay
+        World world,
+        @Nullable ModelCommandRenderer.CrumblingOverlayCommand crumblingOverlay
     ) {
         super.updateBaseRenderState(be, state, world, crumblingOverlay);
-        state.facing = state.blockState.getValue(CuckooClockBlock.HORIZONTAL_FACING);
+        state.facing = state.blockState.get(CuckooClockBlock.HORIZONTAL_FACING);
     }
 
     @Override
-    public void submit(
-        CuckooClockRenderState state,
-        PoseStack matrices,
-        SubmitNodeCollector queue,
-        CameraRenderState cameraState
-    ) {
-        queue.submitCustomGeometry(matrices, state.layer, state);
+    public void render(CuckooClockRenderState state, MatrixStack matrices, OrderedRenderCommandQueue queue, CameraRenderState cameraState) {
+        queue.submitCustom(matrices, state.layer, state);
     }
 
     @Override
-    protected RenderType getRenderType(CuckooClockBlockEntity be, BlockState state) {
-        return RenderTypes.solidMovingBlock();
+    protected RenderLayer getRenderType(CuckooClockBlockEntity be, BlockState state) {
+        return RenderLayer.getSolid();
     }
 
     @Override
@@ -142,22 +130,20 @@ public class CuckooClockRenderer extends KineticBlockEntityRenderer<CuckooClockB
         public float offset;
 
         @Override
-        public void render(PoseStack.Pose matricesEntry, VertexConsumer vertexConsumer) {
+        public void render(MatrixStack.Entry matricesEntry, VertexConsumer vertexConsumer) {
             if (model != null) {
                 super.render(matricesEntry, vertexConsumer);
             }
-            hourHand.rotateCentered(angle, Direction.UP).translate(0.125f, 0.375f, 0.5f)
-                .rotate(hourAngle, Direction.EAST).translate(-0.125f, -0.375f, -0.5f).light(lightCoords)
-                .renderInto(matricesEntry, vertexConsumer);
-            minuteHand.rotateCentered(angle, Direction.UP).translate(0.125f, 0.375f, 0.5f)
-                .rotate(minuteAngle, Direction.EAST).translate(-0.125f, -0.375f, -0.5f).light(lightCoords)
-                .renderInto(matricesEntry, vertexConsumer);
-            leftDoor.rotateCentered(angle, Direction.UP).translate(0.125f, 0, 0.375f).rotate(-doorAngle, Direction.UP)
-                .translate(-0.125f, 0, -0.375f).light(lightCoords).renderInto(matricesEntry, vertexConsumer);
-            rightDoor.rotateCentered(angle, Direction.UP).translate(0.125f, 0, 0.625f).rotate(doorAngle, Direction.UP)
-                .translate(-0.125f, 0, -0.625f).light(lightCoords).renderInto(matricesEntry, vertexConsumer);
+            hourHand.rotateCentered(angle, Direction.UP).translate(0.125f, 0.375f, 0.5f).rotate(hourAngle, Direction.EAST)
+                .translate(-0.125f, -0.375f, -0.5f).light(lightmapCoordinates).renderInto(matricesEntry, vertexConsumer);
+            minuteHand.rotateCentered(angle, Direction.UP).translate(0.125f, 0.375f, 0.5f).rotate(minuteAngle, Direction.EAST)
+                .translate(-0.125f, -0.375f, -0.5f).light(lightmapCoordinates).renderInto(matricesEntry, vertexConsumer);
+            leftDoor.rotateCentered(angle, Direction.UP).translate(0.125f, 0, 0.375f).rotate(-doorAngle, Direction.UP).translate(-0.125f, 0, -0.375f)
+                .light(lightmapCoordinates).renderInto(matricesEntry, vertexConsumer);
+            rightDoor.rotateCentered(angle, Direction.UP).translate(0.125f, 0, 0.625f).rotate(doorAngle, Direction.UP).translate(-0.125f, 0, -0.625f)
+                .light(lightmapCoordinates).renderInto(matricesEntry, vertexConsumer);
             if (figure != null) {
-                figure.rotateCentered(angle, Direction.UP).translate(offset, 0, 0).light(lightCoords)
+                figure.rotateCentered(angle, Direction.UP).translate(offset, 0, 0).light(lightmapCoordinates)
                     .renderInto(matricesEntry, vertexConsumer);
             }
         }

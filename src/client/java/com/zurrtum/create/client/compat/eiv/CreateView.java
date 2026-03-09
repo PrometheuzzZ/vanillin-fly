@@ -16,21 +16,21 @@ import de.crafty.eiv.common.recipe.inventory.RecipeViewMenu.OptionalSlotRenderer
 import de.crafty.eiv.common.recipe.inventory.RecipeViewMenu.SlotDefinition;
 import de.crafty.eiv.common.recipe.inventory.RecipeViewMenu.SlotFillContext;
 import de.crafty.eiv.common.recipe.inventory.SlotContent;
-import net.minecraft.ChatFormatting;
-import net.minecraft.core.Holder;
-import net.minecraft.core.component.DataComponentPatch;
-import net.minecraft.core.component.DataComponents;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.network.chat.Component;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
-import net.minecraft.world.item.alchemy.Potion;
-import net.minecraft.world.item.alchemy.PotionContents;
-import net.minecraft.world.item.component.CustomData;
-import net.minecraft.world.item.enchantment.Enchantment;
-import net.minecraft.world.item.enchantment.ItemEnchantments;
-import net.minecraft.world.level.material.Fluid;
+import net.minecraft.component.ComponentChanges;
+import net.minecraft.component.DataComponentTypes;
+import net.minecraft.component.type.ItemEnchantmentsComponent;
+import net.minecraft.component.type.NbtComponent;
+import net.minecraft.component.type.PotionContentsComponent;
+import net.minecraft.enchantment.Enchantment;
+import net.minecraft.fluid.Fluid;
+import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
+import net.minecraft.item.Items;
+import net.minecraft.nbt.NbtCompound;
+import net.minecraft.potion.Potion;
+import net.minecraft.registry.entry.RegistryEntry;
+import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
 
 import java.util.*;
 import java.util.function.Consumer;
@@ -38,19 +38,10 @@ import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
 
 public abstract class CreateView extends AbstractList<IEivViewRecipe> implements IEivViewRecipe {
-    public static final OptionalSlotRenderer SLOT = (context, x, y, pt) -> AllGuiTextures.JEI_SLOT.render(
-        context,
-        0,
-        0
-    );
-    public static final OptionalSlotRenderer CHANCE_SLOT = (context, x, y, pt) -> AllGuiTextures.JEI_CHANCE_SLOT.render(context,
-        0,
-        0
-    );
-    public static final AdditionalStackModifier NOT_CONSUMED = (stack, tooltip) -> tooltip.add(
-        1,
-        CreateLang.translateDirect("recipe.deploying.not_consumed").withStyle(ChatFormatting.GOLD)
-    );
+    public static final OptionalSlotRenderer SLOT = (context, x, y, pt) -> AllGuiTextures.JEI_SLOT.render(context, 0, 0);
+    public static final OptionalSlotRenderer CHANCE_SLOT = (context, x, y, pt) -> AllGuiTextures.JEI_CHANCE_SLOT.render(context, 0, 0);
+    public static final AdditionalStackModifier NOT_CONSUMED = (stack, tooltip) -> tooltip.add(CreateLang.translateDirect(
+        "recipe.deploying.not_consumed").formatted(Formatting.GOLD));
 
     public void placeSlots(SlotDefinition slotDefinition) {
         for (int i = placeViewSlots(slotDefinition), size = getViewType().getSlotCount(); i < size; i++) {
@@ -74,10 +65,7 @@ public abstract class CreateView extends AbstractList<IEivViewRecipe> implements
     }
 
     public void bindChanceSlot(SlotFillContext slotFillContext, int i, SlotContent content, float chance) {
-        Component text = CreateLang.translateDirect(
-            "recipe.processing.chance",
-            chance < 0.01 ? "<1" : (int) (chance * 100)
-        ).withStyle(ChatFormatting.GOLD);
+        Text text = CreateLang.translateDirect("recipe.processing.chance", chance < 0.01 ? "<1" : (int) (chance * 100)).formatted(Formatting.GOLD);
         slotFillContext.bindOptionalSlot(i, content, CHANCE_SLOT);
         slotFillContext.addAdditionalStackModifier(i, (stack, tooltip) -> tooltip.add(1, text));
     }
@@ -97,16 +85,16 @@ public abstract class CreateView extends AbstractList<IEivViewRecipe> implements
     }
 
     private static boolean matchPotion(Item item, ItemStack stack, List<SlotContent> slotContents) {
-        PotionContents component = stack.get(DataComponents.POTION_CONTENTS);
+        PotionContentsComponent component = stack.get(DataComponentTypes.POTION_CONTENTS);
         if (component == null) {
             return true;
         }
-        Holder<Potion> potion = component.potion().orElse(null);
+        RegistryEntry<Potion> potion = component.potion().orElse(null);
         BottleType bottleType = potion != null ? stack.get(AllDataComponents.POTION_FLUID_BOTTLE_TYPE) : null;
         for (SlotContent slotContent : slotContents) {
             for (ItemStack validStack : slotContent.getValidContents()) {
-                if (validStack.is(item)) {
-                    PotionContents validComponent = validStack.get(DataComponents.POTION_CONTENTS);
+                if (validStack.isOf(item)) {
+                    PotionContentsComponent validComponent = validStack.get(DataComponentTypes.POTION_CONTENTS);
                     if (validComponent == null) {
                         return true;
                     }
@@ -114,7 +102,7 @@ public abstract class CreateView extends AbstractList<IEivViewRecipe> implements
                         if (validComponent.potion().isEmpty()) {
                             return true;
                         }
-                    } else if (validComponent.is(potion) && (bottleType == null || validStack.get(AllDataComponents.POTION_FLUID_BOTTLE_TYPE) == bottleType)) {
+                    } else if (validComponent.matches(potion) && (bottleType == null || validStack.get(AllDataComponents.POTION_FLUID_BOTTLE_TYPE) == bottleType)) {
                         return true;
                     }
                 }
@@ -124,20 +112,20 @@ public abstract class CreateView extends AbstractList<IEivViewRecipe> implements
     }
 
     private static boolean matchEnchantments(Item item, ItemStack stack, List<SlotContent> slotContents) {
-        ItemEnchantments enchantments = stack.get(DataComponents.ENCHANTMENTS);
+        ItemEnchantmentsComponent enchantments = stack.get(DataComponentTypes.ENCHANTMENTS);
         if (enchantments == null) {
             return true;
         }
-        int size = enchantments.size();
-        Set<Holder<Enchantment>> entries = enchantments.keySet();
+        int size = enchantments.getSize();
+        Set<RegistryEntry<Enchantment>> entries = enchantments.getEnchantments();
         for (SlotContent slotContent : slotContents) {
             for (ItemStack validStack : slotContent.getValidContents()) {
-                if (validStack.is(item)) {
-                    ItemEnchantments validEnchantments = validStack.get(DataComponents.ENCHANTMENTS);
+                if (validStack.isOf(item)) {
+                    ItemEnchantmentsComponent validEnchantments = validStack.get(DataComponentTypes.ENCHANTMENTS);
                     if (validEnchantments == null) {
                         return true;
                     }
-                    if (validEnchantments.size() != size) {
+                    if (validEnchantments.getSize() != size) {
                         continue;
                     }
                     if (matchEnchantments(entries, enchantments, validEnchantments)) {
@@ -150,11 +138,11 @@ public abstract class CreateView extends AbstractList<IEivViewRecipe> implements
     }
 
     private static boolean matchEnchantments(
-        Set<Holder<Enchantment>> entries,
-        ItemEnchantments enchantments,
-        ItemEnchantments validEnchantments
+        Set<RegistryEntry<Enchantment>> entries,
+        ItemEnchantmentsComponent enchantments,
+        ItemEnchantmentsComponent validEnchantments
     ) {
-        for (Holder<Enchantment> enchantment : entries) {
+        for (RegistryEntry<Enchantment> enchantment : entries) {
             if (validEnchantments.getLevel(enchantment) != enchantments.getLevel(enchantment)) {
                 return false;
             }
@@ -166,7 +154,7 @@ public abstract class CreateView extends AbstractList<IEivViewRecipe> implements
         List<Fluid> fluids = ingredient.getMatchingFluids();
         List<ItemStack> list = new ArrayList<>(fluids.size());
         int amount = ingredient.amount();
-        DataComponentPatch components = null;
+        ComponentChanges components = null;
         if (ingredient instanceof FluidStackIngredient stackIngredient) {
             components = stackIngredient.components();
         }
@@ -175,14 +163,14 @@ public abstract class CreateView extends AbstractList<IEivViewRecipe> implements
             if (item == Items.AIR) {
                 continue;
             }
-            ItemStack stack = item.getDefaultInstance();
+            ItemStack stack = item.getDefaultStack();
             if (components != null) {
-                stack.applyComponents(components);
+                stack.applyUnvalidatedChanges(components);
                 updatePotionName(fluid, stack);
             }
-            CompoundTag tag = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
+            NbtCompound tag = stack.getOrDefault(DataComponentTypes.CUSTOM_DATA, NbtComponent.DEFAULT).copyNbt();
             tag.putInt("fluidAmount", amount);
-            stack.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
+            stack.set(DataComponentTypes.CUSTOM_DATA, NbtComponent.of(tag));
             list.add(stack);
         }
         return list;
@@ -194,12 +182,12 @@ public abstract class CreateView extends AbstractList<IEivViewRecipe> implements
         if (item == Items.AIR) {
             return ItemStack.EMPTY;
         }
-        ItemStack stack = item.getDefaultInstance();
-        stack.applyComponents(fluidStack.getComponents());
+        ItemStack stack = item.getDefaultStack();
+        stack.applyComponentsFrom(fluidStack.getComponents());
         updatePotionName(fluid, stack);
-        CompoundTag tag = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
+        NbtCompound tag = stack.getOrDefault(DataComponentTypes.CUSTOM_DATA, NbtComponent.DEFAULT).copyNbt();
         tag.putInt("fluidAmount", fluidStack.getAmount());
-        stack.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
+        stack.set(DataComponentTypes.CUSTOM_DATA, NbtComponent.of(tag));
         return stack;
     }
 
@@ -207,16 +195,12 @@ public abstract class CreateView extends AbstractList<IEivViewRecipe> implements
         if (fluid != AllFluids.POTION) {
             return;
         }
-        PotionContents contents = stack.getOrDefault(DataComponents.POTION_CONTENTS, PotionContents.EMPTY);
+        PotionContentsComponent contents = stack.getOrDefault(DataComponentTypes.POTION_CONTENTS, PotionContentsComponent.DEFAULT);
         BottleType bottleType = stack.getOrDefault(AllDataComponents.POTION_FLUID_BOTTLE_TYPE, BottleType.REGULAR);
-        Component name = contents.getName(PotionFluidHandler.itemFromBottleType(bottleType)
-            .getDescriptionId() + ".effect.");
-        stack.set(DataComponents.ITEM_NAME, name);
-        if (!stack.has(DataComponents.POTION_DURATION_SCALE) && bottleType == BottleType.LINGERING) {
-            stack.set(
-                DataComponents.POTION_DURATION_SCALE,
-                Items.LINGERING_POTION.components().get(DataComponents.POTION_DURATION_SCALE)
-            );
+        Text name = contents.getName(PotionFluidHandler.itemFromBottleType(bottleType).getTranslationKey() + ".effect.");
+        stack.set(DataComponentTypes.ITEM_NAME, name);
+        if (!stack.contains(DataComponentTypes.POTION_DURATION_SCALE) && bottleType == BottleType.LINGERING) {
+            stack.set(DataComponentTypes.POTION_DURATION_SCALE, Items.LINGERING_POTION.getComponents().get(DataComponentTypes.POTION_DURATION_SCALE));
         }
     }
 

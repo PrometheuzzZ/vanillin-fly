@@ -8,12 +8,12 @@ import com.zurrtum.create.AllRecipeTypes;
 import com.zurrtum.create.content.processing.recipe.ProcessingOutput;
 import com.zurrtum.create.foundation.recipe.CreateSingleStackRollableRecipe;
 import com.zurrtum.create.foundation.recipe.TimedRecipe;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.world.item.crafting.Ingredient;
-import net.minecraft.world.item.crafting.RecipeSerializer;
-import net.minecraft.world.item.crafting.RecipeType;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.recipe.Ingredient;
+import net.minecraft.recipe.RecipeSerializer;
+import net.minecraft.recipe.RecipeType;
 
 import java.util.List;
 
@@ -36,12 +36,12 @@ public record CuttingRecipe(int time, List<ProcessingOutput> results,
             Ingredient.CODEC.fieldOf("ingredient").forGetter(CuttingRecipe::ingredient)
         ).apply(instance, CuttingRecipe::new));
 
-        public static final StreamCodec<RegistryFriendlyByteBuf, CuttingRecipe> PACKET_CODEC = StreamCodec.composite(
-            ByteBufCodecs.INT,
+        public static final PacketCodec<RegistryByteBuf, CuttingRecipe> PACKET_CODEC = PacketCodec.tuple(
+            PacketCodecs.INTEGER,
             CuttingRecipe::time,
-            ProcessingOutput.STREAM_CODEC.apply(ByteBufCodecs.list()),
+            ProcessingOutput.STREAM_CODEC.collect(PacketCodecs.toList()),
             CuttingRecipe::results,
-            Ingredient.CONTENTS_STREAM_CODEC,
+            Ingredient.PACKET_CODEC,
             CuttingRecipe::ingredient,
             CuttingRecipe::new
         );
@@ -52,7 +52,7 @@ public record CuttingRecipe(int time, List<ProcessingOutput> results,
         }
 
         @Override
-        public StreamCodec<RegistryFriendlyByteBuf, CuttingRecipe> streamCodec() {
+        public PacketCodec<RegistryByteBuf, CuttingRecipe> packetCodec() {
             return PACKET_CODEC;
         }
     }

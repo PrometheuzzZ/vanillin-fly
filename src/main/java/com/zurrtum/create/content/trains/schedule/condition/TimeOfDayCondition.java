@@ -1,11 +1,11 @@
 package com.zurrtum.create.content.trains.schedule.condition;
 
 import com.zurrtum.create.content.trains.entity.Train;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.resources.Identifier;
-import net.minecraft.world.level.Level;
+import net.minecraft.nbt.NbtCompound;
+import net.minecraft.text.MutableText;
+import net.minecraft.text.Text;
+import net.minecraft.util.Identifier;
+import net.minecraft.world.World;
 
 public class TimeOfDayCondition extends ScheduleWaitCondition {
     public TimeOfDayCondition(Identifier id) {
@@ -15,11 +15,11 @@ public class TimeOfDayCondition extends ScheduleWaitCondition {
     }
 
     @Override
-    public boolean tickCompletion(Level level, Train train, CompoundTag context) {
+    public boolean tickCompletion(World level, Train train, NbtCompound context) {
         int maxTickDiff = 40;
         int targetHour = intData("Hour");
         int targetMinute = intData("Minute");
-        int dayTime = (int) (level.getDayTime() % getRotation());
+        int dayTime = (int) (level.getTimeOfDay() % getRotation());
         int targetTicks = (int) ((((targetHour + 18) % 24) * 1000 + Math.ceil(targetMinute / 60f * 1000)) % getRotation());
         int diff = dayTime - targetTicks;
         return diff >= 0 && maxTickDiff >= diff;
@@ -41,17 +41,16 @@ public class TimeOfDayCondition extends ScheduleWaitCondition {
         };
     }
 
-    public MutableComponent getDigitalDisplay(int hour, int minute, boolean doubleDigitHrs) {
+    public MutableText getDigitalDisplay(int hour, int minute, boolean doubleDigitHrs) {
         int hour12raw = hour % 12 == 0 ? 12 : hour % 12;
         String hr12 = doubleDigitHrs ? twoDigits(hour12raw) : ("" + hour12raw);
         String hr24 = doubleDigitHrs ? twoDigits(hour) : ("" + hour);
-        return Component.translatable(
+        return Text.translatable(
             "create.schedule.condition.time_of_day.digital_format",
             hr12,
             hr24,
             twoDigits(minute),
-            hour > 11 ? Component.translatable("create.generic.daytime.pm") : Component.translatable(
-                "create.generic.daytime.am")
+            hour > 11 ? Text.translatable("create.generic.daytime.pm") : Text.translatable("create.generic.daytime.am")
         );
     }
 
@@ -60,23 +59,21 @@ public class TimeOfDayCondition extends ScheduleWaitCondition {
     }
 
     @Override
-    public MutableComponent getWaitingStatus(Level level, Train train, CompoundTag tag) {
+    public MutableText getWaitingStatus(World level, Train train, NbtCompound tag) {
         int targetHour = intData("Hour");
         int targetMinute = intData("Minute");
-        long timeOfDay = level.getDayTime();
+        long timeOfDay = level.getTimeOfDay();
         int dayTime = (int) (timeOfDay % getRotation());
         int targetTicks = (int) ((((targetHour + 18) % 24) * 1000 + Math.ceil(targetMinute / 60f * 1000)) % getRotation());
         int diff = targetTicks - dayTime;
 
-        if (diff < 0) {
+        if (diff < 0)
             diff += getRotation();
-        }
 
         int departureTime = (int) (timeOfDay + diff) % 24000;
         int departingHour = (departureTime / 1000 + 6) % 24;
         int departingMinute = (departureTime % 1000) * 60 / 1000;
 
-        return Component.translatable("create.schedule.condition.time_of_day.status")
-            .append(getDigitalDisplay(departingHour, departingMinute, false));
+        return Text.translatable("create.schedule.condition.time_of_day.status").append(getDigitalDisplay(departingHour, departingMinute, false));
     }
 }

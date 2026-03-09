@@ -1,10 +1,10 @@
 package com.zurrtum.create.client.flywheel.lib.internal;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.zurrtum.create.client.flywheel.impl.FlwLibLinkImpl;
 import com.zurrtum.create.client.flywheel.lib.transform.PoseTransformStack;
-import net.minecraft.client.model.geom.ModelPart;
+import net.minecraft.client.model.ModelPart;
+import net.minecraft.client.render.VertexConsumer;
+import net.minecraft.client.util.math.MatrixStack;
 import org.slf4j.Logger;
 
 import java.util.List;
@@ -15,20 +15,13 @@ public interface FlwLibLink {
 
     Logger getLogger();
 
-    PoseTransformStack getPoseTransformStackOf(PoseStack stack);
+    PoseTransformStack getPoseTransformStackOf(MatrixStack stack);
 
     Map<String, ModelPart> getModelPartChildren(ModelPart part);
 
-    void compileModelPart(
-        ModelPart part,
-        PoseStack.Pose pose,
-        VertexConsumer consumer,
-        int light,
-        int overlay,
-        int color
-    );
+    void compileModelPart(ModelPart part, MatrixStack.Entry pose, VertexConsumer consumer, int light, int overlay, int color);
 
-    List<PoseStack.Pose> getPoseStack(PoseStack stack);
+    List<MatrixStack.Entry> getPoseStack(MatrixStack stack);
 
     boolean isIrisLoaded();
 

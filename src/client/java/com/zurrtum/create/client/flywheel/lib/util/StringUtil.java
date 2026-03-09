@@ -48,8 +48,7 @@ public final class StringUtil {
         } else if (ns < 1000000L) {
             return THREE_DECIMAL_PLACES.format((double) ((float) ns / 1000.0F)) + " μs";
         } else {
-            return ns < 1000000000L ? THREE_DECIMAL_PLACES.format((double) ((float) ns / 1000000.0F)) + " ms" : THREE_DECIMAL_PLACES.format(
-                (double) ((float) ns / 1.0E9F)) + " s";
+            return ns < 1000000000L ? THREE_DECIMAL_PLACES.format((double) ((float) ns / 1000000.0F)) + " ms" : THREE_DECIMAL_PLACES.format((double) ((float) ns / 1.0E9F)) + " s";
         }
     }
 

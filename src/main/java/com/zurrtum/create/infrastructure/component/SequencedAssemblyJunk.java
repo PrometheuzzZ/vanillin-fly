@@ -3,10 +3,10 @@ package com.zurrtum.create.infrastructure.component;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import com.zurrtum.create.content.processing.recipe.ProcessingOutput;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.item.ItemStack;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
 
 import java.util.List;
 import java.util.Random;
@@ -16,10 +16,10 @@ public record SequencedAssemblyJunk(float chance, List<ProcessingOutput> junks) 
         Codec.FLOAT.fieldOf("chance").forGetter(SequencedAssemblyJunk::chance),
         ProcessingOutput.CODEC.listOf().fieldOf("junks").forGetter(SequencedAssemblyJunk::junks)
     ).apply(instance, SequencedAssemblyJunk::new));
-    public static final StreamCodec<RegistryFriendlyByteBuf, SequencedAssemblyJunk> PACKET_CODEC = StreamCodec.composite(
-        ByteBufCodecs.FLOAT,
+    public static final PacketCodec<RegistryByteBuf, SequencedAssemblyJunk> PACKET_CODEC = PacketCodec.tuple(
+        PacketCodecs.FLOAT,
         SequencedAssemblyJunk::chance,
-        ProcessingOutput.STREAM_CODEC.apply(ByteBufCodecs.list()),
+        ProcessingOutput.STREAM_CODEC.collect(PacketCodecs.toList()),
         SequencedAssemblyJunk::junks,
         SequencedAssemblyJunk::new
     );
@@ -40,9 +40,8 @@ public record SequencedAssemblyJunk(float chance, List<ProcessingOutput> junks) 
         float number = random.nextFloat() * totalWeight;
         for (ProcessingOutput junk : junks) {
             number -= junk.chance();
-            if (number < 0) {
+            if (number < 0)
                 return junk.create();
-            }
         }
         return ItemStack.EMPTY;
     }

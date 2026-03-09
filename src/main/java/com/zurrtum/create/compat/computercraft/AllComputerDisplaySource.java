@@ -4,9 +4,9 @@ import com.zurrtum.create.api.behaviour.display.DisplaySource;
 import com.zurrtum.create.api.registry.CreateRegistries;
 import com.zurrtum.create.compat.Mods;
 import net.fabricmc.fabric.api.event.registry.RegistryEntryAddedCallback;
-import net.minecraft.core.Registry;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.Identifier;
+import net.minecraft.registry.Registries;
+import net.minecraft.registry.Registry;
+import net.minecraft.util.Identifier;
 
 import java.util.List;
 
@@ -22,15 +22,11 @@ public class AllComputerDisplaySource {
     );
 
     private static ComputerDisplaySource registerDisplay() {
-        return Registry.register(
-            CreateRegistries.DISPLAY_SOURCE,
-            Identifier.fromNamespaceAndPath(MOD_ID, "computer"),
-            new ComputerDisplaySource()
-        );
+        return Registry.register(CreateRegistries.DISPLAY_SOURCE, Identifier.of(MOD_ID, "computer"), new ComputerDisplaySource());
     }
 
     public static void register() {
-        RegistryEntryAddedCallback.event(BuiltInRegistries.BLOCK).register((rawId, id, block) -> {
+        RegistryEntryAddedCallback.event(Registries.BLOCK).register((rawId, id, block) -> {
             if (SUPPORT_BLOCK.contains(id)) {
                 DisplaySource.BY_BLOCK.add(block, COMPUTER);
             }

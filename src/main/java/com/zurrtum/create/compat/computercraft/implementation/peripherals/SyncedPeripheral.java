@@ -25,9 +25,8 @@ public abstract class SyncedPeripheral<T extends SmartBlockEntity> implements IP
     public void attach(@NotNull IComputerAccess computer) {
         synchronized (computers) {
             computers.add(computer);
-            if (computers.size() == 1) {
+            if (computers.size() == 1)
                 onFirstAttach();
-            }
             updateBlockEntity();
         }
     }
@@ -40,9 +39,8 @@ public abstract class SyncedPeripheral<T extends SmartBlockEntity> implements IP
         synchronized (computers) {
             computers.remove(computer);
             updateBlockEntity();
-            if (computers.isEmpty()) {
+            if (computers.isEmpty())
                 onLastDetach();
-            }
         }
     }
 
@@ -53,8 +51,7 @@ public abstract class SyncedPeripheral<T extends SmartBlockEntity> implements IP
         boolean hasAttachedComputer = !computers.isEmpty();
 
         blockEntity.getBehaviour(ComputerBehaviour.TYPE).setHasAttachedComputer(hasAttachedComputer);
-        blockEntity.getLevel().getServer().getPlayerList()
-            .broadcastAll(new AttachedComputerPacket(blockEntity.getBlockPos(), hasAttachedComputer));
+        blockEntity.getWorld().getServer().getPlayerManager().sendToAll(new AttachedComputerPacket(blockEntity.getPos(), hasAttachedComputer));
     }
 
     @Override

@@ -2,21 +2,21 @@ package com.zurrtum.create.content.contraptions.chassis;
 
 import com.zurrtum.create.AllBlockEntityTypes;
 import com.zurrtum.create.AllBlocks;
-import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.api.contraption.BlockMovementChecks;
 import com.zurrtum.create.catnip.data.Iterate;
 import com.zurrtum.create.foundation.blockEntity.SmartBlockEntity;
+import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.foundation.blockEntity.behaviour.scrollValue.ServerChassisScrollValueBehaviour;
 import com.zurrtum.create.foundation.blockEntity.behaviour.scrollValue.ServerScrollValueBehaviour;
 import com.zurrtum.create.infrastructure.config.AllConfigs;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.core.Direction.Axis;
-import net.minecraft.core.Direction.AxisDirection;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.properties.BlockStateProperties;
-import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.state.property.Properties;
+import net.minecraft.storage.ReadView;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Direction.Axis;
+import net.minecraft.util.math.Direction.AxisDirection;
 
 import java.util.*;
 
@@ -41,11 +41,10 @@ public class ChassisBlockEntity extends SmartBlockEntity {
     }
 
     @Override
-    protected void read(ValueInput view, boolean clientPacket) {
+    protected void read(ReadView view, boolean clientPacket) {
         super.read(view, clientPacket);
-        if (clientPacket) {
+        if (clientPacket)
             currentlySelectedRange = getRange();
-        }
     }
 
     public int getRange() {
@@ -53,31 +52,26 @@ public class ChassisBlockEntity extends SmartBlockEntity {
     }
 
     public List<BlockPos> getIncludedBlockPositions(Direction forcedMovement, boolean visualize) {
-        if (!(getBlockState().getBlock() instanceof AbstractChassisBlock)) {
+        if (!(getCachedState().getBlock() instanceof AbstractChassisBlock))
             return Collections.emptyList();
-        }
-        return isRadial() ? getIncludedBlockPositionsRadial(
-            forcedMovement,
-            visualize
-        ) : getIncludedBlockPositionsLinear(forcedMovement, visualize);
+        return isRadial() ? getIncludedBlockPositionsRadial(forcedMovement, visualize) : getIncludedBlockPositionsLinear(forcedMovement, visualize);
     }
 
     protected boolean isRadial() {
-        return level.getBlockState(worldPosition).getBlock() instanceof RadialChassisBlock;
+        return world.getBlockState(pos).getBlock() instanceof RadialChassisBlock;
     }
 
     public List<ChassisBlockEntity> collectChassisGroup() {
         Queue<BlockPos> frontier = new LinkedList<>();
         List<ChassisBlockEntity> collected = new ArrayList<>();
         Set<BlockPos> visited = new HashSet<>();
-        frontier.add(worldPosition);
+        frontier.add(pos);
         while (!frontier.isEmpty()) {
             BlockPos current = frontier.poll();
-            if (visited.contains(current)) {
+            if (visited.contains(current))
                 continue;
-            }
             visited.add(current);
-            BlockEntity blockEntity = level.getBlockEntity(current);
+            BlockEntity blockEntity = world.getBlockEntity(current);
             if (blockEntity instanceof ChassisBlockEntity chassis) {
                 collected.add(chassis);
                 visited.add(current);
@@ -88,31 +82,26 @@ public class ChassisBlockEntity extends SmartBlockEntity {
     }
 
     public boolean addAttachedChasses(Queue<BlockPos> frontier, Set<BlockPos> visited) {
-        BlockState state = getBlockState();
-        if (!(state.getBlock() instanceof AbstractChassisBlock)) {
+        BlockState state = getCachedState();
+        if (!(state.getBlock() instanceof AbstractChassisBlock))
             return false;
-        }
-        Axis axis = state.getValue(AbstractChassisBlock.AXIS);
+        Axis axis = state.get(AbstractChassisBlock.AXIS);
         if (isRadial()) {
 
             // Collect chain of radial chassis
             for (int offset : new int[]{-1, 1}) {
                 Direction direction = Direction.get(AxisDirection.POSITIVE, axis);
-                BlockPos currentPos = worldPosition.relative(direction, offset);
-                if (!level.isLoaded(currentPos)) {
+                BlockPos currentPos = pos.offset(direction, offset);
+                if (!world.isPosLoaded(currentPos))
                     return false;
-                }
 
-                BlockState neighbourState = level.getBlockState(currentPos);
-                if (!neighbourState.is(AllBlocks.RADIAL_CHASSIS)) {
+                BlockState neighbourState = world.getBlockState(currentPos);
+                if (!neighbourState.isOf(AllBlocks.RADIAL_CHASSIS))
                     continue;
-                }
-                if (axis != neighbourState.getValue(BlockStateProperties.AXIS)) {
+                if (axis != neighbourState.get(Properties.AXIS))
                     continue;
-                }
-                if (!visited.contains(currentPos)) {
+                if (!visited.contains(currentPos))
                     frontier.add(currentPos);
-                }
             }
 
             return true;
@@ -120,24 +109,19 @@ public class ChassisBlockEntity extends SmartBlockEntity {
 
         // Collect group of connected linear chassis
         for (Direction offset : Iterate.directions) {
-            BlockPos current = worldPosition.relative(offset);
-            if (visited.contains(current)) {
+            BlockPos current = pos.offset(offset);
+            if (visited.contains(current))
                 continue;
-            }
-            if (!level.isLoaded(current)) {
+            if (!world.isPosLoaded(current))
                 return false;
-            }
 
-            BlockState neighbourState = level.getBlockState(current);
-            if (!LinearChassisBlock.isChassis(neighbourState)) {
+            BlockState neighbourState = world.getBlockState(current);
+            if (!LinearChassisBlock.isChassis(neighbourState))
                 continue;
-            }
-            if (!LinearChassisBlock.sameKind(state, neighbourState)) {
+            if (!LinearChassisBlock.sameKind(state, neighbourState))
                 continue;
-            }
-            if (neighbourState.getValue(LinearChassisBlock.AXIS) != axis) {
+            if (neighbourState.get(LinearChassisBlock.AXIS) != axis)
                 continue;
-            }
 
             frontier.add(current);
         }
@@ -147,38 +131,33 @@ public class ChassisBlockEntity extends SmartBlockEntity {
 
     private List<BlockPos> getIncludedBlockPositionsLinear(Direction forcedMovement, boolean visualize) {
         List<BlockPos> positions = new ArrayList<>();
-        BlockState state = getBlockState();
+        BlockState state = getCachedState();
         AbstractChassisBlock block = (AbstractChassisBlock) state.getBlock();
-        Axis axis = state.getValue(AbstractChassisBlock.AXIS);
+        Axis axis = state.get(AbstractChassisBlock.AXIS);
         Direction facing = Direction.get(AxisDirection.POSITIVE, axis);
         int chassisRange = visualize ? currentlySelectedRange : getRange();
 
         for (int offset : new int[]{1, -1}) {
-            if (offset == -1) {
+            if (offset == -1)
                 facing = facing.getOpposite();
-            }
-            boolean sticky = state.getValue(block.getGlueableSide(state, facing));
+            boolean sticky = state.get(block.getGlueableSide(state, facing));
             for (int i = 1; i <= chassisRange; i++) {
-                BlockPos current = worldPosition.relative(facing, i);
-                BlockState currentState = level.getBlockState(current);
+                BlockPos current = pos.offset(facing, i);
+                BlockState currentState = world.getBlockState(current);
 
-                if (forcedMovement != facing && !sticky) {
+                if (forcedMovement != facing && !sticky)
                     break;
-                }
 
                 // Ignore replaceable Blocks and Air-like
-                if (!BlockMovementChecks.isMovementNecessary(currentState, level, current)) {
+                if (!BlockMovementChecks.isMovementNecessary(currentState, world, current))
                     break;
-                }
-                if (BlockMovementChecks.isBrittle(currentState)) {
+                if (BlockMovementChecks.isBrittle(currentState))
                     break;
-                }
 
                 positions.add(current);
 
-                if (BlockMovementChecks.isNotSupportive(currentState, facing)) {
+                if (BlockMovementChecks.isNotSupportive(currentState, facing))
                     break;
-                }
             }
         }
 
@@ -187,58 +166,48 @@ public class ChassisBlockEntity extends SmartBlockEntity {
 
     private List<BlockPos> getIncludedBlockPositionsRadial(Direction forcedMovement, boolean visualize) {
         List<BlockPos> positions = new ArrayList<>();
-        BlockState state = level.getBlockState(worldPosition);
-        Axis axis = state.getValue(AbstractChassisBlock.AXIS);
+        BlockState state = world.getBlockState(pos);
+        Axis axis = state.get(AbstractChassisBlock.AXIS);
         AbstractChassisBlock block = (AbstractChassisBlock) state.getBlock();
         int chassisRange = visualize ? currentlySelectedRange : getRange();
 
         for (Direction facing : Iterate.directions) {
-            if (facing.getAxis() == axis) {
+            if (facing.getAxis() == axis)
                 continue;
-            }
-            if (!state.getValue(block.getGlueableSide(state, facing))) {
+            if (!state.get(block.getGlueableSide(state, facing)))
                 continue;
-            }
 
-            BlockPos startPos = worldPosition.relative(facing);
+            BlockPos startPos = pos.offset(facing);
             List<BlockPos> localFrontier = new LinkedList<>();
             Set<BlockPos> localVisited = new HashSet<>();
             localFrontier.add(startPos);
 
             while (!localFrontier.isEmpty()) {
                 BlockPos searchPos = localFrontier.remove(0);
-                BlockState searchedState = level.getBlockState(searchPos);
+                BlockState searchedState = world.getBlockState(searchPos);
 
-                if (localVisited.contains(searchPos)) {
+                if (localVisited.contains(searchPos))
                     continue;
-                }
-                if (!searchPos.closerThan(worldPosition, chassisRange + .5f)) {
+                if (!searchPos.isWithinDistance(pos, chassisRange + .5f))
                     continue;
-                }
-                if (!BlockMovementChecks.isMovementNecessary(searchedState, level, searchPos)) {
+                if (!BlockMovementChecks.isMovementNecessary(searchedState, world, searchPos))
                     continue;
-                }
-                if (BlockMovementChecks.isBrittle(searchedState)) {
+                if (BlockMovementChecks.isBrittle(searchedState))
                     continue;
-                }
 
                 localVisited.add(searchPos);
-                if (!searchPos.equals(worldPosition)) {
+                if (!searchPos.equals(pos))
                     positions.add(searchPos);
-                }
 
                 for (Direction offset : Iterate.directions) {
-                    if (offset.getAxis() == axis) {
+                    if (offset.getAxis() == axis)
                         continue;
-                    }
-                    if (searchPos.equals(worldPosition) && offset != facing) {
+                    if (searchPos.equals(pos) && offset != facing)
                         continue;
-                    }
-                    if (BlockMovementChecks.isNotSupportive(searchedState, offset)) {
+                    if (BlockMovementChecks.isNotSupportive(searchedState, offset))
                         continue;
-                    }
 
-                    localFrontier.add(searchPos.relative(offset));
+                    localFrontier.add(searchPos.offset(offset));
                 }
             }
         }

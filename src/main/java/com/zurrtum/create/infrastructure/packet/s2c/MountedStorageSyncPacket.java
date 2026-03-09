@@ -4,36 +4,37 @@ import com.zurrtum.create.AllClientHandle;
 import com.zurrtum.create.AllPackets;
 import com.zurrtum.create.api.contraption.storage.fluid.MountedFluidStorage;
 import com.zurrtum.create.api.contraption.storage.item.MountedItemStorage;
-import net.minecraft.core.BlockPos;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.PacketType;
-import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.network.listener.ClientPlayPacketListener;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.PacketType;
+import net.minecraft.util.math.BlockPos;
 
 import java.util.HashMap;
 import java.util.Map;
 
-public record MountedStorageSyncPacket(int contraptionId, Map<BlockPos, MountedItemStorage> items,
-                                       Map<BlockPos, MountedFluidStorage> fluids) implements Packet<ClientGamePacketListener> {
-    public static final StreamCodec<RegistryFriendlyByteBuf, MountedStorageSyncPacket> CODEC = StreamCodec.composite(
-        ByteBufCodecs.INT,
+public record MountedStorageSyncPacket(
+    int contraptionId, Map<BlockPos, MountedItemStorage> items, Map<BlockPos, MountedFluidStorage> fluids
+) implements Packet<ClientPlayPacketListener> {
+    public static final PacketCodec<RegistryByteBuf, MountedStorageSyncPacket> CODEC = PacketCodec.tuple(
+        PacketCodecs.INTEGER,
         MountedStorageSyncPacket::contraptionId,
-        ByteBufCodecs.map(HashMap::new, BlockPos.STREAM_CODEC, MountedItemStorage.STREAM_CODEC),
+        PacketCodecs.map(HashMap::new, BlockPos.PACKET_CODEC, MountedItemStorage.STREAM_CODEC),
         MountedStorageSyncPacket::items,
-        ByteBufCodecs.map(HashMap::new, BlockPos.STREAM_CODEC, MountedFluidStorage.STREAM_CODEC),
+        PacketCodecs.map(HashMap::new, BlockPos.PACKET_CODEC, MountedFluidStorage.STREAM_CODEC),
         MountedStorageSyncPacket::fluids,
         MountedStorageSyncPacket::new
     );
 
     @Override
-    public void handle(ClientGamePacketListener listener) {
+    public void apply(ClientPlayPacketListener listener) {
         AllClientHandle.INSTANCE.onMountedStorageSync(this);
     }
 
     @Override
-    public PacketType<MountedStorageSyncPacket> type() {
+    public PacketType<MountedStorageSyncPacket> getPacketType() {
         return AllPackets.MOUNTED_STORAGE_SYNC;
     }
 }

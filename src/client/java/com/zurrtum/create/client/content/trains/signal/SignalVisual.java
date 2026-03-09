@@ -19,11 +19,11 @@ import com.zurrtum.create.content.trains.signal.SignalBoundary;
 import com.zurrtum.create.content.trains.track.ITrackBlock;
 import com.zurrtum.create.content.trains.track.TrackTargetingBehaviour;
 import com.zurrtum.create.content.trains.track.TrackTargetingBehaviour.RenderedTrackOverlayType;
-import net.minecraft.client.renderer.LightTexture;
-import net.minecraft.core.BlockPos;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
+import net.minecraft.client.render.LightmapTextureManager;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.function.Consumer;
@@ -38,11 +38,9 @@ public class SignalVisual extends AbstractBlockEntityVisual<SignalBlockEntity> i
     public SignalVisual(VisualizationContext ctx, SignalBlockEntity blockEntity, float partialTick) {
         super(ctx, blockEntity, partialTick);
 
-        signalLight = ctx.instancerProvider()
-            .instancer(InstanceTypes.TRANSFORMED, Models.partial(AllPartialModels.SIGNAL_OFF)).createInstance();
+        signalLight = ctx.instancerProvider().instancer(InstanceTypes.TRANSFORMED, Models.partial(AllPartialModels.SIGNAL_OFF)).createInstance();
 
-        signalOverlay = ctx.instancerProvider()
-            .instancer(InstanceTypes.TRANSFORMED, Models.partial(AllPartialModels.TRACK_SIGNAL_OVERLAY))
+        signalOverlay = ctx.instancerProvider().instancer(InstanceTypes.TRANSFORMED, Models.partial(AllPartialModels.TRACK_SIGNAL_OVERLAY))
             .createInstance();
 
         setupVisual();
@@ -73,20 +71,18 @@ public class SignalVisual extends AbstractBlockEntityVisual<SignalBlockEntity> i
         {
             SignalState signalState = blockEntity.getState();
 
-            float renderTime = AnimationTickHolder.getRenderTime(blockEntity.getLevel());
+            float renderTime = AnimationTickHolder.getRenderTime(blockEntity.getWorld());
             boolean isRedLight = signalState.isRedLight(renderTime);
 
             if (isRedLight != previousIsRedLight) {
                 PartialModel partial = isRedLight ? AllPartialModels.SIGNAL_ON : AllPartialModels.SIGNAL_OFF;
-                instancerProvider().instancer(InstanceTypes.TRANSFORMED, Models.partial(partial))
-                    .stealInstance(signalLight);
+                instancerProvider().instancer(InstanceTypes.TRANSFORMED, Models.partial(partial)).stealInstance(signalLight);
             }
 
             signalLight.setIdentityTransform().translate(getVisualPosition());
 
-            if (isRedLight) {
-                signalLight.light(LightTexture.FULL_BLOCK);
-            }
+            if (isRedLight)
+                signalLight.light(LightmapTextureManager.MAX_BLOCK_LIGHT_COORDINATE);
 
             signalLight.setChanged();
 
@@ -98,7 +94,7 @@ public class SignalVisual extends AbstractBlockEntityVisual<SignalBlockEntity> i
 
             TrackTargetingBehaviour<SignalBoundary> target = blockEntity.edgePoint;
             BlockPos targetPosition = target.getGlobalPosition();
-            Level level = blockEntity.getLevel();
+            World level = blockEntity.getWorld();
             BlockState trackState = level.getBlockState(targetPosition);
             Block block = trackState.getBlock();
 
@@ -121,8 +117,7 @@ public class SignalVisual extends AbstractBlockEntityVisual<SignalBlockEntity> i
                     partial = AllPartialModels.TRACK_SIGNAL_OVERLAY;
                 }
 
-                instancerProvider().instancer(InstanceTypes.TRANSFORMED, Models.partial(partial))
-                    .stealInstance(signalOverlay);
+                instancerProvider().instancer(InstanceTypes.TRANSFORMED, Models.partial(partial)).stealInstance(signalOverlay);
 
                 signalOverlay.setIdentityTransform().translate(targetPosition.subtract(renderOrigin()));
 

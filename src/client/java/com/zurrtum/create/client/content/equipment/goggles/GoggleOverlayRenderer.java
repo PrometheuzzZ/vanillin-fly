@@ -1,6 +1,5 @@
 package com.zurrtum.create.client.content.equipment.goggles;
 
-import com.mojang.blaze3d.platform.Window;
 import com.zurrtum.create.AllBlocks;
 import com.zurrtum.create.AllItems;
 import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
@@ -26,22 +25,23 @@ import com.zurrtum.create.compat.Mods;
 import com.zurrtum.create.content.contraptions.piston.MechanicalPistonBlock;
 import com.zurrtum.create.content.contraptions.piston.PistonExtensionPoleBlock;
 import com.zurrtum.create.content.equipment.goggles.GogglesItem;
-import net.minecraft.client.DeltaTracker;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.MouseHandler;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.multiplayer.ClientLevel;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.network.chat.CommonComponents;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.FormattedText;
-import net.minecraft.util.Mth;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.BlockHitResult;
-import net.minecraft.world.phys.HitResult;
+import net.minecraft.block.BlockState;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.Mouse;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.render.RenderTickCounter;
+import net.minecraft.client.util.Window;
+import net.minecraft.client.world.ClientWorld;
+import net.minecraft.item.ItemStack;
+import net.minecraft.screen.ScreenTexts;
+import net.minecraft.text.StringVisitable;
+import net.minecraft.text.Text;
+import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.util.hit.HitResult;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.world.World;
 import org.joml.Matrix3x2fStack;
 
 import java.util.ArrayList;
@@ -55,8 +55,8 @@ public class GoggleOverlayRenderer {
     public static int hoverTicks = 0;
     public static BlockPos lastHovered = null;
 
-    public static void renderOverlay(Minecraft mc, GuiGraphics guiGraphics, DeltaTracker deltaTracker) {
-        HitResult objectMouseOver = mc.hitResult;
+    public static void renderOverlay(MinecraftClient mc, DrawContext guiGraphics, RenderTickCounter deltaTracker) {
+        HitResult objectMouseOver = mc.crosshairTarget;
         if (!(objectMouseOver instanceof BlockHitResult result)) {
             lastHovered = null;
             hoverTicks = 0;
@@ -64,16 +64,14 @@ public class GoggleOverlayRenderer {
         }
 
         for (OutlineEntry entry : outlines.values()) {
-            if (!entry.isAlive()) {
+            if (!entry.isAlive())
                 continue;
-            }
             Outline outline = entry.getOutline();
-            if (outline instanceof ValueBox && !((ValueBox) outline).isPassive) {
+            if (outline instanceof ValueBox && !((ValueBox) outline).isPassive)
                 return;
-            }
         }
 
-        ClientLevel world = mc.level;
+        ClientWorld world = mc.world;
         BlockPos pos = result.getBlockPos();
 
         int prevHoverTicks = hoverTicks;
@@ -85,7 +83,7 @@ public class GoggleOverlayRenderer {
         TooltipBehaviour<?> be = BlockEntityBehaviour.get(world, pos, TooltipBehaviour.TYPE);
         boolean wearingGoggles = GogglesItem.isWearingGoggles(mc.player);
 
-        boolean isShifting = mc.player.isShiftKeyDown();
+        boolean isShifting = mc.player.isSneaking();
 
         boolean hasGoggleInformation = be instanceof IHaveGoggleInformation;
         boolean hasHoveringInformation = be instanceof IHaveHoveringInformation;
@@ -94,11 +92,10 @@ public class GoggleOverlayRenderer {
         boolean hoverAddedInformation = false;
 
         ItemStack item = new ItemStack(AllItems.GOGGLES);
-        List<Component> tooltip = new ArrayList<>();
+        List<Text> tooltip = new ArrayList<>();
 
-        if (be instanceof IHaveCustomOverlayIcon customOverlayIcon) {
+        if (be instanceof IHaveCustomOverlayIcon customOverlayIcon)
             item = customOverlayIcon.getIcon(isShifting);
-        }
 
         if (hasGoggleInformation && wearingGoggles) {
             IHaveGoggleInformation gte = (IHaveGoggleInformation) be;
@@ -106,15 +103,13 @@ public class GoggleOverlayRenderer {
         }
 
         if (hasHoveringInformation) {
-            if (!tooltip.isEmpty()) {
-                tooltip.add(CommonComponents.EMPTY);
-            }
+            if (!tooltip.isEmpty())
+                tooltip.add(ScreenTexts.EMPTY);
             IHaveHoveringInformation hte = (IHaveHoveringInformation) be;
             hoverAddedInformation = hte.addToTooltip(tooltip, isShifting);
 
-            if (goggleAddedInformation && !hoverAddedInformation) {
+            if (goggleAddedInformation && !hoverAddedInformation)
                 tooltip.remove(tooltip.size() - 1);
-            }
         }
 
         if (be instanceof IDisplayAssemblyExceptions) {
@@ -125,11 +120,9 @@ public class GoggleOverlayRenderer {
             }
         }
 
-        if (!hasHoveringInformation) {
-            if (hasHoveringInformation = hoverAddedInformation = TrainRelocatorClient.addToTooltip(tooltip)) {
+        if (!hasHoveringInformation)
+            if (hasHoveringInformation = hoverAddedInformation = TrainRelocatorClient.addToTooltip(tooltip))
                 hoverTicks = prevHoverTicks + 1;
-            }
-        }
 
         // break early if goggle or hover returned false when present
         if ((hasGoggleInformation && !goggleAddedInformation) && (hasHoveringInformation && !hoverAddedInformation)) {
@@ -139,25 +132,22 @@ public class GoggleOverlayRenderer {
 
         // check for piston poles if goggles are worn
         BlockState state = world.getBlockState(pos);
-        if (wearingGoggles && state.is(AllBlocks.PISTON_EXTENSION_POLE)) {
-            Direction[] directions = Iterate.directionsInAxis(state.getValue(PistonExtensionPoleBlock.FACING)
-                .getAxis());
+        if (wearingGoggles && state.isOf(AllBlocks.PISTON_EXTENSION_POLE)) {
+            Direction[] directions = Iterate.directionsInAxis(state.get(PistonExtensionPoleBlock.FACING).getAxis());
             int poles = 1;
             boolean pistonFound = false;
             for (Direction dir : directions) {
                 int attachedPoles = PistonExtensionPoleBlock.PlacementHelper.get().attachedPoles(world, pos, dir);
                 poles += attachedPoles;
-                pistonFound |= world.getBlockState(pos.relative(dir, attachedPoles + 1))
-                    .getBlock() instanceof MechanicalPistonBlock;
+                pistonFound |= world.getBlockState(pos.offset(dir, attachedPoles + 1)).getBlock() instanceof MechanicalPistonBlock;
             }
 
             if (!pistonFound) {
                 hoverTicks = 0;
                 return;
             }
-            if (!tooltip.isEmpty()) {
-                tooltip.add(CommonComponents.EMPTY);
-            }
+            if (!tooltip.isEmpty())
+                tooltip.add(ScreenTexts.EMPTY);
 
             CreateLang.translate("gui.goggles.pole_length").text(" " + poles).forGoggles(tooltip);
         }
@@ -167,15 +157,14 @@ public class GoggleOverlayRenderer {
             return;
         }
 
-        Matrix3x2fStack poseStack = guiGraphics.pose();
+        Matrix3x2fStack poseStack = guiGraphics.getMatrices();
         poseStack.pushMatrix();
 
         int tooltipTextWidth = 0;
-        for (FormattedText textLine : tooltip) {
-            int textLineWidth = mc.font.width(textLine);
-            if (textLineWidth > tooltipTextWidth) {
+        for (StringVisitable textLine : tooltip) {
+            int textLineWidth = mc.textRenderer.getWidth(textLine);
+            if (textLineWidth > tooltipTextWidth)
                 tooltipTextWidth = textLineWidth;
-            }
         }
 
         int tooltipHeight = 8;
@@ -184,8 +173,8 @@ public class GoggleOverlayRenderer {
             tooltipHeight += (tooltip.size() - 1) * 10;
         }
 
-        int width = guiGraphics.guiWidth();
-        int height = guiGraphics.guiHeight();
+        int width = guiGraphics.getScaledWindowWidth();
+        int height = guiGraphics.getScaledWindowHeight();
 
         CClient cfg = AllConfigs.client();
         int posX = width / 2 + cfg.overlayOffsetX.get();
@@ -194,14 +183,11 @@ public class GoggleOverlayRenderer {
         posX = Math.min(posX, width - tooltipTextWidth - 20);
         posY = Math.min(posY, height - tooltipHeight - 20);
 
-        float fade = Mth.clamp((hoverTicks + deltaTracker.getGameTimeDeltaPartialTick(false)) / 24f, 0, 1);
+        float fade = MathHelper.clamp((hoverTicks + deltaTracker.getTickProgress(false)) / 24f, 0, 1);
         Boolean useCustom = cfg.overlayCustomColor.get();
-        Color colorBackground = useCustom ? new Color(cfg.overlayBackgroundColor.get()) : BoxElement.COLOR_VANILLA_BACKGROUND.scaleAlpha(
-            .75f);
-        Color colorBorderTop = useCustom ? new Color(cfg.overlayBorderColorTop.get()) : BoxElement.COLOR_VANILLA_BORDER.getFirst()
-            .copy();
-        Color colorBorderBot = useCustom ? new Color(cfg.overlayBorderColorBot.get()) : BoxElement.COLOR_VANILLA_BORDER.getSecond()
-            .copy();
+        Color colorBackground = useCustom ? new Color(cfg.overlayBackgroundColor.get()) : BoxElement.COLOR_VANILLA_BACKGROUND.scaleAlpha(.75f);
+        Color colorBorderTop = useCustom ? new Color(cfg.overlayBorderColorTop.get()) : BoxElement.COLOR_VANILLA_BORDER.getFirst().copy();
+        Color colorBorderBot = useCustom ? new Color(cfg.overlayBorderColorBot.get()) : BoxElement.COLOR_VANILLA_BORDER.getSecond().copy();
 
         if (fade < 1) {
             poseStack.translate((float) (Math.pow(1 - fade, 3) * Math.signum(cfg.overlayOffsetX.get() + .5f) * 8), 0);
@@ -223,9 +209,9 @@ public class GoggleOverlayRenderer {
                 colorBackground.getRGB(),
                 colorBorderTop.getRGB(),
                 colorBorderBot.getRGB(),
-                mc.font
+                mc.textRenderer
             );
-            guiGraphics.renderItem(item, posX + 10, posY - 16);
+            guiGraphics.drawItem(item, posX + 10, posY - 16);
 
             poseStack.popMatrix();
 
@@ -240,13 +226,13 @@ public class GoggleOverlayRenderer {
          *
          * this is a workaround to fix this behavior
          */
-        MouseHandler mouseHandler = mc.mouseHandler;
+        Mouse mouseHandler = mc.mouse;
         Window window = mc.getWindow();
-        double guiScale = window.getGuiScale();
-        double cursorX = mouseHandler.xpos();
-        double cursorY = mouseHandler.ypos();
-        mouseHandler.xpos = Math.round(cursorX / guiScale) * guiScale;
-        mouseHandler.ypos = Math.round(cursorY / guiScale) * guiScale;
+        double guiScale = window.getScaleFactor();
+        double cursorX = mouseHandler.getX();
+        double cursorY = mouseHandler.getY();
+        mouseHandler.x = Math.round(cursorX / guiScale) * guiScale;
+        mouseHandler.y = Math.round(cursorY / guiScale) * guiScale;
 
         RemovedGuiUtils.drawHoveringText(
             guiGraphics,
@@ -259,22 +245,21 @@ public class GoggleOverlayRenderer {
             colorBackground.getRGB(),
             colorBorderTop.getRGB(),
             colorBorderBot.getRGB(),
-            mc.font
+            mc.textRenderer
         );
 
-        guiGraphics.renderItem(item, posX + 10, posY - 16);
+        guiGraphics.drawItem(item, posX + 10, posY - 16);
 
-        mouseHandler.xpos = cursorX;
-        mouseHandler.ypos = cursorY;
+        mouseHandler.x = cursorX;
+        mouseHandler.y = cursorY;
         poseStack.popMatrix();
 
     }
 
-    public static BlockPos proxiedOverlayPosition(Level level, BlockPos pos) {
+    public static BlockPos proxiedOverlayPosition(World level, BlockPos pos) {
         BlockState targetedState = level.getBlockState(pos);
-        if (targetedState.getBlock() instanceof IProxyHoveringInformation proxy) {
+        if (targetedState.getBlock() instanceof IProxyHoveringInformation proxy)
             return proxy.getInformationSource(level, pos, targetedState);
-        }
         return pos;
     }
 

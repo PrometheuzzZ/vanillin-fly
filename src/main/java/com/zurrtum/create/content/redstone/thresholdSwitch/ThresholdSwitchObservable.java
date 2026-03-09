@@ -1,6 +1,6 @@
 package com.zurrtum.create.content.redstone.thresholdSwitch;
 
-import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.text.MutableText;
 
 public interface ThresholdSwitchObservable {
 
@@ -10,6 +10,6 @@ public interface ThresholdSwitchObservable {
 
     int getCurrentValue();
 
-    MutableComponent format(int value);
+    MutableText format(int value);
 
 }

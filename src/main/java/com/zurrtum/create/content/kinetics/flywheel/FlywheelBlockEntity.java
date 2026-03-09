@@ -4,10 +4,10 @@ import com.zurrtum.create.AllBlockEntityTypes;
 import com.zurrtum.create.catnip.animation.LerpedFloat;
 import com.zurrtum.create.catnip.animation.LerpedFloat.Chaser;
 import com.zurrtum.create.content.kinetics.base.KineticBlockEntity;
-import net.minecraft.core.BlockPos;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.phys.AABB;
+import net.minecraft.block.BlockState;
+import net.minecraft.storage.ReadView;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Box;
 
 public class FlywheelBlockEntity extends KineticBlockEntity {
 
@@ -19,25 +19,23 @@ public class FlywheelBlockEntity extends KineticBlockEntity {
     }
 
     @Override
-    protected AABB createRenderBoundingBox() {
-        return super.createRenderBoundingBox().inflate(2);
+    protected Box createRenderBoundingBox() {
+        return super.createRenderBoundingBox().expand(2);
     }
 
     @Override
-    protected void read(ValueInput view, boolean clientPacket) {
+    protected void read(ReadView view, boolean clientPacket) {
         super.read(view, clientPacket);
-        if (clientPacket) {
+        if (clientPacket)
             visualSpeed.chase(getGeneratedSpeed(), 1 / 64f, Chaser.EXP);
-        }
     }
 
     @Override
     public void tick() {
         super.tick();
 
-        if (!level.isClientSide()) {
+        if (!world.isClient())
             return;
-        }
 
         float targetSpeed = getSpeed();
         visualSpeed.updateChaseTarget(targetSpeed);

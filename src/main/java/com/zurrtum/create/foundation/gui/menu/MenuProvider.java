@@ -2,43 +2,37 @@ package com.zurrtum.create.foundation.gui.menu;
 
 import com.zurrtum.create.infrastructure.packet.s2c.OpenScreenPacket;
 import io.netty.buffer.Unpooled;
-import net.minecraft.ChatFormatting;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.chat.Component;
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.entity.player.Inventory;
-import net.minecraft.world.entity.player.Player;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.entity.player.PlayerInventory;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
 import org.jetbrains.annotations.Nullable;
 
 public interface MenuProvider {
-    default Component getDisplayName() {
-        return Component.empty();
+    default Text getDisplayName() {
+        return Text.empty();
     }
 
-    @Nullable MenuBase<?> createMenu(
-        int syncId,
-        Inventory playerInventory,
-        Player player,
-        RegistryFriendlyByteBuf extraData
-    );
+    @Nullable MenuBase<?> createMenu(int syncId, PlayerInventory playerInventory, PlayerEntity player, RegistryByteBuf extraData);
 
-    default void openHandledScreen(ServerPlayer player) {
+    default void openHandledScreen(ServerPlayerEntity player) {
         openHandledScreen(player, this);
     }
 
-    static void openHandledScreen(ServerPlayer player, MenuProvider provider) {
-        if (player.containerMenu != player.inventoryMenu) {
-            player.closeContainer();
+    static void openHandledScreen(ServerPlayerEntity player, MenuProvider provider) {
+        if (player.currentScreenHandler != player.playerScreenHandler) {
+            player.closeHandledScreen();
         }
 
-        player.nextContainerCounter();
+        player.incrementScreenHandlerSyncId();
 
-        RegistryFriendlyByteBuf buf = new RegistryFriendlyByteBuf(Unpooled.buffer(), player.registryAccess());
-        MenuBase<?> menu = provider.createMenu(player.containerCounter, player.getInventory(), player, buf);
+        RegistryByteBuf buf = new RegistryByteBuf(Unpooled.buffer(), player.getRegistryManager());
+        MenuBase<?> menu = provider.createMenu(player.screenHandlerSyncId, player.getInventory(), player, buf);
         if (menu == null) {
             if (player.isSpectator()) {
-                player.displayClientMessage(
-                    Component.translatable("container.spectatorCantOpen").withStyle(ChatFormatting.RED), true);
+                player.sendMessage(Text.translatable("container.spectatorCantOpen").formatted(Formatting.RED), true);
             }
 
             buf.release();
@@ -47,14 +41,9 @@ public interface MenuProvider {
             byte[] data = new byte[buf.readableBytes()];
             buf.readBytes(data);
             buf.release();
-            player.connection.send(new OpenScreenPacket(
-                menu.containerId,
-                menu.getMenuType(),
-                provider.getDisplayName(),
-                data
-            ));
-            player.initMenu(menu);
-            player.containerMenu = menu;
+            player.networkHandler.sendPacket(new OpenScreenPacket(menu.syncId, menu.getMenuType(), provider.getDisplayName(), data));
+            player.onScreenHandlerOpened(menu);
+            player.currentScreenHandler = menu;
         }
     }
 }

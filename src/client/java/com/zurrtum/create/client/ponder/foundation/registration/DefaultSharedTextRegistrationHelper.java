@@ -1,7 +1,7 @@
 package com.zurrtum.create.client.ponder.foundation.registration;
 
 import com.zurrtum.create.client.ponder.api.registration.SharedTextRegistrationHelper;
-import net.minecraft.resources.Identifier;
+import net.minecraft.util.Identifier;
 
 public class DefaultSharedTextRegistrationHelper implements SharedTextRegistrationHelper {
 
@@ -15,6 +15,6 @@ public class DefaultSharedTextRegistrationHelper implements SharedTextRegistrati
 
     @Override
     public void registerSharedText(String key, String en_us) {
-        localization.registerShared(Identifier.fromNamespaceAndPath(namespace, key), en_us);
+        localization.registerShared(Identifier.of(namespace, key), en_us);
     }
 }

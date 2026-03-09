@@ -1,7 +1,5 @@
 package com.zurrtum.create.client.content.contraptions.bearing;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.zurrtum.create.catnip.math.AngleHelper;
 import com.zurrtum.create.client.AllPartialModels;
 import com.zurrtum.create.client.catnip.render.CachedBuffers;
@@ -10,20 +8,21 @@ import com.zurrtum.create.client.content.kinetics.base.KineticBlockEntityRendere
 import com.zurrtum.create.client.flywheel.lib.model.baked.PartialModel;
 import com.zurrtum.create.content.contraptions.bearing.IBearingBlockEntity;
 import com.zurrtum.create.content.kinetics.base.KineticBlockEntity;
-import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
-import net.minecraft.client.renderer.feature.ModelFeatureRenderer;
-import net.minecraft.client.renderer.rendertype.RenderType;
-import net.minecraft.client.renderer.rendertype.RenderTypes;
-import net.minecraft.core.Direction;
-import net.minecraft.core.Direction.Axis;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.properties.BlockStateProperties;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.block.BlockState;
+import net.minecraft.client.render.RenderLayer;
+import net.minecraft.client.render.VertexConsumer;
+import net.minecraft.client.render.block.entity.BlockEntityRendererFactory;
+import net.minecraft.client.render.command.ModelCommandRenderer;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.state.property.Properties;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Direction.Axis;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
 public class BearingRenderer<T extends KineticBlockEntity & IBearingBlockEntity> extends KineticBlockEntityRenderer<T, BearingRenderer.BearingRenderState> {
-    public BearingRenderer(BlockEntityRendererProvider.Context context) {
+    public BearingRenderer(BlockEntityRendererFactory.Context context) {
         super(context);
     }
 
@@ -33,14 +32,14 @@ public class BearingRenderer<T extends KineticBlockEntity & IBearingBlockEntity>
     }
 
     @Override
-    public void extractRenderState(
+    public void updateRenderState(
         T be,
         BearingRenderState state,
         float tickProgress,
-        Vec3 cameraPos,
-        @Nullable ModelFeatureRenderer.CrumblingOverlay crumblingOverlay
+        Vec3d cameraPos,
+        @Nullable ModelCommandRenderer.CrumblingOverlayCommand crumblingOverlay
     ) {
-        super.extractRenderState(be, state, tickProgress, cameraPos, crumblingOverlay);
+        super.updateRenderState(be, state, tickProgress, cameraPos, crumblingOverlay);
         if (state.support) {
             return;
         }
@@ -59,16 +58,16 @@ public class BearingRenderer<T extends KineticBlockEntity & IBearingBlockEntity>
     public void updateBaseRenderState(
         T be,
         BearingRenderState state,
-        Level world,
-        @Nullable ModelFeatureRenderer.CrumblingOverlay crumblingOverlay
+        World world,
+        @Nullable ModelCommandRenderer.CrumblingOverlayCommand crumblingOverlay
     ) {
         super.updateBaseRenderState(be, state, world, crumblingOverlay);
-        state.facing = state.blockState.getValue(BlockStateProperties.FACING);
+        state.facing = state.blockState.get(Properties.FACING);
     }
 
     @Override
-    protected RenderType getRenderType(T be, BlockState state) {
-        return RenderTypes.solidMovingBlock();
+    protected RenderLayer getRenderType(T be, BlockState state) {
+        return RenderLayer.getSolid();
     }
 
     @Override
@@ -84,9 +83,9 @@ public class BearingRenderer<T extends KineticBlockEntity & IBearingBlockEntity>
         public float eastAngle;
 
         @Override
-        public void render(PoseStack.Pose matricesEntry, VertexConsumer vertexConsumer) {
+        public void render(MatrixStack.Entry matricesEntry, VertexConsumer vertexConsumer) {
             super.render(matricesEntry, vertexConsumer);
-            top.light(lightCoords);
+            top.light(lightmapCoordinates);
             top.rotateCentered(topAngle, direction);
             top.color(color);
             if (upAngle != -1) {

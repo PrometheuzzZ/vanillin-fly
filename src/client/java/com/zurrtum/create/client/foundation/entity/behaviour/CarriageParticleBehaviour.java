@@ -1,6 +1,5 @@
 package com.zurrtum.create.client.foundation.entity.behaviour;
 
-import com.zurrtum.create.api.behaviour.EntityBehaviour;
 import com.zurrtum.create.catnip.animation.LerpedFloat;
 import com.zurrtum.create.catnip.animation.LerpedFloat.Chaser;
 import com.zurrtum.create.catnip.data.Iterate;
@@ -11,12 +10,13 @@ import com.zurrtum.create.content.trains.entity.CarriageBogey;
 import com.zurrtum.create.content.trains.entity.CarriageContraption;
 import com.zurrtum.create.content.trains.entity.CarriageContraptionEntity;
 import com.zurrtum.create.foundation.blockEntity.behaviour.BehaviourType;
-import net.minecraft.client.Minecraft;
-import net.minecraft.core.Direction.Axis;
-import net.minecraft.util.RandomSource;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.phys.Vec3;
+import com.zurrtum.create.api.behaviour.EntityBehaviour;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.entity.Entity;
+import net.minecraft.util.math.Direction.Axis;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.util.math.random.Random;
+import net.minecraft.world.World;
 
 public class CarriageParticleBehaviour extends EntityBehaviour<CarriageContraptionEntity> {
     public static final BehaviourType<CarriageParticleBehaviour> TYPE = new BehaviourType<>();
@@ -43,36 +43,29 @@ public class CarriageParticleBehaviour extends EntityBehaviour<CarriageContrapti
 
     public void tick() {
         Contraption contraption = entity.getContraption();
-        if (contraption == null) {
+        if (contraption == null)
             return;
-        }
-        if (!(contraption instanceof CarriageContraption)) {
+        if (!(contraption instanceof CarriageContraption))
             return;
-        }
         Carriage carriage = entity.getCarriage();
-        if (carriage == null) {
+        if (carriage == null)
             return;
-        }
-        Minecraft mc = Minecraft.getInstance();
+        MinecraftClient mc = MinecraftClient.getInstance();
         Entity camEntity = mc.getCameraEntity();
-        if (camEntity == null) {
+        if (camEntity == null)
             return;
-        }
-        Carriage.DimensionalCarriageEntity dce = carriage.getDimensional(entity.level());
-        if (!dce.pointsInitialised) {
+        Carriage.DimensionalCarriageEntity dce = carriage.getDimensional(entity.getEntityWorld());
+        if (!dce.pointsInitialised)
             return;
-        }
-        Vec3 leadingAnchor = dce.leadingAnchor();
-        if (leadingAnchor == null || !leadingAnchor.closerThan(camEntity.position(), 64)) {
+        Vec3d leadingAnchor = dce.leadingAnchor();
+        if (leadingAnchor == null || !leadingAnchor.isInRange(camEntity.getEntityPos(), 64))
             return;
-        }
 
-        RandomSource r = entity.level().random;
-        Vec3 contraptionMotion = entity.position().subtract(entity.getPrevPositionVec());
+        Random r = entity.getEntityWorld().random;
+        Vec3d contraptionMotion = entity.getEntityPos().subtract(entity.getPrevPositionVec());
         double length = contraptionMotion.length();
-        if (arrived && length > 0.01f) {
+        if (arrived && length > 0.01f)
             arrived = false;
-        }
         arrived |= entity.isStalled();
 
         boolean stopped = length < .002f;
@@ -81,48 +74,42 @@ public class CarriageParticleBehaviour extends EntityBehaviour<CarriageContrapti
                 arrived = true;
                 depressurise = (int) (20 * entity.getCarriage().train.accumulatedSteamRelease / 10f);
             }
-        } else {
+        } else
             depressurise = 0;
-        }
 
-        if (depressurise > 0) {
+        if (depressurise > 0)
             depressurise--;
-        }
 
         brakes.chase(prevMotion > length + length / 512f ? 1 : 0, .25f, Chaser.exp(.625f));
         brakes.tickChaser();
         prevMotion = length;
 
-        Level level = entity.level();
-        Vec3 position = entity.getPosition(0);
+        World level = entity.getEntityWorld();
+        Vec3d position = entity.getLerpedPos(0);
         float viewYRot = entity.getViewYRot(0);
         float viewXRot = entity.getViewXRot(0);
         int bogeySpacing = entity.getCarriage().bogeySpacing;
 
         for (CarriageBogey bogey : entity.getCarriage().bogeys) {
-            if (bogey == null) {
+            if (bogey == null)
                 continue;
-            }
 
             boolean spark = depressurise == 0 || depressurise > 10;
 
             float cutoff = length < 1 / 8f ? 0 : 1 / 8f;
 
-            if (length > 1 / 6f) {
+            if (length > 1 / 6f)
                 cutoff = Math.max(cutoff, brakes.getValue() * 1.15f);
-            }
 
             for (int j : Iterate.positiveAndNegative) {
-                if (r.nextFloat() > cutoff && (spark || r.nextInt(4) == 0)) {
+                if (r.nextFloat() > cutoff && (spark || r.nextInt(4) == 0))
                     continue;
-                }
                 for (int i : Iterate.positiveAndNegative) {
-                    if (r.nextFloat() > cutoff && (spark || r.nextInt(4) == 0)) {
+                    if (r.nextFloat() > cutoff && (spark || r.nextInt(4) == 0))
                         continue;
-                    }
 
-                    Vec3 v = Vec3.ZERO.add(j * 1.15, spark ? -.6f : .32, i);
-                    Vec3 m = Vec3.ZERO.add(j * (spark ? .5 : .25), spark ? .49 : -.29, 0);
+                    Vec3d v = Vec3d.ZERO.add(j * 1.15, spark ? -.6f : .32, i);
+                    Vec3d m = Vec3d.ZERO.add(j * (spark ? .5 : .25), spark ? .49 : -.29, 0);
 
                     m = VecHelper.rotate(m, bogey.pitch.getValue(0), Axis.X);
                     m = VecHelper.rotate(m, bogey.yaw.getValue(0), Axis.Y);
@@ -140,17 +127,9 @@ public class CarriageParticleBehaviour extends EntityBehaviour<CarriageContrapti
                     v = VecHelper.rotate(v, viewYRot + 90, Axis.Y);
                     v = v.add(position);
 
-                    m = m.add(contraptionMotion.scale(.75f));
+                    m = m.add(contraptionMotion.multiply(.75f));
 
-                    level.addParticle(
-                        spark ? bogey.getStyle().contactParticle : bogey.getStyle().smokeParticle,
-                        v.x,
-                        v.y,
-                        v.z,
-                        m.x,
-                        m.y,
-                        m.z
-                    );
+                    level.addParticleClient(spark ? bogey.getStyle().contactParticle : bogey.getStyle().smokeParticle, v.x, v.y, v.z, m.x, m.y, m.z);
                 }
             }
         }

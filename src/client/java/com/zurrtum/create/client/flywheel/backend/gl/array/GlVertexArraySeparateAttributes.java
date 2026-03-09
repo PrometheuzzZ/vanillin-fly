@@ -47,11 +47,7 @@ public class GlVertexArraySeparateAttributes extends GlVertexArray {
     }
 
     @Override
-    public void bindAttributes(
-        final int bindingIndex,
-        final int startAttribIndex,
-        List<VertexAttribute> vertexAttributes
-    ) {
+    public void bindAttributes(final int bindingIndex, final int startAttribIndex, List<VertexAttribute> vertexAttributes) {
         GlStateTracker.bindVao(handle());
         int attribIndex = startAttribIndex;
         int offset = 0;

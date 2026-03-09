@@ -12,14 +12,14 @@ import com.zurrtum.create.client.flywheel.lib.model.Models;
 import com.zurrtum.create.client.flywheel.lib.model.baked.PartialModel;
 import com.zurrtum.create.client.foundation.virtualWorld.VirtualRenderWorld;
 import com.zurrtum.create.content.contraptions.behaviour.MovementContext;
-import net.minecraft.core.Direction;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.properties.BlockStateProperties;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.block.BlockState;
+import net.minecraft.state.property.Properties;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Vec3d;
 
 public class HarvesterActorVisual extends ActorVisual {
     static float originOffset = 1 / 16f;
-    static Vec3 rotOffset = new Vec3(0.5f, -2 * originOffset + 0.5f, originOffset + 0.5f);
+    static Vec3d rotOffset = new Vec3d(0.5f, -2 * originOffset + 0.5f, originOffset + 0.5f);
 
     protected TransformedInstance harvester;
     private final Direction facing;
@@ -29,21 +29,16 @@ public class HarvesterActorVisual extends ActorVisual {
     private double rotation;
     private double previousRotation;
 
-    public HarvesterActorVisual(
-        VisualizationContext visualizationContext,
-        VirtualRenderWorld simulationWorld,
-        MovementContext movementContext
-    ) {
+    public HarvesterActorVisual(VisualizationContext visualizationContext, VirtualRenderWorld simulationWorld, MovementContext movementContext) {
         super(visualizationContext, simulationWorld, movementContext);
 
         BlockState state = movementContext.state;
 
-        facing = state.getValue(BlockStateProperties.HORIZONTAL_FACING);
+        facing = state.get(Properties.HORIZONTAL_FACING);
 
-        harvester = instancerProvider.instancer(InstanceTypes.TRANSFORMED, Models.partial(getRollingPartial()))
-            .createInstance();
+        harvester = instancerProvider.instancer(InstanceTypes.TRANSFORMED, Models.partial(getRollingPartial())).createInstance();
 
-        horizontalAngle = facing.toYRot() + ((facing.getAxis() == Direction.Axis.X) ? 180 : 0);
+        horizontalAngle = facing.getPositiveHorizontalDegrees() + ((facing.getAxis() == Direction.Axis.X) ? 180 : 0);
 
         harvester.light(localBlockLight(), 0);
         harvester.setChanged();
@@ -53,7 +48,7 @@ public class HarvesterActorVisual extends ActorVisual {
         return AllPartialModels.HARVESTER_BLADE;
     }
 
-    protected Vec3 getRotationOffset() {
+    protected Vec3d getRotationOffset() {
         return rotOffset;
     }
 
@@ -67,12 +62,8 @@ public class HarvesterActorVisual extends ActorVisual {
 
         previousRotation = rotation;
 
-        if (context.contraption.stalled || context.disabled || VecHelper.isVecPointingTowards(
-            context.relativeMotion,
-            facing.getOpposite()
-        )) {
+        if (context.contraption.stalled || context.disabled || VecHelper.isVecPointingTowards(context.relativeMotion, facing.getOpposite()))
             return;
-        }
 
         double arcLength = context.motion.length();
 
@@ -90,8 +81,7 @@ public class HarvesterActorVisual extends ActorVisual {
     @Override
     public void beginFrame() {
         harvester.setIdentityTransform().translate(context.localPos).center().rotateYDegrees(horizontalAngle).uncenter()
-            .translate(getRotationOffset()).rotateXDegrees((float) getRotation()).translateBack(getRotationOffset())
-            .setChanged();
+            .translate(getRotationOffset()).rotateXDegrees((float) getRotation()).translateBack(getRotationOffset()).setChanged();
     }
 
     @Override

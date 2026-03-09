@@ -5,7 +5,7 @@ import com.zurrtum.create.client.foundation.sound.SoundScapes;
 import com.zurrtum.create.client.infrastructure.model.TableClothModel;
 import com.zurrtum.create.content.kinetics.belt.BeltHelper;
 import com.zurrtum.create.foundation.utility.CreateResourceReloader;
-import net.minecraft.server.packs.resources.ResourceManager;
+import net.minecraft.resource.ResourceManager;
 
 public class ClientResourceReloadListener extends CreateResourceReloader {
     public ClientResourceReloadListener() {
@@ -13,7 +13,7 @@ public class ClientResourceReloadListener extends CreateResourceReloader {
     }
 
     @Override
-    public void onResourceManagerReload(ResourceManager resourceManager) {
+    public void reload(ResourceManager resourceManager) {
         Create.invalidateRenderers();
         SoundScapes.invalidateAll();
         BeltHelper.uprightCache.clear();

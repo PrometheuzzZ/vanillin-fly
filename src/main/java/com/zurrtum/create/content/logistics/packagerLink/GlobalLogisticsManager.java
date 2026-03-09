@@ -1,9 +1,9 @@
 package com.zurrtum.create.content.logistics.packagerLink;
 
-import net.minecraft.core.GlobalPos;
+import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.level.Level;
+import net.minecraft.util.math.GlobalPos;
+import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.HashMap;
@@ -26,14 +26,14 @@ public class GlobalLogisticsManager {
         loadLogisticsData(server);
     }
 
-    public boolean mayInteract(UUID networkId, Player player) {
+    public boolean mayInteract(UUID networkId, PlayerEntity player) {
         LogisticsNetwork network = logisticsNetworks.get(networkId);
-        return network == null || network.owner == null || !network.locked || network.owner.equals(player.getUUID());
+        return network == null || network.owner == null || !network.locked || network.owner.equals(player.getUuid());
     }
 
-    public boolean mayAdministrate(UUID networkId, Player player) {
+    public boolean mayAdministrate(UUID networkId, PlayerEntity player) {
         LogisticsNetwork network = logisticsNetworks.get(networkId);
-        return network == null || network.owner == null || network.owner.equals(player.getUUID());
+        return network == null || network.owner == null || network.owner.equals(player.getUuid());
     }
 
     public boolean isLockable(UUID networkId) {
@@ -49,9 +49,8 @@ public class GlobalLogisticsManager {
     public void linkAdded(UUID networkId, GlobalPos pos, UUID ownedBy) {
         LogisticsNetwork network = logisticsNetworks.computeIfAbsent(networkId, $ -> new LogisticsNetwork(networkId));
         network.totalLinks.add(pos);
-        if (ownedBy != null && network.owner == null) {
+        if (ownedBy != null && network.owner == null)
             network.owner = ownedBy;
-        }
         markDirty();
     }
 
@@ -61,30 +60,26 @@ public class GlobalLogisticsManager {
 
     public void linkRemoved(UUID networkId, GlobalPos pos) {
         LogisticsNetwork logisticsNetwork = logisticsNetworks.get(networkId);
-        if (logisticsNetwork == null) {
+        if (logisticsNetwork == null)
             return;
-        }
         logisticsNetwork.totalLinks.remove(pos);
         logisticsNetwork.loadedLinks.remove(pos);
-        if (logisticsNetwork.totalLinks.size() <= 0) {
+        if (logisticsNetwork.totalLinks.size() <= 0)
             logisticsNetworks.remove(networkId);
-        }
         markDirty();
     }
 
     public void linkInvalidated(UUID networkId, GlobalPos pos) {
         LogisticsNetwork logisticsNetwork = logisticsNetworks.get(networkId);
-        if (logisticsNetwork == null) {
+        if (logisticsNetwork == null)
             return;
-        }
         logisticsNetwork.loadedLinks.remove(pos);
     }
 
     public int getUnloadedLinkCount(UUID networkId) {
         LogisticsNetwork logisticsNetwork = logisticsNetworks.get(networkId);
-        if (logisticsNetwork == null) {
+        if (logisticsNetwork == null)
             return 0;
-        }
         return logisticsNetwork.totalLinks.size() - logisticsNetwork.loadedLinks.size();
     }
 
@@ -98,26 +93,23 @@ public class GlobalLogisticsManager {
     }
 
     private void loadLogisticsData(MinecraftServer server) {
-        if (savedData != null) {
+        if (savedData != null)
             return;
-        }
         savedData = LogisticsNetworkSavedData.load(server);
         logisticsNetworks = savedData.getLogisticsNetworks();
     }
 
-    public void tick(Level level) {
-        if (level.dimension() != Level.OVERWORLD) {
+    public void tick(World level) {
+        if (level.getRegistryKey() != World.OVERWORLD)
             return;
-        }
         logisticsNetworks.forEach((id, network) -> {
             network.panelPromises.tick();
         });
     }
 
     public void markDirty() {
-        if (savedData != null) {
-            savedData.setDirty();
-        }
+        if (savedData != null)
+            savedData.markDirty();
     }
 
 }

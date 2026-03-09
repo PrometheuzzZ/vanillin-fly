@@ -10,12 +10,12 @@ import com.zurrtum.create.infrastructure.component.ItemAttributeEntry;
 import com.zurrtum.create.infrastructure.packet.c2s.BlueprintAssignCompleteRecipePacket;
 import de.crafty.eiv.common.api.recipe.IEivViewRecipe;
 import de.crafty.eiv.common.recipe.inventory.SlotContent;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.tags.TagKey;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.component.ItemContainerContents;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.component.type.ContainerComponent;
+import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
+import net.minecraft.registry.tag.TagKey;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -51,11 +51,8 @@ public class BlueprintTransferHandler implements RecipeTransferHandler {
                 }
                 Optional<TagKey<Item>> tag = ingredient.itemTag();
                 if (tag.isPresent()) {
-                    ItemStack filterItem = AllItems.ATTRIBUTE_FILTER.getDefaultInstance();
-                    filterItem.set(
-                        AllDataComponents.ATTRIBUTE_FILTER_WHITELIST_MODE,
-                        AttributeFilterWhitelistMode.WHITELIST_DISJ
-                    );
+                    ItemStack filterItem = AllItems.ATTRIBUTE_FILTER.getDefaultStack();
+                    filterItem.set(AllDataComponents.ATTRIBUTE_FILTER_WHITELIST_MODE, AttributeFilterWhitelistMode.WHITELIST_DISJ);
                     filterItem.set(
                         AllDataComponents.ATTRIBUTE_FILTER_MATCHED_ATTRIBUTES,
                         List.of(new ItemAttributeEntry(new InTagAttribute(tag.get()), false))
@@ -63,8 +60,8 @@ public class BlueprintTransferHandler implements RecipeTransferHandler {
                     input.add(filterItem);
                     continue;
                 }
-                ItemStack filterItem = AllItems.FILTER.getDefaultInstance();
-                filterItem.set(AllDataComponents.FILTER_ITEMS, ItemContainerContents.fromItems(items));
+                ItemStack filterItem = AllItems.FILTER.getDefaultStack();
+                filterItem.set(AllDataComponents.FILTER_ITEMS, ContainerComponent.fromStacks(items));
                 input.add(filterItem);
             }
             ItemStack output = null;
@@ -79,7 +76,7 @@ public class BlueprintTransferHandler implements RecipeTransferHandler {
             if (output == null) {
                 return false;
             }
-            Minecraft.getInstance().player.connection.send(new BlueprintAssignCompleteRecipePacket(input, output));
+            MinecraftClient.getInstance().player.networkHandler.sendPacket(new BlueprintAssignCompleteRecipePacket(input, output));
         }
         return true;
     }

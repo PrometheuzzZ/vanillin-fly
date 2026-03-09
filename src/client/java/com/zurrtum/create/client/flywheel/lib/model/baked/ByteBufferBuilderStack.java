@@ -1,22 +1,22 @@
 package com.zurrtum.create.client.flywheel.lib.model.baked;
 
-import com.mojang.blaze3d.vertex.ByteBufferBuilder;
 import it.unimi.dsi.fastutil.objects.ReferenceArrayList;
+import net.minecraft.client.util.BufferAllocator;
 
 class ByteBufferBuilderStack {
     private static final int INITIAL_CAPACITY_BYTES = 256 * 32;
 
     private int nextBufferBuilderIndex = 0;
-    private final ReferenceArrayList<ByteBufferBuilder> bufferBuilders = new ReferenceArrayList<>();
+    private final ReferenceArrayList<BufferAllocator> bufferBuilders = new ReferenceArrayList<>();
 
-    ByteBufferBuilder nextOrCreate() {
-        ByteBufferBuilder bufferBuilder;
+    BufferAllocator nextOrCreate() {
+        BufferAllocator bufferBuilder;
         if (nextBufferBuilderIndex < bufferBuilders.size()) {
             bufferBuilder = bufferBuilders.get(nextBufferBuilderIndex);
         } else {
             // Need to allocate at least some memory up front, as BufferBuilder internally
             // only calls `ensureCapacity` after writing a vertex.
-            bufferBuilder = new ByteBufferBuilder(INITIAL_CAPACITY_BYTES);
+            bufferBuilder = new BufferAllocator(INITIAL_CAPACITY_BYTES);
             bufferBuilders.add(bufferBuilder);
         }
         nextBufferBuilderIndex++;

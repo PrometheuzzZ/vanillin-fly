@@ -2,7 +2,7 @@ package com.zurrtum.create.client.flywheel.api.backend;
 
 import com.zurrtum.create.client.flywheel.api.internal.FlwApiLink;
 import com.zurrtum.create.client.flywheel.api.registry.IdRegistry;
-import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.WorldAccess;
 
 @BackendImplemented
 public interface Backend {
@@ -11,7 +11,7 @@ public interface Backend {
     /**
      * Create a new engine instance.
      */
-    Engine createEngine(LevelAccessor var1);
+    Engine createEngine(WorldAccess var1);
 
     /**
      * The priority of this backend.

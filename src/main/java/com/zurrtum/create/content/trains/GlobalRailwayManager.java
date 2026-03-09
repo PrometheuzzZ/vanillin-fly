@@ -11,11 +11,11 @@ import com.zurrtum.create.content.trains.signal.SignalEdgeGroup;
 import com.zurrtum.create.infrastructure.packet.s2c.AddTrainPacket;
 import com.zurrtum.create.infrastructure.packet.s2c.RemoveTrainPacket;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.level.ServerLevel;
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.server.players.PlayerList;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.server.PlayerManager;
+import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.world.ServerWorld;
+import net.minecraft.world.World;
+import net.minecraft.world.WorldAccess;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
@@ -38,7 +38,7 @@ public class GlobalRailwayManager {
         cleanUp();
     }
 
-    public void playerLogin(MinecraftServer server, ServerPlayer player) {
+    public void playerLogin(MinecraftServer server, ServerPlayerEntity player) {
         loadTrackData(server);
         for (TrackGraph g : trackNetworks.values()) {
             sync.sendFullGraphTo(g, player);
@@ -52,7 +52,7 @@ public class GlobalRailwayManager {
         }
         sync.sendEdgeGroups(ids, colors, player);
         for (Train train : trains.values()) {
-            player.connection.send(new AddTrainPacket(train));
+            player.networkHandler.sendPacket(new AddTrainPacket(train));
         }
     }
 
@@ -63,9 +63,8 @@ public class GlobalRailwayManager {
     }
 
     private void loadTrackData(MinecraftServer server) {
-        if (savedData != null) {
+        if (savedData != null)
             return;
-        }
         savedData = RailwaySavedData.load(server);
         trains = savedData.getTrains();
         trackNetworks = savedData.getTrackNetworks();
@@ -84,9 +83,8 @@ public class GlobalRailwayManager {
     }
 
     public void markTracksDirty() {
-        if (savedData != null) {
-            savedData.setDirty();
-        }
+        if (savedData != null)
+            savedData.markDirty();
     }
 
     public void addTrain(Train train) {
@@ -96,9 +94,8 @@ public class GlobalRailwayManager {
 
     public void removeTrain(UUID id) {
         Train removed = trains.remove(id);
-        if (removed == null) {
+        if (removed == null)
             return;
-        }
         movingTrains.remove(removed);
         waitingTrains.remove(removed);
     }
@@ -138,7 +135,7 @@ public class GlobalRailwayManager {
         markTracksDirty();
     }
 
-    public void updateSplitGraph(LevelAccessor level, TrackGraph graph) {
+    public void updateSplitGraph(WorldAccess level, TrackGraph graph) {
         Set<TrackGraph> disconnected = graph.findDisconnectedGraphs(level, null);
         MinecraftServer server = level.getServer();
         for (TrackGraph d : disconnected) {
@@ -152,34 +149,27 @@ public class GlobalRailwayManager {
 
     @Nullable
     public TrackGraph getGraph(TrackNodeLocation vertex) {
-        if (trackNetworks == null) {
+        if (trackNetworks == null)
             return null;
-        }
-        for (TrackGraph railGraph : trackNetworks.values()) {
-            if (railGraph.locateNode(vertex) != null) {
+        for (TrackGraph railGraph : trackNetworks.values())
+            if (railGraph.locateNode(vertex) != null)
                 return railGraph;
-            }
-        }
         return null;
     }
 
     public List<TrackGraph> getGraphs(TrackNodeLocation vertex) {
-        if (trackNetworks == null) {
+        if (trackNetworks == null)
             return Collections.emptyList();
-        }
         ArrayList<TrackGraph> intersecting = new ArrayList<>();
-        for (TrackGraph railGraph : trackNetworks.values()) {
-            if (railGraph.locateNode(vertex) != null) {
+        for (TrackGraph railGraph : trackNetworks.values())
+            if (railGraph.locateNode(vertex) != null)
                 intersecting.add(railGraph);
-            }
-        }
         return intersecting;
     }
 
-    public void tick(ServerLevel level) {
-        if (level.dimension() != Level.OVERWORLD) {
+    public void tick(ServerWorld level) {
+        if (level.getRegistryKey() != World.OVERWORLD)
             return;
-        }
 
         for (SignalEdgeGroup group : signalEdgeGroups.values()) {
             group.trains.clear();
@@ -198,10 +188,9 @@ public class GlobalRailwayManager {
             graph.tickPoints(server, false);
         }
 
-        GlobalTrainDisplayData.updateTick = level.getGameTime() % 100 == 0;
-        if (GlobalTrainDisplayData.updateTick) {
+        GlobalTrainDisplayData.updateTick = level.getTime() % 100 == 0;
+        if (GlobalTrainDisplayData.updateTick)
             GlobalTrainDisplayData.refresh();
-        }
 
         //		if (AllKeys.isKeyDown(GLFW.GLFW_KEY_H) && AllKeys.altDown())
         //			for (TrackGraph trackGraph : trackNetworks.values())
@@ -211,35 +200,30 @@ public class GlobalRailwayManager {
         //				TrackGraphVisualizer.debugViewNodes(trackGraph);
     }
 
-    private void tickTrains(Level level) {
+    private void tickTrains(World level) {
         // keeping two lists ensures a tick order starting at longest waiting
-        for (Train train : waitingTrains) {
+        for (Train train : waitingTrains)
             train.earlyTick(level);
-        }
-        for (Train train : movingTrains) {
+        for (Train train : movingTrains)
             train.earlyTick(level);
-        }
-        for (Train train : waitingTrains) {
+        for (Train train : waitingTrains)
             train.tick(level);
-        }
-        for (Train train : movingTrains) {
+        for (Train train : movingTrains)
             train.tick(level);
-        }
 
-        PlayerList playerManager = level.getServer().getPlayerList();
+        PlayerManager playerManager = level.getServer().getPlayerManager();
         for (Iterator<Train> iterator = waitingTrains.iterator(); iterator.hasNext(); ) {
             Train train = iterator.next();
 
             if (train.invalid) {
                 iterator.remove();
                 trains.remove(train.id);
-                playerManager.broadcastAll(new RemoveTrainPacket(train));
+                playerManager.sendToAll(new RemoveTrainPacket(train));
                 continue;
             }
 
-            if (train.navigation.waitingForSignal != null) {
+            if (train.navigation.waitingForSignal != null)
                 continue;
-            }
             movingTrains.add(train);
             iterator.remove();
         }
@@ -250,23 +234,21 @@ public class GlobalRailwayManager {
             if (train.invalid) {
                 iterator.remove();
                 trains.remove(train.id);
-                playerManager.broadcastAll(new RemoveTrainPacket(train));
+                playerManager.sendToAll(new RemoveTrainPacket(train));
                 continue;
             }
 
-            if (train.navigation.waitingForSignal == null) {
+            if (train.navigation.waitingForSignal == null)
                 continue;
-            }
             waitingTrains.add(train);
             iterator.remove();
         }
 
     }
 
-    public GlobalRailwayManager sided(LevelAccessor level) {
-        if (level != null && !level.isClientSide()) {
+    public GlobalRailwayManager sided(WorldAccess level) {
+        if (level != null && !level.isClient())
             return this;
-        }
         return AllClientHandle.INSTANCE.getGlobalRailwayManager();
     }
 

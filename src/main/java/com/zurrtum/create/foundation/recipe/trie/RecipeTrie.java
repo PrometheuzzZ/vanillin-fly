@@ -14,14 +14,14 @@ import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
-import net.minecraft.world.Container;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.crafting.Ingredient;
-import net.minecraft.world.item.crafting.Recipe;
-import net.minecraft.world.item.crafting.ShapedRecipe;
-import net.minecraft.world.item.crafting.ShapelessRecipe;
-import net.minecraft.world.level.material.Fluid;
+import net.minecraft.fluid.Fluid;
+import net.minecraft.inventory.Inventory;
+import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
+import net.minecraft.recipe.Ingredient;
+import net.minecraft.recipe.Recipe;
+import net.minecraft.recipe.ShapedRecipe;
+import net.minecraft.recipe.ShapelessRecipe;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -36,8 +36,7 @@ public class RecipeTrie<R extends Recipe<?>> {
     private final Int2ObjectMap<IntSet> variantToIngredients;
     private final int universalIngredientId;
 
-    private final Cache<Set<AbstractVariant>, IntSet> ingredientCache = CacheBuilder.newBuilder()
-        .maximumSize(MAX_CACHE_SIZE).build();
+    private final Cache<Set<AbstractVariant>, IntSet> ingredientCache = CacheBuilder.newBuilder().maximumSize(MAX_CACHE_SIZE).build();
 
     private RecipeTrie(
         IntArrayTrie<R> trie,
@@ -51,18 +50,14 @@ public class RecipeTrie<R extends Recipe<?>> {
         this.universalIngredientId = universalIngredientId;
     }
 
-    public static @NotNull Set<AbstractVariant> getVariants(
-        @Nullable Container itemStorage,
-        @Nullable FluidInventory fluidStorage
-    ) {
+    public static @NotNull Set<AbstractVariant> getVariants(@Nullable Inventory itemStorage, @Nullable FluidInventory fluidStorage) {
         Set<AbstractVariant> variants = new HashSet<>();
 
         if (itemStorage != null) {
-            for (int slot = 0, size = itemStorage.getContainerSize(); slot < size; slot++) {
-                ItemStack item = itemStorage.getItem(slot);
-                if (item.isEmpty()) {
+            for (int slot = 0, size = itemStorage.size(); slot < size; slot++) {
+                ItemStack item = itemStorage.getStack(slot);
+                if (item.isEmpty())
                     continue;
-                }
 
                 variants.add(new AbstractVariant.AbstractItem(item.getItem()));
             }
@@ -71,9 +66,8 @@ public class RecipeTrie<R extends Recipe<?>> {
         if (fluidStorage != null) {
             for (int tank = 0, size = fluidStorage.size(); tank < size; tank++) {
                 FluidStack fluid = fluidStorage.getStack(tank);
-                if (fluid.isEmpty()) {
+                if (fluid.isEmpty())
                     continue;
-                }
 
                 variants.add(new AbstractVariant.AbstractFluid(fluid.getFluid()));
             }
@@ -148,8 +142,7 @@ public class RecipeTrie<R extends Recipe<?>> {
                 ingredient, $ -> {
                     int id = nextIngredientId++;
                     for (AbstractVariant variant : ingredient.variants) {
-                        variantToIngredients.computeIfAbsent(getOrAssignId(variant), $1 -> new IntOpenHashSet())
-                            .add(id);
+                        variantToIngredients.computeIfAbsent(getOrAssignId(variant), $1 -> new IntOpenHashSet()).add(id);
                     }
                     return id;
                 }
@@ -167,10 +160,7 @@ public class RecipeTrie<R extends Recipe<?>> {
         }
 
         private AbstractVariant getOrAssignVariant(Fluid fluid) {
-            AbstractVariant variant = variantCache.computeIfAbsent(
-                fluid,
-                $ -> new AbstractVariant.AbstractFluid(fluid)
-            );
+            AbstractVariant variant = variantCache.computeIfAbsent(fluid, $ -> new AbstractVariant.AbstractFluid(fluid));
             getOrAssignId(variant);
             return variant;
         }
@@ -201,8 +191,7 @@ public class RecipeTrie<R extends Recipe<?>> {
             Iterator<Ingredient> items = null;
             List<FluidIngredient> fluids = null;
             if (recipe instanceof ShapedRecipe shapedRecipe) {
-                items = shapedRecipe.getIngredients().stream().filter(Optional::isPresent).map(Optional::get)
-                    .iterator();
+                items = shapedRecipe.getIngredients().stream().filter(Optional::isPresent).map(Optional::get).iterator();
             } else if (recipe instanceof ShapelessRecipe shapelessRecipe) {
                 items = shapelessRecipe.ingredients.iterator();
             } else if (recipe instanceof BasinRecipe basinRecipe) {
@@ -217,7 +206,7 @@ public class RecipeTrie<R extends Recipe<?>> {
                         continue;
                     }
                     Set<AbstractVariant> variants = new HashSet<>();
-                    ingredient.items().forEach(entry -> variants.add(getOrAssignVariant(entry.value())));
+                    ingredient.getMatchingItems().forEach(entry -> variants.add(getOrAssignVariant(entry.value())));
                     ingredients.add(new AbstractIngredient(variants));
                 }
             }

@@ -2,33 +2,32 @@ package com.zurrtum.create.infrastructure.packet.s2c;
 
 import com.zurrtum.create.AllClientHandle;
 import com.zurrtum.create.AllPackets;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.PacketType;
-import net.minecraft.network.protocol.game.ClientGamePacketListener;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.item.ItemStack;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.network.listener.ClientPlayPacketListener;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.PacketType;
 
-public record ContraptionDisableActorPacket(int entityId, ItemStack filter,
-                                            boolean enable) implements Packet<ClientGamePacketListener> {
-    public static final StreamCodec<RegistryFriendlyByteBuf, ContraptionDisableActorPacket> CODEC = StreamCodec.composite(
-        ByteBufCodecs.INT,
+public record ContraptionDisableActorPacket(int entityId, ItemStack filter, boolean enable) implements Packet<ClientPlayPacketListener> {
+    public static final PacketCodec<RegistryByteBuf, ContraptionDisableActorPacket> CODEC = PacketCodec.tuple(
+        PacketCodecs.INTEGER,
         ContraptionDisableActorPacket::entityId,
-        ItemStack.OPTIONAL_STREAM_CODEC,
+        ItemStack.OPTIONAL_PACKET_CODEC,
         ContraptionDisableActorPacket::filter,
-        ByteBufCodecs.BOOL,
+        PacketCodecs.BOOLEAN,
         ContraptionDisableActorPacket::enable,
         ContraptionDisableActorPacket::new
     );
 
     @Override
-    public void handle(ClientGamePacketListener listener) {
+    public void apply(ClientPlayPacketListener listener) {
         AllClientHandle.INSTANCE.onContraptionDisableActor(listener, this);
     }
 
     @Override
-    public PacketType<ContraptionDisableActorPacket> type() {
+    public PacketType<ContraptionDisableActorPacket> getPacketType() {
         return AllPackets.CONTRAPTION_ACTOR_TOGGLE;
     }
 }

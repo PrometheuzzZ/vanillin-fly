@@ -4,16 +4,16 @@ import com.zurrtum.create.AllBlockEntityTypes;
 import com.zurrtum.create.AllBlocks;
 import com.zurrtum.create.AllClientHandle;
 import com.zurrtum.create.AllDataComponents;
-import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.foundation.blockEntity.SmartBlockEntity;
+import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.infrastructure.component.ClipboardContent;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.UUIDUtil;
-import net.minecraft.core.component.DataComponentMap;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.block.BlockState;
+import net.minecraft.component.ComponentMap;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.storage.ReadView;
+import net.minecraft.storage.WriteView;
+import net.minecraft.util.Uuids;
+import net.minecraft.util.math.BlockPos;
 
 import java.util.List;
 import java.util.UUID;
@@ -31,8 +31,8 @@ public class ClipboardBlockEntity extends SmartBlockEntity {
         updateWrittenState();
     }
 
-    public void onEditedBy(Player player) {
-        lastEdit = player.getUUID();
+    public void onEditedBy(PlayerEntity player) {
+        lastEdit = player.getUuid();
         notifyUpdate();
         updateWrittenState();
     }
@@ -40,25 +40,21 @@ public class ClipboardBlockEntity extends SmartBlockEntity {
     @Override
     public void lazyTick() {
         super.lazyTick();
-        if (level.isClientSide()) {
+        if (world.isClient())
             AllClientHandle.INSTANCE.advertiseToAddressHelper(this);
-        }
     }
 
     public void updateWrittenState() {
-        BlockState blockState = getBlockState();
-        if (!blockState.is(AllBlocks.CLIPBOARD)) {
+        BlockState blockState = getCachedState();
+        if (!blockState.isOf(AllBlocks.CLIPBOARD))
             return;
-        }
-        if (level.isClientSide()) {
+        if (world.isClient())
             return;
-        }
-        boolean isWritten = blockState.getValue(ClipboardBlock.WRITTEN);
-        boolean shouldBeWritten = components().has(AllDataComponents.CLIPBOARD_CONTENT);
-        if (isWritten == shouldBeWritten) {
+        boolean isWritten = blockState.get(ClipboardBlock.WRITTEN);
+        boolean shouldBeWritten = getComponents().contains(AllDataComponents.CLIPBOARD_CONTENT);
+        if (isWritten == shouldBeWritten)
             return;
-        }
-        level.setBlockAndUpdate(worldPosition, blockState.setValue(ClipboardBlock.WRITTEN, shouldBeWritten));
+        world.setBlockState(pos, blockState.with(ClipboardBlock.WRITTEN, shouldBeWritten));
     }
 
     @Override
@@ -66,26 +62,25 @@ public class ClipboardBlockEntity extends SmartBlockEntity {
     }
 
     @Override
-    protected void write(ValueOutput view, boolean clientPacket) {
+    protected void write(WriteView view, boolean clientPacket) {
         super.write(view, clientPacket);
         if (clientPacket) {
-            view.store("components", DataComponentMap.CODEC, components());
+            view.put("components", ComponentMap.CODEC, getComponents());
         }
-        if (lastEdit != null) {
-            view.store("LastEdit", UUIDUtil.CODEC, lastEdit);
-        }
+        if (lastEdit != null)
+            view.put("LastEdit", Uuids.INT_STREAM_CODEC, lastEdit);
     }
 
     @Override
-    protected void read(ValueInput view, boolean clientPacket) {
+    protected void read(ReadView view, boolean clientPacket) {
         super.read(view, clientPacket);
         if (clientPacket) {
-            view.read("components", DataComponentMap.CODEC).ifPresent(this::setComponents);
-            UUID lastEdit = view.read("LastEdit", UUIDUtil.CODEC).orElse(null);
+            view.read("components", ComponentMap.CODEC).ifPresent(this::setComponents);
+            UUID lastEdit = view.read("LastEdit", Uuids.INT_STREAM_CODEC).orElse(null);
             AllClientHandle.INSTANCE.updateClipboardScreen(
                 lastEdit,
-                worldPosition,
-                components().getOrDefault(AllDataComponents.CLIPBOARD_CONTENT, ClipboardContent.EMPTY)
+                pos,
+                getComponents().getOrDefault(AllDataComponents.CLIPBOARD_CONTENT, ClipboardContent.EMPTY)
             );
         }
     }

@@ -1,9 +1,9 @@
 package com.zurrtum.create.client.ponder.foundation.registration;
 
 import com.zurrtum.create.client.ponder.api.registration.TagBuilder;
-import net.minecraft.resources.Identifier;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.ItemLike;
+import net.minecraft.item.ItemConvertible;
+import net.minecraft.item.ItemStack;
+import net.minecraft.util.Identifier;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.function.Consumer;
@@ -45,19 +45,13 @@ public class PonderTagBuilder implements TagBuilder {
 
     @Override
     public TagBuilder icon(Identifier location) {
-        this.textureIconLocation = Identifier.fromNamespaceAndPath(
-            location.getNamespace(),
-            "textures/ponder/tag/" + location.getPath() + ".png"
-        );
+        this.textureIconLocation = Identifier.of(location.getNamespace(), "textures/ponder/tag/" + location.getPath() + ".png");
         return this;
     }
 
     @Override
     public TagBuilder icon(String path) {
-        this.textureIconLocation = Identifier.fromNamespaceAndPath(
-            id.getNamespace(),
-            "textures/ponder/tag/" + path + ".png"
-        );
+        this.textureIconLocation = Identifier.of(id.getNamespace(), "textures/ponder/tag/" + path + ".png");
         return this;
     }
 
@@ -67,13 +61,11 @@ public class PonderTagBuilder implements TagBuilder {
     }
 
     @Override
-    public TagBuilder item(ItemLike item, boolean useAsIcon, boolean useAsMainItem) {
-        if (useAsIcon) {
+    public TagBuilder item(ItemConvertible item, boolean useAsIcon, boolean useAsMainItem) {
+        if (useAsIcon)
             this.itemIcon = new ItemStack(item);
-        }
-        if (useAsMainItem) {
+        if (useAsMainItem)
             this.mainItem = new ItemStack(item);
-        }
         return this;
     }
 

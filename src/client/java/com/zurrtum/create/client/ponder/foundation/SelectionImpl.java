@@ -3,10 +3,10 @@ package com.zurrtum.create.client.ponder.foundation;
 import com.zurrtum.create.client.catnip.outliner.Outline.OutlineParams;
 import com.zurrtum.create.client.catnip.outliner.Outliner;
 import com.zurrtum.create.client.ponder.api.scene.Selection;
-import net.minecraft.core.BlockPos;
-import net.minecraft.world.level.levelgen.structure.BoundingBox;
-import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.util.math.BlockBox;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Box;
+import net.minecraft.util.math.Vec3d;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -16,14 +16,14 @@ import java.util.Set;
 
 public class SelectionImpl {
 
-    public static Selection of(BoundingBox bb) {
+    public static Selection of(BlockBox bb) {
         return new Simple(bb);
     }
 
     private static class Compound implements Selection {
         private final Set<BlockPos> posSet;
         @Nullable
-        private Vec3 center;
+        private Vec3d center;
 
         public Compound(Simple initial) {
             posSet = new HashSet<>();
@@ -41,14 +41,14 @@ public class SelectionImpl {
 
         @Override
         public Selection add(Selection other) {
-            other.forEach(p -> posSet.add(p.immutable()));
+            other.forEach(p -> posSet.add(p.toImmutable()));
             center = null;
             return this;
         }
 
         @Override
         public Selection substract(Selection other) {
-            other.forEach(p -> posSet.remove(p.immutable()));
+            other.forEach(p -> posSet.remove(p.toImmutable()));
             center = null;
             return this;
         }
@@ -59,20 +59,18 @@ public class SelectionImpl {
         }
 
         @Override
-        public Vec3 getCenter() {
+        public Vec3d getCenter() {
             return center == null ? center = evalCenter() : center;
         }
 
-        private Vec3 evalCenter() {
-            Vec3 center = Vec3.ZERO;
-            if (posSet.isEmpty()) {
+        private Vec3d evalCenter() {
+            Vec3d center = Vec3d.ZERO;
+            if (posSet.isEmpty())
                 return center;
-            }
-            for (BlockPos blockPos : posSet) {
-                center = center.add(Vec3.atLowerCornerOf(blockPos));
-            }
-            center = center.scale(1f / posSet.size());
-            return center.add(new Vec3(.5, .5, .5));
+            for (BlockPos blockPos : posSet)
+                center = center.add(Vec3d.of(blockPos));
+            center = center.multiply(1f / posSet.size());
+            return center.add(new Vec3d(.5, .5, .5));
         }
 
         @Override
@@ -88,26 +86,26 @@ public class SelectionImpl {
     }
 
     private static class Simple implements Selection {
-        private final BoundingBox bb;
-        private final AABB aabb;
+        private final BlockBox bb;
+        private final Box aabb;
         private final Iterable<BlockPos> iterable;
 
-        public Simple(BoundingBox bb) {
+        public Simple(BlockBox bb) {
             this.bb = bb;
-            this.aabb = new AABB(bb.minX(), bb.minY(), bb.minZ(), bb.maxX() + 1, bb.maxY() + 1, bb.maxZ() + 1);
-            iterable = BlockPos.betweenClosed(
-                Math.min(bb.minX(), bb.maxX()),
-                Math.min(bb.minY(), bb.maxY()),
-                Math.min(bb.minZ(), bb.maxZ()),
-                Math.max(bb.minX(), bb.maxX()),
-                Math.max(bb.minY(), bb.maxY()),
-                Math.max(bb.minZ(), bb.maxZ())
+            this.aabb = new Box(bb.getMinX(), bb.getMinY(), bb.getMinZ(), bb.getMaxX() + 1, bb.getMaxY() + 1, bb.getMaxZ() + 1);
+            iterable = BlockPos.iterate(
+                Math.min(bb.getMinX(), bb.getMaxX()),
+                Math.min(bb.getMinY(), bb.getMaxY()),
+                Math.min(bb.getMinZ(), bb.getMaxZ()),
+                Math.max(bb.getMinX(), bb.getMaxX()),
+                Math.max(bb.getMinY(), bb.getMaxY()),
+                Math.max(bb.getMinZ(), bb.getMaxZ())
             );
         }
 
         @Override
         public boolean test(BlockPos t) {
-            return bb.isInside(t);
+            return bb.contains(t);
         }
 
         @Override
@@ -121,7 +119,7 @@ public class SelectionImpl {
         }
 
         @Override
-        public Vec3 getCenter() {
+        public Vec3d getCenter() {
             return aabb.getCenter();
         }
 
@@ -132,7 +130,7 @@ public class SelectionImpl {
 
         @Override
         public Selection copy() {
-            return new Simple(new BoundingBox(bb.minX(), bb.minY(), bb.minZ(), bb.maxX(), bb.maxY(), bb.maxZ()));
+            return new Simple(new BlockBox(bb.getMinX(), bb.getMinY(), bb.getMinZ(), bb.getMaxX(), bb.getMaxY(), bb.getMaxZ()));
         }
 
         @Override

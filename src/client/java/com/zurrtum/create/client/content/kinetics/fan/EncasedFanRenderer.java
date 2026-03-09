@@ -1,7 +1,5 @@
 package com.zurrtum.create.client.content.kinetics.fan;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.zurrtum.create.catnip.theme.Color;
 import com.zurrtum.create.client.AllPartialModels;
 import com.zurrtum.create.client.catnip.animation.AnimationTickHolder;
@@ -10,26 +8,27 @@ import com.zurrtum.create.client.catnip.render.SuperByteBuffer;
 import com.zurrtum.create.client.content.kinetics.base.KineticBlockEntityRenderer;
 import com.zurrtum.create.content.kinetics.base.IRotate;
 import com.zurrtum.create.content.kinetics.fan.EncasedFanBlockEntity;
-import net.minecraft.client.renderer.LevelRenderer;
-import net.minecraft.client.renderer.LightTexture;
-import net.minecraft.client.renderer.SubmitNodeCollector;
-import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
-import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
-import net.minecraft.client.renderer.blockentity.state.BlockEntityRenderState;
-import net.minecraft.client.renderer.feature.ModelFeatureRenderer;
-import net.minecraft.client.renderer.rendertype.RenderType;
-import net.minecraft.client.renderer.rendertype.RenderTypes;
-import net.minecraft.client.renderer.state.CameraRenderState;
-import net.minecraft.core.Direction;
-import net.minecraft.util.Mth;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.client.render.LightmapTextureManager;
+import net.minecraft.client.render.RenderLayer;
+import net.minecraft.client.render.VertexConsumer;
+import net.minecraft.client.render.WorldRenderer;
+import net.minecraft.client.render.block.entity.BlockEntityRenderer;
+import net.minecraft.client.render.block.entity.BlockEntityRendererFactory;
+import net.minecraft.client.render.block.entity.state.BlockEntityRenderState;
+import net.minecraft.client.render.command.ModelCommandRenderer;
+import net.minecraft.client.render.command.OrderedRenderCommandQueue;
+import net.minecraft.client.render.state.CameraRenderState;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
-import static net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
+import static net.minecraft.state.property.Properties.FACING;
 
 public class EncasedFanRenderer implements BlockEntityRenderer<EncasedFanBlockEntity, EncasedFanRenderer.EncasedFanRenderState> {
-    public EncasedFanRenderer(BlockEntityRendererProvider.Context context) {
+    public EncasedFanRenderer(BlockEntityRendererFactory.Context context) {
     }
 
     @Override
@@ -38,57 +37,50 @@ public class EncasedFanRenderer implements BlockEntityRenderer<EncasedFanBlockEn
     }
 
     @Override
-    public void extractRenderState(
+    public void updateRenderState(
         EncasedFanBlockEntity be,
         EncasedFanRenderState state,
         float tickProgress,
-        Vec3 cameraPos,
-        @Nullable ModelFeatureRenderer.CrumblingOverlay crumblingOverlay
+        Vec3d cameraPos,
+        @Nullable ModelCommandRenderer.CrumblingOverlayCommand crumblingOverlay
     ) {
-        state.blockPos = be.getBlockPos();
-        state.blockState = be.getBlockState();
-        state.blockEntityType = be.getType();
-        state.breakProgress = crumblingOverlay;
-        state.layer = RenderTypes.cutoutMovingBlock();
-        Direction direction = state.blockState.getValue(FACING);
+        state.pos = be.getPos();
+        state.blockState = be.getCachedState();
+        state.type = be.getType();
+        state.crumblingOverlay = crumblingOverlay;
+        state.layer = RenderLayer.getCutoutMipped();
+        Direction direction = state.blockState.get(FACING);
         Direction opposite = direction.getOpposite();
-        Level world = be.getLevel();
+        World world = be.getWorld();
         if (world != null) {
-            state.lightBehind = LevelRenderer.getLightColor(world, state.blockPos.relative(opposite));
-            state.lightInFront = LevelRenderer.getLightColor(world, state.blockPos.relative(direction));
+            state.lightBehind = WorldRenderer.getLightmapCoordinates(world, state.pos.offset(opposite));
+            state.lightInFront = WorldRenderer.getLightmapCoordinates(world, state.pos.offset(direction));
         } else {
-            state.lightBehind = state.lightInFront = LightTexture.FULL_BRIGHT;
+            state.lightBehind = state.lightInFront = LightmapTextureManager.MAX_LIGHT_COORDINATE;
         }
         state.shaftHalf = CachedBuffers.partialFacing(AllPartialModels.SHAFT_HALF, state.blockState, opposite);
         state.fanInner = CachedBuffers.partialFacing(AllPartialModels.ENCASED_FAN_INNER, state.blockState, opposite);
         float time = AnimationTickHolder.getRenderTime(world);
         float speed = be.getSpeed() * 5;
-        if (speed > 0) {
-            speed = Mth.clamp(speed, 80, 64 * 20);
-        }
-        if (speed < 0) {
-            speed = Mth.clamp(speed, -64 * 20, -80);
-        }
+        if (speed > 0)
+            speed = MathHelper.clamp(speed, 80, 64 * 20);
+        if (speed < 0)
+            speed = MathHelper.clamp(speed, -64 * 20, -80);
         float angle = (time * speed * 3 / 10f) % 360;
         Direction.Axis axis = ((IRotate) state.blockState.getBlock()).getRotationAxis(state.blockState);
-        state.angle = KineticBlockEntityRenderer.getAngleForBe(be, state.blockPos, axis);
-        state.direction = Direction.fromAxisAndDirection(axis, Direction.AxisDirection.POSITIVE);
+        state.angle = KineticBlockEntityRenderer.getAngleForBe(be, state.pos, axis);
+        state.direction = Direction.from(axis, Direction.AxisDirection.POSITIVE);
         state.color = KineticBlockEntityRenderer.getColor(be);
         state.fanAngle = angle / 180f * (float) Math.PI;
     }
 
     @Override
-    public void submit(
-        EncasedFanRenderState state,
-        PoseStack matrices,
-        SubmitNodeCollector queue,
-        CameraRenderState cameraState
-    ) {
-        queue.submitCustomGeometry(matrices, state.layer, state);
+    public void render(EncasedFanRenderState state, MatrixStack matrices, OrderedRenderCommandQueue queue, CameraRenderState cameraState) {
+        queue.submitCustom(matrices, state.layer, state);
     }
 
-    public static class EncasedFanRenderState extends BlockEntityRenderState implements SubmitNodeCollector.CustomGeometryRenderer {
-        public RenderType layer;
+    public static class EncasedFanRenderState extends BlockEntityRenderState implements OrderedRenderCommandQueue.Custom {
+        public RenderLayer layer;
         public int lightBehind;
         public int lightInFront;
         public SuperByteBuffer shaftHalf;
@@ -99,7 +91,7 @@ public class EncasedFanRenderer implements BlockEntityRenderer<EncasedFanBlockEn
         public float fanAngle;
 
         @Override
-        public void render(PoseStack.Pose matricesEntry, VertexConsumer vertexConsumer) {
+        public void render(MatrixStack.Entry matricesEntry, VertexConsumer vertexConsumer) {
             shaftHalf.light(lightBehind);
             shaftHalf.rotateCentered(angle, direction);
             shaftHalf.color(color);

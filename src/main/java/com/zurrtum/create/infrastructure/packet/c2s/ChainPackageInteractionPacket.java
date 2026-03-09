@@ -4,35 +4,36 @@ import com.zurrtum.create.AllHandle;
 import com.zurrtum.create.AllPackets;
 import com.zurrtum.create.catnip.codecs.stream.CatnipStreamCodecBuilders;
 import io.netty.buffer.ByteBuf;
-import net.minecraft.core.BlockPos;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.PacketType;
-import net.minecraft.network.protocol.game.ServerGamePacketListener;
-import net.minecraft.server.network.ServerGamePacketListenerImpl;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.network.listener.ServerPlayPacketListener;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.PacketType;
+import net.minecraft.server.network.ServerPlayNetworkHandler;
+import net.minecraft.util.math.BlockPos;
 
-public record ChainPackageInteractionPacket(BlockPos pos, BlockPos selectedConnection, float chainPosition,
-                                            boolean removingPackage) implements Packet<ServerGamePacketListener> {
-    public static final StreamCodec<ByteBuf, ChainPackageInteractionPacket> CODEC = StreamCodec.composite(
-        BlockPos.STREAM_CODEC,
+public record ChainPackageInteractionPacket(
+    BlockPos pos, BlockPos selectedConnection, float chainPosition, boolean removingPackage
+) implements Packet<ServerPlayPacketListener> {
+    public static final PacketCodec<ByteBuf, ChainPackageInteractionPacket> CODEC = PacketCodec.tuple(
+        BlockPos.PACKET_CODEC,
         ChainPackageInteractionPacket::pos,
-        CatnipStreamCodecBuilders.nullable(BlockPos.STREAM_CODEC),
+        CatnipStreamCodecBuilders.nullable(BlockPos.PACKET_CODEC),
         ChainPackageInteractionPacket::selectedConnection,
-        ByteBufCodecs.FLOAT,
+        PacketCodecs.FLOAT,
         ChainPackageInteractionPacket::chainPosition,
-        ByteBufCodecs.BOOL,
+        PacketCodecs.BOOLEAN,
         ChainPackageInteractionPacket::removingPackage,
         ChainPackageInteractionPacket::new
     );
 
     @Override
-    public void handle(ServerGamePacketListener listener) {
-        AllHandle.onChainPackageInteraction((ServerGamePacketListenerImpl) listener, this);
+    public void apply(ServerPlayPacketListener listener) {
+        AllHandle.onChainPackageInteraction((ServerPlayNetworkHandler) listener, this);
     }
 
     @Override
-    public PacketType<ChainPackageInteractionPacket> type() {
+    public PacketType<ChainPackageInteractionPacket> getPacketType() {
         return AllPackets.CHAIN_PACKAGE_INTERACTION;
     }
 }

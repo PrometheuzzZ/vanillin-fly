@@ -1,16 +1,17 @@
 package com.zurrtum.create.client.ponder.foundation.render;
 
-import com.mojang.blaze3d.platform.Window;
 import com.zurrtum.create.catnip.animation.LerpedFloat;
 import com.zurrtum.create.client.ponder.foundation.PonderScene;
-import net.minecraft.client.gui.navigation.ScreenRectangle;
-import net.minecraft.client.gui.render.state.pip.PictureInPictureRenderState;
+import net.minecraft.client.gui.ScreenRect;
+import net.minecraft.client.gui.render.state.special.SpecialGuiElementRenderState;
+import net.minecraft.client.util.Window;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix3x2f;
 
-public record SceneRenderState(int id, PonderScene scene, int width, int height, double slide, boolean userViewMode,
-                               LerpedFloat finishingFlash, float partialTicks, Matrix3x2f pose, int x1, int y1,
-                               ScreenRectangle bounds) implements PictureInPictureRenderState {
+public record SceneRenderState(
+    int id, PonderScene scene, int width, int height, double slide, boolean userViewMode, LerpedFloat finishingFlash, float partialTicks,
+    Matrix3x2f pose, int x2, int y2, ScreenRect bounds
+) implements SpecialGuiElementRenderState {
     public SceneRenderState(
         int id,
         PonderScene scene,
@@ -33,19 +34,19 @@ public record SceneRenderState(int id, PonderScene scene, int width, int height,
             finishingFlash,
             partialTicks,
             pose,
-            window.getGuiScaledWidth(),
-            window.getGuiScaledHeight(),
-            new ScreenRectangle(0, 0, window.getGuiScaledWidth(), window.getGuiScaledHeight()).transformMaxBounds(pose)
+            window.getScaledWidth(),
+            window.getScaledHeight(),
+            new ScreenRect(0, 0, window.getScaledWidth(), window.getScaledHeight()).transformEachVertex(pose)
         );
     }
 
     @Override
-    public int x0() {
+    public int x1() {
         return 0;
     }
 
     @Override
-    public int y0() {
+    public int y1() {
         return 0;
     }
 
@@ -55,7 +56,7 @@ public record SceneRenderState(int id, PonderScene scene, int width, int height,
     }
 
     @Override
-    public @Nullable ScreenRectangle scissorArea() {
+    public @Nullable ScreenRect scissorArea() {
         return null;
     }
 }

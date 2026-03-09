@@ -8,8 +8,8 @@ import com.zurrtum.create.content.contraptions.bearing.IBearingBlockEntity;
 import com.zurrtum.create.content.contraptions.pulley.PulleyBlockEntity;
 import com.zurrtum.create.content.kinetics.deployer.DeployerBlockEntity;
 import com.zurrtum.create.content.trains.bogey.AbstractBogeyBlockEntity;
-import net.minecraft.core.BlockPos;
-import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.util.math.BlockPos;
 
 import java.util.Optional;
 import java.util.function.BiConsumer;
@@ -31,19 +31,22 @@ public class AnimateBlockEntityInstruction extends TickingInstruction {
             totalDelta,
             ticks,
             (w, f) -> castIfPresent(w, location, IBearingBlockEntity.class).ifPresent(bte -> bte.setAngle(f)),
-            (w) -> castIfPresent(w, location, IBearingBlockEntity.class).map(bte -> bte.getInterpolatedAngle(0))
-                .orElse(0f)
+            (w) -> castIfPresent(w, location, IBearingBlockEntity.class).map(bte -> bte.getInterpolatedAngle(0)).orElse(0f)
         );
     }
 
     public static AnimateBlockEntityInstruction bogey(BlockPos location, float totalDelta, int ticks) {
         float movedPerTick = totalDelta / ticks;
         return new AnimateBlockEntityInstruction(
-            location, totalDelta, ticks, (w, f) -> castIfPresent(
-            w,
             location,
-            AbstractBogeyBlockEntity.class
-        ).ifPresent(bte -> bte.animate(f.equals(totalDelta) ? 0 : movedPerTick)), (w) -> 0f
+            totalDelta,
+            ticks,
+            (w, f) -> castIfPresent(
+                w,
+                location,
+                AbstractBogeyBlockEntity.class
+            ).ifPresent(bte -> bte.animate(f.equals(totalDelta) ? 0 : movedPerTick)),
+            (w) -> 0f
         );
     }
 
@@ -62,15 +65,8 @@ public class AnimateBlockEntityInstruction extends TickingInstruction {
             location,
             totalDelta,
             ticks,
-            (w, f) -> castIfPresent(
-                w,
-                location,
-                DeployerBlockEntity.class
-            ).ifPresent(deployer -> deployer.setAnimatedOffset(f)),
-            (w) -> castIfPresent(w, location, DeployerBlockEntity.class).map(deployer -> DeployerRenderer.getHandOffset(
-                deployer,
-                1
-            )).orElse(0f)
+            (w, f) -> castIfPresent(w, location, DeployerBlockEntity.class).ifPresent(deployer -> deployer.setAnimatedOffset(f)),
+            (w) -> castIfPresent(w, location, DeployerBlockEntity.class).map(deployer -> DeployerRenderer.getHandOffset(deployer, 1)).orElse(0f)
         );
     }
 
@@ -93,27 +89,24 @@ public class AnimateBlockEntityInstruction extends TickingInstruction {
     @Override
     protected final void firstTick(PonderScene scene) {
         super.firstTick(scene);
-        target = getter.apply(scene.getLevel()) + totalDelta;
+        target = getter.apply(scene.getWorld()) + totalDelta;
     }
 
     @Override
     public void tick(PonderScene scene) {
         super.tick(scene);
-        PonderLevel world = scene.getLevel();
+        PonderLevel world = scene.getWorld();
         float current = getter.apply(world);
         float next = (float) (remainingTicks == 0 ? target : current + deltaPerTick);
         setter.accept(world, next);
         if (remainingTicks == 0) // lock interpolation
-        {
             setter.accept(world, next);
-        }
     }
 
     private static <T> Optional<T> castIfPresent(PonderLevel world, BlockPos pos, Class<T> beType) {
         BlockEntity blockEntity = world.getBlockEntity(pos);
-        if (beType.isInstance(blockEntity)) {
+        if (beType.isInstance(blockEntity))
             return Optional.of(beType.cast(blockEntity));
-        }
         return Optional.empty();
     }
 

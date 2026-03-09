@@ -1,14 +1,17 @@
 package com.zurrtum.create.content.kinetics.belt;
 
-import net.minecraft.util.StringRepresentable;
+import net.minecraft.util.StringIdentifiable;
 
 import java.util.Locale;
 
-public enum BeltPart implements StringRepresentable {
-    START, MIDDLE, END, PULLEY;
+public enum BeltPart implements StringIdentifiable {
+    START,
+    MIDDLE,
+    END,
+    PULLEY;
 
     @Override
-    public String getSerializedName() {
+    public String asString() {
         return name().toLowerCase(Locale.ROOT);
     }
 }

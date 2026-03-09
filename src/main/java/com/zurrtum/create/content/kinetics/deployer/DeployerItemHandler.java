@@ -2,10 +2,10 @@ package com.zurrtum.create.content.kinetics.deployer;
 
 import com.zurrtum.create.infrastructure.items.SidedItemInventory;
 import com.zurrtum.create.infrastructure.transfer.SlotRangeCache;
-import net.minecraft.core.Direction;
-import net.minecraft.core.component.DataComponents;
-import net.minecraft.world.InteractionHand;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.component.DataComponentTypes;
+import net.minecraft.item.ItemStack;
+import net.minecraft.util.Hand;
+import net.minecraft.util.math.Direction;
 import org.jetbrains.annotations.Nullable;
 
 public class DeployerItemHandler implements SidedItemInventory {
@@ -18,12 +18,12 @@ public class DeployerItemHandler implements SidedItemInventory {
     }
 
     @Override
-    public int[] getSlotsForFace(Direction side) {
+    public int[] getAvailableSlots(Direction side) {
         return SlotRangeCache.get(be.overflowItems.size() + 1);
     }
 
     @Override
-    public boolean canPlaceItemThroughFace(int slot, ItemStack stack, @Nullable Direction dir) {
+    public boolean canInsert(int slot, ItemStack stack, @Nullable Direction dir) {
         if (slot != 0 || player == null) {
             return false;
         }
@@ -34,7 +34,7 @@ public class DeployerItemHandler implements SidedItemInventory {
     }
 
     @Override
-    public boolean canTakeItemThroughFace(int slot, ItemStack stack, Direction dir) {
+    public boolean canExtract(int slot, ItemStack stack, Direction dir) {
         if (slot != 0) {
             return true;
         }
@@ -44,47 +44,47 @@ public class DeployerItemHandler implements SidedItemInventory {
         if (be.filtering.getFilter().isEmpty()) {
             return true;
         }
-        return !be.filtering.test(player.cast().getMainHandItem());
+        return !be.filtering.test(player.cast().getMainHandStack());
     }
 
     @Override
-    public int getContainerSize() {
+    public int size() {
         return 1 + be.overflowItems.size();
     }
 
     @Override
-    public ItemStack getItem(int slot) {
+    public ItemStack getStack(int slot) {
         int size = be.overflowItems.size();
         if (slot > size) {
             return ItemStack.EMPTY;
         }
         if (slot == 0) {
-            return player == null ? ItemStack.EMPTY : player.cast().getMainHandItem();
+            return player == null ? ItemStack.EMPTY : player.cast().getMainHandStack();
         }
         return be.overflowItems.get(slot - 1);
     }
 
     @Override
-    public void setItem(int slot, ItemStack stack) {
+    public void setStack(int slot, ItemStack stack) {
         int size = be.overflowItems.size();
         if (slot > size) {
             return;
         }
         if (slot == 0) {
-            player.cast().setItemInHand(InteractionHand.MAIN_HAND, stack);
+            player.cast().setStackInHand(Hand.MAIN_HAND, stack);
         } else {
             be.overflowItems.set(slot - 1, stack);
         }
     }
 
     @Override
-    public void setChanged() {
+    public void markDirty() {
         be.overflowItems.removeIf(ItemStack::isEmpty);
         be.notifyUpdate();
     }
 
     @Override
-    public int getMaxStackSize(ItemStack stack) {
-        return stack.getOrDefault(DataComponents.MAX_STACK_SIZE, 64);
+    public int getMaxCount(ItemStack stack) {
+        return stack.getOrDefault(DataComponentTypes.MAX_STACK_SIZE, 64);
     }
 }

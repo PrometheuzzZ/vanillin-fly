@@ -1,19 +1,19 @@
 package com.zurrtum.create.client.content.schematics.client.tools;
 
-import com.mojang.blaze3d.platform.InputConstants;
-import com.mojang.blaze3d.vertex.PoseStack;
 import com.zurrtum.create.AllDataComponents;
 import com.zurrtum.create.client.catnip.animation.AnimationTickHolder;
 import com.zurrtum.create.client.catnip.outliner.AABBOutline;
 import com.zurrtum.create.client.catnip.render.SuperRenderTypeBuffer;
 import com.zurrtum.create.client.content.schematics.client.SchematicTransformation;
 import com.zurrtum.create.client.flywheel.lib.transform.TransformStack;
-import net.minecraft.client.Minecraft;
-import net.minecraft.core.BlockPos;
-import net.minecraft.util.Mth;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.util.InputUtil;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.item.ItemStack;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Box;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.Vec3d;
 import org.lwjgl.glfw.GLFW;
 
 public class DeployTool extends PlacementToolBase {
@@ -25,66 +25,63 @@ public class DeployTool extends PlacementToolBase {
     }
 
     @Override
-    public void updateSelection(Minecraft mc) {
+    public void updateSelection(MinecraftClient mc) {
         if (schematicHandler.isActive() && selectionRange == -1) {
             selectionRange = (int) (schematicHandler.getBounds().getCenter().length() / 2);
-            selectionRange = Mth.clamp(selectionRange, 1, 100);
+            selectionRange = MathHelper.clamp(selectionRange, 1, 100);
         }
-        selectIgnoreBlocks = InputConstants.isKeyDown(mc.getWindow(), GLFW.GLFW_KEY_LEFT_CONTROL);
+        selectIgnoreBlocks = InputUtil.isKeyPressed(mc.getWindow(), GLFW.GLFW_KEY_LEFT_CONTROL);
         super.updateSelection(mc);
     }
 
     @Override
-    public void renderTool(Minecraft mc, PoseStack ms, SuperRenderTypeBuffer buffer, Vec3 camera) {
+    public void renderTool(MinecraftClient mc, MatrixStack ms, SuperRenderTypeBuffer buffer, Vec3d camera) {
         super.renderTool(mc, ms, buffer, camera);
 
-        if (selectedPos == null) {
+        if (selectedPos == null)
             return;
-        }
 
-        ms.pushPose();
+        ms.push();
         float pt = AnimationTickHolder.getPartialTicks();
-        double x = Mth.lerp(pt, lastChasingSelectedPos.x, chasingSelectedPos.x);
-        double y = Mth.lerp(pt, lastChasingSelectedPos.y, chasingSelectedPos.y);
-        double z = Mth.lerp(pt, lastChasingSelectedPos.z, chasingSelectedPos.z);
+        double x = MathHelper.lerp(pt, lastChasingSelectedPos.x, chasingSelectedPos.x);
+        double y = MathHelper.lerp(pt, lastChasingSelectedPos.y, chasingSelectedPos.y);
+        double z = MathHelper.lerp(pt, lastChasingSelectedPos.z, chasingSelectedPos.z);
 
         SchematicTransformation transformation = schematicHandler.getTransformation();
-        AABB bounds = schematicHandler.getBounds();
-        Vec3 center = bounds.getCenter();
-        Vec3 rotationOffset = transformation.getRotationOffset(true);
+        Box bounds = schematicHandler.getBounds();
+        Vec3d center = bounds.getCenter();
+        Vec3d rotationOffset = transformation.getRotationOffset(true);
         int centerX = (int) center.x;
         int centerZ = (int) center.z;
-        double xOrigin = bounds.getXsize() / 2f;
-        double zOrigin = bounds.getZsize() / 2f;
-        Vec3 origin = new Vec3(xOrigin, 0, zOrigin);
+        double xOrigin = bounds.getLengthX() / 2f;
+        double zOrigin = bounds.getLengthZ() / 2f;
+        Vec3d origin = new Vec3d(xOrigin, 0, zOrigin);
 
         ms.translate(x - centerX - camera.x, y - camera.y, z - centerZ - camera.z);
-        TransformStack.of(ms).translate(origin).translate(rotationOffset)
-            .rotateYDegrees(transformation.getCurrentRotation()).translateBack(rotationOffset).translateBack(origin);
+        TransformStack.of(ms).translate(origin).translate(rotationOffset).rotateYDegrees(transformation.getCurrentRotation())
+            .translateBack(rotationOffset).translateBack(origin);
 
         AABBOutline outline = schematicHandler.getOutline();
-        outline.render(mc, ms, buffer, Vec3.ZERO, pt);
+        outline.render(mc, ms, buffer, Vec3d.ZERO, pt);
         outline.getParams().clearTextures();
-        ms.popPose();
+        ms.pop();
     }
 
     @Override
     public boolean handleMouseWheel(double delta) {
-        if (!selectIgnoreBlocks) {
+        if (!selectIgnoreBlocks)
             return super.handleMouseWheel(delta);
-        }
         selectionRange += delta;
-        selectionRange = Mth.clamp(selectionRange, 1, 100);
+        selectionRange = MathHelper.clamp(selectionRange, 1, 100);
         return true;
     }
 
     @Override
-    public boolean handleRightClick(Minecraft mc) {
-        if (selectedPos == null) {
+    public boolean handleRightClick(MinecraftClient mc) {
+        if (selectedPos == null)
             return super.handleRightClick(mc);
-        }
-        Vec3 center = schematicHandler.getBounds().getCenter();
-        BlockPos target = selectedPos.offset(-((int) center.x), 0, -((int) center.z));
+        Vec3d center = schematicHandler.getBounds().getCenter();
+        BlockPos target = selectedPos.add(-((int) center.x), 0, -((int) center.z));
 
         ItemStack item = schematicHandler.getActiveSchematicItem();
         if (item != null) {

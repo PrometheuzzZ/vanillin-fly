@@ -2,7 +2,7 @@ package com.zurrtum.create.client.flywheel.backend.compile;
 
 import com.zurrtum.create.client.flywheel.backend.NoiseTextures;
 import com.zurrtum.create.foundation.utility.CreateResourceReloader;
-import net.minecraft.server.packs.resources.ResourceManager;
+import net.minecraft.resource.ResourceManager;
 
 public final class FlwProgramsReloader extends CreateResourceReloader {
     public static final FlwProgramsReloader INSTANCE = new FlwProgramsReloader();
@@ -12,7 +12,7 @@ public final class FlwProgramsReloader extends CreateResourceReloader {
     }
 
     @Override
-    public void onResourceManagerReload(ResourceManager manager) {
+    public void reload(ResourceManager manager) {
         FlwPrograms.reload(manager);
         NoiseTextures.reload(manager);
     }

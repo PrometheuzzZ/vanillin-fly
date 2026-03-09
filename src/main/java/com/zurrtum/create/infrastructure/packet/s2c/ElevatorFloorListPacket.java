@@ -6,21 +6,20 @@ import com.zurrtum.create.catnip.codecs.stream.CatnipStreamCodecBuilders;
 import com.zurrtum.create.catnip.data.Couple;
 import com.zurrtum.create.catnip.data.IntAttached;
 import com.zurrtum.create.content.contraptions.AbstractContraptionEntity;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.PacketType;
-import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.network.listener.ClientPlayPacketListener;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.PacketType;
 
 import java.util.List;
 
-public record ElevatorFloorListPacket(int entityId,
-                                      List<IntAttached<Couple<String>>> floors) implements Packet<ClientGamePacketListener> {
-    public static final StreamCodec<RegistryFriendlyByteBuf, ElevatorFloorListPacket> CODEC = StreamCodec.composite(
-        ByteBufCodecs.INT,
+public record ElevatorFloorListPacket(int entityId, List<IntAttached<Couple<String>>> floors) implements Packet<ClientPlayPacketListener> {
+    public static final PacketCodec<RegistryByteBuf, ElevatorFloorListPacket> CODEC = PacketCodec.tuple(
+        PacketCodecs.INTEGER,
         ElevatorFloorListPacket::entityId,
-        CatnipStreamCodecBuilders.list(IntAttached.streamCodec(Couple.streamCodec(ByteBufCodecs.STRING_UTF8))),
+        CatnipStreamCodecBuilders.list(IntAttached.streamCodec(Couple.streamCodec(PacketCodecs.STRING))),
         ElevatorFloorListPacket::floors,
         ElevatorFloorListPacket::new
     );
@@ -30,12 +29,12 @@ public record ElevatorFloorListPacket(int entityId,
     }
 
     @Override
-    public void handle(ClientGamePacketListener listener) {
+    public void apply(ClientPlayPacketListener listener) {
         AllClientHandle.INSTANCE.onElevatorFloorList(listener, this);
     }
 
     @Override
-    public PacketType<ElevatorFloorListPacket> type() {
+    public PacketType<ElevatorFloorListPacket> getPacketType() {
         return AllPackets.UPDATE_ELEVATOR_FLOORS;
     }
 }

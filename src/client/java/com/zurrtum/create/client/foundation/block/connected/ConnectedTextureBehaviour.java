@@ -1,67 +1,49 @@
 package com.zurrtum.create.client.foundation.block.connected;
 
 import com.zurrtum.create.foundation.block.AppearanceControlBlock;
-import net.minecraft.client.renderer.texture.TextureAtlasSprite;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.core.Direction.Axis;
-import net.minecraft.core.Direction.AxisDirection;
-import net.minecraft.util.RandomSource;
-import net.minecraft.world.level.BlockAndTintGetter;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
+import net.minecraft.client.texture.Sprite;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Direction.Axis;
+import net.minecraft.util.math.Direction.AxisDirection;
+import net.minecraft.util.math.random.Random;
+import net.minecraft.world.BlockRenderView;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 public abstract class ConnectedTextureBehaviour {
 
     @Nullable
-    public CTSpriteShiftEntry getShift(
-        BlockState state,
-        RandomSource rand,
-        Direction direction,
-        @NotNull TextureAtlasSprite sprite
-    ) {
+    public CTSpriteShiftEntry getShift(BlockState state, Random rand, Direction direction, @NotNull Sprite sprite) {
         return getShift(state, direction, sprite);
     }
 
     @Nullable
-    public abstract CTSpriteShiftEntry getShift(
-        BlockState state,
-        Direction direction,
-        @NotNull TextureAtlasSprite sprite
-    );
+    public abstract CTSpriteShiftEntry getShift(BlockState state, Direction direction, @NotNull Sprite sprite);
 
     // TODO: allow more than one data type per state/face?
     @Nullable
-    public abstract CTType getDataType(BlockAndTintGetter world, BlockPos pos, BlockState state, Direction direction);
+    public abstract CTType getDataType(BlockRenderView world, BlockPos pos, BlockState state, Direction direction);
 
     public boolean buildContextForOccludedDirections() {
         return false;
     }
 
-    protected boolean isBeingBlocked(
-        BlockState state,
-        BlockAndTintGetter reader,
-        BlockPos pos,
-        BlockPos otherPos,
-        Direction face
-    ) {
-        BlockPos blockingPos = otherPos.relative(face);
+    protected boolean isBeingBlocked(BlockState state, BlockRenderView reader, BlockPos pos, BlockPos otherPos, Direction face) {
+        BlockPos blockingPos = otherPos.offset(face);
         BlockState blockState = reader.getBlockState(pos);
         BlockState blockingState = reader.getBlockState(blockingPos);
 
-        if (!Block.isFaceFull(blockingState.getShape(reader, blockingPos), face.getOpposite())) {
+        if (!Block.isFaceFullSquare(blockingState.getOutlineShape(reader, blockingPos), face.getOpposite()))
             return false;
-        }
-        if (face.getAxis().choose(pos.getX(), pos.getY(), pos.getZ()) != face.getAxis()
-            .choose(otherPos.getX(), otherPos.getY(), otherPos.getZ())) {
+        if (face.getAxis().choose(pos.getX(), pos.getY(), pos.getZ()) != face.getAxis().choose(otherPos.getX(), otherPos.getY(), otherPos.getZ()))
             return false;
-        }
 
         return connectsTo(
             state,
-            getCTBlockState(reader, blockState, face.getOpposite(), pos.relative(face), blockingPos),
+            getCTBlockState(reader, blockState, face.getOpposite(), pos.offset(face), blockingPos),
             reader,
             pos,
             blockingPos,
@@ -72,7 +54,7 @@ public abstract class ConnectedTextureBehaviour {
     public boolean connectsTo(
         BlockState state,
         BlockState other,
-        BlockAndTintGetter reader,
+        BlockRenderView reader,
         BlockPos pos,
         BlockPos otherPos,
         Direction face,
@@ -82,19 +64,12 @@ public abstract class ConnectedTextureBehaviour {
         return connectsTo(state, other, reader, pos, otherPos, face);
     }
 
-    public boolean connectsTo(
-        BlockState state,
-        BlockState other,
-        BlockAndTintGetter reader,
-        BlockPos pos,
-        BlockPos otherPos,
-        Direction face
-    ) {
+    public boolean connectsTo(BlockState state, BlockState other, BlockRenderView reader, BlockPos pos, BlockPos otherPos, Direction face) {
         return !isBeingBlocked(state, reader, pos, otherPos, face) && state.getBlock() == other.getBlock();
     }
 
     private boolean testConnection(
-        BlockAndTintGetter reader,
+        BlockRenderView reader,
         BlockPos currentPos,
         BlockState connectiveCurrentState,
         Direction textureSide,
@@ -104,14 +79,8 @@ public abstract class ConnectedTextureBehaviour {
         int sv
     ) {
         BlockState trueCurrentState = reader.getBlockState(currentPos);
-        BlockPos targetPos = currentPos.relative(horizontal, sh).relative(vertical, sv);
-        BlockState connectiveTargetState = getCTBlockState(
-            reader,
-            trueCurrentState,
-            textureSide,
-            currentPos,
-            targetPos
-        );
+        BlockPos targetPos = currentPos.offset(horizontal, sh).offset(vertical, sv);
+        BlockState connectiveTargetState = getCTBlockState(reader, trueCurrentState, textureSide, currentPos, targetPos);
         return connectsTo(
             connectiveCurrentState,
             connectiveTargetState,
@@ -124,13 +93,7 @@ public abstract class ConnectedTextureBehaviour {
         );
     }
 
-    public BlockState getCTBlockState(
-        BlockAndTintGetter reader,
-        BlockState reference,
-        Direction face,
-        BlockPos fromPos,
-        BlockPos toPos
-    ) {
+    public BlockState getCTBlockState(BlockRenderView reader, BlockState reference, Direction face, BlockPos fromPos, BlockPos toPos) {
         BlockState blockState = reader.getBlockState(toPos);
         if (blockState.getBlock() instanceof AppearanceControlBlock block) {
             return block.getAppearance(blockState, reader, toPos, face, reference, fromPos);
@@ -150,24 +113,18 @@ public abstract class ConnectedTextureBehaviour {
         return reverseUVs(state, face);
     }
 
-    protected Direction getUpDirection(BlockAndTintGetter reader, BlockPos pos, BlockState state, Direction face) {
+    protected Direction getUpDirection(BlockRenderView reader, BlockPos pos, BlockState state, Direction face) {
         Axis axis = face.getAxis();
         return axis.isHorizontal() ? Direction.UP : Direction.NORTH;
     }
 
-    protected Direction getRightDirection(BlockAndTintGetter reader, BlockPos pos, BlockState state, Direction face) {
+    protected Direction getRightDirection(BlockRenderView reader, BlockPos pos, BlockState state, Direction face) {
         Axis axis = face.getAxis();
         return axis == Axis.X ? Direction.SOUTH : Direction.WEST;
     }
 
-    public CTContext buildContext(
-        BlockAndTintGetter reader,
-        BlockPos pos,
-        BlockState state,
-        Direction face,
-        ContextRequirement requirement
-    ) {
-        boolean positive = face.getAxisDirection() == AxisDirection.POSITIVE;
+    public CTContext buildContext(BlockRenderView reader, BlockPos pos, BlockState state, Direction face, ContextRequirement requirement) {
+        boolean positive = face.getDirection() == AxisDirection.POSITIVE;
         Direction h = getRightDirection(reader, pos, state, face);
         Direction v = getUpDirection(reader, pos, state, face);
         h = positive ? h.getOpposite() : h;
@@ -200,52 +157,16 @@ public abstract class ConnectedTextureBehaviour {
         }
 
         if (requirement.topLeft) {
-            context.topLeft = context.up && context.left && testConnection(
-                reader,
-                pos,
-                state,
-                face,
-                horizontal,
-                vertical,
-                -sh,
-                sv
-            );
+            context.topLeft = context.up && context.left && testConnection(reader, pos, state, face, horizontal, vertical, -sh, sv);
         }
         if (requirement.topRight) {
-            context.topRight = context.up && context.right && testConnection(
-                reader,
-                pos,
-                state,
-                face,
-                horizontal,
-                vertical,
-                sh,
-                sv
-            );
+            context.topRight = context.up && context.right && testConnection(reader, pos, state, face, horizontal, vertical, sh, sv);
         }
         if (requirement.bottomLeft) {
-            context.bottomLeft = context.down && context.left && testConnection(
-                reader,
-                pos,
-                state,
-                face,
-                horizontal,
-                vertical,
-                -sh,
-                -sv
-            );
+            context.bottomLeft = context.down && context.left && testConnection(reader, pos, state, face, horizontal, vertical, -sh, -sv);
         }
         if (requirement.bottomRight) {
-            context.bottomRight = context.down && context.right && testConnection(
-                reader,
-                pos,
-                state,
-                face,
-                horizontal,
-                vertical,
-                sh,
-                -sv
-            );
+            context.bottomRight = context.down && context.right && testConnection(reader, pos, state, face, horizontal, vertical, sh, -sv);
         }
 
         return context;
@@ -371,15 +292,11 @@ public abstract class ConnectedTextureBehaviour {
     public static abstract class Base extends ConnectedTextureBehaviour {
         @Override
         @Nullable
-        public abstract CTSpriteShiftEntry getShift(
-            BlockState state,
-            Direction direction,
-            @Nullable TextureAtlasSprite sprite
-        );
+        public abstract CTSpriteShiftEntry getShift(BlockState state, Direction direction, @Nullable Sprite sprite);
 
         @Override
         @Nullable
-        public CTType getDataType(BlockAndTintGetter world, BlockPos pos, BlockState state, Direction direction) {
+        public CTType getDataType(BlockRenderView world, BlockPos pos, BlockState state, Direction direction) {
             CTSpriteShiftEntry shift = getShift(state, direction, null);
             if (shift == null) {
                 return null;

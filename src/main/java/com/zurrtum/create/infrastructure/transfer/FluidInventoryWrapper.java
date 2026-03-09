@@ -13,7 +13,7 @@ import net.fabricmc.fabric.api.transfer.v1.storage.Storage;
 import net.fabricmc.fabric.api.transfer.v1.storage.StorageView;
 import net.fabricmc.fabric.api.transfer.v1.storage.base.SingleSlotStorage;
 import net.fabricmc.fabric.api.transfer.v1.transaction.Transaction;
-import net.minecraft.core.Direction;
+import net.minecraft.util.math.Direction;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -46,7 +46,7 @@ public abstract class FluidInventoryWrapper<T extends Storage<FluidVariant>, S e
     }
 
     @Override
-    public void clearContent() {
+    public void clear() {
         try (Transaction transaction = Transaction.openOuter()) {
             for (StorageView<FluidVariant> view : storage.nonEmptyViews()) {
                 view.extract(view.getResource(), view.getAmount(), transaction);
@@ -67,11 +67,7 @@ public abstract class FluidInventoryWrapper<T extends Storage<FluidVariant>, S e
     @Override
     public int count(FluidStack stack, int maxAmount) {
         try (Transaction transaction = Transaction.openOuter()) {
-            long extract = storage.extract(
-                FluidVariant.of(stack.getFluid(), stack.getComponentChanges()),
-                maxAmount,
-                transaction
-            );
+            long extract = storage.extract(FluidVariant.of(stack.getFluid(), stack.getComponentChanges()), maxAmount, transaction);
             transaction.abort();
             return (int) extract;
         }
@@ -170,11 +166,7 @@ public abstract class FluidInventoryWrapper<T extends Storage<FluidVariant>, S e
     @Override
     public int countSpace(FluidStack stack, int maxAmount) {
         try (Transaction transaction = Transaction.openOuter()) {
-            long insert = storage.insert(
-                FluidVariant.of(stack.getFluid(), stack.getComponentChanges()),
-                maxAmount,
-                transaction
-            );
+            long insert = storage.insert(FluidVariant.of(stack.getFluid(), stack.getComponentChanges()), maxAmount, transaction);
             transaction.abort();
             return (int) insert;
         }
@@ -191,8 +183,7 @@ public abstract class FluidInventoryWrapper<T extends Storage<FluidVariant>, S e
             int amount = stack.getAmount();
             return countSpace(stack, amount) == amount;
         }
-        Object2IntLinkedOpenCustomHashMap<FluidStack> map = new Object2IntLinkedOpenCustomHashMap<>(
-            FLUID_STACK_HASH_STRATEGY);
+        Object2IntLinkedOpenCustomHashMap<FluidStack> map = new Object2IntLinkedOpenCustomHashMap<>(FLUID_STACK_HASH_STRATEGY);
         for (FluidStack stack : stacks) {
             map.merge(stack, stack.getAmount(), Integer::sum);
         }
@@ -209,11 +200,7 @@ public abstract class FluidInventoryWrapper<T extends Storage<FluidVariant>, S e
                 Object2IntMap.Entry<FluidStack> entry = iterator.next();
                 FluidStack stack = entry.getKey();
                 int amount = entry.getIntValue();
-                long insert = storage.insert(
-                    FluidVariant.of(stack.getFluid(), stack.getComponentChanges()),
-                    amount,
-                    transaction
-                );
+                long insert = storage.insert(FluidVariant.of(stack.getFluid(), stack.getComponentChanges()), amount, transaction);
                 if (insert < amount) {
                     transaction.abort();
                     return false;
@@ -236,11 +223,7 @@ public abstract class FluidInventoryWrapper<T extends Storage<FluidVariant>, S e
     @Override
     public int extract(FluidStack stack, int maxAmount) {
         try (Transaction transaction = Transaction.openOuter()) {
-            long extract = storage.extract(
-                FluidVariant.of(stack.getFluid(), stack.getComponentChanges()),
-                maxAmount,
-                transaction
-            );
+            long extract = storage.extract(FluidVariant.of(stack.getFluid(), stack.getComponentChanges()), maxAmount, transaction);
             transaction.commit();
             return (int) extract;
         }
@@ -390,11 +373,7 @@ public abstract class FluidInventoryWrapper<T extends Storage<FluidVariant>, S e
     @Override
     public int insert(FluidStack stack, int maxAmount) {
         try (Transaction transaction = Transaction.openOuter()) {
-            long insert = storage.insert(
-                FluidVariant.of(stack.getFluid(), stack.getComponentChanges()),
-                maxAmount,
-                transaction
-            );
+            long insert = storage.insert(FluidVariant.of(stack.getFluid(), stack.getComponentChanges()), maxAmount, transaction);
             transaction.commit();
             return (int) insert;
         }
@@ -418,8 +397,7 @@ public abstract class FluidInventoryWrapper<T extends Storage<FluidVariant>, S e
             }
             return List.of(stack.directCopy(amount - insert));
         }
-        Object2IntLinkedOpenCustomHashMap<FluidStack> map = new Object2IntLinkedOpenCustomHashMap<>(
-            FLUID_STACK_HASH_STRATEGY);
+        Object2IntLinkedOpenCustomHashMap<FluidStack> map = new Object2IntLinkedOpenCustomHashMap<>(FLUID_STACK_HASH_STRATEGY);
         for (FluidStack stack : stacks) {
             map.merge(stack, stack.getAmount(), Integer::sum);
         }
@@ -444,11 +422,7 @@ public abstract class FluidInventoryWrapper<T extends Storage<FluidVariant>, S e
                 Object2IntMap.Entry<FluidStack> entry = iterator.next();
                 FluidStack stack = entry.getKey();
                 int amount = entry.getIntValue();
-                long insert = storage.insert(
-                    FluidVariant.of(stack.getFluid(), stack.getComponentChanges()),
-                    amount,
-                    transaction
-                );
+                long insert = storage.insert(FluidVariant.of(stack.getFluid(), stack.getComponentChanges()), amount, transaction);
                 if (insert == amount) {
                     iterator.remove();
                     if (entries.isEmpty()) {
@@ -486,11 +460,7 @@ public abstract class FluidInventoryWrapper<T extends Storage<FluidVariant>, S e
             return 0;
         }
         try (Transaction transaction = Transaction.openOuter()) {
-            long insert = storage.insert(
-                FluidVariant.of(stack.getFluid(), stack.getComponentChanges()),
-                stack.getAmount(),
-                transaction
-            );
+            long insert = storage.insert(FluidVariant.of(stack.getFluid(), stack.getComponentChanges()), stack.getAmount(), transaction);
             transaction.commit();
             return (int) insert;
         }
@@ -517,11 +487,7 @@ public abstract class FluidInventoryWrapper<T extends Storage<FluidVariant>, S e
         }
         try (Transaction transaction = Transaction.openOuter()) {
             int amount = stack.getAmount();
-            long extract = storage.extract(
-                FluidVariant.of(stack.getFluid(), stack.getComponentChanges()),
-                amount,
-                transaction
-            );
+            long extract = storage.extract(FluidVariant.of(stack.getFluid(), stack.getComponentChanges()), amount, transaction);
             if (extract < amount) {
                 transaction.abort();
                 return false;
@@ -570,11 +536,7 @@ public abstract class FluidInventoryWrapper<T extends Storage<FluidVariant>, S e
     @Override
     public boolean preciseInsert(FluidStack stack, int maxAmount) {
         try (Transaction transaction = Transaction.openOuter()) {
-            long insert = storage.insert(
-                FluidVariant.of(stack.getFluid(), stack.getComponentChanges()),
-                maxAmount,
-                transaction
-            );
+            long insert = storage.insert(FluidVariant.of(stack.getFluid(), stack.getComponentChanges()), maxAmount, transaction);
             if (insert < maxAmount) {
                 transaction.abort();
                 return false;
@@ -594,8 +556,7 @@ public abstract class FluidInventoryWrapper<T extends Storage<FluidVariant>, S e
         if (listSize == 1) {
             return preciseInsert(stacks.getFirst());
         }
-        Object2IntLinkedOpenCustomHashMap<FluidStack> map = new Object2IntLinkedOpenCustomHashMap<>(
-            FLUID_STACK_HASH_STRATEGY);
+        Object2IntLinkedOpenCustomHashMap<FluidStack> map = new Object2IntLinkedOpenCustomHashMap<>(FLUID_STACK_HASH_STRATEGY);
         for (FluidStack stack : stacks) {
             map.merge(stack, stack.getAmount(), Integer::sum);
         }
@@ -610,11 +571,7 @@ public abstract class FluidInventoryWrapper<T extends Storage<FluidVariant>, S e
                 Object2IntMap.Entry<FluidStack> entry = iterator.next();
                 FluidStack stack = entry.getKey();
                 int amount = entry.getIntValue();
-                long insert = storage.insert(
-                    FluidVariant.of(stack.getFluid(), stack.getComponentChanges()),
-                    amount,
-                    transaction
-                );
+                long insert = storage.insert(FluidVariant.of(stack.getFluid(), stack.getComponentChanges()), amount, transaction);
                 if (insert < amount) {
                     transaction.abort();
                     return false;
@@ -681,12 +638,7 @@ public abstract class FluidInventoryWrapper<T extends Storage<FluidVariant>, S e
                 if (stack.isEmpty()) {
                     return;
                 }
-                insert(
-                    view,
-                    FluidVariant.of(stack.getFluid(), stack.getComponentChanges()),
-                    stack.getAmount(),
-                    transaction
-                );
+                insert(view, FluidVariant.of(stack.getFluid(), stack.getComponentChanges()), stack.getAmount(), transaction);
             } else if (FluidInventoryStorage.matches(variant, stack)) {
                 int amount = stack.getAmount();
                 int targetAmount = (int) view.getAmount();
@@ -701,12 +653,7 @@ public abstract class FluidInventoryWrapper<T extends Storage<FluidVariant>, S e
                 }
             } else {
                 view.extract(variant, view.getAmount(), transaction);
-                insert(
-                    view,
-                    FluidVariant.of(stack.getFluid(), stack.getComponentChanges()),
-                    stack.getAmount(),
-                    transaction
-                );
+                insert(view, FluidVariant.of(stack.getFluid(), stack.getComponentChanges()), stack.getAmount(), transaction);
             }
             transaction.commit();
         }
@@ -741,11 +688,11 @@ public abstract class FluidInventoryWrapper<T extends Storage<FluidVariant>, S e
         }
 
         @Override
-        public void clearContent() {
+        public void clear() {
             if (!canExtract) {
                 return;
             }
-            inventory.clearContent();
+            inventory.clear();
         }
 
         @Override
@@ -1149,12 +1096,7 @@ public abstract class FluidInventoryWrapper<T extends Storage<FluidVariant>, S e
         }
 
         @Override
-        protected void insert(
-            StorageView<FluidVariant> view,
-            FluidVariant variant,
-            int amount,
-            Transaction transaction
-        ) {
+        protected void insert(StorageView<FluidVariant> view, FluidVariant variant, int amount, Transaction transaction) {
             storage.insert(variant, amount, transaction);
         }
 
@@ -1175,12 +1117,7 @@ public abstract class FluidInventoryWrapper<T extends Storage<FluidVariant>, S e
         }
 
         @Override
-        protected void insert(
-            SingleSlotStorage<FluidVariant> view,
-            FluidVariant variant,
-            int amount,
-            Transaction transaction
-        ) {
+        protected void insert(SingleSlotStorage<FluidVariant> view, FluidVariant variant, int amount, Transaction transaction) {
             view.insert(variant, amount, transaction);
         }
 

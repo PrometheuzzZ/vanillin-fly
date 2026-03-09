@@ -1,21 +1,21 @@
 package com.zurrtum.create.content.fluids;
 
 import com.zurrtum.create.AllClientHandle;
-import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.catnip.animation.LerpedFloat;
 import com.zurrtum.create.catnip.data.Couple;
 import com.zurrtum.create.catnip.data.Iterate;
 import com.zurrtum.create.catnip.math.BlockFace;
+import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.foundation.codec.CreateCodecs;
 import com.zurrtum.create.infrastructure.fluids.FluidStack;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.util.Mth;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.chunk.status.ChunkStatus;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.storage.ReadView;
+import net.minecraft.storage.WriteView;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.world.World;
+import net.minecraft.world.chunk.ChunkStatus;
 
 import java.util.List;
 import java.util.Optional;
@@ -49,78 +49,59 @@ public class PipeConnection {
 
     public FluidStack getProvidedFluid() {
         FluidStack empty = FluidStack.EMPTY;
-        if (!hasFlow()) {
+        if (!hasFlow())
             return empty;
-        }
         Flow flow = this.flow.get();
-        if (!flow.inbound) {
+        if (!flow.inbound)
             return empty;
-        }
-        if (!flow.complete) {
+        if (!flow.complete)
             return empty;
-        }
         return flow.fluid;
     }
 
     public boolean flipFlowsIfPressureReversed() {
-        if (!hasFlow()) {
+        if (!hasFlow())
             return false;
-        }
         boolean singlePressure = comparePressure() != 0 && (getInboundPressure() == 0 || getOutwardPressure() == 0);
         Flow flow = this.flow.get();
-        if (!singlePressure || comparePressure() < 0 == flow.inbound) {
+        if (!singlePressure || comparePressure() < 0 == flow.inbound)
             return false;
-        }
         flow.inbound = !flow.inbound;
-        if (!flow.complete) {
+        if (!flow.complete)
             this.flow = Optional.empty();
-        }
         return true;
     }
 
-    public void manageSource(Level world, BlockPos pos, BlockEntity blockEntity) {
-        if (!source.isPresent() && !determineSource(world, pos)) {
+    public void manageSource(World world, BlockPos pos, BlockEntity blockEntity) {
+        if (!source.isPresent() && !determineSource(world, pos))
             return;
-        }
         FlowSource flowSource = source.get();
         flowSource.manageSource(world, blockEntity);
     }
 
-    public boolean manageFlows(
-        Level world,
-        BlockPos pos,
-        FluidStack internalFluid,
-        Predicate<FluidStack> extractionPredicate
-    ) {
+    public boolean manageFlows(World world, BlockPos pos, FluidStack internalFluid, Predicate<FluidStack> extractionPredicate) {
 
         // Only keep network if still valid
         Optional<FluidNetwork> retainedNetwork = network;
         network = Optional.empty();
 
         // chunk border
-        if (!source.isPresent() && !determineSource(world, pos)) {
+        if (!source.isPresent() && !determineSource(world, pos))
             return false;
-        }
         FlowSource flowSource = source.get();
 
         if (!hasFlow()) {
-            if (!hasPressure()) {
+            if (!hasPressure())
                 return false;
-            }
 
             // Try starting a new flow
             boolean prioritizeInbound = comparePressure() < 0;
             for (boolean trueFalse : Iterate.trueAndFalse) {
                 boolean inbound = prioritizeInbound == trueFalse;
-                if (pressure.get(inbound) == 0) {
+                if (pressure.get(inbound) == 0)
                     continue;
-                }
-                if (tryStartingNewFlow(
-                    inbound,
-                    inbound ? flowSource.provideFluid(extractionPredicate) : internalFluid
-                )) {
+                if (tryStartingNewFlow(inbound, inbound ? flowSource.provideFluid(extractionPredicate) : internalFluid))
                     return true;
-                }
             }
             return false;
         }
@@ -128,10 +109,7 @@ public class PipeConnection {
         // Manage existing flow
         Flow flow = this.flow.get();
         FluidStack provided = flow.inbound ? flowSource.provideFluid(extractionPredicate) : internalFluid;
-        if (!hasPressure() || provided.isEmpty() || !FluidStack.areFluidsAndComponentsEqualIgnoreCapacity(
-            provided,
-            flow.fluid
-        )) {
+        if (!hasPressure() || provided.isEmpty() || !FluidStack.areFluidsAndComponentsEqualIgnoreCapacity(provided, flow.fluid)) {
             this.flow = Optional.empty();
             return true;
         }
@@ -148,46 +126,40 @@ public class PipeConnection {
 
         flowSource.whileFlowPresent(world, flow.inbound);
 
-        if (!flowSource.isEndpoint()) {
+        if (!flowSource.isEndpoint())
             return false;
-        }
-        if (!flow.inbound) {
+        if (!flow.inbound)
             return false;
-        }
 
         // Layer III
         network = retainedNetwork;
-        if (!hasNetwork()) {
+        if (!hasNetwork())
             network = Optional.of(new FluidNetwork(world, new BlockFace(pos, side), flowSource::provideHandler));
-        }
         network.get().tick();
 
         return false;
     }
 
     private boolean tryStartingNewFlow(boolean inbound, FluidStack providedFluid) {
-        if (providedFluid.isEmpty()) {
+        if (providedFluid.isEmpty())
             return false;
-        }
         Flow flow = new Flow(inbound, providedFluid);
         this.flow = Optional.of(flow);
         return true;
     }
 
-    public boolean determineSource(Level world, BlockPos pos) {
-        BlockPos relative = pos.relative(side);
+    public boolean determineSource(World world, BlockPos pos) {
+        BlockPos relative = pos.offset(side);
         // cannot use world.isLoaded because it always returns true on client
-        if (world.getChunk(relative.getX() >> 4, relative.getZ() >> 4, ChunkStatus.FULL, false) == null) {
+        if (world.getChunk(relative.getX() >> 4, relative.getZ() >> 4, ChunkStatus.FULL, false) == null)
             return false;
-        }
 
         BlockFace location = new BlockFace(pos, side);
         if (FluidPropagator.isOpenEnd(world, pos, side)) {
-            if (previousSource.orElse(null) instanceof OpenEndedPipe) {
+            if (previousSource.orElse(null) instanceof OpenEndedPipe)
                 source = previousSource;
-            } else {
+            else
                 source = Optional.of(new OpenEndedPipe(location));
-            }
             return true;
         }
 
@@ -201,19 +173,16 @@ public class PipeConnection {
         return true;
     }
 
-    public void tickFlowProgress(Level world, BlockPos pos) {
-        if (!hasFlow()) {
+    public void tickFlowProgress(World world, BlockPos pos) {
+        if (!hasFlow())
             return;
-        }
         Flow flow = this.flow.get();
-        if (flow.fluid.isEmpty()) {
+        if (flow.fluid.isEmpty())
             return;
-        }
 
-        if (world.isClientSide()) {
-            if (!source.isPresent()) {
+        if (world.isClient()) {
+            if (!source.isPresent())
                 determineSource(world, pos);
-            }
 
             boolean openEnd = hasOpenEnd();
             int amount = 1;
@@ -224,31 +193,28 @@ public class PipeConnection {
             particleSplashNextTick = false;
         }
 
-        float flowSpeed = 1 / 32f + Mth.clamp(pressure.get(flow.inbound) / 128f, 0, 1) * 31 / 32f;
+        float flowSpeed = 1 / 32f + MathHelper.clamp(pressure.get(flow.inbound) / 128f, 0, 1) * 31 / 32f;
         flow.progress.setValue(Math.min(flow.progress.getValue() + flowSpeed, 1));
-        if (flow.progress.getValue() >= 1) {
+        if (flow.progress.getValue() >= 1)
             flow.complete = true;
-        }
     }
 
-    public void write(ValueOutput view, BlockPos blockEntityPos, boolean clientPacket) {
+    public void write(WriteView view, BlockPos blockEntityPos, boolean clientPacket) {
         if (hasPressure()) {
-            view.store("Pressure", CreateCodecs.FLOAT_LIST_CODEC, List.of(getInboundPressure(), getOutwardPressure()));
+            view.put("Pressure", CreateCodecs.FLOAT_LIST_CODEC, List.of(getInboundPressure(), getOutwardPressure()));
         }
 
-        if (source.orElse(null) instanceof OpenEndedPipe openEndedPipe) {
-            view.store("OpenEnd", OpenEndedPipe.codec(blockEntityPos), openEndedPipe);
-        }
+        if (source.orElse(null) instanceof OpenEndedPipe openEndedPipe)
+            view.put("OpenEnd", OpenEndedPipe.codec(blockEntityPos), openEndedPipe);
 
         flow.ifPresent(flow -> {
-            ValueOutput flowData = view.child("Flow");
+            WriteView flowData = view.get("Flow");
             if (!flow.fluid.isEmpty()) {
-                flowData.store("Fluid", FluidStack.CODEC, flow.fluid);
+                flowData.put("Fluid", FluidStack.CODEC, flow.fluid);
             }
             flowData.putBoolean("In", flow.inbound);
-            if (!flow.complete) {
-                flow.progress.write(flowData.child("Progress"));
-            }
+            if (!flow.complete)
+                flow.progress.write(flowData.get("Progress"));
         });
 
     }
@@ -257,7 +223,7 @@ public class PipeConnection {
         return source.orElse(null) instanceof OpenEndedPipe;
     }
 
-    public void read(ValueInput view, BlockPos blockEntityPos, boolean clientPacket) {
+    public void read(ReadView view, BlockPos blockEntityPos, boolean clientPacket) {
         view.read("Pressure", CreateCodecs.FLOAT_LIST_CODEC).ifPresentOrElse(
             list -> {
                 pressure = Couple.create(list.getFirst(), list.getLast());
@@ -266,31 +232,29 @@ public class PipeConnection {
 
         source = Optional.ofNullable(view.read("OpenEnd", OpenEndedPipe.codec(blockEntityPos)).orElse(null));
 
-        view.child("Flow").ifPresentOrElse(
+        view.getOptionalReadView("Flow").ifPresentOrElse(
             flowData -> {
-                boolean inbound = flowData.getBooleanOr("In", false);
+                boolean inbound = flowData.getBoolean("In", false);
                 FluidStack fluid = flowData.read("Fluid", FluidStack.CODEC).orElse(FluidStack.EMPTY);
                 Flow flow;
                 if (this.flow.isEmpty()) {
                     flow = new Flow(inbound, fluid);
                     this.flow = Optional.of(flow);
-                    if (clientPacket) {
+                    if (clientPacket)
                         particleSplashNextTick = true;
-                    }
                 } else {
                     flow = this.flow.get();
                     flow.fluid = fluid;
                     flow.inbound = inbound;
                 }
-                flowData.child("Progress").ifPresentOrElse(
+                flowData.getOptionalReadView("Progress").ifPresentOrElse(
                     progress -> {
                         flow.complete = false;
                         flow.progress.read(progress, clientPacket);
                     }, () -> {
                         flow.complete = true;
-                        if (flow.progress.getValue() == 0) {
+                        if (flow.progress.getValue() == 0)
                             flow.progress.startWithValue(1);
-                        }
                         flow.progress.setValue(1);
                     }
                 );
@@ -309,21 +273,18 @@ public class PipeConnection {
 
     public void wipePressure() {
         this.pressure.replace(f -> 0f);
-        if (this.source.isPresent()) {
+        if (this.source.isPresent())
             this.previousSource = this.source;
-        }
         this.source = Optional.empty();
         resetNetwork();
     }
 
     public FluidStack provideOutboundFlow() {
-        if (!hasFlow()) {
+        if (!hasFlow())
             return FluidStack.EMPTY;
-        }
         Flow flow = this.flow.get();
-        if (!flow.complete || flow.inbound) {
+        if (!flow.complete || flow.inbound)
             return FluidStack.EMPTY;
-        }
         return flow.fluid;
     }
 

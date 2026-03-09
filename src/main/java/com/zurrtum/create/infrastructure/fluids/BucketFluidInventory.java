@@ -1,11 +1,11 @@
 package com.zurrtum.create.infrastructure.fluids;
 
 import com.zurrtum.create.AllFluids;
-import net.minecraft.world.item.BucketItem;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
-import net.minecraft.world.level.material.Fluid;
+import net.minecraft.fluid.Fluid;
+import net.minecraft.item.BucketItem;
+import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
+import net.minecraft.item.Items;
 
 public class BucketFluidInventory extends FluidItemInventoryWrapper {
     public static final int CAPACITY = 81000;
@@ -17,16 +17,16 @@ public class BucketFluidInventory extends FluidItemInventoryWrapper {
 
     public ItemStack toFillBucket(FluidStack stack) {
         if (stack.isOf(AllFluids.MILK)) {
-            return Items.MILK_BUCKET.getDefaultInstance();
+            return Items.MILK_BUCKET.getDefaultStack();
         }
-        return stack.getFluid().getBucket().getDefaultInstance();
+        return stack.getFluid().getBucketItem().getDefaultStack();
     }
 
     public Fluid toFluid() {
-        if (stack.is(Items.MILK_BUCKET)) {
+        if (stack.isOf(Items.MILK_BUCKET)) {
             return AllFluids.MILK;
         }
-        return ((BucketItem) this.stack.getItem()).content;
+        return ((BucketItem) this.stack.getItem()).fluid;
     }
 
     @Override
@@ -108,7 +108,7 @@ public class BucketFluidInventory extends FluidItemInventoryWrapper {
         if (!canExtract() || maxAmount != CAPACITY || stack.getFluid() != toFluid()) {
             return 0;
         }
-        this.stack = Items.BUCKET.getDefaultInstance();
+        this.stack = Items.BUCKET.getDefaultStack();
         return CAPACITY;
     }
 
@@ -118,7 +118,7 @@ public class BucketFluidInventory extends FluidItemInventoryWrapper {
             return FluidStack.EMPTY;
         }
         FluidStack fluid = new FluidStack(toFluid(), CAPACITY);
-        stack = Items.BUCKET.getDefaultInstance();
+        stack = Items.BUCKET.getDefaultStack();
         return fluid;
     }
 
@@ -141,7 +141,7 @@ public class BucketFluidInventory extends FluidItemInventoryWrapper {
         if (stack.getAmount() >= CAPACITY) {
             this.stack = toFillBucket(stack);
         } else {
-            this.stack = Items.BUCKET.getDefaultInstance();
+            this.stack = Items.BUCKET.getDefaultStack();
         }
     }
 
@@ -151,7 +151,7 @@ public class BucketFluidInventory extends FluidItemInventoryWrapper {
         if (item == Items.BUCKET || item == Items.AIR) {
             return FluidStack.EMPTY;
         }
-        stack = Items.BUCKET.getDefaultInstance();
+        stack = Items.BUCKET.getDefaultStack();
         return new FluidStack(toFluid(), CAPACITY);
     }
 

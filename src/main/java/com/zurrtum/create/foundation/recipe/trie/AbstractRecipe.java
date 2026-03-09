@@ -1,6 +1,6 @@
 package com.zurrtum.create.foundation.recipe.trie;
 
-import net.minecraft.world.item.crafting.Recipe;
+import net.minecraft.recipe.Recipe;
 
 import java.util.Set;
 

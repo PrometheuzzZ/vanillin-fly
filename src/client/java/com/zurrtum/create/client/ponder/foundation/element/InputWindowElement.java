@@ -11,24 +11,24 @@ import com.zurrtum.create.client.ponder.enums.PonderGuiTextures;
 import com.zurrtum.create.client.ponder.foundation.PonderIndex;
 import com.zurrtum.create.client.ponder.foundation.PonderScene;
 import com.zurrtum.create.client.ponder.foundation.ui.PonderUI;
-import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.resources.Identifier;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.phys.Vec2;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.client.font.TextRenderer;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.item.ItemStack;
+import net.minecraft.util.Identifier;
+import net.minecraft.util.math.Vec2f;
+import net.minecraft.util.math.Vec3d;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix3x2fStack;
 
 public class InputWindowElement extends AnimatedOverlayElementBase {
 
-    private final Vec3 sceneSpace;
+    private final Vec3d sceneSpace;
     private final Pointing direction;
     @Nullable Identifier key;
     @Nullable ScreenElement icon;
     @Nullable GuiItemRenderBuilder item;
 
-    public InputWindowElement(Vec3 sceneSpace, Pointing direction) {
+    public InputWindowElement(Vec3d sceneSpace, Pointing direction) {
         this.sceneSpace = sceneSpace;
         this.direction = direction;
     }
@@ -84,8 +84,8 @@ public class InputWindowElement extends AnimatedOverlayElementBase {
     }
 
     @Override
-    public void render(PonderScene scene, PonderUI screen, GuiGraphics graphics, float partialTicks, float fade) {
-        Font font = screen.getFontRenderer();
+    public void render(PonderScene scene, PonderUI screen, DrawContext graphics, float partialTicks, float fade) {
+        TextRenderer font = screen.getFontRenderer();
         int width = 0;
         int height = 0;
 
@@ -99,10 +99,9 @@ public class InputWindowElement extends AnimatedOverlayElementBase {
         int keyWidth = 0;
         String text = hasText ? PonderIndex.getLangAccess().getShared(key) : "";
 
-        if (fade < 1 / 16f) {
+        if (fade < 1 / 16f)
             return;
-        }
-        Vec2 sceneToScreen = scene.getTransform().sceneToScreen(sceneSpace, partialTicks);
+        Vec2f sceneToScreen = scene.getTransform().sceneToScreen(sceneSpace, partialTicks);
 
         if (hasIcon) {
             width += 24;
@@ -110,7 +109,7 @@ public class InputWindowElement extends AnimatedOverlayElementBase {
         }
 
         if (hasText) {
-            keyWidth = font.width(text);
+            keyWidth = font.getWidth(text);
             width += keyWidth;
         }
 
@@ -119,22 +118,21 @@ public class InputWindowElement extends AnimatedOverlayElementBase {
             height = 24;
         }
 
-        Matrix3x2fStack poseStack = graphics.pose();
+        Matrix3x2fStack poseStack = graphics.getMatrices();
         poseStack.pushMatrix();
         poseStack.translate(sceneToScreen.x + xFade, sceneToScreen.y + yFade);
 
         PonderUI.renderSpeechBox(graphics, 0, 0, width, height, false, direction, true);
 
-        if (hasText) {
-            graphics.drawString(
+        if (hasText)
+            graphics.drawText(
                 font,
                 text,
                 2,
-                (int) ((height - font.lineHeight) / 2f + 2),
+                (int) ((height - font.fontHeight) / 2f + 2),
                 PonderPalette.WHITE.getColorObject().scaleAlpha(fade).getRGB(),
                 false
             );
-        }
 
         if (hasIcon) {
             poseStack.pushMatrix();
@@ -156,21 +154,6 @@ public class InputWindowElement extends AnimatedOverlayElementBase {
         super.setVisible(visible);
         if (item != null && !visible) {
             item.clear();
-        }
-    }
-
-    @Override
-    public void setFade(float fade) {
-        super.setFade(fade);
-        if (item != null && fade == 0) {
-            item.clear();
-        }
-    }
-
-    @Override
-    public void clear() {
-        if (visible) {
-            setVisible(false);
         }
     }
 }

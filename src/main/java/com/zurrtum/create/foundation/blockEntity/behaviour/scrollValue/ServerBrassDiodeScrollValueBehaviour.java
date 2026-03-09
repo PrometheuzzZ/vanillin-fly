@@ -3,11 +3,11 @@ package com.zurrtum.create.foundation.blockEntity.behaviour.scrollValue;
 import com.zurrtum.create.content.redstone.diodes.BrassDiodeBlock;
 import com.zurrtum.create.foundation.blockEntity.SmartBlockEntity;
 import com.zurrtum.create.foundation.blockEntity.behaviour.ValueSettings;
-import net.minecraft.core.Direction;
-import net.minecraft.world.InteractionHand;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.block.BlockState;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.util.Hand;
+import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.util.math.Direction;
 
 public class ServerBrassDiodeScrollValueBehaviour extends ServerScrollValueBehaviour {
     private static final int TICK = 20;
@@ -19,27 +19,24 @@ public class ServerBrassDiodeScrollValueBehaviour extends ServerScrollValueBehav
     }
 
     @Override
-    public void onShortInteract(Player player, InteractionHand hand, Direction side, BlockHitResult hitResult) {
-        if (getLevel().isClientSide()) {
+    public void onShortInteract(PlayerEntity player, Hand hand, Direction side, BlockHitResult hitResult) {
+        if (getWorld().isClient())
             return;
-        }
-        BlockState blockState = blockEntity.getBlockState();
-        if (blockState.getBlock() instanceof BrassDiodeBlock bdb) {
-            bdb.toggle(getLevel(), getPos(), blockState, player, hand);
-        }
+        BlockState blockState = blockEntity.getCachedState();
+        if (blockState.getBlock() instanceof BrassDiodeBlock bdb)
+            bdb.toggle(getWorld(), getPos(), blockState, player, hand);
     }
 
     @Override
-    public void setValueSettings(Player player, ValueSettings valueSetting, boolean ctrlHeld) {
+    public void setValueSettings(PlayerEntity player, ValueSettings valueSetting, boolean ctrlHeld) {
         int value = valueSetting.value();
         int multiplier = switch (valueSetting.row()) {
             case 0 -> 1;
             case 1 -> 20;
             default -> 60 * 20;
         };
-        if (!valueSetting.equals(getValueSettings())) {
+        if (!valueSetting.equals(getValueSettings()))
             playFeedbackSound(this);
-        }
         setValue(Math.max(2, Math.max(1, value) * multiplier));
     }
 

@@ -9,10 +9,10 @@ import me.shedaniel.rei.api.common.display.Display;
 import me.shedaniel.rei.api.common.display.DisplaySerializer;
 import me.shedaniel.rei.api.common.entry.EntryIngredient;
 import me.shedaniel.rei.api.common.util.EntryIngredients;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.resources.Identifier;
-import net.minecraft.world.item.crafting.RecipeHolder;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.recipe.RecipeEntry;
+import net.minecraft.util.Identifier;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -25,19 +25,19 @@ public record MillingDisplay(EntryIngredient input, List<ProcessingOutput> outpu
             EntryIngredient.codec().fieldOf("input").forGetter(MillingDisplay::input),
             ProcessingOutput.CODEC.listOf().fieldOf("outputs").forGetter(MillingDisplay::outputs),
             Identifier.CODEC.optionalFieldOf("location").forGetter(MillingDisplay::location)
-        ).apply(instance, MillingDisplay::new)), StreamCodec.composite(
+        ).apply(instance, MillingDisplay::new)), PacketCodec.tuple(
             EntryIngredient.streamCodec(),
             MillingDisplay::input,
-            ProcessingOutput.STREAM_CODEC.apply(ByteBufCodecs.list()),
+            ProcessingOutput.STREAM_CODEC.collect(PacketCodecs.toList()),
             MillingDisplay::outputs,
-            ByteBufCodecs.optional(Identifier.STREAM_CODEC),
+            PacketCodecs.optional(Identifier.PACKET_CODEC),
             MillingDisplay::location,
             MillingDisplay::new
         )
     );
 
-    public MillingDisplay(RecipeHolder<MillingRecipe> entry) {
-        this(entry.id().identifier(), entry.value());
+    public MillingDisplay(RecipeEntry<MillingRecipe> entry) {
+        this(entry.id().getValue(), entry.value());
     }
 
     public MillingDisplay(Identifier id, MillingRecipe recipe) {

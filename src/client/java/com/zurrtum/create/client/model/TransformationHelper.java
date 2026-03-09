@@ -6,9 +6,9 @@
 package com.zurrtum.create.client.model;
 
 import com.google.gson.*;
-import com.mojang.math.Axis;
-import com.mojang.math.Transformation;
-import net.minecraft.util.StringRepresentable;
+import net.minecraft.util.StringIdentifiable;
+import net.minecraft.util.math.AffineTransformation;
+import net.minecraft.util.math.RotationAxis;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
@@ -33,31 +33,26 @@ public class TransformationHelper {
         return new Quaternionf(values[0], values[1], values[2], values[3]);
     }
 
-    public static class Deserializer implements JsonDeserializer<Transformation> {
-        public Transformation deserialize(
-            JsonElement json,
-            Type typeOfT,
-            JsonDeserializationContext context
-        ) throws JsonParseException {
+    public static class Deserializer implements JsonDeserializer<AffineTransformation> {
+        public AffineTransformation deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context) throws JsonParseException {
             if (json.isJsonPrimitive() && json.getAsJsonPrimitive().isString()) {
                 String transform = json.getAsString();
                 if (transform.equals("identity")) {
-                    return Transformation.identity();
+                    return AffineTransformation.identity();
                 } else {
                     throw new JsonParseException("TRSR: unknown default string: " + transform);
                 }
             }
             if (json.isJsonArray()) {
                 // direct matrix array
-                return new Transformation(parseMatrix(json));
+                return new AffineTransformation(parseMatrix(json));
             }
-            if (!json.isJsonObject()) {
+            if (!json.isJsonObject())
                 throw new JsonParseException("TRSR: expected array or object, got: " + json);
-            }
             JsonObject obj = json.getAsJsonObject();
             if (obj.has("matrix")) {
                 // matrix as a sole key
-                Transformation ret = new Transformation(parseMatrix(obj.get("matrix")));
+                AffineTransformation ret = new AffineTransformation(parseMatrix(obj.get("matrix")));
                 if (obj.entrySet().size() > 1) {
                     throw new JsonParseException("TRSR: can't combine matrix and other keys");
                 }
@@ -106,25 +101,23 @@ public class TransformationHelper {
                 origin = parseOrigin(obj);
                 elements.remove("origin");
             }
-            if (!elements.isEmpty()) {
+            if (!elements.isEmpty())
                 throw new JsonParseException(
                     "TRSR: can either have single 'matrix' key, or a combination of 'translation', 'rotation' OR 'left_rotation', 'scale', 'post-rotation' (legacy) OR 'right_rotation', 'origin'. Found: " + String.join(
                         ", ",
                         elements
                     ));
-            }
 
-            Transformation matrix = new Transformation(translation, leftRot, scale, rightRot);
-            if (matrix.equals(Transformation.identity())) {
-                return Transformation.identity();
-            }
+            AffineTransformation matrix = new AffineTransformation(translation, leftRot, scale, rightRot);
+            if (matrix.equals(AffineTransformation.identity()))
+                return AffineTransformation.identity();
 
             Matrix4f ret = new Matrix4f(matrix.getMatrix());
             Matrix4f tmp = new Matrix4f().translation(origin.x(), origin.y(), origin.z());
             tmp.mul(ret, ret);
             tmp.translation(-origin.x(), -origin.y(), -origin.z());
             ret.mul(tmp);
-            return new Transformation(ret);
+            return new AffineTransformation(ret);
         }
 
         private static Vector3f parseOrigin(JsonObject obj) {
@@ -148,22 +141,18 @@ public class TransformationHelper {
         }
 
         public static Matrix4f parseMatrix(JsonElement e) {
-            if (!e.isJsonArray()) {
+            if (!e.isJsonArray())
                 throw new JsonParseException("Matrix: expected an array, got: " + e);
-            }
             JsonArray m = e.getAsJsonArray();
-            if (m.size() != 3) {
+            if (m.size() != 3)
                 throw new JsonParseException("Matrix: expected an array of length 3, got: " + m.size());
-            }
             Matrix4f matrix = new Matrix4f();
             for (int rowIdx = 0; rowIdx < 3; rowIdx++) {
-                if (!m.get(rowIdx).isJsonArray()) {
+                if (!m.get(rowIdx).isJsonArray())
                     throw new JsonParseException("Matrix row: expected an array, got: " + m.get(rowIdx));
-                }
                 JsonArray r = m.get(rowIdx).getAsJsonArray();
-                if (r.size() != 4) {
+                if (r.size() != 4)
                     throw new JsonParseException("Matrix row: expected an array of length 4, got: " + r.size());
-                }
                 for (int columnIdx = 0; columnIdx < 4; columnIdx++) {
                     try {
                         matrix.set(columnIdx, rowIdx, r.get(columnIdx).getAsNumber().floatValue());
@@ -178,13 +167,11 @@ public class TransformationHelper {
         }
 
         public static float[] parseFloatArray(JsonElement e, int length, String prefix) {
-            if (!e.isJsonArray()) {
+            if (!e.isJsonArray())
                 throw new JsonParseException(prefix + ": expected an array, got: " + e);
-            }
             JsonArray t = e.getAsJsonArray();
-            if (t.size() != length) {
+            if (t.size() != length)
                 throw new JsonParseException(prefix + ": expected an array of length " + length + ", got: " + t.size());
-            }
             float[] ret = new float[length];
             for (int i = 0; i < length; i++) {
                 try {
@@ -197,25 +184,22 @@ public class TransformationHelper {
         }
 
         public static Quaternionf parseAxisRotation(JsonElement e) {
-            if (!e.isJsonObject()) {
+            if (!e.isJsonObject())
                 throw new JsonParseException("Axis rotation: object expected, got: " + e);
-            }
             JsonObject obj = e.getAsJsonObject();
-            if (obj.entrySet().size() != 1) {
+            if (obj.entrySet().size() != 1)
                 throw new JsonParseException("Axis rotation: expected single axis object, got: " + e);
-            }
             Map.Entry<String, JsonElement> entry = obj.entrySet().iterator().next();
             Quaternionf ret;
             try {
                 if (entry.getKey().equals("x")) {
-                    ret = Axis.XP.rotationDegrees(entry.getValue().getAsNumber().floatValue());
+                    ret = RotationAxis.POSITIVE_X.rotationDegrees(entry.getValue().getAsNumber().floatValue());
                 } else if (entry.getKey().equals("y")) {
-                    ret = Axis.YP.rotationDegrees(entry.getValue().getAsNumber().floatValue());
+                    ret = RotationAxis.POSITIVE_Y.rotationDegrees(entry.getValue().getAsNumber().floatValue());
                 } else if (entry.getKey().equals("z")) {
-                    ret = Axis.ZP.rotationDegrees(entry.getValue().getAsNumber().floatValue());
-                } else {
+                    ret = RotationAxis.POSITIVE_Z.rotationDegrees(entry.getValue().getAsNumber().floatValue());
+                } else
                     throw new JsonParseException("Axis rotation: expected single axis key, got: " + entry.getKey());
-                }
             } catch (ClassCastException ex) {
                 throw new JsonParseException("Axis rotation value: expected number, got: " + entry.getValue());
             }
@@ -233,31 +217,22 @@ public class TransformationHelper {
                 } else if (e.isJsonArray()) {
                     JsonArray array = e.getAsJsonArray();
                     if (array.size() == 3) //Vanilla rotation
-                    {
                         return quatFromXYZ(parseFloatArray(e, 3, "Rotation"), true);
-                    } else // quaternion
-                    {
+                    else // quaternion
                         return makeQuaternion(parseFloatArray(e, 4, "Rotation"));
-                    }
-                } else {
+                } else
                     throw new JsonParseException("Rotation: expected array or object, got: " + e);
-                }
             } else if (e.isJsonObject()) {
                 return parseAxisRotation(e);
-            } else {
+            } else
                 throw new JsonParseException("Rotation: expected array or object, got: " + e);
-            }
         }
     }
 
-    public enum TransformOrigin implements StringRepresentable {
-        CENTER(new Vector3f(.5f, .5f, .5f), "center"), CORNER(new Vector3f(), "corner"), OPPOSING_CORNER(
-            new Vector3f(
-                1,
-            1,
-            1
-        ), "opposing-corner"
-        );
+    public enum TransformOrigin implements StringIdentifiable {
+        CENTER(new Vector3f(.5f, .5f, .5f), "center"),
+        CORNER(new Vector3f(), "corner"),
+        OPPOSING_CORNER(new Vector3f(1, 1, 1), "opposing-corner");
 
         private final Vector3f vec;
         private final String name;
@@ -272,18 +247,18 @@ public class TransformationHelper {
         }
 
         @Override
-        public String getSerializedName() {
+        public String asString() {
             return name;
         }
 
         public static @Nullable TransformOrigin fromString(String originName) {
-            if (CENTER.getSerializedName().equals(originName)) {
+            if (CENTER.asString().equals(originName)) {
                 return CENTER;
             }
-            if (CORNER.getSerializedName().equals(originName)) {
+            if (CORNER.asString().equals(originName)) {
                 return CORNER;
             }
-            if (OPPOSING_CORNER.getSerializedName().equals(originName)) {
+            if (OPPOSING_CORNER.asString().equals(originName)) {
                 return OPPOSING_CORNER;
             }
             return null;

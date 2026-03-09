@@ -7,61 +7,59 @@ import com.zurrtum.create.catnip.data.Iterate;
 import com.zurrtum.create.content.equipment.wrench.IWrenchable;
 import com.zurrtum.create.foundation.block.IBE;
 import com.zurrtum.create.foundation.block.ProperWaterloggedBlock;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.util.RandomSource;
-import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.context.BlockPlaceContext;
-import net.minecraft.world.level.BlockGetter;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.LevelReader;
-import net.minecraft.world.level.ScheduledTickAccess;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.FaceAttachedHorizontalDirectionalBlock;
-import net.minecraft.world.level.block.entity.BlockEntityType;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.StateDefinition.Builder;
-import net.minecraft.world.level.block.state.properties.AttachFace;
-import net.minecraft.world.level.block.state.properties.BlockStateProperties;
-import net.minecraft.world.level.block.state.properties.BooleanProperty;
-import net.minecraft.world.level.material.FluidState;
-import net.minecraft.world.level.pathfinder.PathComputationType;
-import net.minecraft.world.level.redstone.Orientation;
-import net.minecraft.world.phys.shapes.CollisionContext;
-import net.minecraft.world.phys.shapes.VoxelShape;
+import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.ShapeContext;
+import net.minecraft.block.WallMountedBlock;
+import net.minecraft.block.entity.BlockEntityType;
+import net.minecraft.block.enums.BlockFace;
+import net.minecraft.entity.LivingEntity;
+import net.minecraft.entity.ai.pathing.NavigationType;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.fluid.FluidState;
+import net.minecraft.item.ItemPlacementContext;
+import net.minecraft.item.ItemStack;
+import net.minecraft.state.StateManager.Builder;
+import net.minecraft.state.property.BooleanProperty;
+import net.minecraft.state.property.Properties;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.random.Random;
+import net.minecraft.util.shape.VoxelShape;
+import net.minecraft.world.BlockView;
+import net.minecraft.world.World;
+import net.minecraft.world.WorldView;
+import net.minecraft.world.block.WireOrientation;
+import net.minecraft.world.tick.ScheduledTickView;
 import org.jetbrains.annotations.Nullable;
 
-public class PackagerLinkBlock extends FaceAttachedHorizontalDirectionalBlock implements IBE<PackagerLinkBlockEntity>, ProperWaterloggedBlock, IWrenchable {
-    public static final MapCodec<PackagerLinkBlock> CODEC = simpleCodec(PackagerLinkBlock::new);
+public class PackagerLinkBlock extends WallMountedBlock implements IBE<PackagerLinkBlockEntity>, ProperWaterloggedBlock, IWrenchable {
+    public static final MapCodec<PackagerLinkBlock> CODEC = createCodec(PackagerLinkBlock::new);
 
-    public static final BooleanProperty POWERED = BlockStateProperties.POWERED;
+    public static final BooleanProperty POWERED = Properties.POWERED;
 
-    public PackagerLinkBlock(Properties properties) {
+    public PackagerLinkBlock(Settings properties) {
         super(properties);
-        registerDefaultState(defaultBlockState().setValue(POWERED, false).setValue(WATERLOGGED, false));
+        setDefaultState(getDefaultState().with(POWERED, false).with(WATERLOGGED, false));
     }
 
     @Override
-    public BlockState getStateForPlacement(BlockPlaceContext context) {
-        BlockPos pos = context.getClickedPos();
-        BlockState placed = super.getStateForPlacement(context);
-        if (placed == null) {
+    public BlockState getPlacementState(ItemPlacementContext context) {
+        BlockPos pos = context.getBlockPos();
+        BlockState placed = super.getPlacementState(context);
+        if (placed == null)
             return null;
-        }
-        if (placed.getValue(FACE) == AttachFace.CEILING) {
-            placed = placed.setValue(FACING, placed.getValue(FACING).getOpposite());
-        }
-        return withWater(placed.setValue(POWERED, getPower(placed, context.getLevel(), pos) > 0), context);
+        if (placed.get(FACE) == BlockFace.CEILING)
+            placed = placed.with(FACING, placed.get(FACING).getOpposite());
+        return withWater(placed.with(POWERED, getPower(placed, context.getWorld(), pos) > 0), context);
     }
 
     public static Direction getConnectedDirection(BlockState state) {
-        return FaceAttachedHorizontalDirectionalBlock.getConnectedDirection(state);
+        return WallMountedBlock.getDirection(state);
     }
 
     @Override
-    public boolean canSurvive(BlockState pState, LevelReader pLevel, BlockPos pPos) {
+    public boolean canPlaceAt(BlockState pState, WorldView pLevel, BlockPos pPos) {
         return true;
     }
 
@@ -71,59 +69,55 @@ public class PackagerLinkBlock extends FaceAttachedHorizontalDirectionalBlock im
     }
 
     @Override
-    public BlockState updateShape(
+    public BlockState getStateForNeighborUpdate(
         BlockState pState,
-        LevelReader pLevel,
-        ScheduledTickAccess tickView,
+        WorldView pLevel,
+        ScheduledTickView tickView,
         BlockPos pPos,
         Direction pDirection,
         BlockPos pNeighborPos,
         BlockState pNeighborState,
-        RandomSource random
+        Random random
     ) {
         updateWater(pLevel, tickView, pState, pPos);
         return pState;
     }
 
     @Override
-    public void neighborChanged(
+    public void neighborUpdate(
         BlockState state,
-        Level worldIn,
+        World worldIn,
         BlockPos pos,
         Block blockIn,
-        @Nullable Orientation wireOrientation,
+        @Nullable WireOrientation wireOrientation,
         boolean isMoving
     ) {
-        if (worldIn.isClientSide()) {
+        if (worldIn.isClient())
             return;
-        }
 
         int power = getPower(state, worldIn, pos);
         boolean powered = power > 0;
-        boolean previouslyPowered = state.getValue(POWERED);
-        if (previouslyPowered != powered) {
-            worldIn.setBlock(pos, state.cycle(POWERED), Block.UPDATE_CLIENTS);
-        }
+        boolean previouslyPowered = state.get(POWERED);
+        if (previouslyPowered != powered)
+            worldIn.setBlockState(pos, state.cycle(POWERED), Block.NOTIFY_LISTENERS);
         withBlockEntityDo(worldIn, pos, link -> link.behaviour.redstonePowerChanged(power));
     }
 
-    public static int getPower(BlockState state, Level worldIn, BlockPos pos) {
+    public static int getPower(BlockState state, World worldIn, BlockPos pos) {
         int power = 0;
-        for (Direction d : Iterate.directions) {
-            if (d.getOpposite() != getConnectedDirection(state)) {
-                power = Math.max(power, worldIn.getSignal(pos.relative(d), d));
-            }
-        }
+        for (Direction d : Iterate.directions)
+            if (d.getOpposite() != getConnectedDirection(state))
+                power = Math.max(power, worldIn.getEmittedRedstonePower(pos.offset(d), d));
         return power;
     }
 
     @Override
-    public void setPlacedBy(Level pLevel, BlockPos pPos, BlockState pState, LivingEntity pPlacer, ItemStack pStack) {
-        super.setPlacedBy(pLevel, pPos, pState, pPlacer, pStack);
+    public void onPlaced(World pLevel, BlockPos pPos, BlockState pState, LivingEntity pPlacer, ItemStack pStack) {
+        super.onPlaced(pLevel, pPos, pState, pPlacer, pStack);
         withBlockEntityDo(
             pLevel, pPos, plbe -> {
-                if (pPlacer instanceof Player player) {
-                    plbe.placedBy = player.getUUID();
+                if (pPlacer instanceof PlayerEntity player) {
+                    plbe.placedBy = player.getUuid();
                     plbe.notifyUpdate();
                 }
             }
@@ -131,17 +125,17 @@ public class PackagerLinkBlock extends FaceAttachedHorizontalDirectionalBlock im
     }
 
     @Override
-    public VoxelShape getShape(BlockState pState, BlockGetter pLevel, BlockPos pPos, CollisionContext pContext) {
+    public VoxelShape getOutlineShape(BlockState pState, BlockView pLevel, BlockPos pPos, ShapeContext pContext) {
         return AllShapes.STOCK_LINK.get(getConnectedDirection(pState));
     }
 
     @Override
-    protected void createBlockStateDefinition(Builder<Block, BlockState> builder) {
-        super.createBlockStateDefinition(builder.add(POWERED, WATERLOGGED, FACE, FACING));
+    protected void appendProperties(Builder<Block, BlockState> builder) {
+        super.appendProperties(builder.add(POWERED, WATERLOGGED, FACE, FACING));
     }
 
     @Override
-    protected boolean isPathfindable(BlockState state, PathComputationType pathComputationType) {
+    protected boolean canPathfindThrough(BlockState state, NavigationType pathComputationType) {
         return false;
     }
 
@@ -156,7 +150,7 @@ public class PackagerLinkBlock extends FaceAttachedHorizontalDirectionalBlock im
     }
 
     @Override
-    protected MapCodec<? extends FaceAttachedHorizontalDirectionalBlock> codec() {
+    protected MapCodec<? extends WallMountedBlock> getCodec() {
         return CODEC;
     }
 }

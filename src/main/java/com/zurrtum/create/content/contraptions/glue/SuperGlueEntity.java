@@ -15,204 +15,173 @@ import com.zurrtum.create.content.schematics.requirement.ItemRequirement;
 import com.zurrtum.create.content.schematics.requirement.ItemRequirement.ItemUseType;
 import com.zurrtum.create.foundation.codec.CreateCodecs;
 import com.zurrtum.create.infrastructure.packet.s2c.SuperGlueSpawnPacket;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.core.Direction.Axis;
-import net.minecraft.core.Direction.AxisDirection;
-import net.minecraft.core.particles.ParticleTypes;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.game.ClientGamePacketListener;
-import net.minecraft.network.protocol.game.ClientboundAddEntityPacket;
-import net.minecraft.network.syncher.SynchedEntityData;
-import net.minecraft.server.level.ServerEntity;
-import net.minecraft.server.level.ServerLevel;
-import net.minecraft.util.Mth;
-import net.minecraft.world.InteractionHand;
-import net.minecraft.world.InteractionResult;
-import net.minecraft.world.damagesource.DamageSource;
-import net.minecraft.world.entity.*;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.LevelAccessor;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.DirectionalBlock;
-import net.minecraft.world.level.block.Rotation;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.properties.BooleanProperty;
-import net.minecraft.world.level.material.PushReaction;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
-import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.Blocks;
+import net.minecraft.block.FacingBlock;
+import net.minecraft.block.piston.PistonBehavior;
+import net.minecraft.entity.*;
+import net.minecraft.entity.damage.DamageSource;
+import net.minecraft.entity.data.DataTracker;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.nbt.NbtCompound;
+import net.minecraft.network.listener.ClientPlayPacketListener;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.s2c.play.EntitySpawnS2CPacket;
+import net.minecraft.particle.ParticleTypes;
+import net.minecraft.server.network.EntityTrackerEntry;
+import net.minecraft.server.world.ServerWorld;
+import net.minecraft.state.property.BooleanProperty;
+import net.minecraft.storage.ReadView;
+import net.minecraft.storage.WriteView;
+import net.minecraft.util.ActionResult;
+import net.minecraft.util.BlockRotation;
+import net.minecraft.util.Hand;
+import net.minecraft.util.math.*;
+import net.minecraft.util.math.Direction.Axis;
+import net.minecraft.util.math.Direction.AxisDirection;
+import net.minecraft.world.World;
+import net.minecraft.world.WorldAccess;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
 public class SuperGlueEntity extends Entity implements SpecialEntityItemRequirement {
-    public static AABB span(BlockPos startPos, BlockPos endPos) {
-        return new AABB(Vec3.atLowerCornerOf(startPos), Vec3.atLowerCornerOf(endPos)).expandTowards(1, 1, 1);
+    public static Box span(BlockPos startPos, BlockPos endPos) {
+        return new Box(Vec3d.of(startPos), Vec3d.of(endPos)).stretch(1, 1, 1);
     }
 
-    public static boolean isGlued(
-        LevelAccessor level,
-        BlockPos blockPos,
-        Direction direction,
-        Set<SuperGlueEntity> cached
-    ) {
-        BlockPos targetPos = blockPos.relative(direction);
-        if (cached != null) {
-            for (SuperGlueEntity glueEntity : cached) {
-                if (glueEntity.contains(blockPos) && glueEntity.contains(targetPos)) {
+    public static boolean isGlued(WorldAccess level, BlockPos blockPos, Direction direction, Set<SuperGlueEntity> cached) {
+        BlockPos targetPos = blockPos.offset(direction);
+        if (cached != null)
+            for (SuperGlueEntity glueEntity : cached)
+                if (glueEntity.contains(blockPos) && glueEntity.contains(targetPos))
                     return true;
-                }
-            }
-        }
-        for (SuperGlueEntity glueEntity : level.getEntitiesOfClass(
-            SuperGlueEntity.class,
-            span(blockPos, targetPos).inflate(16)
-        )) {
-            if (!glueEntity.contains(blockPos) || !glueEntity.contains(targetPos)) {
+        for (SuperGlueEntity glueEntity : level.getNonSpectatingEntities(SuperGlueEntity.class, span(blockPos, targetPos).expand(16))) {
+            if (!glueEntity.contains(blockPos) || !glueEntity.contains(targetPos))
                 continue;
-            }
-            if (cached != null) {
+            if (cached != null)
                 cached.add(glueEntity);
-            }
             return true;
         }
         return false;
     }
 
-    public static List<SuperGlueEntity> collectCropped(Level level, AABB bb) {
+    public static List<SuperGlueEntity> collectCropped(World level, Box bb) {
         List<SuperGlueEntity> glue = new ArrayList<>();
-        for (SuperGlueEntity glueEntity : level.getEntitiesOfClass(SuperGlueEntity.class, bb)) {
-            AABB glueBox = glueEntity.getBoundingBox();
-            AABB intersect = bb.intersect(glueBox);
-            if (intersect.getXsize() * intersect.getYsize() * intersect.getZsize() == 0) {
+        for (SuperGlueEntity glueEntity : level.getNonSpectatingEntities(SuperGlueEntity.class, bb)) {
+            Box glueBox = glueEntity.getBoundingBox();
+            Box intersect = bb.intersection(glueBox);
+            if (intersect.getLengthX() * intersect.getLengthY() * intersect.getLengthZ() == 0)
                 continue;
-            }
-            if (Mth.equal(intersect.getSize(), 1)) {
+            if (MathHelper.approximatelyEquals(intersect.getAverageSideLength(), 1))
                 continue;
-            }
             glue.add(new SuperGlueEntity(level, intersect));
         }
         return glue;
     }
 
-    public SuperGlueEntity(EntityType<? extends SuperGlueEntity> type, Level world) {
+    public SuperGlueEntity(EntityType<? extends SuperGlueEntity> type, World world) {
         super(type, world);
     }
 
-    public SuperGlueEntity(Level world, AABB boundingBox) {
+    public SuperGlueEntity(World world, Box boundingBox) {
         this(AllEntityTypes.SUPER_GLUE, world);
         setBoundingBox(boundingBox);
         resetPositionToBB();
     }
 
     public void resetPositionToBB() {
-        AABB bb = getBoundingBox();
-        setPosRaw(bb.getCenter().x, bb.minY, bb.getCenter().z);
+        Box bb = getBoundingBox();
+        setPos(bb.getCenter().x, bb.minY, bb.getCenter().z);
     }
 
     @Override
-    protected void defineSynchedData(SynchedEntityData.Builder builder) {
+    protected void initDataTracker(DataTracker.Builder builder) {
     }
 
-    public static boolean isValidFace(Level world, BlockPos pos, Direction direction) {
+    public static boolean isValidFace(World world, BlockPos pos, Direction direction) {
         BlockState state = world.getBlockState(pos);
-        if (BlockMovementChecks.isBlockAttachedTowards(state, world, pos, direction)) {
+        if (BlockMovementChecks.isBlockAttachedTowards(state, world, pos, direction))
             return true;
-        }
-        if (!BlockMovementChecks.isMovementNecessary(state, world, pos)) {
+        if (!BlockMovementChecks.isMovementNecessary(state, world, pos))
             return false;
-        }
         return !BlockMovementChecks.isNotSupportive(state, direction);
     }
 
-    public static boolean isSideSticky(Level world, BlockPos pos, Direction direction) {
+    public static boolean isSideSticky(World world, BlockPos pos, Direction direction) {
         BlockState state = world.getBlockState(pos);
-        if (state.is(AllBlocks.STICKY_MECHANICAL_PISTON)) {
-            return state.getValue(DirectionalKineticBlock.FACING) == direction;
-        }
+        if (state.isOf(AllBlocks.STICKY_MECHANICAL_PISTON))
+            return state.get(DirectionalKineticBlock.FACING) == direction;
 
-        if (state.is(AllBlocks.STICKER)) {
-            return state.getValue(DirectionalBlock.FACING) == direction;
-        }
+        if (state.isOf(AllBlocks.STICKER))
+            return state.get(FacingBlock.FACING) == direction;
 
-        if (state.getBlock() == Blocks.SLIME_BLOCK) {
+        if (state.getBlock() == Blocks.SLIME_BLOCK)
             return true;
-        }
-        if (state.getBlock() == Blocks.HONEY_BLOCK) {
+        if (state.getBlock() == Blocks.HONEY_BLOCK)
             return true;
-        }
 
-        if (state.is(AllBlocks.CART_ASSEMBLER)) {
+        if (state.isOf(AllBlocks.CART_ASSEMBLER))
             return Direction.UP == direction;
-        }
 
-        if (state.is(AllBlocks.GANTRY_CARRIAGE)) {
-            return state.getValue(DirectionalKineticBlock.FACING) == direction;
-        }
+        if (state.isOf(AllBlocks.GANTRY_CARRIAGE))
+            return state.get(DirectionalKineticBlock.FACING) == direction;
 
         if (state.getBlock() instanceof BearingBlock) {
-            return state.getValue(DirectionalKineticBlock.FACING) == direction;
+            return state.get(DirectionalKineticBlock.FACING) == direction;
         }
 
         if (state.getBlock() instanceof AbstractChassisBlock) {
             BooleanProperty glueableSide = ((AbstractChassisBlock) state.getBlock()).getGlueableSide(state, direction);
-            if (glueableSide == null) {
+            if (glueableSide == null)
                 return false;
-            }
-            return state.getValue(glueableSide);
+            return state.get(glueableSide);
         }
 
         return false;
     }
 
     @Override
-    public boolean hurtServer(ServerLevel world, DamageSource source, float amount) {
+    public boolean damage(ServerWorld world, DamageSource source, float amount) {
         return false;
     }
 
     @Override
     public void tick() {
-        xRotO = getXRot();
-        yRotO = getYRot();
+        lastPitch = getPitch();
+        lastYaw = getYaw();
         //        walkDistO = walkDist;
-        xo = getX();
-        yo = getY();
-        zo = getZ();
+        lastX = getX();
+        lastY = getY();
+        lastZ = getZ();
 
-        if (getBoundingBox().getXsize() == 0) {
+        if (getBoundingBox().getLengthX() == 0)
             discard();
-        }
     }
 
     @Override
-    public void setPos(double x, double y, double z) {
-        AABB bb = getBoundingBox();
-        setPosRaw(x, y, z);
-        Vec3 center = bb.getCenter();
-        setBoundingBox(bb.move(-center.x, -bb.minY, -center.z).move(x, y, z));
+    public void setPosition(double x, double y, double z) {
+        Box bb = getBoundingBox();
+        setPos(x, y, z);
+        Vec3d center = bb.getCenter();
+        setBoundingBox(bb.offset(-center.x, -bb.minY, -center.z).offset(x, y, z));
     }
 
     @Override
-    public void move(MoverType typeIn, Vec3 pos) {
-        if (!level().isClientSide() && isAlive() && pos.lengthSqr() > 0.0D) {
+    public void move(MovementType typeIn, Vec3d pos) {
+        if (!getEntityWorld().isClient() && isAlive() && pos.lengthSquared() > 0.0D)
             discard();
-        }
     }
 
     @Override
-    public void push(double x, double y, double z) {
-        if (!level().isClientSide() && isAlive() && x * x + y * y + z * z > 0.0D) {
+    public void addVelocity(double x, double y, double z) {
+        if (!getEntityWorld().isClient() && isAlive() && x * x + y * y + z * z > 0.0D)
             discard();
-        }
     }
 
     @Override
-    public EntityDimensions getDimensions(Pose pose) {
+    public EntityDimensions getDimensions(EntityPose pose) {
         return super.getDimensions(pose).withEyeHeight(0.0F);
     }
 
@@ -221,64 +190,63 @@ public class SuperGlueEntity extends Entity implements SpecialEntityItemRequirem
     }
 
     @Override
-    public InteractionResult interact(Player player, InteractionHand hand) {
-        return InteractionResult.PASS;
+    public ActionResult interact(PlayerEntity player, Hand hand) {
+        return ActionResult.PASS;
     }
 
     @Override
-    public void addAdditionalSaveData(ValueOutput view) {
-        AABB box = getBoundingBox().move(position().scale(-1));
-        view.store("Box", CreateCodecs.BOX_CODEC, box);
+    public void writeCustomData(WriteView view) {
+        Box box = getBoundingBox().offset(getEntityPos().multiply(-1));
+        view.put("Box", CreateCodecs.BOX_CODEC, box);
     }
 
     @Override
-    public void readAdditionalSaveData(ValueInput view) {
-        AABB box = view.read("Box", CreateCodecs.BOX_CODEC).orElseThrow().move(position());
+    public void readCustomData(ReadView view) {
+        Box box = view.read("Box", CreateCodecs.BOX_CODEC).orElseThrow().offset(getEntityPos());
         setBoundingBox(box);
     }
 
-    public static void writeBoundingBox(CompoundTag compound, AABB bb) {
-        compound.put("From", VecHelper.writeNBT(new Vec3(bb.minX, bb.minY, bb.minZ)));
-        compound.put("To", VecHelper.writeNBT(new Vec3(bb.maxX, bb.maxY, bb.maxZ)));
+    public static void writeBoundingBox(NbtCompound compound, Box bb) {
+        compound.put("From", VecHelper.writeNBT(new Vec3d(bb.minX, bb.minY, bb.minZ)));
+        compound.put("To", VecHelper.writeNBT(new Vec3d(bb.maxX, bb.maxY, bb.maxZ)));
     }
 
-    public static AABB readBoundingBox(CompoundTag compound) {
-        Vec3 from = VecHelper.readNBT(compound.getListOrEmpty("From"));
-        Vec3 to = VecHelper.readNBT(compound.getListOrEmpty("To"));
-        return new AABB(from, to);
+    public static Box readBoundingBox(NbtCompound compound) {
+        Vec3d from = VecHelper.readNBT(compound.getListOrEmpty("From"));
+        Vec3d to = VecHelper.readNBT(compound.getListOrEmpty("To"));
+        return new Box(from, to);
     }
 
     @Override
-    public Packet<ClientGamePacketListener> getAddEntityPacket(ServerEntity entityTrackerEntry) {
+    public Packet<ClientPlayPacketListener> createSpawnPacket(EntityTrackerEntry entityTrackerEntry) {
         return new SuperGlueSpawnPacket(this, entityTrackerEntry);
     }
 
     @Override
-    public void recreateFromPacket(ClientboundAddEntityPacket packet) {
-        super.recreateFromPacket(packet);
+    public void onSpawnPacket(EntitySpawnS2CPacket packet) {
+        super.onSpawnPacket(packet);
         setBoundingBox(((SuperGlueSpawnPacket) packet).getBox());
     }
 
     @Override
-    protected boolean repositionEntityAfterLoad() {
+    protected boolean shouldSetPositionOnLoad() {
         return false;
     }
 
     @Override
-    public float rotate(Rotation transformRotation) {
-        AABB bb = getBoundingBox().move(position().scale(-1));
-        if (transformRotation == Rotation.CLOCKWISE_90 || transformRotation == Rotation.COUNTERCLOCKWISE_90) {
-            setBoundingBox(new AABB(bb.minZ, bb.minY, bb.minX, bb.maxZ, bb.maxY, bb.maxX).move(position()));
-        }
-        return super.rotate(transformRotation);
+    public float applyRotation(BlockRotation transformRotation) {
+        Box bb = getBoundingBox().offset(getEntityPos().multiply(-1));
+        if (transformRotation == BlockRotation.CLOCKWISE_90 || transformRotation == BlockRotation.COUNTERCLOCKWISE_90)
+            setBoundingBox(new Box(bb.minZ, bb.minY, bb.minX, bb.maxZ, bb.maxY, bb.maxX).offset(getEntityPos()));
+        return super.applyRotation(transformRotation);
     }
 
     @Override
-    public void thunderHit(ServerLevel world, LightningBolt lightningBolt) {
+    public void onStruckByLightning(ServerWorld world, LightningEntity lightningBolt) {
     }
 
     @Override
-    public void refreshDimensions() {
+    public void calculateDimensions() {
     }
 
     @Override
@@ -287,52 +255,48 @@ public class SuperGlueEntity extends Entity implements SpecialEntityItemRequirem
     }
 
     @Override
-    public boolean isIgnoringBlockTriggers() {
+    public boolean canAvoidTraps() {
         return true;
     }
 
     public boolean contains(BlockPos pos) {
-        return getBoundingBox().contains(Vec3.atCenterOf(pos));
+        return getBoundingBox().contains(Vec3d.ofCenter(pos));
     }
 
     @Override
-    public PushReaction getPistonPushReaction() {
-        return PushReaction.IGNORE;
+    public PistonBehavior getPistonBehavior() {
+        return PistonBehavior.IGNORE;
     }
 
     public void spawnParticles() {
-        AABB bb = getBoundingBox();
-        Vec3 origin = new Vec3(bb.minX, bb.minY, bb.minZ);
-        Vec3 extents = new Vec3(bb.getXsize(), bb.getYsize(), bb.getZsize());
+        Box bb = getBoundingBox();
+        Vec3d origin = new Vec3d(bb.minX, bb.minY, bb.minZ);
+        Vec3d extents = new Vec3d(bb.getLengthX(), bb.getLengthY(), bb.getLengthZ());
 
-        if (!(level() instanceof ServerLevel slevel)) {
+        if (!(getEntityWorld() instanceof ServerWorld slevel))
             return;
-        }
 
         for (Axis axis : Iterate.axes) {
             AxisDirection positive = AxisDirection.POSITIVE;
             double max = axis.choose(extents.x, extents.y, extents.z);
-            Vec3 normal = Vec3.atLowerCornerOf(Direction.fromAxisAndDirection(axis, positive).getUnitVec3i());
+            Vec3d normal = Vec3d.of(Direction.from(axis, positive).getVector());
             for (Axis axis2 : Iterate.axes) {
-                if (axis2 == axis) {
+                if (axis2 == axis)
                     continue;
-                }
                 double max2 = axis2.choose(extents.x, extents.y, extents.z);
-                Vec3 normal2 = Vec3.atLowerCornerOf(Direction.fromAxisAndDirection(axis2, positive).getUnitVec3i());
+                Vec3d normal2 = Vec3d.of(Direction.from(axis2, positive).getVector());
                 for (Axis axis3 : Iterate.axes) {
-                    if (axis3 == axis2 || axis3 == axis) {
+                    if (axis3 == axis2 || axis3 == axis)
                         continue;
-                    }
                     double max3 = axis3.choose(extents.x, extents.y, extents.z);
-                    Vec3 normal3 = Vec3.atLowerCornerOf(Direction.fromAxisAndDirection(axis3, positive).getUnitVec3i());
+                    Vec3d normal3 = Vec3d.of(Direction.from(axis3, positive).getVector());
 
                     for (int i = 0; i <= max * 2; i++) {
                         for (int o1 : Iterate.zeroAndOne) {
                             for (int o2 : Iterate.zeroAndOne) {
-                                Vec3 v = origin.add(normal.scale(i / 2f)).add(normal2.scale(max2 * o1))
-                                    .add(normal3.scale(max3 * o2));
+                                Vec3d v = origin.add(normal.multiply(i / 2f)).add(normal2.multiply(max2 * o1)).add(normal3.multiply(max3 * o2));
 
-                                slevel.sendParticles(ParticleTypes.ITEM_SLIME, v.x, v.y, v.z, 1, 0, 0, 0, 0);
+                                slevel.spawnParticles(ParticleTypes.ITEM_SLIME, v.x, v.y, v.z, 1, 0, 0, 0, 0);
 
                             }
                         }

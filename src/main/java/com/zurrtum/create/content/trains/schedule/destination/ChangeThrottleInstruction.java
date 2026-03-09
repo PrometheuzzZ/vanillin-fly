@@ -3,8 +3,8 @@ package com.zurrtum.create.content.trains.schedule.destination;
 import com.zurrtum.create.content.trains.graph.DiscoveredPath;
 import com.zurrtum.create.content.trains.schedule.ScheduleRuntime;
 import com.zurrtum.create.content.trains.schedule.ScheduleRuntime.State;
-import net.minecraft.resources.Identifier;
-import net.minecraft.world.level.Level;
+import net.minecraft.util.Identifier;
+import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
 public class ChangeThrottleInstruction extends ScheduleInstruction {
@@ -23,7 +23,7 @@ public class ChangeThrottleInstruction extends ScheduleInstruction {
     }
 
     @Override
-    public @Nullable DiscoveredPath start(ScheduleRuntime runtime, Level level) {
+    public @Nullable DiscoveredPath start(ScheduleRuntime runtime, World level) {
         runtime.train.throttle = getThrottle();
         runtime.state = State.PRE_TRANSIT;
         runtime.currentEntry++;

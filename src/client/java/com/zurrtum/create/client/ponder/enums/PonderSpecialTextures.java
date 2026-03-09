@@ -1,15 +1,18 @@
 package com.zurrtum.create.client.ponder.enums;
 
+import com.mojang.blaze3d.textures.GpuTextureView;
 import com.zurrtum.create.client.catnip.render.BindableTexture;
 import com.zurrtum.create.client.ponder.Ponder;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.render.TextureSetup;
-import net.minecraft.client.renderer.texture.AbstractTexture;
-import net.minecraft.client.renderer.texture.TextureManager;
-import net.minecraft.resources.Identifier;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.texture.TextureManager;
+import net.minecraft.client.texture.TextureSetup;
+import net.minecraft.util.Identifier;
 
 public enum PonderSpecialTextures implements BindableTexture {
-    BLANK("blank.png");
+
+    BLANK("blank.png"),
+
+    ;
 
     public static final String ASSET_PATH = "textures/special/";
     private final Identifier location;
@@ -20,9 +23,9 @@ public enum PonderSpecialTextures implements BindableTexture {
 
     @Override
     public TextureSetup bind() {
-        TextureManager manager = Minecraft.getInstance().getTextureManager();
-        AbstractTexture texture = manager.getTexture(location);
-        return TextureSetup.singleTexture(texture.getTextureView(), texture.getSampler());
+        TextureManager manager = MinecraftClient.getInstance().getTextureManager();
+        GpuTextureView gpuTextureView = manager.getTexture(location).getGlTextureView();
+        return TextureSetup.withoutGlTexture(gpuTextureView);
     }
 
     @Override

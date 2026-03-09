@@ -13,28 +13,29 @@ import com.zurrtum.create.content.processing.recipe.ProcessingOutput;
 import com.zurrtum.create.content.processing.recipe.SizedIngredient;
 import com.zurrtum.create.foundation.blockEntity.behaviour.filtering.ServerFilteringBehaviour;
 import com.zurrtum.create.foundation.fluid.FluidIngredient;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.crafting.RecipeSerializer;
-import net.minecraft.world.item.crafting.RecipeType;
-import net.minecraft.world.level.Level;
+import net.minecraft.item.ItemStack;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.recipe.RecipeSerializer;
+import net.minecraft.recipe.RecipeType;
+import net.minecraft.world.World;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.List;
 
-public record CompactingRecipe(List<ProcessingOutput> results, HeatCondition heat,
-                               List<FluidIngredient> fluidIngredients,
-                               List<SizedIngredient> ingredients) implements BasinRecipe {
+public record CompactingRecipe(
+    List<ProcessingOutput> results, HeatCondition heat, List<FluidIngredient> fluidIngredients,
+    List<SizedIngredient> ingredients
+) implements BasinRecipe {
     @Override
     public int getIngredientSize() {
         return fluidIngredients.size() + ingredients.size();
     }
 
     @Override
-    public boolean matches(BasinInput input, Level world) {
+    public boolean matches(BasinInput input, World world) {
         if (!heat.testBlazeBurner(input.heat())) {
             return false;
         }
@@ -90,12 +91,9 @@ public record CompactingRecipe(List<ProcessingOutput> results, HeatCondition hea
     public static class Serializer implements RecipeSerializer<CompactingRecipe> {
         public static final MapCodec<CompactingRecipe> CODEC = RecordCodecBuilder.mapCodec((Instance<CompactingRecipe> instance) -> instance.group(
             ProcessingOutput.CODEC.listOf(1, 4).fieldOf("results").forGetter(CompactingRecipe::results),
-            HeatCondition.CODEC.optionalFieldOf("heat_requirement", HeatCondition.NONE)
-                .forGetter(CompactingRecipe::heat),
-            FluidIngredient.CODEC.listOf(1, 2).optionalFieldOf("fluid_ingredients", List.of())
-                .forGetter(CompactingRecipe::fluidIngredients),
-            SizedIngredient.LIST_CODEC.optionalFieldOf("ingredients", List.of())
-                .forGetter(CompactingRecipe::ingredients)
+            HeatCondition.CODEC.optionalFieldOf("heat_requirement", HeatCondition.NONE).forGetter(CompactingRecipe::heat),
+            FluidIngredient.CODEC.listOf(1, 2).optionalFieldOf("fluid_ingredients", List.of()).forGetter(CompactingRecipe::fluidIngredients),
+            SizedIngredient.LIST_CODEC.optionalFieldOf("ingredients", List.of()).forGetter(CompactingRecipe::ingredients)
         ).apply(instance, CompactingRecipe::new)).validate(recipe -> {
             if (recipe.fluidIngredients.isEmpty() && recipe.ingredients.isEmpty()) {
                 return DataResult.error(() -> "CompactingRecipe must have a ingredient or a fluid ingredient");
@@ -105,14 +103,14 @@ public record CompactingRecipe(List<ProcessingOutput> results, HeatCondition hea
             }
             return DataResult.success(recipe);
         });
-        public static final StreamCodec<RegistryFriendlyByteBuf, CompactingRecipe> PACKET_CODEC = StreamCodec.composite(
-            ProcessingOutput.STREAM_CODEC.apply(ByteBufCodecs.list()),
+        public static final PacketCodec<RegistryByteBuf, CompactingRecipe> PACKET_CODEC = PacketCodec.tuple(
+            ProcessingOutput.STREAM_CODEC.collect(PacketCodecs.toList()),
             CompactingRecipe::results,
             HeatCondition.PACKET_CODEC,
             CompactingRecipe::heat,
-            FluidIngredient.PACKET_CODEC.apply(ByteBufCodecs.list()),
+            FluidIngredient.PACKET_CODEC.collect(PacketCodecs.toList()),
             CompactingRecipe::fluidIngredients,
-            SizedIngredient.PACKET_CODEC.apply(ByteBufCodecs.list()),
+            SizedIngredient.PACKET_CODEC.collect(PacketCodecs.toList()),
             CompactingRecipe::ingredients,
             CompactingRecipe::new
         );
@@ -123,7 +121,7 @@ public record CompactingRecipe(List<ProcessingOutput> results, HeatCondition hea
         }
 
         @Override
-        public StreamCodec<RegistryFriendlyByteBuf, CompactingRecipe> streamCodec() {
+        public PacketCodec<RegistryByteBuf, CompactingRecipe> packetCodec() {
             return PACKET_CODEC;
         }
     }

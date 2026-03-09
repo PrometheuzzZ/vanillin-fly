@@ -8,12 +8,12 @@ import com.zurrtum.create.catnip.codecs.stream.CatnipStreamCodecBuilders;
 import com.zurrtum.create.foundation.codec.CreateCodecs;
 import com.zurrtum.create.foundation.item.ItemSlots;
 import com.zurrtum.create.infrastructure.items.ItemInventory;
-import net.minecraft.core.NonNullList;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.item.ItemStack;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.storage.ReadView;
+import net.minecraft.storage.WriteView;
+import net.minecraft.util.collection.DefaultedList;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -25,28 +25,27 @@ public class ToolboxInventory implements ItemInventory {
     public static final int STACKS_PER_COMPARTMENT = 4;
     public static final int SIZE = 8 * STACKS_PER_COMPARTMENT;
     public static final Codec<ToolboxInventory> CODEC = RecordCodecBuilder.create(instance -> instance.group(
-        ItemSlots.maxSizeCodec(
-            8 * STACKS_PER_COMPARTMENT).fieldOf("items").forGetter(ItemSlots::fromHandler),
+        ItemSlots.maxSizeCodec(8 * STACKS_PER_COMPARTMENT).fieldOf("items").forGetter(ItemSlots::fromHandler),
         ItemStack.OPTIONAL_CODEC.listOf().fieldOf("filters").forGetter(toolbox -> toolbox.filters)
     ).apply(instance, ToolboxInventory::deserialize));
 
-    public static final StreamCodec<RegistryFriendlyByteBuf, ToolboxInventory> STREAM_CODEC = StreamCodec.composite(
+    public static final PacketCodec<RegistryByteBuf, ToolboxInventory> STREAM_CODEC = PacketCodec.tuple(
         ItemSlots.STREAM_CODEC,
         ItemSlots::fromHandler,
-        CatnipStreamCodecBuilders.list(ItemStack.OPTIONAL_STREAM_CODEC),
+        CatnipStreamCodecBuilders.list(ItemStack.OPTIONAL_PACKET_CODEC),
         toolbox -> toolbox.filters,
         ToolboxInventory::deserialize
     );
 
-    public NonNullList<ItemStack> filters;
-    NonNullList<ItemStack> stacks;
+    public DefaultedList<ItemStack> filters;
+    DefaultedList<ItemStack> stacks;
     @Nullable
     private final ToolboxBlockEntity blockEntity;
     private boolean limitedMode;
 
     public ToolboxInventory(@Nullable ToolboxBlockEntity be) {
-        filters = NonNullList.withSize(8, ItemStack.EMPTY);
-        stacks = NonNullList.withSize(SIZE, ItemStack.EMPTY);
+        filters = DefaultedList.ofSize(8, ItemStack.EMPTY);
+        stacks = DefaultedList.ofSize(SIZE, ItemStack.EMPTY);
         blockEntity = be;
         limitedMode = false;
     }
@@ -58,12 +57,12 @@ public class ToolboxInventory implements ItemInventory {
     }
 
     @Override
-    public int getContainerSize() {
+    public int size() {
         return SIZE;
     }
 
     @Override
-    public ItemStack getItem(int slot) {
+    public ItemStack getStack(int slot) {
         if (slot >= SIZE) {
             return ItemStack.EMPTY;
         }
@@ -71,8 +70,8 @@ public class ToolboxInventory implements ItemInventory {
     }
 
     @Override
-    public boolean canPlaceItem(int slot, ItemStack stack) {
-        if (!stack.getItem().canFitInsideContainerItems()) {
+    public boolean isValid(int slot, ItemStack stack) {
+        if (!stack.getItem().canBeNested()) {
             return false;
         }
         if (slot >= SIZE) {
@@ -87,7 +86,7 @@ public class ToolboxInventory implements ItemInventory {
     }
 
     @Override
-    public void setItem(int slot, ItemStack stack) {
+    public void setStack(int slot, ItemStack stack) {
         if (slot >= SIZE) {
             return;
         }
@@ -101,7 +100,7 @@ public class ToolboxInventory implements ItemInventory {
     }
 
     public int distributeToCompartment(@NotNull ItemStack stack, int compartment, boolean simulate) {
-        if (stack.isEmpty() || !stack.getItem().canFitInsideContainerItems()) {
+        if (stack.isEmpty() || !stack.getItem().canBeNested()) {
             return 0;
         }
         ItemStack filter = filters.get(compartment);
@@ -109,11 +108,11 @@ public class ToolboxInventory implements ItemInventory {
             return 0;
         }
         int maxAmount = stack.getCount();
-        int stackSize = stack.getMaxStackSize();
+        int stackSize = stack.getMaxCount();
         if (simulate) {
             int count = 0;
             for (int i = compartment * STACKS_PER_COMPARTMENT, end = i + STACKS_PER_COMPARTMENT; i < end; i++) {
-                ItemStack target = getItem(i);
+                ItemStack target = getStack(i);
                 if (target.isEmpty()) {
                     return maxAmount;
                 } else {
@@ -127,10 +126,10 @@ public class ToolboxInventory implements ItemInventory {
         } else {
             int remaining = maxAmount;
             for (int i = compartment * STACKS_PER_COMPARTMENT, end = i + STACKS_PER_COMPARTMENT; i < end; i++) {
-                ItemStack target = getItem(i);
+                ItemStack target = getStack(i);
                 if (target.isEmpty()) {
-                    setItem(i, directCopy(stack, remaining));
-                    setChanged();
+                    setStack(i, directCopy(stack, remaining));
+                    markDirty();
                     return maxAmount;
                 } else {
                     int count = target.getCount();
@@ -138,7 +137,7 @@ public class ToolboxInventory implements ItemInventory {
                         int insert = Math.min(remaining, stackSize - count);
                         target.setCount(count + insert);
                         if (remaining == insert) {
-                            setChanged();
+                            markDirty();
                             return maxAmount;
                         }
                         remaining -= insert;
@@ -148,7 +147,7 @@ public class ToolboxInventory implements ItemInventory {
             if (remaining == maxAmount) {
                 return 0;
             }
-            setChanged();
+            markDirty();
             return maxAmount - remaining;
         }
     }
@@ -169,7 +168,7 @@ public class ToolboxInventory implements ItemInventory {
                     return directCopy(findStack, maxAmount);
                 }
                 for (int j = i - 1; j >= index; j--) {
-                    ItemStack stack = getItem(i);
+                    ItemStack stack = getStack(i);
                     if (stack.isEmpty()) {
                         continue;
                     }
@@ -187,7 +186,7 @@ public class ToolboxInventory implements ItemInventory {
             if (stack == ItemStack.EMPTY) {
                 return stack;
             }
-            setChanged();
+            markDirty();
             return stack;
         }
     }
@@ -203,7 +202,7 @@ public class ToolboxInventory implements ItemInventory {
                 findStack.setCount(count - maxAmount);
                 return directCopy(findStack, maxAmount);
             }
-            setItem(i, ItemStack.EMPTY);
+            setStack(i, ItemStack.EMPTY);
             if (count == maxAmount) {
                 return findStack;
             }
@@ -215,12 +214,12 @@ public class ToolboxInventory implements ItemInventory {
                 }
                 count = stack.getCount();
                 if (count < remaining) {
-                    setItem(i, ItemStack.EMPTY);
+                    setStack(i, ItemStack.EMPTY);
                     remaining -= count;
                     continue;
                 }
                 if (count == remaining) {
-                    setItem(i, ItemStack.EMPTY);
+                    setStack(i, ItemStack.EMPTY);
                 } else {
                     stack.setCount(count - remaining);
                 }
@@ -234,35 +233,32 @@ public class ToolboxInventory implements ItemInventory {
     }
 
     @Override
-    public void setChanged() {
+    public void markDirty() {
         if (blockEntity != null) {
             blockEntity.notifyUpdate();
         }
     }
 
     public static ItemStack cleanItemNBT(ItemStack stack) {
-        if (stack.is(AllItems.BELT_CONNECTOR)) {
+        if (stack.isOf(AllItems.BELT_CONNECTOR))
             stack.remove(AllDataComponents.BELT_FIRST_SHAFT);
-        }
         return stack;
     }
 
     public static boolean canItemsShareCompartment(ItemStack stack1, ItemStack stack2) {
-        if (!stack1.isStackable() && !stack2.isStackable() && stack1.isDamageableItem() && stack2.isDamageableItem()) {
+        if (!stack1.isStackable() && !stack2.isStackable() && stack1.isDamageable() && stack2.isDamageable())
             return stack1.getItem() == stack2.getItem();
-        }
-        if (stack1.is(AllItems.BELT_CONNECTOR) && stack2.is(AllItems.BELT_CONNECTOR)) {
+        if (stack1.isOf(AllItems.BELT_CONNECTOR) && stack2.isOf(AllItems.BELT_CONNECTOR))
             return true;
-        }
-        return ItemStack.isSameItemSameComponents(stack1, stack2);
+        return ItemStack.areItemsAndComponentsEqual(stack1, stack2);
     }
 
-    public void write(ValueOutput view) {
-        view.store("Items", ItemSlots.CODEC, ItemSlots.fromHandler(this));
-        view.store("Compartments", CreateCodecs.ITEM_LIST_CODEC, filters);
+    public void write(WriteView view) {
+        view.put("Items", ItemSlots.CODEC, ItemSlots.fromHandler(this));
+        view.put("Compartments", CreateCodecs.ITEM_LIST_CODEC, filters);
     }
 
-    public void read(ValueInput view) {
+    public void read(ReadView view) {
         view.read("Items", ItemSlots.CODEC).ifPresentOrElse(
             slots -> {
                 boolean[] fill = new boolean[SIZE];
@@ -297,14 +293,10 @@ public class ToolboxInventory implements ItemInventory {
 
     @Override
     public final boolean equals(Object o) {
-        if (!(o instanceof ToolboxInventory that)) {
+        if (!(o instanceof ToolboxInventory that))
             return false;
-        }
 
-        return limitedMode == that.limitedMode && filters.equals(that.filters) && Objects.equals(
-            blockEntity,
-            that.blockEntity
-        );
+        return limitedMode == that.limitedMode && filters.equals(that.filters) && Objects.equals(blockEntity, that.blockEntity);
     }
 
     @Override

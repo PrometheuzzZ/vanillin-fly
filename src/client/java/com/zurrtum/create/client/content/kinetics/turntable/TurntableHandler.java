@@ -3,51 +3,46 @@ package com.zurrtum.create.client.content.kinetics.turntable;
 import com.zurrtum.create.AllBlocks;
 import com.zurrtum.create.catnip.math.VecHelper;
 import com.zurrtum.create.content.kinetics.turntable.TurntableBlockEntity;
-import net.minecraft.client.DeltaTracker;
-import net.minecraft.client.Minecraft;
-import net.minecraft.core.BlockPos;
-import net.minecraft.util.Mth;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.render.RenderTickCounter;
+import net.minecraft.client.world.ClientWorld;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.Vec3d;
 
 public class TurntableHandler {
-    public static void gameRenderFrame(Minecraft mc) {
-        if (mc.gameMode == null || mc.player == null) {
+    public static void gameRenderFrame(MinecraftClient mc) {
+        if (mc.interactionManager == null || mc.player == null)
             return;
-        }
-        BlockPos pos = mc.player.blockPosition();
-        if (!mc.level.getBlockState(pos).is(AllBlocks.TURNTABLE)) {
+        BlockPos pos = mc.player.getBlockPos();
+        ClientWorld world = mc.world;
+        if (!world.getBlockState(pos).isOf(AllBlocks.TURNTABLE))
             return;
-        }
-        if (!mc.player.onGround()) {
+        if (!mc.player.isOnGround())
             return;
-        }
-        if (mc.isPaused()) {
+        if (mc.isPaused())
             return;
-        }
 
-        BlockEntity blockEntity = mc.level.getBlockEntity(pos);
-        if (!(blockEntity instanceof TurntableBlockEntity turnTable)) {
+        BlockEntity blockEntity = world.getBlockEntity(pos);
+        if (!(blockEntity instanceof TurntableBlockEntity turnTable))
             return;
-        }
 
-        DeltaTracker deltaTracker = mc.getDeltaTracker();
-        float tickSpeed = mc.level.tickRateManager().tickrate() / 20;
-        float speed = turnTable.getSpeed() * (2 / 3f) * tickSpeed * deltaTracker.getRealtimeDeltaTicks();
+        RenderTickCounter deltaTracker = mc.getRenderTickCounter();
+        float tickSpeed = world.getTickManager().getTickRate() / 20;
+        float speed = turnTable.getSpeed() * (2 / 3f) * tickSpeed * deltaTracker.getFixedDeltaTicks();
 
-        if (speed == 0) {
+        if (speed == 0)
             return;
-        }
 
-        Vec3 origin = VecHelper.getCenterOf(pos);
-        Vec3 offset = mc.player.position().subtract(origin);
+        Vec3d origin = VecHelper.getCenterOf(pos);
+        Vec3d offset = mc.player.getEntityPos().subtract(origin);
 
-        if (offset.length() > 1 / 4f) {
-            speed *= (float) Mth.clamp((1 / 2f - offset.length()) * 2, 0, 1);
-        }
+        if (offset.length() > 1 / 4f)
+            speed *= (float) MathHelper.clamp((1 / 2f - offset.length()) * 2, 0, 1);
 
-        float yRotOffset = speed * deltaTracker.getGameTimeDeltaPartialTick(false);
-        mc.player.setYRot(mc.player.getYRot() - yRotOffset);
-        mc.player.yBodyRot -= yRotOffset;
+        float yRotOffset = speed * deltaTracker.getTickProgress(false);
+        mc.player.setYaw(mc.player.getYaw() - yRotOffset);
+        mc.player.bodyYaw -= yRotOffset;
     }
 }

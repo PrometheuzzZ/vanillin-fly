@@ -10,7 +10,7 @@ import de.crafty.eiv.common.api.recipe.ItemView;
 import de.crafty.eiv.common.builtin.shaped.CraftingViewType;
 import de.crafty.eiv.common.overlay.OverlayManager;
 import de.crafty.eiv.common.overlay.itemlist.view.ItemViewOverlay;
-import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.widget.TextFieldWidget;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -84,17 +84,17 @@ public class EivClientPlugin implements IExtendedItemViewIntegration {
     }
 
     public static void setSearchText(String text) {
-        EditBox searchbar = ItemViewOverlay.INSTANCE.getSearchbar();
+        TextFieldWidget searchbar = ItemViewOverlay.INSTANCE.getSearchbar();
         if (searchbar != null) {
-            searchbar.setValue(text);
+            searchbar.setText(text);
         }
     }
 
     @Nullable
     public static String readSearchText(boolean force) {
-        EditBox searchbar = ItemViewOverlay.INSTANCE.getSearchbar();
+        TextFieldWidget searchbar = ItemViewOverlay.INSTANCE.getSearchbar();
         if (searchbar != null && (force || searchbar.isFocused())) {
-            return searchbar.getValue();
+            return searchbar.getText();
         }
         return null;
     }

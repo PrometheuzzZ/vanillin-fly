@@ -2,12 +2,12 @@ package com.zurrtum.create.content.trains.bogey;
 
 import com.zurrtum.create.AllBogeyStyles;
 import com.zurrtum.create.AllSoundEvents;
-import net.minecraft.core.particles.ParticleOptions;
-import net.minecraft.core.particles.ParticleTypes;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
-import net.minecraft.sounds.SoundEvent;
+import net.minecraft.nbt.NbtCompound;
+import net.minecraft.particle.ParticleEffect;
+import net.minecraft.particle.ParticleTypes;
+import net.minecraft.sound.SoundEvent;
+import net.minecraft.text.Text;
+import net.minecraft.util.Identifier;
 
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -19,21 +19,21 @@ import java.util.stream.Stream;
 public class BogeyStyle {
     public final Identifier id;
     public final Identifier cycleGroup;
-    public final Component displayName;
+    public final Text displayName;
     public final Supplier<SoundEvent> soundEvent;
-    public final ParticleOptions contactParticle;
-    public final ParticleOptions smokeParticle;
-    public final CompoundTag defaultData;
+    public final ParticleEffect contactParticle;
+    public final ParticleEffect smokeParticle;
+    public final NbtCompound defaultData;
     private final Map<BogeySize, AbstractBogeyBlock<?>> sizes;
 
     public BogeyStyle(
         Identifier id,
         Identifier cycleGroup,
-        Component displayName,
+        Text displayName,
         Supplier<SoundEvent> soundEvent,
-        ParticleOptions contactParticle,
-        ParticleOptions smokeParticle,
-        CompoundTag defaultData,
+        ParticleEffect contactParticle,
+        ParticleEffect smokeParticle,
+        NbtCompound defaultData,
         Map<BogeySize, AbstractBogeyBlock<?>> sizes
     ) {
         this.id = id;
@@ -60,8 +60,8 @@ public class BogeyStyle {
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     public AbstractBogeyBlock<?> getNextBlock(BogeySize currentSize) {
-        return Stream.iterate(currentSize.nextBySize(), BogeySize::nextBySize).filter(sizes::containsKey).findFirst()
-            .map(this::getBlockForSize).orElse((AbstractBogeyBlock) getBlockForSize(currentSize));
+        return Stream.iterate(currentSize.nextBySize(), BogeySize::nextBySize).filter(sizes::containsKey).findFirst().map(this::getBlockForSize)
+            .orElse((AbstractBogeyBlock) getBlockForSize(currentSize));
     }
 
     public static class Builder {
@@ -69,18 +69,18 @@ public class BogeyStyle {
         protected final Identifier cycleGroup;
         protected final Map<BogeySize, AbstractBogeyBlock<?>> sizes = new LinkedHashMap<>();
 
-        protected Component displayName = Component.translatable("create.bogey.style.invalid");
+        protected Text displayName = Text.translatable("create.bogey.style.invalid");
         protected Supplier<SoundEvent> soundEvent = AllSoundEvents.TRAIN2::getMainEvent;
-        protected ParticleOptions contactParticle = ParticleTypes.CRIT;
-        protected ParticleOptions smokeParticle = ParticleTypes.POOF;
-        protected CompoundTag defaultData = new CompoundTag();
+        protected ParticleEffect contactParticle = ParticleTypes.CRIT;
+        protected ParticleEffect smokeParticle = ParticleTypes.POOF;
+        protected NbtCompound defaultData = new NbtCompound();
 
         public Builder(Identifier id, Identifier cycleGroup) {
             this.id = id;
             this.cycleGroup = cycleGroup;
         }
 
-        public Builder displayName(Component displayName) {
+        public Builder displayName(Text displayName) {
             this.displayName = displayName;
             return this;
         }
@@ -90,17 +90,17 @@ public class BogeyStyle {
             return this;
         }
 
-        public Builder contactParticle(ParticleOptions contactParticle) {
+        public Builder contactParticle(ParticleEffect contactParticle) {
             this.contactParticle = contactParticle;
             return this;
         }
 
-        public Builder smokeParticle(ParticleOptions smokeParticle) {
+        public Builder smokeParticle(ParticleEffect smokeParticle) {
             this.smokeParticle = smokeParticle;
             return this;
         }
 
-        public Builder defaultData(CompoundTag defaultData) {
+        public Builder defaultData(NbtCompound defaultData) {
             this.defaultData = defaultData;
             return this;
         }
@@ -111,16 +111,7 @@ public class BogeyStyle {
         }
 
         public BogeyStyle build() {
-            BogeyStyle entry = new BogeyStyle(
-                id,
-                cycleGroup,
-                displayName,
-                soundEvent,
-                contactParticle,
-                smokeParticle,
-                defaultData,
-                sizes
-            );
+            BogeyStyle entry = new BogeyStyle(id, cycleGroup, displayName, soundEvent, contactParticle, smokeParticle, defaultData, sizes);
             AllBogeyStyles.BOGEY_STYLES.put(id, entry);
             AllBogeyStyles.CYCLE_GROUPS.computeIfAbsent(cycleGroup, l -> new HashMap<>()).put(id, entry);
             return entry;

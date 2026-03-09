@@ -3,32 +3,28 @@ package com.zurrtum.create;
 import com.zurrtum.create.api.behaviour.spouting.BlockSpoutingBehaviour;
 import com.zurrtum.create.api.behaviour.spouting.CauldronSpoutingBehavior;
 import com.zurrtum.create.api.behaviour.spouting.StateChangingBehavior;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.FarmBlock;
-import net.minecraft.world.level.block.LayeredCauldronBlock;
-import net.minecraft.world.level.material.Fluid;
-import net.minecraft.world.level.material.Fluids;
+import net.minecraft.block.Blocks;
+import net.minecraft.block.FarmlandBlock;
+import net.minecraft.block.LeveledCauldronBlock;
+import net.minecraft.fluid.Fluid;
+import net.minecraft.fluid.Fluids;
 
 public class AllBlockSpoutingBehaviours {
-    public static final BlockSpoutingBehaviour MUD = StateChangingBehavior.setTo(
-        20250,
-        AllBlockSpoutingBehaviours::isWater,
-        Blocks.MUD
-    );
+    public static final BlockSpoutingBehaviour MUD = StateChangingBehavior.setTo(20250, AllBlockSpoutingBehaviours::isWater, Blocks.MUD);
     public static final BlockSpoutingBehaviour FARMLAND = StateChangingBehavior.incrementingState(
         8100,
         AllBlockSpoutingBehaviours::isWater,
-        FarmBlock.MOISTURE
+        FarmlandBlock.MOISTURE
     );
     public static final BlockSpoutingBehaviour WATER_CAULDRON = StateChangingBehavior.incrementingState(
         27000,
         AllBlockSpoutingBehaviours::isWater,
-        LayeredCauldronBlock.LEVEL
+        LeveledCauldronBlock.LEVEL
     );
     public static final CauldronSpoutingBehavior CAULDRON = new CauldronSpoutingBehavior();
 
     private static boolean isWater(Fluid fluid) {
-        return fluid.isSame(Fluids.WATER);
+        return fluid.matchesType(Fluids.WATER);
     }
 
     public static void register() {

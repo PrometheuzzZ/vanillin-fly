@@ -1,6 +1,6 @@
 package com.zurrtum.create.client.flywheel.api.material;
 
-import net.minecraft.resources.Identifier;
+import net.minecraft.util.Identifier;
 
 /**
  * A shader that controls the GPU-based light on a material.

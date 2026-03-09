@@ -1,10 +1,10 @@
 package com.zurrtum.create.content.decoration.slidingDoor;
 
-import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.foundation.blockEntity.SmartBlockEntity;
 import com.zurrtum.create.foundation.blockEntity.behaviour.BehaviourType;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
+import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
+import net.minecraft.storage.ReadView;
+import net.minecraft.storage.WriteView;
 
 public class DoorControlBehaviour extends BlockEntityBehaviour<SmartBlockEntity> {
 
@@ -18,21 +18,20 @@ public class DoorControlBehaviour extends BlockEntityBehaviour<SmartBlockEntity>
     }
 
     public void set(DoorControl mode) {
-        if (this.mode == mode) {
+        if (this.mode == mode)
             return;
-        }
         this.mode = mode;
         blockEntity.notifyUpdate();
     }
 
     @Override
-    public void write(ValueOutput view, boolean clientPacket) {
-        view.store("DoorControl", DoorControl.CODEC, mode);
+    public void write(WriteView view, boolean clientPacket) {
+        view.put("DoorControl", DoorControl.CODEC, mode);
         super.write(view, clientPacket);
     }
 
     @Override
-    public void read(ValueInput view, boolean clientPacket) {
+    public void read(ReadView view, boolean clientPacket) {
         mode = view.read("DoorControl", DoorControl.CODEC).orElse(DoorControl.ALL);
         super.read(view, clientPacket);
     }

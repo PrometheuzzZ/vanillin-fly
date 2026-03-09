@@ -9,21 +9,22 @@ import com.zurrtum.create.Create;
 import com.zurrtum.create.content.trains.graph.DiscoveredPath;
 import com.zurrtum.create.content.trains.schedule.ScheduleDataEntry;
 import com.zurrtum.create.content.trains.schedule.ScheduleRuntime;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.Tag;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.resources.Identifier;
-import net.minecraft.util.ProblemReporter;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.storage.TagValueInput;
-import net.minecraft.world.level.storage.TagValueOutput;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.nbt.NbtCompound;
+import net.minecraft.nbt.NbtElement;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.storage.NbtReadView;
+import net.minecraft.storage.NbtWriteView;
+import net.minecraft.storage.ReadView;
+import net.minecraft.storage.WriteView;
+import net.minecraft.util.ErrorReporter;
+import net.minecraft.util.Identifier;
+import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
 public abstract class ScheduleInstruction extends ScheduleDataEntry {
-    public static final StreamCodec<RegistryFriendlyByteBuf, ScheduleInstruction> STREAM_CODEC = StreamCodec.of(ScheduleInstruction::encode,
+    public static final PacketCodec<RegistryByteBuf, ScheduleInstruction> STREAM_CODEC = PacketCodec.ofStatic(
+        ScheduleInstruction::encode,
         ScheduleInstruction::decode
     );
 
@@ -34,17 +35,14 @@ public abstract class ScheduleInstruction extends ScheduleDataEntry {
     public abstract boolean supportsConditions();
 
     @Nullable
-    public abstract DiscoveredPath start(ScheduleRuntime runtime, Level level);
+    public abstract DiscoveredPath start(ScheduleRuntime runtime, World level);
 
-    public final void write(ValueOutput view) {
-        view.store("Id", Identifier.CODEC, id);
-        try (ProblemReporter.ScopedCollector logging = new ProblemReporter.ScopedCollector(
-            () -> "ScheduleInstruction",
-            Create.LOGGER
-        )) {
-            TagValueOutput writeView = new TagValueOutput(logging, ((TagValueOutput) view).ops, data);
+    public final void write(WriteView view) {
+        view.put("Id", Identifier.CODEC, id);
+        try (ErrorReporter.Logging logging = new ErrorReporter.Logging(() -> "ScheduleInstruction", Create.LOGGER)) {
+            NbtWriteView writeView = new NbtWriteView(logging, ((NbtWriteView) view).ops, data);
             writeAdditional(writeView);
-            view.store("Data", CompoundTag.CODEC, writeView.buildResult());
+            view.put("Data", NbtCompound.CODEC, writeView.getNbt());
         }
     }
 
@@ -52,26 +50,23 @@ public abstract class ScheduleInstruction extends ScheduleDataEntry {
     public static <T> DataResult<T> encode(final ScheduleInstruction input, final DynamicOps<T> ops, final T empty) {
         RecordBuilder<T> map = ops.mapBuilder();
         map.add("Id", input.id, Identifier.CODEC);
-        try (ProblemReporter.ScopedCollector logging = new ProblemReporter.ScopedCollector(
-            () -> "ScheduleInstruction",
-            Create.LOGGER
-        )) {
-            TagValueOutput view = new TagValueOutput(logging, (DynamicOps<Tag>) ops, input.data);
+        try (ErrorReporter.Logging logging = new ErrorReporter.Logging(() -> "ScheduleInstruction", Create.LOGGER)) {
+            NbtWriteView view = new NbtWriteView(logging, (DynamicOps<NbtElement>) ops, input.data);
             input.writeAdditional(view);
-            map.add("Data", view.buildResult(), CompoundTag.CODEC);
+            map.add("Data", view.getNbt(), NbtCompound.CODEC);
         }
         return map.build(empty);
     }
 
-    public static ScheduleInstruction read(ValueInput view) {
+    public static ScheduleInstruction read(ReadView view) {
         Identifier location = view.read("Id", Identifier.CODEC).orElse(null);
         ScheduleInstruction scheduleDestination = AllSchedules.createScheduleInstruction(location);
         if (scheduleDestination == null) {
             return fallback(location);
         }
-        ValueInput data = view.childOrEmpty("Data");
+        ReadView data = view.getReadView("Data");
         scheduleDestination.readAdditional(data);
-        scheduleDestination.data = view.read("Data", CompoundTag.CODEC).orElseGet(CompoundTag::new);
+        scheduleDestination.data = view.read("Data", NbtCompound.CODEC).orElseGet(NbtCompound::new);
         return scheduleDestination;
     }
 
@@ -82,12 +77,9 @@ public abstract class ScheduleInstruction extends ScheduleDataEntry {
         if (scheduleDestination == null) {
             return fallback(location);
         }
-        scheduleDestination.data = CompoundTag.CODEC.parse(ops, map.get("Data")).result().orElseGet(CompoundTag::new);
-        try (ProblemReporter.ScopedCollector logging = new ProblemReporter.ScopedCollector(
-            () -> "ScheduleInstruction",
-            Create.LOGGER
-        )) {
-            TagValueInput view = new TagValueInput(logging, new NbtReadContext(ops), scheduleDestination.data);
+        scheduleDestination.data = NbtCompound.CODEC.parse(ops, map.get("Data")).result().orElseGet(NbtCompound::new);
+        try (ErrorReporter.Logging logging = new ErrorReporter.Logging(() -> "ScheduleInstruction", Create.LOGGER)) {
+            NbtReadView view = new NbtReadView(logging, new NbtReadContext(ops), scheduleDestination.data);
             scheduleDestination.readAdditional(view);
         }
         return scheduleDestination;
@@ -98,23 +90,17 @@ public abstract class ScheduleInstruction extends ScheduleDataEntry {
         return AllSchedules.createScheduleInstruction(AllSchedules.DESTINATION);
     }
 
-    private static void encode(RegistryFriendlyByteBuf buf, ScheduleInstruction value) {
-        try (ProblemReporter.ScopedCollector logging = new ProblemReporter.ScopedCollector(
-            () -> "ScheduleInstruction",
-            Create.LOGGER
-        )) {
-            TagValueOutput view = TagValueOutput.createWithContext(logging, buf.registryAccess());
+    private static void encode(RegistryByteBuf buf, ScheduleInstruction value) {
+        try (ErrorReporter.Logging logging = new ErrorReporter.Logging(() -> "ScheduleInstruction", Create.LOGGER)) {
+            NbtWriteView view = NbtWriteView.create(logging, buf.getRegistryManager());
             value.write(view);
-            buf.writeNbt(view.buildResult());
+            buf.writeNbt(view.getNbt());
         }
     }
 
-    private static ScheduleInstruction decode(RegistryFriendlyByteBuf buf) {
-        try (ProblemReporter.ScopedCollector logging = new ProblemReporter.ScopedCollector(
-            () -> "ScheduleInstruction",
-            Create.LOGGER
-        )) {
-            ValueInput view = TagValueInput.create(logging, buf.registryAccess(), buf.readNbt());
+    private static ScheduleInstruction decode(RegistryByteBuf buf) {
+        try (ErrorReporter.Logging logging = new ErrorReporter.Logging(() -> "ScheduleInstruction", Create.LOGGER)) {
+            ReadView view = NbtReadView.create(logging, buf.getRegistryManager(), buf.readNbt());
             return ScheduleInstruction.read(view);
         }
     }

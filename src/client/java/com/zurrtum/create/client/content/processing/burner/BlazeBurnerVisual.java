@@ -21,9 +21,9 @@ import com.zurrtum.create.client.foundation.render.AllInstanceTypes;
 import com.zurrtum.create.content.processing.burner.BlazeBurnerBlock;
 import com.zurrtum.create.content.processing.burner.BlazeBurnerBlock.HeatLevel;
 import com.zurrtum.create.content.processing.burner.BlazeBurnerBlockEntity;
-import net.minecraft.client.renderer.LightTexture;
-import net.minecraft.core.Direction;
-import net.minecraft.util.Mth;
+import net.minecraft.client.render.LightmapTextureManager;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.MathHelper;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.function.Consumer;
@@ -60,7 +60,7 @@ public class BlazeBurnerVisual extends AbstractBlockEntityVisual<BlazeBurnerBloc
 
         head = instancerProvider().instancer(InstanceTypes.TRANSFORMED, Models.partial(blazeModel)).createInstance();
 
-        head.light(LightTexture.FULL_BRIGHT);
+        head.light(LightmapTextureManager.MAX_LIGHT_COORDINATE);
 
         animate(partialTick);
     }
@@ -98,21 +98,17 @@ public class BlazeBurnerVisual extends AbstractBlockEntityVisual<BlazeBurnerBloc
                 PartialModel rodsModel = heatLevel == BlazeBurnerBlock.HeatLevel.SEETHING ? AllPartialModels.BLAZE_BURNER_SUPER_RODS : AllPartialModels.BLAZE_BURNER_RODS;
                 PartialModel rodsModel2 = heatLevel == BlazeBurnerBlock.HeatLevel.SEETHING ? AllPartialModels.BLAZE_BURNER_SUPER_RODS_2 : AllPartialModels.BLAZE_BURNER_RODS_2;
 
-                smallRods = instancerProvider().instancer(InstanceTypes.TRANSFORMED, Models.partial(rodsModel))
-                    .createInstance();
-                largeRods = instancerProvider().instancer(InstanceTypes.TRANSFORMED, Models.partial(rodsModel2))
-                    .createInstance();
+                smallRods = instancerProvider().instancer(InstanceTypes.TRANSFORMED, Models.partial(rodsModel)).createInstance();
+                largeRods = instancerProvider().instancer(InstanceTypes.TRANSFORMED, Models.partial(rodsModel2)).createInstance();
 
-                smallRods.light(LightTexture.FULL_BRIGHT);
-                largeRods.light(LightTexture.FULL_BRIGHT);
+                smallRods.light(LightmapTextureManager.MAX_LIGHT_COORDINATE);
+                largeRods.light(LightmapTextureManager.MAX_LIGHT_COORDINATE);
 
             } else if (!needsRods && hasRods) {
-                if (smallRods != null) {
+                if (smallRods != null)
                     smallRods.delete();
-                }
-                if (largeRods != null) {
+                if (largeRods != null)
                     largeRods.delete();
-                }
                 smallRods = null;
                 largeRods = null;
             }
@@ -133,7 +129,7 @@ public class BlazeBurnerVisual extends AbstractBlockEntityVisual<BlazeBurnerBloc
                 InstanceTypes.TRANSFORMED,
                 Models.partial(isInert ? AllPartialModels.BLAZE_GOGGLES_SMALL : AllPartialModels.BLAZE_GOGGLES)
             ).createInstance();
-            goggles.light(LightTexture.FULL_BRIGHT);
+            goggles.light(LightmapTextureManager.MAX_LIGHT_COORDINATE);
         } else if (!blockEntity.goggles && goggles != null) {
             goggles.delete();
             goggles = null;
@@ -145,7 +141,7 @@ public class BlazeBurnerVisual extends AbstractBlockEntityVisual<BlazeBurnerBloc
                 InstanceTypes.TRANSFORMED,
                 Models.partial(blockEntity.stockKeeper ? AllPartialModels.LOGISTICS_HAT : AllPartialModels.TRAIN_HAT)
             ).createInstance();
-            hat.light(LightTexture.FULL_BRIGHT);
+            hat.light(LightmapTextureManager.MAX_LIGHT_COORDINATE);
         } else if (!hatPresent && hat != null) {
             hat.delete();
             hat = null;
@@ -155,55 +151,50 @@ public class BlazeBurnerVisual extends AbstractBlockEntityVisual<BlazeBurnerBloc
         float time = AnimationTickHolder.getRenderTime(level);
         float renderTick = time + (hashCode % 13) * 16f;
         float offsetMult = heatLevel.isAtLeast(BlazeBurnerBlock.HeatLevel.FADING) ? 64 : 16;
-        float offset = Mth.sin((float) ((renderTick / 16f) % (2 * Math.PI))) / offsetMult;
+        float offset = MathHelper.sin((float) ((renderTick / 16f) % (2 * Math.PI))) / offsetMult;
         float headY = offset - (animation * .75f);
 
         float horizontalAngle = AngleHelper.rad(blockEntity.headAngle.getValue(partialTicks));
 
-        head.setIdentityTransform().translate(getVisualPosition()).translateY(headY).translate(Translate.CENTER)
-            .rotateY(horizontalAngle).translateBack(Translate.CENTER).setChanged();
+        head.setIdentityTransform().translate(getVisualPosition()).translateY(headY).translate(Translate.CENTER).rotateY(horizontalAngle)
+            .translateBack(Translate.CENTER).setChanged();
 
         if (goggles != null) {
-            goggles.setIdentityTransform().translate(getVisualPosition()).translateY(headY + 8 / 16f)
-                .translate(Translate.CENTER).rotateY(horizontalAngle).translateBack(Translate.CENTER).setChanged();
+            goggles.setIdentityTransform().translate(getVisualPosition()).translateY(headY + 8 / 16f).translate(Translate.CENTER)
+                .rotateY(horizontalAngle).translateBack(Translate.CENTER).setChanged();
         }
 
         if (hat != null) {
             hat.setIdentityTransform().translate(getVisualPosition()).translateY(headY).translateY(0.75f);
-            hat.rotateCentered(horizontalAngle + Mth.PI, Direction.UP).translate(0.5f, 0, 0.5f)
-                .light(LightTexture.FULL_BRIGHT);
+            hat.rotateCentered(horizontalAngle + MathHelper.PI, Direction.UP).translate(0.5f, 0, 0.5f)
+                .light(LightmapTextureManager.MAX_LIGHT_COORDINATE);
 
             hat.setChanged();
         }
 
         if (smallRods != null) {
-            float offset1 = Mth.sin((float) ((renderTick / 16f + Math.PI) % (2 * Math.PI))) / offsetMult;
+            float offset1 = MathHelper.sin((float) ((renderTick / 16f + Math.PI) % (2 * Math.PI))) / offsetMult;
 
-            smallRods.setIdentityTransform().translate(getVisualPosition()).translateY(offset1 + animation + .125f)
-                .setChanged();
+            smallRods.setIdentityTransform().translate(getVisualPosition()).translateY(offset1 + animation + .125f).setChanged();
         }
 
         if (largeRods != null) {
-            float offset2 = Mth.sin((float) ((renderTick / 16f + Math.PI / 2) % (2 * Math.PI))) / offsetMult;
+            float offset2 = MathHelper.sin((float) ((renderTick / 16f + Math.PI / 2) % (2 * Math.PI))) / offsetMult;
 
-            largeRods.setIdentityTransform().translate(getVisualPosition()).translateY(offset2 + animation - 3 / 16f)
-                .setChanged();
+            largeRods.setIdentityTransform().translate(getVisualPosition()).translateY(offset2 + animation - 3 / 16f).setChanged();
         }
     }
 
     private void setupFlameInstance() {
-        flame = instancerProvider().instancer(
-            AllInstanceTypes.SCROLLING,
-            Models.partial(AllPartialModels.BLAZE_BURNER_FLAME)
-        ).createInstance();
+        flame = instancerProvider().instancer(AllInstanceTypes.SCROLLING, Models.partial(AllPartialModels.BLAZE_BURNER_FLAME)).createInstance();
 
-        flame.position(getVisualPosition()).light(LightTexture.FULL_BRIGHT);
+        flame.position(getVisualPosition()).light(LightmapTextureManager.MAX_LIGHT_COORDINATE);
 
         SpriteShiftEntry spriteShift = heatLevel == BlazeBurnerBlock.HeatLevel.SEETHING ? AllSpriteShifts.SUPER_BURNER_FLAME : AllSpriteShifts.BURNER_FLAME;
 
-        float spriteWidth = spriteShift.getTarget().getU1() - spriteShift.getTarget().getU0();
+        float spriteWidth = spriteShift.getTarget().getMaxU() - spriteShift.getTarget().getMinU();
 
-        float spriteHeight = spriteShift.getTarget().getV1() - spriteShift.getTarget().getV0();
+        float spriteHeight = spriteShift.getTarget().getMaxV() - spriteShift.getTarget().getMinV();
 
         float speed = 1 / 32f + 1 / 64f * heatLevel.ordinal();
 
@@ -213,8 +204,8 @@ public class BlazeBurnerVisual extends AbstractBlockEntityVisual<BlazeBurnerBloc
         flame.scaleU = spriteWidth / 2;
         flame.scaleV = spriteHeight / 2;
 
-        flame.diffU = spriteShift.getTarget().getU0() - spriteShift.getOriginal().getU0();
-        flame.diffV = spriteShift.getTarget().getV0() - spriteShift.getOriginal().getV0();
+        flame.diffU = spriteShift.getTarget().getMinU() - spriteShift.getOriginal().getMinU();
+        flame.diffV = spriteShift.getTarget().getMinV() - spriteShift.getOriginal().getMinV();
     }
 
     @Override

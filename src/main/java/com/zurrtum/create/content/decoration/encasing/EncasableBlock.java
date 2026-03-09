@@ -1,16 +1,16 @@
 package com.zurrtum.create.content.decoration.encasing;
 
-import net.minecraft.core.BlockPos;
-import net.minecraft.sounds.SoundSource;
-import net.minecraft.world.InteractionHand;
-import net.minecraft.world.InteractionResult;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.SoundType;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.item.ItemStack;
+import net.minecraft.sound.BlockSoundGroup;
+import net.minecraft.sound.SoundCategory;
+import net.minecraft.util.ActionResult;
+import net.minecraft.util.Hand;
+import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.World;
 
 import java.util.List;
 
@@ -19,44 +19,42 @@ import java.util.List;
  */
 public interface EncasableBlock {
     /**
-     * This method should be called in the {@link Block#useItemOn(ItemStack, BlockState, Level, BlockPos, Player, InteractionHand, BlockHitResult)} method.
+     * This method should be called in the {@link Block#onUseWithItem(ItemStack, BlockState, World, BlockPos, PlayerEntity, Hand, BlockHitResult)} method.
      */
-    default InteractionResult tryEncase(
+    default ActionResult tryEncase(
         BlockState state,
-        Level level,
+        World level,
         BlockPos pos,
         ItemStack heldItem,
-        Player player,
-        InteractionHand hand,
+        PlayerEntity player,
+        Hand hand,
         BlockHitResult ray
     ) {
         List<Block> encasedVariants = EncasingRegistry.getVariants(state.getBlock());
         for (Block block : encasedVariants) {
             if (block instanceof EncasedBlock encased) {
-                if (encased.getCasing().asItem() != heldItem.getItem()) {
+                if (encased.getCasing().asItem() != heldItem.getItem())
                     continue;
-                }
 
-                if (level.isClientSide()) {
-                    return InteractionResult.SUCCESS;
-                }
+                if (level.isClient())
+                    return ActionResult.SUCCESS;
 
                 encased.handleEncasing(state, level, pos, heldItem, player, hand, ray);
                 playEncaseSound(level, pos);
-                return InteractionResult.SUCCESS;
+                return ActionResult.SUCCESS;
             }
         }
-        return InteractionResult.TRY_WITH_EMPTY_HAND;
+        return ActionResult.PASS_TO_DEFAULT_BLOCK_ACTION;
     }
 
-    default void playEncaseSound(Level level, BlockPos pos) {
+    default void playEncaseSound(World level, BlockPos pos) {
         BlockState newState = level.getBlockState(pos);
-        SoundType soundType = newState.getSoundType();
+        BlockSoundGroup soundType = newState.getSoundGroup();
         level.playSound(
             null,
             pos,
             soundType.getPlaceSound(),
-            SoundSource.BLOCKS,
+            SoundCategory.BLOCKS,
             (soundType.getVolume() + 1.0F) / 2.0F,
             soundType.getPitch() * 0.8F
         );

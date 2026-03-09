@@ -3,15 +3,13 @@ package com.zurrtum.create.client.catnip.gui.element;
 import com.zurrtum.create.catnip.data.Couple;
 import com.zurrtum.create.catnip.theme.Color;
 import com.zurrtum.create.client.catnip.gui.render.BoxRenderState;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.DrawContext;
 import org.joml.Matrix3x2f;
 
 public class BoxElement extends AbstractRenderElement {
 
-    public static final Couple<Color> COLOR_VANILLA_BORDER = Couple.create(
-        new Color(0x50_5000ff, true),
-        new Color(0x50_28007f, true)
-    ).map(Color::setImmutable);
+    public static final Couple<Color> COLOR_VANILLA_BORDER = Couple.create(new Color(0x50_5000ff, true), new Color(0x50_28007f, true))
+        .map(Color::setImmutable);
     public static final Color COLOR_VANILLA_BACKGROUND = new Color(0xf0_100010, true).setImmutable();
     public static final Color COLOR_BACKGROUND_FLAT = new Color(0xff_000000, true).setImmutable();
     public static final Color COLOR_BACKGROUND_TRANSPARENT = new Color(0xdd_000000, true).setImmutable();
@@ -67,14 +65,14 @@ public class BoxElement extends AbstractRenderElement {
     }
 
     @Override
-    public void render(GuiGraphics graphics) {
+    public void render(DrawContext graphics) {
         renderBox(graphics);
     }
 
     //total box width = 1 * 2 (outer border) + 1 * 2 (inner color border) + 2 * borderOffset + width
     //defaults to 2 + 2 + 4 + 16 = 24px
     //batch everything together to save a bunch of gl calls over ScreenUtils
-    protected void renderBox(GuiGraphics graphics) {
+    protected void renderBox(DrawContext graphics) {
         /*
          *          _____________
          *        _|_____________|_
@@ -93,17 +91,7 @@ public class BoxElement extends AbstractRenderElement {
         Color c1 = background.copy().scaleAlpha(alpha);
         Color c2 = borderTop.copy().scaleAlpha(alpha);
         Color c3 = borderBot.copy().scaleAlpha(alpha);
-        Matrix3x2f model = new Matrix3x2f(graphics.pose());
-        graphics.guiRenderState.submitGuiElement(new BoxRenderState(
-            model,
-            x,
-            y,
-            width,
-            height,
-            borderOffset,
-            c1,
-            c2,
-            c3
-        ));
+        Matrix3x2f model = new Matrix3x2f(graphics.getMatrices());
+        graphics.state.addSimpleElement(new BoxRenderState(model, x, y, width, height, borderOffset, c1, c2, c3));
     }
 }

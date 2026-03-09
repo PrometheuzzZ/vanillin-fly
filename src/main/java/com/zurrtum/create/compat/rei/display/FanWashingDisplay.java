@@ -9,10 +9,10 @@ import me.shedaniel.rei.api.common.display.Display;
 import me.shedaniel.rei.api.common.display.DisplaySerializer;
 import me.shedaniel.rei.api.common.entry.EntryIngredient;
 import me.shedaniel.rei.api.common.util.EntryIngredients;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.resources.Identifier;
-import net.minecraft.world.item.crafting.RecipeHolder;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.recipe.RecipeEntry;
+import net.minecraft.util.Identifier;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -25,19 +25,19 @@ public record FanWashingDisplay(EntryIngredient input, List<ProcessingOutput> ou
             EntryIngredient.codec().fieldOf("input").forGetter(FanWashingDisplay::input),
             ProcessingOutput.CODEC.listOf().fieldOf("outputs").forGetter(FanWashingDisplay::outputs),
             Identifier.CODEC.optionalFieldOf("location").forGetter(FanWashingDisplay::location)
-        ).apply(instance, FanWashingDisplay::new)), StreamCodec.composite(
+        ).apply(instance, FanWashingDisplay::new)), PacketCodec.tuple(
             EntryIngredient.streamCodec(),
             FanWashingDisplay::input,
-            ProcessingOutput.STREAM_CODEC.apply(ByteBufCodecs.list()),
+            ProcessingOutput.STREAM_CODEC.collect(PacketCodecs.toList()),
             FanWashingDisplay::outputs,
-            ByteBufCodecs.optional(Identifier.STREAM_CODEC),
+            PacketCodecs.optional(Identifier.PACKET_CODEC),
             FanWashingDisplay::location,
             FanWashingDisplay::new
         )
     );
 
-    public FanWashingDisplay(RecipeHolder<SplashingRecipe> entry) {
-        this(entry.id().identifier(), entry.value());
+    public FanWashingDisplay(RecipeEntry<SplashingRecipe> entry) {
+        this(entry.id().getValue(), entry.value());
     }
 
     public FanWashingDisplay(Identifier id, SplashingRecipe recipe) {

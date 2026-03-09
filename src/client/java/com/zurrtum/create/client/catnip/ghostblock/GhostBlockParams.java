@@ -1,8 +1,8 @@
 package com.zurrtum.create.client.catnip.ghostblock;
 
-import net.minecraft.core.BlockPos;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
+import net.minecraft.util.math.BlockPos;
 
 import java.util.function.Supplier;
 
@@ -14,7 +14,7 @@ public class GhostBlockParams {
 
     private GhostBlockParams(BlockState state) {
         this.state = state;
-        this.pos = BlockPos.ZERO;
+        this.pos = BlockPos.ORIGIN;
         this.alphaSupplier = () -> 1f;
     }
 
@@ -23,7 +23,7 @@ public class GhostBlockParams {
     }
 
     public static GhostBlockParams of(Block block) {
-        return of(block.defaultBlockState());
+        return of(block.getDefaultState());
     }
 
     public GhostBlockParams at(BlockPos pos) {

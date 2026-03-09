@@ -4,8 +4,8 @@ import com.zurrtum.create.AllEntityTypes;
 import com.zurrtum.create.api.behaviour.EntityBehaviour;
 import com.zurrtum.create.client.foundation.entity.behaviour.CarriageAudioBehaviour;
 import com.zurrtum.create.client.foundation.entity.behaviour.CarriageParticleBehaviour;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntityType;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.EntityType;
 
 import java.util.function.Function;
 

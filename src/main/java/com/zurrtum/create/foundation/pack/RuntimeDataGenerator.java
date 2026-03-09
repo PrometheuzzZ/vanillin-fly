@@ -12,17 +12,17 @@ import com.zurrtum.create.content.kinetics.saw.CuttingRecipe;
 import com.zurrtum.create.content.processing.recipe.ProcessingOutput;
 import com.zurrtum.create.foundation.data.recipe.Mods;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.Identifier;
-import net.minecraft.tags.TagEntry;
-import net.minecraft.tags.TagFile;
-import net.minecraft.tags.TagKey;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.item.crafting.Ingredient;
-import net.minecraft.world.item.crafting.Recipe;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.ConcretePowderBlock;
+import net.minecraft.block.Block;
+import net.minecraft.block.ConcretePowderBlock;
+import net.minecraft.item.Item;
+import net.minecraft.recipe.Ingredient;
+import net.minecraft.recipe.Recipe;
+import net.minecraft.registry.Registries;
+import net.minecraft.registry.RegistryKeys;
+import net.minecraft.registry.tag.TagEntry;
+import net.minecraft.registry.tag.TagFile;
+import net.minecraft.registry.tag.TagKey;
+import net.minecraft.util.Identifier;
 
 import java.util.*;
 import java.util.regex.Matcher;
@@ -44,17 +44,14 @@ public class RuntimeDataGenerator {
     private static final Multimap<Identifier, TagEntry> TAGS = HashMultimap.create();
     private static final Object2ObjectOpenHashMap<Identifier, JsonElement> JSON_FILES = new Object2ObjectOpenHashMap<>();
     private static final Map<Identifier, Identifier> MISMATCHED_WOOD_NAMES = ImmutableMap.<Identifier, Identifier>builder()
-        .put(
-            Mods.ARS_N.asResource("blue_archwood"),
-            Mods.ARS_N.asResource("archwood")
-        ) // Generate recipes for planks -> everything else
+        .put(Mods.ARS_N.asResource("blue_archwood"), Mods.ARS_N.asResource("archwood")) // Generate recipes for planks -> everything else
         //.put(Mods.UUE.asResource("chorus_cane"), Mods.UUE.asResource("chorus_nest")) // Has a weird setup with both normal and stripped planks, that it already provides cutting recipes for
         .put(Mods.DD.asResource("blooming"), Mods.DD.asResource("bloom")).build();
 
     public static void insertIntoPack(DynamicPack dynamicPack) {
-        Identifier cuttingId = BuiltInRegistries.RECIPE_TYPE.getKey(AllRecipeTypes.CUTTING);
-        Identifier splashingId = BuiltInRegistries.RECIPE_TYPE.getKey(AllRecipeTypes.SPLASHING);
-        for (Identifier itemId : BuiltInRegistries.ITEM.keySet()) {
+        Identifier cuttingId = Registries.RECIPE_TYPE.getId(AllRecipeTypes.CUTTING);
+        Identifier splashingId = Registries.RECIPE_TYPE.getId(AllRecipeTypes.SPLASHING);
+        for (Identifier itemId : Registries.ITEM.getIds()) {
             if (IGNORES.contains(itemId.getNamespace())) {
                 continue;
             }
@@ -74,7 +71,7 @@ public class RuntimeDataGenerator {
             for (Map.Entry<Identifier, Collection<TagEntry>> tags : TAGS.asMap().entrySet()) {
                 TagFile tagFile = new TagFile(new ArrayList<>(tags.getValue()), false);
                 dynamicPack.put(
-                    tags.getKey().withPrefix("tags/item/"),
+                    tags.getKey().withPrefixedPath("tags/item/"),
                     TagFile.CODEC.encodeStart(JsonOps.INSTANCE, tagFile).result().orElseThrow()
                 );
             }
@@ -99,8 +96,8 @@ public class RuntimeDataGenerator {
 
         // Last ditch attempt. Try to find logs without stripped variants
         boolean noStrippedVariant = false;
-        if (!hasFoundMatch && !BuiltInRegistries.ITEM.containsKey(itemId.withPrefix("stripped_")) && !BuiltInRegistries.ITEM.containsKey(
-            itemId.withSuffix("_stripped"))) {
+        if (!hasFoundMatch && !Registries.ITEM.containsId(itemId.withPrefixedPath("stripped_")) && !Registries.ITEM.containsId(itemId.withSuffixedPath(
+            "_stripped"))) {
             match = NON_STRIPPED_WOODS_REGEX.matcher(path);
             hasFoundMatch = match.find();
             noStrippedVariant = true;
@@ -112,41 +109,36 @@ public class RuntimeDataGenerator {
             String type = match.group(strippedInPrefix ? 3 : 2);
             Identifier matched_name = itemId.withPath(match.group(strippedInPrefix ? 2 : 1));
             // re-add 'wood' to wood types such as Botania's livingwood
-            Identifier base = matched_name.withSuffix(type.equals("wood") ? "wood" : "");
+            Identifier base = matched_name.withSuffixedPath(type.equals("wood") ? "wood" : "");
             base = MISMATCHED_WOOD_NAMES.getOrDefault(base, base);
-            Identifier nonStrippedId = matched_name.withSuffix(type).withPrefix(prefix).withSuffix(suffix);
-            Identifier planksId = base.withSuffix("_planks");
-            Identifier stairsId = base.withSuffix(base.getNamespace()
-                .equals(Mods.BTN.getId()) ? "_planks_stairs" : "_stairs");
-            Identifier slabId = base.withSuffix(base.getNamespace()
-                .equals(Mods.BTN.getId()) ? "_planks_slab" : "_slab");
-            Identifier fenceId = base.withSuffix("_fence");
-            Identifier fenceGateId = base.withSuffix("_fence_gate");
-            Identifier doorId = base.withSuffix("_door");
-            Identifier trapdoorId = base.withSuffix("_trapdoor");
-            Identifier pressurePlateId = base.withSuffix("_pressure_plate");
-            Identifier buttonId = base.withSuffix("_button");
-            Identifier signId = base.withSuffix("_sign");
+            Identifier nonStrippedId = matched_name.withSuffixedPath(type).withPrefixedPath(prefix).withSuffixedPath(suffix);
+            Identifier planksId = base.withSuffixedPath("_planks");
+            Identifier stairsId = base.withSuffixedPath(base.getNamespace().equals(Mods.BTN.getId()) ? "_planks_stairs" : "_stairs");
+            Identifier slabId = base.withSuffixedPath(base.getNamespace().equals(Mods.BTN.getId()) ? "_planks_slab" : "_slab");
+            Identifier fenceId = base.withSuffixedPath("_fence");
+            Identifier fenceGateId = base.withSuffixedPath("_fence_gate");
+            Identifier doorId = base.withSuffixedPath("_door");
+            Identifier trapdoorId = base.withSuffixedPath("_trapdoor");
+            Identifier pressurePlateId = base.withSuffixedPath("_pressure_plate");
+            Identifier buttonId = base.withSuffixedPath("_button");
+            Identifier signId = base.withSuffixedPath("_sign");
             // Bamboo, GotD whistlecane
             int planksCount = type.contains("block") ? 3 : 6;
 
             if (!noStrippedVariant) {
                 // Catch mods like JNE that have a non-stripped log prefixed but not the stripped log
-                if (BuiltInRegistries.ITEM.containsKey(nonStrippedId)) {
+                if (Registries.ITEM.containsId(nonStrippedId)) {
                     simpleWoodRecipe(typeId, nonStrippedId, itemId);
                 }
                 simpleWoodRecipe(typeId, itemId, planksId, planksCount);
-            } else if (BuiltInRegistries.ITEM.containsKey(planksId)) {
-                Identifier tag = Identifier.fromNamespaceAndPath(
-                    MOD_ID,
-                    "runtime_generated/compat/" + itemId.getNamespace() + "/" + base.getPath()
-                );
+            } else if (Registries.ITEM.containsId(planksId)) {
+                Identifier tag = Identifier.of(MOD_ID, "runtime_generated/compat/" + itemId.getNamespace() + "/" + base.getPath());
                 insertIntoTag(tag, itemId);
 
-                simpleWoodRecipe(typeId, TagKey.create(Registries.ITEM, tag), planksId, planksCount);
+                simpleWoodRecipe(typeId, TagKey.of(RegistryKeys.ITEM, tag), planksId, planksCount);
             }
 
-            if (!path.contains("_wood") && !path.contains("_hyphae") && BuiltInRegistries.ITEM.containsKey(planksId)) {
+            if (!path.contains("_wood") && !path.contains("_hyphae") && Registries.ITEM.containsId(planksId)) {
                 simpleWoodRecipe(typeId, planksId, stairsId);
                 simpleWoodRecipe(typeId, planksId, slabId, 2);
                 simpleWoodRecipe(typeId, planksId, fenceId);
@@ -161,16 +153,15 @@ public class RuntimeDataGenerator {
     }
 
     private static void washingRecipes(Identifier typeId, Identifier itemId) {
-        Block block = BuiltInRegistries.BLOCK.getValue(itemId);
+        Block block = Registries.BLOCK.get(itemId);
         if (block instanceof ConcretePowderBlock concretePowderBlock) {
-            simpleSplashingRecipe(typeId, itemId, BuiltInRegistries.BLOCK.getKey(concretePowderBlock.concrete));
+            simpleSplashingRecipe(typeId, itemId, Registries.BLOCK.getId(concretePowderBlock.hardenedState));
         }
     }
 
     private static void insertIntoTag(Identifier tag, Identifier itemId) {
-        if (BuiltInRegistries.ITEM.containsKey(itemId)) {
-            TAGS.put(tag, TagEntry.optionalElement(itemId));
-        }
+        if (Registries.ITEM.containsId(itemId))
+            TAGS.put(tag, TagEntry.createOptional(itemId));
     }
 
     private static void simpleWoodRecipe(Identifier typeId, Identifier inputId, Identifier outputId) {
@@ -178,28 +169,25 @@ public class RuntimeDataGenerator {
     }
 
     private static void simpleWoodRecipe(Identifier typeId, Identifier inputId, Identifier outputId, int amount) {
-        if (BuiltInRegistries.ITEM.containsKey(outputId)) {
+        if (Registries.ITEM.containsId(outputId)) {
             addRecipe(
-                typeId, inputId.getNamespace(), inputId.getPath(), outputId.getPath(), new CuttingRecipe(
-                    50,
-                    List.of(new ProcessingOutput(BuiltInRegistries.ITEM.get(outputId).orElseThrow(), amount)),
-                    Ingredient.of(BuiltInRegistries.ITEM.getValue(inputId))
-                )
+                typeId,
+                inputId.getNamespace(),
+                inputId.getPath(),
+                outputId.getPath(),
+                new CuttingRecipe(50, List.of(new ProcessingOutput(Registries.ITEM.getEntry(outputId).orElseThrow(), amount)), Ingredient.ofItem(Registries.ITEM.get(inputId)))
             );
         }
     }
 
     private static void simpleWoodRecipe(Identifier typeId, TagKey<Item> inputTag, Identifier outputId, int amount) {
-        if (BuiltInRegistries.ITEM.containsKey(outputId)) {
+        if (Registries.ITEM.containsId(outputId)) {
             Recipe.CODEC.encodeStart(
-                EmptyJsonOps.INSTANCE, new CuttingRecipe(
-                    50,
-                    List.of(new ProcessingOutput(BuiltInRegistries.ITEM.get(outputId).orElseThrow(), amount)),
-                    EmptyJsonOps.ofTag(inputTag)
-                )
+                EmptyJsonOps.INSTANCE,
+                new CuttingRecipe(50, List.of(new ProcessingOutput(Registries.ITEM.getEntry(outputId).orElseThrow(), amount)), EmptyJsonOps.ofTag(inputTag))
             ).ifSuccess(json -> {
-                Identifier inputId = inputTag.location();
-                Identifier path = Identifier.fromNamespaceAndPath(
+                Identifier inputId = inputTag.id();
+                Identifier path = Identifier.of(
                     typeId.getNamespace(),
                     "recipe/" + typeId.getPath() + "/runtime_generated/compat/" + inputId.getNamespace() + "/" + "tag_" + inputId.getPath() + "_to_" + outputId.getPath()
                 );
@@ -215,15 +203,15 @@ public class RuntimeDataGenerator {
             first.getPath(),
             second.getPath(),
             new SplashingRecipe(
-                List.of(new ProcessingOutput(BuiltInRegistries.BLOCK.getValue(second), 1)),
-                Ingredient.of(BuiltInRegistries.BLOCK.getValue(first))
+                List.of(new ProcessingOutput(Registries.BLOCK.get(second), 1)),
+                Ingredient.ofItem(Registries.BLOCK.get(first))
             )
         );
     }
 
     private static void addRecipe(Identifier typeId, String modid, String from, String to, Recipe<?> recipe) {
         Recipe.CODEC.encodeStart(JsonOps.INSTANCE, recipe).ifSuccess(json -> {
-            Identifier path = Identifier.fromNamespaceAndPath(
+            Identifier path = Identifier.of(
                 typeId.getNamespace(),
                 "recipe/" + typeId.getPath() + "/runtime_generated/compat/" + modid + "/" + from + "_to_" + to
             );

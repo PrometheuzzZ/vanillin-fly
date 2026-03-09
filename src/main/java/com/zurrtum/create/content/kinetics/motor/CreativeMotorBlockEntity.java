@@ -6,8 +6,8 @@ import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.content.kinetics.base.GeneratingKineticBlockEntity;
 import com.zurrtum.create.foundation.blockEntity.behaviour.scrollValue.ServerKineticScrollValueBehaviour;
 import com.zurrtum.create.foundation.blockEntity.behaviour.scrollValue.ServerScrollValueBehaviour;
-import net.minecraft.core.BlockPos;
-import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.block.BlockState;
+import net.minecraft.util.math.BlockPos;
 
 import java.util.List;
 
@@ -36,17 +36,15 @@ public class CreativeMotorBlockEntity extends GeneratingKineticBlockEntity {
     @Override
     public void initialize() {
         super.initialize();
-        if (!hasSource() || getGeneratedSpeed() > getTheoreticalSpeed()) {
+        if (!hasSource() || getGeneratedSpeed() > getTheoreticalSpeed())
             updateGeneratedRotation();
-        }
     }
 
     @Override
     public float getGeneratedSpeed() {
-        if (!getBlockState().is(AllBlocks.CREATIVE_MOTOR)) {
+        if (!getCachedState().isOf(AllBlocks.CREATIVE_MOTOR))
             return 0;
-        }
-        return convertToDirection(generatedSpeed.getValue(), getBlockState().getValue(CreativeMotorBlock.FACING));
+        return convertToDirection(generatedSpeed.getValue(), getCachedState().get(CreativeMotorBlock.FACING));
     }
 
 }

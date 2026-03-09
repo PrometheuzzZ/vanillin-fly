@@ -1,7 +1,7 @@
 package com.zurrtum.create.client.ponder.api.registration;
 
 import com.zurrtum.create.client.ponder.foundation.PonderScene;
-import net.minecraft.resources.Identifier;
+import net.minecraft.util.Identifier;
 
 import java.util.Collection;
 import java.util.List;

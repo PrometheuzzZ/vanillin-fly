@@ -4,8 +4,8 @@ import com.zurrtum.create.client.flywheel.api.backend.Backend;
 import com.zurrtum.create.client.flywheel.impl.visualization.VisualizationManagerImpl;
 import com.zurrtum.create.client.flywheel.lib.backend.SimpleBackend;
 import com.zurrtum.create.client.flywheel.lib.util.ResourceUtil;
-import net.minecraft.client.multiplayer.ClientLevel;
-import net.minecraft.resources.Identifier;
+import net.minecraft.client.world.ClientWorld;
+import net.minecraft.util.Identifier;
 
 import java.util.ArrayList;
 
@@ -86,12 +86,16 @@ public final class BackendManagerImpl {
     public static void init() {
     }
 
-    public static void onEndClientResourceReload() {
+    public static void onEndClientResourceReload(boolean didError) {
+        if (didError) {
+            return;
+        }
+
         chooseBackend();
         VisualizationManagerImpl.resetAll();
     }
 
-    public static void onReloadLevelRenderer(ClientLevel level) {
+    public static void onReloadLevelRenderer(ClientWorld level) {
         chooseBackend();
         VisualizationManagerImpl.reset(level);
     }

@@ -9,36 +9,35 @@ import com.zurrtum.create.client.foundation.blockEntity.behaviour.ValueBox.IconV
 import com.zurrtum.create.client.foundation.blockEntity.behaviour.ValueBox.TextValueBox;
 import com.zurrtum.create.client.foundation.utility.CreateLang;
 import com.zurrtum.create.foundation.blockEntity.SmartBlockEntity;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.multiplayer.ClientLevel;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.world.InteractionHand;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.BlockHitResult;
-import net.minecraft.world.phys.HitResult;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.world.ClientWorld;
+import net.minecraft.item.ItemStack;
+import net.minecraft.text.MutableText;
+import net.minecraft.text.Text;
+import net.minecraft.util.Hand;
+import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.util.hit.HitResult;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Box;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Vec3d;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public class ScrollValueRenderer {
 
-    public static void tick(Minecraft mc) {
-        HitResult target = mc.hitResult;
-        if (!(target instanceof BlockHitResult result)) {
+    public static void tick(MinecraftClient mc) {
+        HitResult target = mc.crosshairTarget;
+        if (!(target instanceof BlockHitResult result))
             return;
-        }
 
-        ClientLevel world = mc.level;
+        ClientWorld world = mc.world;
         if (world == null) {
             return;
         }
         BlockPos pos = result.getBlockPos();
-        Direction face = result.getDirection();
+        Direction face = result.getSide();
 
         if (!(world.getBlockEntity(pos) instanceof SmartBlockEntity sbe)) {
             return;
@@ -54,19 +53,18 @@ public class ScrollValueRenderer {
             return;
         }
 
-        ItemStack mainhandItem = mc.player.getItemInHand(InteractionHand.MAIN_HAND);
+        ItemStack mainhandItem = mc.player.getStackInHand(Hand.MAIN_HAND);
         boolean clipboard = behaviour.bypassesInput(mainhandItem);
-        if (behaviour.needsWrench && !mainhandItem.is(AllItems.WRENCH) && !clipboard) {
+        if (behaviour.needsWrench && !mainhandItem.isOf(AllItems.WRENCH) && !clipboard)
             return;
-        }
-        boolean highlight = behaviour.testHit(target.getLocation()) && !clipboard;
+        boolean highlight = behaviour.testHit(target.getPos()) && !clipboard;
 
         if (AllKeys.hasControlDown()) {
             List<? extends SmartBlockEntity> bulks = behaviour.getBulk();
             if (bulks != null) {
                 for (SmartBlockEntity smartBlockEntity : bulks) {
                     if (smartBlockEntity.getBehaviour(ScrollValueBehaviour.TYPE) instanceof ScrollValueBehaviour<?, ?> other) {
-                        addBox(smartBlockEntity.getBlockPos(), face, other, highlight);
+                        addBox(smartBlockEntity.getPos(), face, other, highlight);
                     }
                 }
             } else {
@@ -76,30 +74,24 @@ public class ScrollValueRenderer {
             addBox(pos, face, behaviour, highlight);
         }
 
-        if (!highlight) {
+        if (!highlight)
             return;
-        }
 
-        List<MutableComponent> tip = new ArrayList<>();
+        List<MutableText> tip = new ArrayList<>();
         tip.add(behaviour.label.copy());
         tip.add(CreateLang.translateDirect("gui.value_settings.hold_to_edit"));
         Create.VALUE_SETTINGS_HANDLER.showHoverTip(mc, tip);
     }
 
-    protected static void addBox(
-        BlockPos pos,
-        Direction face,
-        ScrollValueBehaviour<?, ?> behaviour,
-        boolean highlight
-    ) {
-        AABB bb = new AABB(Vec3.ZERO, Vec3.ZERO).inflate(.5f).contract(0, 0, -.5f).move(0, 0, -.125f);
-        Component label = behaviour.label;
+    protected static void addBox(BlockPos pos, Direction face, ScrollValueBehaviour<?, ?> behaviour, boolean highlight) {
+        Box bb = new Box(Vec3d.ZERO, Vec3d.ZERO).expand(.5f).shrink(0, 0, -.5f).offset(0, 0, -.125f);
+        Text label = behaviour.label;
         ValueBox box;
 
         if (behaviour instanceof ScrollOptionBehaviour<?> optionBehaviour) {
             box = new IconValueBox(label, optionBehaviour.getIconForSelected(), bb, pos);
         } else {
-            box = new TextValueBox(label, bb, pos, Component.literal(behaviour.formatValue()));
+            box = new TextValueBox(label, bb, pos, Text.literal(behaviour.formatValue()));
         }
 
         box.passive(!highlight).wideOutline();

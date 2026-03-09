@@ -4,15 +4,15 @@ import com.zurrtum.create.AllItems;
 import com.zurrtum.create.client.compat.eiv.CreateCategory;
 import com.zurrtum.create.client.foundation.utility.CreateLang;
 import com.zurrtum.create.compat.eiv.EivCommonPlugin;
-import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.item.ItemStack;
+import net.minecraft.text.Text;
+import net.minecraft.util.Identifier;
 
 import java.util.List;
 
 public class MillingCategory extends CreateCategory {
     @Override
-    public Component getDisplayName() {
+    public Text getDisplayName() {
         return CreateLang.translateDirect("recipe.milling");
     }
 
@@ -33,16 +33,16 @@ public class MillingCategory extends CreateCategory {
 
     @Override
     public ItemStack getIcon() {
-        return AllItems.MILLSTONE.getDefaultInstance();
+        return AllItems.MILLSTONE.getDefaultStack();
     }
 
     @Override
     public ItemStack getSubIcon() {
-        return AllItems.WHEAT_FLOUR.getDefaultInstance();
+        return AllItems.WHEAT_FLOUR.getDefaultStack();
     }
 
     @Override
     public List<ItemStack> getCraftReferences() {
-        return List.of(AllItems.MILLSTONE.getDefaultInstance());
+        return List.of(AllItems.MILLSTONE.getDefaultStack());
     }
 }

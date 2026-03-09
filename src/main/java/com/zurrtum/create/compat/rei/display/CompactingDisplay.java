@@ -11,10 +11,10 @@ import me.shedaniel.rei.api.common.display.Display;
 import me.shedaniel.rei.api.common.display.DisplaySerializer;
 import me.shedaniel.rei.api.common.entry.EntryIngredient;
 import me.shedaniel.rei.api.common.util.EntryIngredients;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.resources.Identifier;
-import net.minecraft.world.item.crafting.RecipeHolder;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.recipe.RecipeEntry;
+import net.minecraft.util.Identifier;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -31,29 +31,29 @@ public record CompactingDisplay(List<EntryIngredient> inputs, List<ProcessingOut
             ProcessingOutput.CODEC.listOf().fieldOf("outputs").forGetter(CompactingDisplay::outputs),
             HeatCondition.CODEC.fieldOf("heat").forGetter(CompactingDisplay::heat),
             Identifier.CODEC.optionalFieldOf("location").forGetter(CompactingDisplay::location)
-        ).apply(instance, CompactingDisplay::new)), StreamCodec.composite(
-            EntryIngredient.streamCodec().apply(ByteBufCodecs.list()),
+        ).apply(instance, CompactingDisplay::new)), PacketCodec.tuple(
+            EntryIngredient.streamCodec().collect(PacketCodecs.toList()),
             CompactingDisplay::inputs,
-            ProcessingOutput.STREAM_CODEC.apply(ByteBufCodecs.list()),
+            ProcessingOutput.STREAM_CODEC.collect(PacketCodecs.toList()),
             CompactingDisplay::outputs,
             HeatCondition.PACKET_CODEC,
             CompactingDisplay::heat,
-            ByteBufCodecs.optional(Identifier.STREAM_CODEC),
+            PacketCodecs.optional(Identifier.PACKET_CODEC),
             CompactingDisplay::location,
             CompactingDisplay::new
         )
     );
 
-    public CompactingDisplay(RecipeHolder<CompactingRecipe> entry) {
-        this(entry.id().identifier(), entry.value());
+    public CompactingDisplay(RecipeEntry<CompactingRecipe> entry) {
+        this(entry.id().getValue(), entry.value());
     }
 
     public CompactingDisplay(Identifier id, CompactingRecipe recipe) {
         this(
-            getEntryIngredients(
-                IngredientHelper.getSizedIngredientStream(recipe.ingredients()),
-                getFluidIngredientStream(recipe.fluidIngredients())
-            ), recipe.results(), recipe.heat(), Optional.of(id)
+            getEntryIngredients(IngredientHelper.getSizedIngredientStream(recipe.ingredients()), getFluidIngredientStream(recipe.fluidIngredients())),
+            recipe.results(),
+            recipe.heat(),
+            Optional.of(id)
         );
     }
 

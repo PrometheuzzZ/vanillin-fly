@@ -1,6 +1,5 @@
 package com.zurrtum.create.client.foundation.blockEntity.behaviour.scrollValue;
 
-import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.client.catnip.lang.Lang;
 import com.zurrtum.create.client.content.kinetics.steamEngine.SteamEngineValueBox;
 import com.zurrtum.create.client.foundation.blockEntity.behaviour.ValueBoxTransform;
@@ -11,10 +10,11 @@ import com.zurrtum.create.content.contraptions.bearing.WindmillBearingBlockEntit
 import com.zurrtum.create.content.kinetics.steamEngine.PoweredShaftBlockEntity;
 import com.zurrtum.create.content.kinetics.steamEngine.SteamEngineBlockEntity;
 import com.zurrtum.create.foundation.blockEntity.SmartBlockEntity;
-import net.minecraft.network.chat.Component;
+import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
+import net.minecraft.text.Text;
 
 public class RotationDirectionScrollBehaviour extends ScrollOptionBehaviour<RotationDirection> {
-    public RotationDirectionScrollBehaviour(SmartBlockEntity be, Component title, ValueBoxTransform slot) {
+    public RotationDirectionScrollBehaviour(SmartBlockEntity be, Text title, ValueBoxTransform slot) {
         super(RotationDirectionIcon.class, RotationDirectionIcon::from, title, be, slot);
     }
 
@@ -39,7 +39,8 @@ public class RotationDirectionScrollBehaviour extends ScrollOptionBehaviour<Rota
 
     private enum RotationDirectionIcon implements INamedIconOptions {
 
-        CLOCKWISE(AllIcons.I_REFRESH), COUNTER_CLOCKWISE(AllIcons.I_ROTATE_CCW);
+        CLOCKWISE(AllIcons.I_REFRESH),
+        COUNTER_CLOCKWISE(AllIcons.I_ROTATE_CCW);
 
         private final String translationKey;
         private final AllIcons icon;

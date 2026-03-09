@@ -9,25 +9,25 @@ import com.zurrtum.create.catnip.placement.PlacementHelpers;
 import com.zurrtum.create.content.contraptions.actors.AttachedActorBlock;
 import com.zurrtum.create.foundation.block.IBE;
 import com.zurrtum.create.foundation.placement.PoleHelper;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.world.InteractionHand;
-import net.minecraft.world.InteractionResult;
-import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.BlockItem;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.context.BlockPlaceContext;
-import net.minecraft.world.level.BlockGetter;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.LevelReader;
-import net.minecraft.world.level.block.HorizontalDirectionalBlock;
-import net.minecraft.world.level.block.entity.BlockEntityType;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.BlockHitResult;
-import net.minecraft.world.phys.shapes.CollisionContext;
-import net.minecraft.world.phys.shapes.Shapes;
-import net.minecraft.world.phys.shapes.VoxelShape;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.HorizontalFacingBlock;
+import net.minecraft.block.ShapeContext;
+import net.minecraft.block.entity.BlockEntityType;
+import net.minecraft.entity.LivingEntity;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.item.BlockItem;
+import net.minecraft.item.ItemPlacementContext;
+import net.minecraft.item.ItemStack;
+import net.minecraft.util.ActionResult;
+import net.minecraft.util.Hand;
+import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.shape.VoxelShape;
+import net.minecraft.util.shape.VoxelShapes;
+import net.minecraft.world.BlockView;
+import net.minecraft.world.World;
+import net.minecraft.world.WorldView;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.function.Predicate;
@@ -35,15 +35,15 @@ import java.util.function.Predicate;
 public class RollerBlock extends AttachedActorBlock implements IBE<RollerBlockEntity> {
     private static final int placementHelperId = PlacementHelpers.register(new PlacementHelper());
 
-    public static final MapCodec<RollerBlock> CODEC = simpleCodec(RollerBlock::new);
+    public static final MapCodec<RollerBlock> CODEC = createCodec(RollerBlock::new);
 
-    public RollerBlock(Properties p_i48377_1_) {
+    public RollerBlock(Settings p_i48377_1_) {
         super(p_i48377_1_);
     }
 
     @Override
-    public BlockState getStateForPlacement(BlockPlaceContext context) {
-        return withWater(defaultBlockState().setValue(FACING, context.getHorizontalDirection().getOpposite()), context);
+    public BlockState getPlacementState(ItemPlacementContext context) {
+        return withWater(getDefaultState().with(FACING, context.getHorizontalPlayerFacing().getOpposite()), context);
     }
 
     @Override
@@ -57,62 +57,57 @@ public class RollerBlock extends AttachedActorBlock implements IBE<RollerBlockEn
     }
 
     @Override
-    public VoxelShape getShape(BlockState state, BlockGetter worldIn, BlockPos pos, CollisionContext context) {
-        return Shapes.block();
+    public VoxelShape getOutlineShape(BlockState state, BlockView worldIn, BlockPos pos, ShapeContext context) {
+        return VoxelShapes.fullCube();
     }
 
     @Override
-    public boolean canSurvive(BlockState state, LevelReader worldIn, BlockPos pos) {
+    public boolean canPlaceAt(BlockState state, WorldView worldIn, BlockPos pos) {
         return true;
     }
 
     @Override
-    public void setPlacedBy(Level pLevel, BlockPos pPos, BlockState pState, LivingEntity pPlacer, ItemStack pStack) {
-        super.setPlacedBy(pLevel, pPos, pState, pPlacer, pStack);
+    public void onPlaced(World pLevel, BlockPos pPos, BlockState pState, LivingEntity pPlacer, ItemStack pStack) {
+        super.onPlaced(pLevel, pPos, pState, pPlacer, pStack);
         withBlockEntityDo(pLevel, pPos, RollerBlockEntity::searchForSharedValues);
     }
 
     @Override
-    protected InteractionResult useItemOn(
+    protected ActionResult onUseWithItem(
         ItemStack stack,
         BlockState state,
-        Level level,
+        World level,
         BlockPos pos,
-        Player player,
-        InteractionHand hand,
+        PlayerEntity player,
+        Hand hand,
         BlockHitResult hitResult
     ) {
         IPlacementHelper placementHelper = PlacementHelpers.get(placementHelperId);
-        if (!player.isShiftKeyDown() && player.mayBuild()) {
+        if (!player.isSneaking() && player.canModifyBlocks()) {
             if (placementHelper.matchesItem(stack)) {
-                placementHelper.getOffset(player, level, state, pos, hitResult)
-                    .placeInWorld(level, (BlockItem) stack.getItem(), player, hand);
-                return InteractionResult.SUCCESS;
+                placementHelper.getOffset(player, level, state, pos, hitResult).placeInWorld(level, (BlockItem) stack.getItem(), player, hand);
+                return ActionResult.SUCCESS;
             }
         }
 
-        return InteractionResult.TRY_WITH_EMPTY_HAND;
+        return ActionResult.PASS_TO_DEFAULT_BLOCK_ACTION;
     }
 
     private static class PlacementHelper extends PoleHelper<Direction> {
 
         public PlacementHelper() {
-            super(
-                state -> state.is(AllBlocks.MECHANICAL_ROLLER),
-                state -> state.getValue(FACING).getClockWise().getAxis(),
-                FACING
-            );
+            super(state -> state.isOf(AllBlocks.MECHANICAL_ROLLER), state -> state.get(FACING).rotateYClockwise().getAxis(), FACING);
         }
 
         @Override
         public Predicate<ItemStack> getItemPredicate() {
-            return stack -> stack.is(AllItems.MECHANICAL_ROLLER);
+            return stack -> stack.isOf(AllItems.MECHANICAL_ROLLER);
         }
 
     }
 
     @Override
-    protected @NotNull MapCodec<? extends HorizontalDirectionalBlock> codec() {
+    protected @NotNull MapCodec<? extends HorizontalFacingBlock> getCodec() {
         return CODEC;
     }
 

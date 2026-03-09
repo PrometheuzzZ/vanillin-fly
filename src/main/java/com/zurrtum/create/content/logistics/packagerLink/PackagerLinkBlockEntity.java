@@ -3,7 +3,6 @@ package com.zurrtum.create.content.logistics.packagerLink;
 import com.zurrtum.create.AllBlockEntityTypes;
 import com.zurrtum.create.AllParticleTypes;
 import com.zurrtum.create.AllSoundEvents;
-import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.catnip.data.Pair;
 import com.zurrtum.create.catnip.math.AngleHelper;
 import com.zurrtum.create.catnip.math.VecHelper;
@@ -13,17 +12,18 @@ import com.zurrtum.create.content.logistics.packager.PackagerBlockEntity;
 import com.zurrtum.create.content.logistics.packager.PackagingRequest;
 import com.zurrtum.create.content.logistics.packager.repackager.RepackagerBlockEntity;
 import com.zurrtum.create.content.redstone.displayLink.LinkWithBulbBlockEntity;
+import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.infrastructure.component.PackageOrderWithCrafts;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.core.Direction.Axis;
-import net.minecraft.core.UUIDUtil;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.properties.AttachFace;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.enums.BlockFace;
+import net.minecraft.item.ItemStack;
+import net.minecraft.storage.ReadView;
+import net.minecraft.storage.WriteView;
+import net.minecraft.util.Uuids;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Direction.Axis;
+import net.minecraft.util.math.Vec3d;
 import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.jetbrains.annotations.Nullable;
 
@@ -45,35 +45,30 @@ public class PackagerLinkBlockEntity extends LinkWithBulbBlockEntity {
 
     public InventorySummary fetchSummaryFromPackager(@Nullable IdentifiedInventory ignoredHandler) {
         PackagerBlockEntity packager = getPackager();
-        if (packager == null) {
+        if (packager == null)
             return InventorySummary.EMPTY;
-        }
-        if (packager.isTargetingSameInventory(ignoredHandler)) {
+        if (packager.isTargetingSameInventory(ignoredHandler))
             return InventorySummary.EMPTY;
-        }
         return packager.getAvailableItems();
     }
 
     public void playEffect() {
-        AllSoundEvents.STOCK_LINK.playAt(level, worldPosition, 0.75f, 1.25f, false);
-        Vec3 vec3 = Vec3.atCenterOf(worldPosition);
+        AllSoundEvents.STOCK_LINK.playAt(world, pos, 0.75f, 1.25f, false);
+        Vec3d vec3 = Vec3d.ofCenter(pos);
 
-        BlockState state = getBlockState();
+        BlockState state = getCachedState();
         float f = 1;
 
-        AttachFace face = state.getValueOrElse(PackagerLinkBlock.FACE, AttachFace.FLOOR);
-        if (face != AttachFace.FLOOR) {
+        BlockFace face = state.get(PackagerLinkBlock.FACE, BlockFace.FLOOR);
+        if (face != BlockFace.FLOOR)
             f = -1;
-        }
-        if (face == AttachFace.WALL) {
+        if (face == BlockFace.WALL)
             vec3 = vec3.add(0, 0.25, 0);
-        }
 
-        vec3 = vec3.add(Vec3.atLowerCornerOf(state.getValueOrElse(PackagerLinkBlock.FACING, Direction.SOUTH)
-            .getUnitVec3i()).scale(f * 0.125));
+        vec3 = vec3.add(Vec3d.of(state.get(PackagerLinkBlock.FACING, Direction.SOUTH).getVector()).multiply(f * 0.125));
 
         pulse();
-        level.addParticle(AllParticleTypes.WIFI, vec3.x, vec3.y, vec3.z, 1, face == AttachFace.CEILING ? -1 : 1, 1);
+        world.addParticleClient(AllParticleTypes.WIFI, vec3.x, vec3.y, vec3.z, 1, face == BlockFace.CEILING ? -1 : 1, 1);
     }
 
     public Pair<PackagerBlockEntity, PackagingRequest> processRequest(
@@ -87,37 +82,30 @@ public class PackagerLinkBlockEntity extends LinkWithBulbBlockEntity {
         @Nullable IdentifiedInventory ignoredHandler
     ) {
         PackagerBlockEntity packager = getPackager();
-        if (packager == null) {
+        if (packager == null)
             return null;
-        }
-        if (packager.isTargetingSameInventory(ignoredHandler)) {
+        if (packager.isTargetingSameInventory(ignoredHandler))
             return null;
-        }
 
         InventorySummary summary = packager.getAvailableItems();
         int availableCount = summary.getCountOf(stack);
-        if (availableCount == 0) {
+        if (availableCount == 0)
             return null;
-        }
         int toWithdraw = Math.min(amount, availableCount);
-        return Pair.of(
-            packager,
-            PackagingRequest.create(stack, toWithdraw, address, linkIndex, finalLink, 0, orderId, context)
-        );
+        return Pair.of(packager, PackagingRequest.create(stack, toWithdraw, address, linkIndex, finalLink, 0, orderId, context));
     }
 
     @Override
-    protected void write(ValueOutput view, boolean clientPacket) {
+    protected void write(WriteView view, boolean clientPacket) {
         super.write(view, clientPacket);
-        if (placedBy != null) {
-            view.store("PlacedBy", UUIDUtil.CODEC, placedBy);
-        }
+        if (placedBy != null)
+            view.put("PlacedBy", Uuids.INT_STREAM_CODEC, placedBy);
     }
 
     @Override
-    protected void read(ValueInput view, boolean clientPacket) {
+    protected void read(ReadView view, boolean clientPacket) {
         super.read(view, clientPacket);
-        placedBy = view.read("PlacedBy", UUIDUtil.CODEC).orElse(null);
+        placedBy = view.read("PlacedBy", Uuids.INT_STREAM_CODEC).orElse(null);
     }
 
     @Override
@@ -128,26 +116,22 @@ public class PackagerLinkBlockEntity extends LinkWithBulbBlockEntity {
     @Override
     public void initialize() {
         super.initialize();
-        behaviour.redstonePowerChanged(PackagerLinkBlock.getPower(getBlockState(), level, worldPosition));
+        behaviour.redstonePowerChanged(PackagerLinkBlock.getPower(getCachedState(), world, pos));
         PackagerBlockEntity packager = getPackager();
-        if (packager != null) {
+        if (packager != null)
             packager.recheckIfLinksPresent();
-        }
     }
 
     @Nullable
     public PackagerBlockEntity getPackager() {
-        BlockState blockState = getBlockState();
-        if (behaviour.redstonePower == 15) {
+        BlockState blockState = getCachedState();
+        if (behaviour.redstonePower == 15)
             return null;
-        }
-        BlockPos source = worldPosition.relative(PackagerLinkBlock.getConnectedDirection(blockState).getOpposite());
-        if (!(level.getBlockEntity(source) instanceof PackagerBlockEntity packager)) {
+        BlockPos source = pos.offset(PackagerLinkBlock.getConnectedDirection(blockState).getOpposite());
+        if (!(world.getBlockEntity(source) instanceof PackagerBlockEntity packager))
             return null;
-        }
-        if (packager instanceof RepackagerBlockEntity) {
+        if (packager instanceof RepackagerBlockEntity)
             return null;
-        }
         return packager;
     }
 
@@ -156,23 +140,21 @@ public class PackagerLinkBlockEntity extends LinkWithBulbBlockEntity {
         return PackagerLinkBlock.getConnectedDirection(state);
     }
 
-    private static final Map<BlockState, Vec3> bulbOffsets = new HashMap<>();
+    private static final Map<BlockState, Vec3d> bulbOffsets = new HashMap<>();
 
     @Override
-    public Vec3 getBulbOffset(BlockState state) {
+    public Vec3d getBulbOffset(BlockState state) {
         return bulbOffsets.computeIfAbsent(
             state, s -> {
-                Vec3 offset = VecHelper.voxelSpace(5, 6, 11);
-                Vec3 wallOffset = VecHelper.voxelSpace(11, 6, 5);
-                AttachFace face = s.getValue(PackagerLinkBlock.FACE);
-                Vec3 vec = face == AttachFace.WALL ? wallOffset : offset;
-                float angle = AngleHelper.horizontalAngle(s.getValue(PackagerLinkBlock.FACING));
-                if (face == AttachFace.CEILING) {
+                Vec3d offset = VecHelper.voxelSpace(5, 6, 11);
+                Vec3d wallOffset = VecHelper.voxelSpace(11, 6, 5);
+                BlockFace face = s.get(PackagerLinkBlock.FACE);
+                Vec3d vec = face == BlockFace.WALL ? wallOffset : offset;
+                float angle = AngleHelper.horizontalAngle(s.get(PackagerLinkBlock.FACING));
+                if (face == BlockFace.CEILING)
                     angle = -angle;
-                }
-                if (face == AttachFace.WALL) {
+                if (face == BlockFace.WALL)
                     angle = 0;
-                }
                 return VecHelper.rotateCentered(vec, angle, Axis.Y);
             }
         );

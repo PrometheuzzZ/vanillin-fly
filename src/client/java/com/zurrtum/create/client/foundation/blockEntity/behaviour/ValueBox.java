@@ -1,29 +1,29 @@
 package com.zurrtum.create.client.foundation.blockEntity.behaviour;
 
-import com.mojang.blaze3d.vertex.PoseStack;
 import com.zurrtum.create.client.catnip.outliner.ChasingAABBOutline;
 import com.zurrtum.create.client.catnip.render.SuperRenderTypeBuffer;
 import com.zurrtum.create.client.foundation.blockEntity.behaviour.ValueBoxTransform.Sided;
 import com.zurrtum.create.client.foundation.blockEntity.behaviour.scrollValue.INamedIconOptions;
 import com.zurrtum.create.client.foundation.gui.AllIcons;
 import com.zurrtum.create.content.logistics.filter.FilterItem;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.Font;
-import net.minecraft.client.renderer.LightTexture;
-import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.item.ItemModelResolver;
-import net.minecraft.client.renderer.item.ItemStackRenderState;
-import net.minecraft.core.BlockPos;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.world.item.ItemDisplayContext;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.block.BlockState;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.font.TextRenderer;
+import net.minecraft.client.item.ItemModelManager;
+import net.minecraft.client.render.LightmapTextureManager;
+import net.minecraft.client.render.VertexConsumerProvider;
+import net.minecraft.client.render.item.ItemRenderState;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.item.ItemDisplayContext;
+import net.minecraft.item.ItemStack;
+import net.minecraft.text.MutableText;
+import net.minecraft.text.Text;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Box;
+import net.minecraft.util.math.Vec3d;
 
 public class ValueBox extends ChasingAABBOutline {
-    protected Component label;
+    protected Text label;
 
     public int overrideColor = -1;
     public boolean isPassive;
@@ -32,20 +32,20 @@ public class ValueBox extends ChasingAABBOutline {
 
     protected BlockPos pos;
     protected BlockState blockState;
-    protected ItemStackRenderState state;
+    protected ItemRenderState state;
 
     protected AllIcons outline = AllIcons.VALUE_BOX_HOVER_4PX;
 
-    public ValueBox(Component label, AABB bb, BlockPos pos) {
-        this(label, bb, pos, Minecraft.getInstance().level.getBlockState(pos));
+    public ValueBox(Text label, Box bb, BlockPos pos) {
+        this(label, bb, pos, MinecraftClient.getInstance().world.getBlockState(pos));
     }
 
-    public ValueBox(Component label, AABB bb, BlockPos pos, BlockState state) {
+    public ValueBox(Text label, Box bb, BlockPos pos, BlockState state) {
         super(bb);
         this.label = label;
         this.pos = pos;
         this.blockState = state;
-        this.state = new ItemStackRenderState();
+        this.state = new ItemRenderState();
     }
 
     public ValueBox transform(ValueBoxTransform transform) {
@@ -69,49 +69,46 @@ public class ValueBox extends ChasingAABBOutline {
     }
 
     @Override
-    public void render(Minecraft mc, PoseStack ms, SuperRenderTypeBuffer buffer, Vec3 camera, float pt) {
+    public void render(MinecraftClient mc, MatrixStack ms, SuperRenderTypeBuffer buffer, Vec3d camera, float pt) {
         boolean hasTransform = transform != null;
-        if (transform instanceof Sided && params.getHighlightedFace() != null) {
+        if (transform instanceof Sided && params.getHighlightedFace() != null)
             ((Sided) transform).fromSide(params.getHighlightedFace());
-        }
 
-        if (hasTransform && !transform.shouldRender(blockState)) {
+        if (hasTransform && !transform.shouldRender(blockState))
             return;
-        }
 
-        ms.pushPose();
+        ms.push();
         ms.translate(pos.getX() - camera.x, pos.getY() - camera.y, pos.getZ() - camera.z);
-        if (hasTransform) {
+        if (hasTransform)
             transform.transform(blockState, ms);
-        }
 
         if (!isPassive) {
-            ms.pushPose();
+            ms.push();
             ms.scale(-2.01f, -2.01f, 2.01f);
             ms.translate(-8 / 16.0, -8 / 16.0, -.5 / 16.0);
             getOutline().render(ms, buffer, 0xffffff);
-            ms.popPose();
+            ms.pop();
         }
 
         float fontScale = hasTransform ? -transform.getFontScale() : -1 / 64f;
         ms.scale(fontScale, fontScale, fontScale);
         renderContents(mc, ms, buffer);
 
-        ms.popPose();
+        ms.pop();
     }
 
     public AllIcons getOutline() {
         return outline;
     }
 
-    public void renderContents(Minecraft mc, PoseStack ms, MultiBufferSource buffer) {
+    public void renderContents(MinecraftClient mc, MatrixStack ms, VertexConsumerProvider buffer) {
     }
 
     public static class ItemValueBox extends ValueBox {
         ItemStack stack;
-        MutableComponent count;
+        MutableText count;
 
-        public ItemValueBox(Component label, AABB bb, BlockPos pos, ItemStack stack, MutableComponent count) {
+        public ItemValueBox(Text label, Box bb, BlockPos pos, ItemStack stack, MutableText count) {
             super(label, bb, pos);
             this.stack = stack;
             this.count = count;
@@ -119,30 +116,28 @@ public class ValueBox extends ChasingAABBOutline {
 
         @Override
         public AllIcons getOutline() {
-            if (!stack.isEmpty()) {
+            if (!stack.isEmpty())
                 return AllIcons.VALUE_BOX_HOVER_6PX;
-            }
             return super.getOutline();
         }
 
         @Override
-        public void renderContents(Minecraft mc, PoseStack ms, MultiBufferSource buffer) {
-            if (count == null) {
+        public void renderContents(MinecraftClient mc, MatrixStack ms, VertexConsumerProvider buffer) {
+            if (count == null)
                 return;
-            }
 
-            Font font = mc.font;
+            TextRenderer font = mc.textRenderer;
             ms.translate(17.5, -5, 7);
 
             boolean isFilter = stack.getItem() instanceof FilterItem;
             boolean isEmpty = stack.isEmpty();
 
-            ItemModelResolver itemModelManager = mc.getItemModelResolver();
-            itemModelManager.updateForTopItem(state, stack, ItemDisplayContext.GUI, mc.level, mc.player, 0);
-            boolean blockItem = state.usesBlockLight();
+            ItemModelManager itemModelManager = mc.getItemModelManager();
+            itemModelManager.clearAndUpdate(state, stack, ItemDisplayContext.GUI, mc.world, mc.player, 0);
+            boolean blockItem = state.isSideLit();
 
             float scale = 1.5f;
-            ms.translate(-font.width(count), 0, 0);
+            ms.translate(-font.getWidth(count), 0, 0);
 
             if (isFilter) {
                 ms.translate(-5, 8, 0);
@@ -153,9 +148,8 @@ public class ValueBox extends ChasingAABBOutline {
                 ms.translate(-7, 10, blockItem ? 10 + 1 / 4f : 0);
             }
 
-            if (count.getString().equals("*")) {
+            if (count.getString().equals("*"))
                 ms.translate(-1, 3, 0);
-            }
 
             ms.scale(scale, scale, scale);
             drawString8x(ms, buffer, count, 0, 0, isFilter ? 0xFFFFFFFF : 0xFFEDEDED);
@@ -164,42 +158,40 @@ public class ValueBox extends ChasingAABBOutline {
     }
 
     public static class TextValueBox extends ValueBox {
-        Component text;
+        Text text;
 
-        public TextValueBox(Component label, AABB bb, BlockPos pos, Component text) {
+        public TextValueBox(Text label, Box bb, BlockPos pos, Text text) {
             super(label, bb, pos);
             this.text = text;
         }
 
-        public TextValueBox(Component label, AABB bb, BlockPos pos, BlockState state, Component text) {
+        public TextValueBox(Text label, Box bb, BlockPos pos, BlockState state, Text text) {
             super(label, bb, pos, state);
             this.text = text;
         }
 
         @Override
-        public void renderContents(Minecraft mc, PoseStack ms, MultiBufferSource buffer) {
-            Font font = mc.font;
+        public void renderContents(MinecraftClient mc, MatrixStack ms, VertexConsumerProvider buffer) {
+            TextRenderer font = mc.textRenderer;
             float scale = 3;
             ms.scale(scale, scale, 1);
             ms.translate(-4, -3.75, 5);
 
-            int stringWidth = font.width(text);
-            float numberScale = (float) font.lineHeight / stringWidth;
+            int stringWidth = font.getWidth(text);
+            float numberScale = (float) font.fontHeight / stringWidth;
             boolean singleDigit = stringWidth < 10;
-            if (singleDigit) {
+            if (singleDigit)
                 numberScale = numberScale / 2;
-            }
-            float verticalMargin = (stringWidth - font.lineHeight) / 2f;
+            float verticalMargin = (stringWidth - font.fontHeight) / 2f;
 
             ms.scale(numberScale, numberScale, numberScale);
             ms.translate(singleDigit ? stringWidth / 2 : 0, singleDigit ? -verticalMargin : verticalMargin, 0);
 
             int overrideColor = transform.getOverrideColor();
-            if (overrideColor == -1) {
+            if (overrideColor == -1)
                 drawString8x(ms, buffer, text, 0, 0, 0xFFEDEDED);
-            } else {
+            else
                 drawString(ms, buffer, text, 0, 0, overrideColor);
-            }
         }
 
     }
@@ -207,13 +199,13 @@ public class ValueBox extends ChasingAABBOutline {
     public static class IconValueBox extends ValueBox {
         AllIcons icon;
 
-        public IconValueBox(Component label, INamedIconOptions iconValue, AABB bb, BlockPos pos) {
+        public IconValueBox(Text label, INamedIconOptions iconValue, Box bb, BlockPos pos) {
             super(label, bb, pos);
             icon = iconValue.getIcon();
         }
 
         @Override
-        public void renderContents(Minecraft mc, PoseStack ms, MultiBufferSource buffer) {
+        public void renderContents(MinecraftClient mc, MatrixStack ms, VertexConsumerProvider buffer) {
             float scale = 2 * 16;
             ms.scale(scale, scale, scale);
             ms.translate(-.5f, -.5f, 5 / 32f);
@@ -224,45 +216,31 @@ public class ValueBox extends ChasingAABBOutline {
 
     }
 
-    private static void drawString(
-        PoseStack ms,
-        MultiBufferSource buffer,
-        Component text,
-        float x,
-        float y,
-        int color
-    ) {
-        Minecraft.getInstance().font.drawInBatch(
+    private static void drawString(MatrixStack ms, VertexConsumerProvider buffer, Text text, float x, float y, int color) {
+        MinecraftClient.getInstance().textRenderer.draw(
             text,
             x,
             y,
             color,
             false,
-            ms.last().pose(),
+            ms.peek().getPositionMatrix(),
             buffer,
-            Font.DisplayMode.NORMAL,
+            TextRenderer.TextLayerType.NORMAL,
             0,
-            LightTexture.FULL_BRIGHT
+            LightmapTextureManager.MAX_LIGHT_COORDINATE
         );
     }
 
-    private static void drawString8x(
-        PoseStack ms,
-        MultiBufferSource buffer,
-        Component text,
-        float x,
-        float y,
-        int color
-    ) {
-        Minecraft.getInstance().font.drawInBatch8xOutline(
-            text.getVisualOrderText(),
+    private static void drawString8x(MatrixStack ms, VertexConsumerProvider buffer, Text text, float x, float y, int color) {
+        MinecraftClient.getInstance().textRenderer.drawWithOutline(
+            text.asOrderedText(),
             x,
             y,
             color,
             0xff333333,
-            ms.last().pose(),
+            ms.peek().getPositionMatrix(),
             buffer,
-            LightTexture.FULL_BRIGHT
+            LightmapTextureManager.MAX_LIGHT_COORDINATE
         );
     }
 

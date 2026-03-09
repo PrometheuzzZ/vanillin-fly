@@ -1,77 +1,60 @@
 package com.zurrtum.create.content.equipment.zapper;
 
 import com.zurrtum.create.AllDataComponents;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.game.ClientGamePacketListener;
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.InteractionHand;
-import net.minecraft.world.entity.HumanoidArm;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.item.ItemStack;
+import net.minecraft.network.listener.ClientPlayPacketListener;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.util.Arm;
+import net.minecraft.util.Hand;
+import net.minecraft.util.math.Vec3d;
 
 import java.util.function.Function;
 import java.util.function.Predicate;
 
 public class ShootableGadgetItemMethods {
 
-    public static void applyCooldown(
-        Player player,
-        ItemStack item,
-        InteractionHand hand,
-        Predicate<ItemStack> predicate,
-        int cooldown
-    ) {
-        if (cooldown <= 0) {
+    public static void applyCooldown(PlayerEntity player, ItemStack item, Hand hand, Predicate<ItemStack> predicate, int cooldown) {
+        if (cooldown <= 0)
             return;
-        }
 
-        boolean gunInOtherHand = predicate.test(player.getItemInHand(hand == InteractionHand.MAIN_HAND ? InteractionHand.OFF_HAND : InteractionHand.MAIN_HAND));
-        player.getCooldowns().addCooldown(item, gunInOtherHand ? cooldown * 2 / 3 : cooldown);
+        boolean gunInOtherHand = predicate.test(player.getStackInHand(hand == Hand.MAIN_HAND ? Hand.OFF_HAND : Hand.MAIN_HAND));
+        player.getItemCooldownManager().set(item, gunInOtherHand ? cooldown * 2 / 3 : cooldown);
     }
 
-    public static void sendPackets(Player player, Function<Boolean, Packet<ClientGamePacketListener>> factory) {
-        if (!(player instanceof ServerPlayer serverPlayer)) {
+    public static void sendPackets(PlayerEntity player, Function<Boolean, Packet<ClientPlayPacketListener>> factory) {
+        if (!(player instanceof ServerPlayerEntity serverPlayer))
             return;
-        }
-        serverPlayer.level().getChunkSource().sendToTrackingPlayers(player, factory.apply(false));
-        serverPlayer.connection.send(factory.apply(true));
+        serverPlayer.getEntityWorld().getChunkManager().sendToOtherNearbyPlayers(player, factory.apply(false));
+        serverPlayer.networkHandler.sendPacket(factory.apply(true));
     }
 
-    public static boolean shouldSwap(
-        Player player,
-        ItemStack item,
-        InteractionHand hand,
-        Predicate<ItemStack> predicate
-    ) {
-        boolean isSwap = item.has(AllDataComponents.SHAPER_SWAP);
-        boolean mainHand = hand == InteractionHand.MAIN_HAND;
-        boolean gunInOtherHand = predicate.test(player.getItemInHand(mainHand ? InteractionHand.OFF_HAND : InteractionHand.MAIN_HAND));
+    public static boolean shouldSwap(PlayerEntity player, ItemStack item, Hand hand, Predicate<ItemStack> predicate) {
+        boolean isSwap = item.contains(AllDataComponents.SHAPER_SWAP);
+        boolean mainHand = hand == Hand.MAIN_HAND;
+        boolean gunInOtherHand = predicate.test(player.getStackInHand(mainHand ? Hand.OFF_HAND : Hand.MAIN_HAND));
 
         // Pass To Offhand
-        if (mainHand && isSwap && gunInOtherHand) {
+        if (mainHand && isSwap && gunInOtherHand)
             return true;
-        }
-        if (mainHand && !isSwap && gunInOtherHand) {
+        if (mainHand && !isSwap && gunInOtherHand)
             item.set(AllDataComponents.SHAPER_SWAP, true);
-        }
-        if (!mainHand && isSwap) {
+        if (!mainHand && isSwap)
             item.remove(AllDataComponents.SHAPER_SWAP);
-        }
-        if (!mainHand && gunInOtherHand) {
-            player.getItemInHand(InteractionHand.MAIN_HAND).remove(AllDataComponents.SHAPER_SWAP);
-        }
-        player.startUsingItem(hand);
+        if (!mainHand && gunInOtherHand)
+            player.getStackInHand(Hand.MAIN_HAND).remove(AllDataComponents.SHAPER_SWAP);
+        player.setCurrentHand(hand);
         return false;
     }
 
-    public static Vec3 getGunBarrelVec(Player player, boolean mainHand, Vec3 rightHandForward) {
-        Vec3 start = player.position().add(0, player.getEyeHeight(), 0);
-        float yaw = (float) ((player.getYRot()) / -180 * Math.PI);
-        float pitch = (float) ((player.getXRot()) / -180 * Math.PI);
-        int flip = mainHand == (player.getMainArm() == HumanoidArm.RIGHT) ? -1 : 1;
-        Vec3 barrelPosNoTransform = new Vec3(flip * rightHandForward.x, rightHandForward.y, rightHandForward.z);
-        Vec3 barrelPos = start.add(barrelPosNoTransform.xRot(pitch).yRot(yaw));
+    public static Vec3d getGunBarrelVec(PlayerEntity player, boolean mainHand, Vec3d rightHandForward) {
+        Vec3d start = player.getEntityPos().add(0, player.getStandingEyeHeight(), 0);
+        float yaw = (float) ((player.getYaw()) / -180 * Math.PI);
+        float pitch = (float) ((player.getPitch()) / -180 * Math.PI);
+        int flip = mainHand == (player.getMainArm() == Arm.RIGHT) ? -1 : 1;
+        Vec3d barrelPosNoTransform = new Vec3d(flip * rightHandForward.x, rightHandForward.y, rightHandForward.z);
+        Vec3d barrelPos = start.add(barrelPosNoTransform.rotateX(pitch).rotateY(yaw));
         return barrelPos;
     }
 

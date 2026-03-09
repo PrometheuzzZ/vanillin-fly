@@ -1,24 +1,24 @@
 package com.zurrtum.create.client.catnip.gui.render;
 
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.navigation.ScreenRectangle;
-import net.minecraft.client.gui.render.state.pip.PictureInPictureRenderState;
-import net.minecraft.core.BlockPos;
-import net.minecraft.util.Mth;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.ScreenRect;
+import net.minecraft.client.gui.render.state.special.SpecialGuiElementRenderState;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix3x2f;
 
-public record EntityBlockRenderState(int id, Matrix3x2f pose, Level world, BlockPos pos, BlockEntity entity,
-                                     BlockState state, int x0, int y0, int x1, int y1, float scale, float size,
-                                     float xRot, float yRot, float zRot,
-                                     ScreenRectangle bounds) implements PictureInPictureRenderState {
+public record EntityBlockRenderState(
+    int id, Matrix3x2f pose, World world, BlockPos pos, BlockEntity entity, BlockState state, int x1, int y1, int x2, int y2, float scale, float size,
+    float xRot, float yRot, float zRot, ScreenRect bounds
+) implements SpecialGuiElementRenderState {
     public static EntityBlockRenderState create(
         int id,
-        GuiGraphics graphics,
-        Level world,
+        DrawContext graphics,
+        World world,
         BlockPos pos,
         BlockEntity entity,
         BlockState state,
@@ -30,7 +30,7 @@ public record EntityBlockRenderState(int id, Matrix3x2f pose, Level world, Block
         float yRot,
         float zRot
     ) {
-        Matrix3x2f pose = new Matrix3x2f(graphics.pose());
+        Matrix3x2f pose = new Matrix3x2f(graphics.getMatrices());
         scale = scale * 16;
         float size = scale + padding;
         return new EntityBlockRenderState(
@@ -46,15 +46,15 @@ public record EntityBlockRenderState(int id, Matrix3x2f pose, Level world, Block
             (int) (y + size),
             scale,
             size,
-            Mth.DEG_TO_RAD * xRot,
-            Mth.DEG_TO_RAD * yRot,
-            Mth.DEG_TO_RAD * zRot,
-            new ScreenRectangle(x, y, (int) size, (int) size).transformMaxBounds(pose)
+            MathHelper.RADIANS_PER_DEGREE * xRot,
+            MathHelper.RADIANS_PER_DEGREE * yRot,
+            MathHelper.RADIANS_PER_DEGREE * zRot,
+            new ScreenRect(x, y, (int) size, (int) size).transformEachVertex(pose)
         );
     }
 
     @Override
-    public @Nullable ScreenRectangle scissorArea() {
+    public @Nullable ScreenRect scissorArea() {
         return null;
     }
 }

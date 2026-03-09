@@ -1,48 +1,39 @@
 package com.zurrtum.create.client.infrastructure.model;
 
 import com.google.common.base.Suppliers;
-import com.mojang.blaze3d.platform.Lighting;
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
-import com.mojang.math.Axis;
 import com.mojang.serialization.MapCodec;
 import com.zurrtum.create.AllDataComponents;
 import com.zurrtum.create.client.Create;
 import com.zurrtum.create.client.catnip.animation.AnimationTickHolder;
 import com.zurrtum.create.client.flywheel.lib.model.baked.SinglePosVirtualBlockGetter;
-import com.zurrtum.create.client.foundation.render.CreateRenderTypes;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.multiplayer.ClientLevel;
-import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.client.renderer.*;
-import net.minecraft.client.renderer.block.BlockRenderDispatcher;
-import net.minecraft.client.renderer.block.model.BakedQuad;
-import net.minecraft.client.renderer.block.model.BlockModelPart;
-import net.minecraft.client.renderer.block.model.ItemTransform;
-import net.minecraft.client.renderer.block.model.TextureSlots;
-import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
-import net.minecraft.client.renderer.feature.FeatureRenderDispatcher;
-import net.minecraft.client.renderer.item.ItemModel;
-import net.minecraft.client.renderer.item.ItemModelResolver;
-import net.minecraft.client.renderer.item.ItemStackRenderState;
-import net.minecraft.client.renderer.item.ModelRenderProperties;
-import net.minecraft.client.renderer.rendertype.RenderType;
-import net.minecraft.client.renderer.special.SpecialModelRenderer;
-import net.minecraft.client.resources.model.BlockModelRotation;
-import net.minecraft.client.resources.model.ModelBaker;
-import net.minecraft.client.resources.model.ResolvedModel;
-import net.minecraft.core.BlockPos;
-import net.minecraft.resources.Identifier;
-import net.minecraft.util.Mth;
-import net.minecraft.util.RandomSource;
-import net.minecraft.world.entity.HumanoidArm;
-import net.minecraft.world.entity.ItemOwner;
-import net.minecraft.world.item.ItemDisplayContext;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.block.CrossCollisionBlock;
-import net.minecraft.world.level.block.state.BlockState;
+import com.zurrtum.create.client.foundation.render.RenderTypes;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.HorizontalConnectingBlock;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.item.ItemModelManager;
+import net.minecraft.client.network.ClientPlayerEntity;
+import net.minecraft.client.render.*;
+import net.minecraft.client.render.block.BlockRenderManager;
+import net.minecraft.client.render.command.OrderedRenderCommandQueue;
+import net.minecraft.client.render.command.RenderDispatcher;
+import net.minecraft.client.render.item.ItemRenderState;
+import net.minecraft.client.render.item.model.ItemModel;
+import net.minecraft.client.render.item.model.special.SpecialModelRenderer;
+import net.minecraft.client.render.model.*;
+import net.minecraft.client.render.model.json.Transformation;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.client.world.ClientWorld;
+import net.minecraft.item.ItemDisplayContext;
+import net.minecraft.item.ItemStack;
+import net.minecraft.util.Arm;
+import net.minecraft.util.HeldItemContext;
+import net.minecraft.util.Identifier;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.RotationAxis;
+import net.minecraft.util.math.random.Random;
 import org.jetbrains.annotations.Nullable;
-import org.joml.Vector3fc;
+import org.joml.Vector3f;
 
 import java.util.HashSet;
 import java.util.List;
@@ -54,33 +45,24 @@ import java.util.function.Supplier;
 import static com.zurrtum.create.Create.MOD_ID;
 
 public class WorldshaperModel implements ItemModel, SpecialModelRenderer<WorldshaperModel.RenderData> {
-    public static final Identifier ID = Identifier.fromNamespaceAndPath(MOD_ID, "model/handheld_worldshaper");
-    public static final Identifier ITEM_ID = Identifier.fromNamespaceAndPath(MOD_ID, "item/handheld_worldshaper/item");
-    public static final Identifier CORE_ID = Identifier.fromNamespaceAndPath(MOD_ID, "item/handheld_worldshaper/core");
-    public static final Identifier CORE_GLOW_ID = Identifier.fromNamespaceAndPath(
-        MOD_ID,
-        "item/handheld_worldshaper/core_glow"
-    );
-    public static final Identifier ACCELERATOR_ID = Identifier.fromNamespaceAndPath(
-        MOD_ID,
-        "item/handheld_worldshaper/accelerator"
-    );
+    public static final Identifier ID = Identifier.of(MOD_ID, "model/handheld_worldshaper");
+    public static final Identifier ITEM_ID = Identifier.of(MOD_ID, "item/handheld_worldshaper/item");
+    public static final Identifier CORE_ID = Identifier.of(MOD_ID, "item/handheld_worldshaper/core");
+    public static final Identifier CORE_GLOW_ID = Identifier.of(MOD_ID, "item/handheld_worldshaper/core_glow");
+    public static final Identifier ACCELERATOR_ID = Identifier.of(MOD_ID, "item/handheld_worldshaper/accelerator");
     private static final int[] TINTS = new int[0];
-    private static final RandomSource random = RandomSource.create();
-    private static final PoseStack matrices = new PoseStack();
+    private static final Random random = Random.create();
+    private static final MatrixStack matrices = new MatrixStack();
 
-    private final RenderType blockLayer = Sheets.translucentBlockItemSheet();
-    private final RenderType itemLayer = CreateRenderTypes.itemGlowingSolid();
-    private final RenderType translucent = CreateRenderTypes.itemGlowingTranslucent();
-    private final ModelRenderProperties settings;
+    private final ModelSettings settings;
     private final List<BakedQuad> item;
     private final List<BakedQuad> core;
     private final List<BakedQuad> coreGlow;
     private final List<BakedQuad> accelerator;
-    private final Supplier<Vector3fc[]> vector;
+    private final Supplier<Vector3f[]> vector;
 
     public WorldshaperModel(
-        ModelRenderProperties settings,
+        ModelSettings settings,
         List<BakedQuad> item,
         List<BakedQuad> core,
         List<BakedQuad> coreGlow,
@@ -92,132 +74,118 @@ public class WorldshaperModel implements ItemModel, SpecialModelRenderer<Worldsh
         this.coreGlow = coreGlow;
         this.accelerator = accelerator;
         this.vector = Suppliers.memoize(() -> {
-            Set<Vector3fc> set = new HashSet<>();
-            addPosition(set, item);
-            addPosition(set, core);
-            addPosition(set, coreGlow);
-            addPosition(set, accelerator);
-            return set.toArray(Vector3fc[]::new);
+            Set<Vector3f> set = new HashSet<>();
+            calculatePosition(item, set::add);
+            calculatePosition(core, set::add);
+            calculatePosition(coreGlow, set::add);
+            calculatePosition(accelerator, set::add);
+            return set.toArray(Vector3f[]::new);
         });
     }
 
-    private static void addPosition(Set<Vector3fc> set, List<BakedQuad> quads) {
+    private static void calculatePosition(List<BakedQuad> quads, Consumer<Vector3f> consumer) {
         for (BakedQuad bakedQuad : quads) {
-            set.add(bakedQuad.position0());
-            set.add(bakedQuad.position1());
-            set.add(bakedQuad.position2());
-            set.add(bakedQuad.position3());
+            BakedQuadFactory.calculatePosition(bakedQuad.vertexData(), consumer);
         }
     }
 
     @Override
     public void update(
-        ItemStackRenderState state,
+        ItemRenderState state,
         ItemStack stack,
-        ItemModelResolver resolver,
+        ItemModelManager resolver,
         ItemDisplayContext displayContext,
-        @Nullable ClientLevel world,
-        @Nullable ItemOwner user,
+        @Nullable ClientWorld world,
+        @Nullable HeldItemContext user,
         int seed
     ) {
-        state.appendModelIdentityElement(this);
-        state.setAnimated();
-        ItemStackRenderState.LayerRenderState renderState = state.newLayer();
-        renderState.setExtents(vector);
-        renderState.setUsesBlockLight(settings.usesBlockLight());
-        renderState.setParticleIcon(settings.particleIcon());
+        state.addModelKey(this);
+        state.markAnimated();
+        ItemRenderState.LayerRenderState renderState = state.newLayer();
+        renderState.setVertices(vector);
+        renderState.setUseLight(settings.usesBlockLight());
+        renderState.setParticle(settings.particleIcon());
         RenderData data = new RenderData();
-        data.transform = settings.transforms().getTransform(displayContext);
-        Minecraft mc = Minecraft.getInstance();
-        LocalPlayer player = mc.player;
-        boolean mainHand = player.getMainHandItem() == stack;
-        data.rightHand = mainHand ^ (player.getMainArm() == HumanoidArm.LEFT);
-        data.inHand = mainHand || player.getOffhandItem() == stack;
+        data.transform = settings.transforms().getTransformation(displayContext);
+        MinecraftClient mc = MinecraftClient.getInstance();
+        ClientPlayerEntity player = mc.player;
+        boolean mainHand = player.getMainHandStack() == stack;
+        data.rightHand = mainHand ^ (player.getMainArm() == Arm.LEFT);
+        data.inHand = mainHand || player.getOffHandStack() == stack;
         if (displayContext == ItemDisplayContext.GUI) {
             data.state = stack.get(AllDataComponents.SHAPER_BLOCK_USED);
             data.used = UsedRenderState.create(mc, data.state, displayContext, world, user, seed);
         }
-        state.appendModelIdentityElement(data);
-        renderState.setupSpecialModel(this, data);
+        state.addModelKey(data);
+        renderState.setSpecialModel(this, data);
     }
 
     @Override
-    public void submit(
+    public void render(
         RenderData data,
         ItemDisplayContext displayContext,
-        PoseStack matrices,
-        SubmitNodeCollector queue,
+        MatrixStack matrices,
+        OrderedRenderCommandQueue queue,
         int light,
         int overlay,
         boolean glint,
         int i
     ) {
         assert data != null;
-        matrices.pushPose();
+        matrices.push();
         matrices.translate(0.5F, 0.5F, 0.5F);
-        matrices.pushPose();
-        data.transform.apply(displayContext.leftHand(), matrices.last());
-        renderItem(displayContext, matrices, queue, light, overlay, item, blockLayer);
+        matrices.push();
+        data.transform.apply(displayContext.isLeftHand(), matrices.peek());
+        RenderLayer layer = TexturedRenderLayers.getItemEntityTranslucentCull();
+        renderItem(displayContext, matrices, queue, light, overlay, item, layer);
 
         float pt = AnimationTickHolder.getPartialTicks();
         float worldTime = AnimationTickHolder.getRenderTime() / 20;
-        float animation = Mth.clamp(Create.ZAPPER_RENDER_HANDLER.getAnimation(data.rightHand, pt) * 5, 0, 1);
+        float animation = MathHelper.clamp(Create.ZAPPER_RENDER_HANDLER.getAnimation(data.rightHand, pt) * 5, 0, 1);
 
         // Core glows
         float multiplier;
-        if (data.inHand) {
+        if (data.inHand)
             multiplier = animation;
-        } else {
-            multiplier = Mth.sin(worldTime * 5);
-        }
-        int lightItensity = (int) (15 * Mth.clamp(multiplier, 0, 1));
-        int glowLight = LightTexture.pack(lightItensity, Math.max(lightItensity, 4));
-        renderItem(displayContext, matrices, queue, glowLight, overlay, core, itemLayer);
-        renderItem(displayContext, matrices, queue, glowLight, overlay, coreGlow, translucent);
+        else
+            multiplier = MathHelper.sin(worldTime * 5);
+        int lightItensity = (int) (15 * MathHelper.clamp(multiplier, 0, 1));
+        int glowLight = LightmapTextureManager.pack(lightItensity, Math.max(lightItensity, 4));
+        renderItem(displayContext, matrices, queue, glowLight, overlay, core, RenderTypes.itemGlowingSolid());
+        renderItem(displayContext, matrices, queue, glowLight, overlay, coreGlow, RenderTypes.itemGlowingTranslucent());
 
         // Accelerator spins
         float angle = worldTime * -25;
-        if (data.inHand) {
+        if (data.inHand)
             angle += 360 * animation;
-        }
 
         angle %= 360;
         matrices.translate(0.5f, 0.345f, 0.5f);
-        matrices.mulPose(Axis.ZP.rotationDegrees(angle));
+        matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(angle));
         matrices.translate(-0.5f, -0.345f, -0.5f);
-        renderItem(displayContext, matrices, queue, light, overlay, accelerator, blockLayer);
-        matrices.popPose();
+        renderItem(displayContext, matrices, queue, light, overlay, accelerator, layer);
+        matrices.pop();
 
         if (data.used != null) {
             data.used.render(matrices, queue, light, overlay);
         }
-        matrices.popPose();
+        matrices.pop();
     }
 
     private static void renderItem(
         ItemDisplayContext displayContext,
-        PoseStack matrices,
-        SubmitNodeCollector queue,
+        MatrixStack matrices,
+        OrderedRenderCommandQueue queue,
         int light,
         int overlay,
         List<BakedQuad> item,
-        RenderType layer
+        RenderLayer layer
     ) {
-        queue.submitItem(
-            matrices,
-            displayContext,
-            light,
-            overlay,
-            0,
-            TINTS,
-            item,
-            layer,
-            ItemStackRenderState.FoilType.NONE
-        );
+        queue.submitItem(matrices, displayContext, light, overlay, 0, TINTS, item, layer, ItemRenderState.Glint.NONE);
     }
 
     public static class RenderData {
-        public ItemTransform transform;
+        public Transformation transform;
         public BlockState state;
         public boolean rightHand;
         public boolean inHand;
@@ -225,9 +193,8 @@ public class WorldshaperModel implements ItemModel, SpecialModelRenderer<Worldsh
 
         @Override
         public boolean equals(Object o) {
-            if (!(o instanceof RenderData data)) {
+            if (!(o instanceof RenderData data))
                 return false;
-            }
             return transform == data.transform && state == data.state && rightHand == data.rightHand && inHand == data.inHand;
         }
 
@@ -238,12 +205,12 @@ public class WorldshaperModel implements ItemModel, SpecialModelRenderer<Worldsh
     }
 
     @Override
-    public void getExtents(Consumer<Vector3fc> output) {
+    public void collectVertices(Set<Vector3f> vertices) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public RenderData extractArgument(ItemStack stack) {
+    public RenderData getData(ItemStack stack) {
         throw new UnsupportedOperationException();
     }
 
@@ -251,12 +218,12 @@ public class WorldshaperModel implements ItemModel, SpecialModelRenderer<Worldsh
         public static final MapCodec<Unbaked> CODEC = MapCodec.unit(Unbaked::new);
 
         @Override
-        public MapCodec<? extends ItemModel.Unbaked> type() {
+        public MapCodec<? extends ItemModel.Unbaked> getCodec() {
             return CODEC;
         }
 
         @Override
-        public void resolveDependencies(Resolver resolver) {
+        public void resolve(Resolver resolver) {
             resolver.markDependency(ITEM_ID);
             resolver.markDependency(CORE_ID);
             resolver.markDependency(CORE_GLOW_ID);
@@ -264,119 +231,109 @@ public class WorldshaperModel implements ItemModel, SpecialModelRenderer<Worldsh
         }
 
         @Override
-        public ItemModel bake(ItemModel.BakingContext context) {
-            ModelBaker baker = context.blockModelBaker();
-            ResolvedModel model = baker.getModel(ITEM_ID);
-            TextureSlots textures = model.getTopTextureSlots();
-            List<BakedQuad> quads = model.bakeTopGeometry(textures, baker, BlockModelRotation.IDENTITY).getAll();
-            ModelRenderProperties settings = ModelRenderProperties.fromResolvedModel(baker, model, textures);
-            return new WorldshaperModel(
-                settings,
-                quads,
-                bake(baker, CORE_ID),
-                bake(baker, CORE_GLOW_ID),
-                bake(baker, ACCELERATOR_ID)
-            );
+        public ItemModel bake(ItemModel.BakeContext context) {
+            Baker baker = context.blockModelBaker();
+            BakedSimpleModel model = baker.getModel(ITEM_ID);
+            ModelTextures textures = model.getTextures();
+            List<BakedQuad> quads = model.bakeGeometry(textures, baker, ModelRotation.X0_Y0).getAllQuads();
+            ModelSettings settings = ModelSettings.resolveSettings(baker, model, textures);
+            return new WorldshaperModel(settings, quads, bake(baker, CORE_ID), bake(baker, CORE_GLOW_ID), bake(baker, ACCELERATOR_ID));
         }
 
-        private static List<BakedQuad> bake(ModelBaker baker, Identifier id) {
-            ResolvedModel model = baker.getModel(id);
-            return model.bakeTopGeometry(model.getTopTextureSlots(), baker, BlockModelRotation.IDENTITY).getAll();
+        private static List<BakedQuad> bake(Baker baker, Identifier id) {
+            BakedSimpleModel model = baker.getModel(id);
+            return model.bakeGeometry(model.getTextures(), baker, ModelRotation.X0_Y0).getAllQuads();
         }
     }
 
     public interface UsedRenderState {
         static UsedRenderState create(
-            Minecraft mc,
+            MinecraftClient mc,
             BlockState state,
             ItemDisplayContext displayContext,
-            @Nullable ClientLevel world,
-            @Nullable ItemOwner user,
+            @Nullable ClientWorld world,
+            @Nullable HeldItemContext user,
             int seed
         ) {
             if (state == null) {
                 return null;
             }
-            if (state.getBlock() instanceof CrossCollisionBlock block) {
+            if (state.getBlock() instanceof HorizontalConnectingBlock block) {
                 return UsedItemRenderState.create(mc, block, displayContext, world, user, seed);
             }
             return UsedBlockRenderState.create(mc, state, random, matrices);
         }
 
-        void render(PoseStack matrices, SubmitNodeCollector queue, int light, int overlay);
+        void render(MatrixStack matrices, OrderedRenderCommandQueue queue, int light, int overlay);
     }
 
-    public record UsedItemRenderState(Lighting diffuseLighting, MultiBufferSource.BufferSource entityVertexConsumers,
-                                      FeatureRenderDispatcher entityRenderDispatcher,
-                                      ItemStackRenderState state) implements UsedRenderState {
+    public record UsedItemRenderState(
+        DiffuseLighting diffuseLighting, VertexConsumerProvider.Immediate entityVertexConsumers, RenderDispatcher entityRenderDispatcher,
+        ItemRenderState state
+    ) implements UsedRenderState {
         public static UsedItemRenderState create(
-            Minecraft mc,
-            CrossCollisionBlock block,
+            MinecraftClient mc,
+            HorizontalConnectingBlock block,
             ItemDisplayContext displayContext,
-            @Nullable ClientLevel world,
-            @Nullable ItemOwner user,
+            @Nullable ClientWorld world,
+            @Nullable HeldItemContext user,
             int seed
         ) {
-            ItemStackRenderState item = new ItemStackRenderState();
+            ItemRenderState item = new ItemRenderState();
             item.displayContext = displayContext;
-            mc.getItemModelResolver()
-                .appendItemLayers(item, block.asItem().getDefaultInstance(), displayContext, world, user, seed);
-            if (item.usesBlockLight()) {
+            mc.getItemModelManager().update(item, block.asItem().getDefaultStack(), displayContext, world, user, seed);
+            if (item.isSideLit()) {
                 return new UsedItemRenderState(null, null, null, item);
             }
             GameRenderer gameRenderer = mc.gameRenderer;
             return new UsedItemRenderState(
-                gameRenderer.getLighting(),
-                mc.renderBuffers().bufferSource(),
-                gameRenderer.getFeatureRenderDispatcher(),
+                gameRenderer.getDiffuseLighting(),
+                mc.getBufferBuilders().getEntityVertexConsumers(),
+                gameRenderer.getEntityRenderDispatcher(),
                 item
             );
         }
 
-        public void render(PoseStack matrices, SubmitNodeCollector queue, int light, int overlay) {
+        public void render(MatrixStack matrices, OrderedRenderCommandQueue queue, int light, int overlay) {
             if (diffuseLighting != null) {
-                entityRenderDispatcher.renderAllFeatures();
-                entityVertexConsumers.endBatch();
-                diffuseLighting.setupFor(Lighting.Entry.ITEMS_FLAT);
+                entityRenderDispatcher.render();
+                entityVertexConsumers.draw();
+                diffuseLighting.setShaderLights(DiffuseLighting.Type.ITEMS_FLAT);
             }
             matrices.translate(-0.242f, -0.278f, 0);
             matrices.scale(0.25f, 0.25f, 0.25f);
-            matrices.mulPose(Axis.XP.rotationDegrees(30));
-            matrices.mulPose(Axis.YP.rotationDegrees(45));
-            state.submit(matrices, queue, light, overlay, 0);
+            matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(30));
+            matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(45));
+            state.render(matrices, queue, light, overlay, 0);
         }
     }
 
-    public record UsedBlockRenderState(RenderType layer, BlockRenderDispatcher blockRenderManager, PoseStack matrices,
-                                       SinglePosVirtualBlockGetter world, BlockState state,
-                                       List<BlockModelPart> parts) implements UsedRenderState, SubmitNodeCollector.CustomGeometryRenderer {
-        public static UsedBlockRenderState create(
-            Minecraft mc,
-            BlockState state,
-            RandomSource random,
-            PoseStack matrices
-        ) {
-            RenderType layer = ItemBlockRenderTypes.getChunkRenderType(state) == ChunkSectionLayer.TRANSLUCENT ? Sheets.translucentItemSheet() : Sheets.cutoutBlockSheet();
-            BlockRenderDispatcher blockRenderManager = mc.getBlockRenderer();
+    public record UsedBlockRenderState(
+        RenderLayer layer, BlockRenderManager blockRenderManager, MatrixStack matrices, SinglePosVirtualBlockGetter world, BlockState state,
+        List<BlockModelPart> parts
+    ) implements UsedRenderState, OrderedRenderCommandQueue.Custom {
+        public static UsedBlockRenderState create(MinecraftClient mc, BlockState state, Random random, MatrixStack matrices) {
+            RenderLayer layer = RenderLayers.getBlockLayer(state) == BlockRenderLayer.TRANSLUCENT ? TexturedRenderLayers.getItemEntityTranslucentCull() : TexturedRenderLayers.getEntityCutout();
+            BlockRenderManager blockRenderManager = mc.getBlockRenderManager();
             SinglePosVirtualBlockGetter world = SinglePosVirtualBlockGetter.createFullBright();
             world.blockState(state);
             random.setSeed(42L);
-            List<BlockModelPart> parts = blockRenderManager.getBlockModel(state).collectParts(random);
+            List<BlockModelPart> parts = blockRenderManager.getModel(state).getParts(random);
             return new UsedBlockRenderState(layer, blockRenderManager, matrices, world, state, parts);
         }
 
-        public void render(PoseStack matrices, SubmitNodeCollector queue, int light, int overlay) {
+        public void render(MatrixStack matrices, OrderedRenderCommandQueue queue, int light, int overlay) {
             matrices.translate(-0.42f, -0.385f, 0);
             matrices.scale(0.25f, 0.25f, 0.25f);
-            matrices.mulPose(Axis.XP.rotationDegrees(30));
-            matrices.mulPose(Axis.YP.rotationDegrees(45));
-            queue.submitCustomGeometry(matrices, layer, this);
+            matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(30));
+            matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(45));
+            queue.submitCustom(matrices, layer, this);
         }
 
         @Override
-        public void render(PoseStack.Pose matricesEntry, VertexConsumer vertexConsumer) {
-            matrices.last().set(matricesEntry);
-            blockRenderManager.renderBatched(state, BlockPos.ZERO, world, matrices, vertexConsumer, false, parts);
+        public void render(MatrixStack.Entry matricesEntry, VertexConsumer vertexConsumer) {
+            matrices.peek().copy(matricesEntry);
+            blockRenderManager.renderBlock(state, BlockPos.ORIGIN, world, matrices, vertexConsumer, false, parts);
         }
     }
 }

@@ -4,16 +4,16 @@ import com.zurrtum.create.AllItems;
 import com.zurrtum.create.client.compat.eiv.CreateCategory;
 import com.zurrtum.create.client.foundation.utility.CreateLang;
 import com.zurrtum.create.compat.eiv.EivCommonPlugin;
-import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
+import net.minecraft.item.ItemStack;
+import net.minecraft.item.Items;
+import net.minecraft.text.Text;
+import net.minecraft.util.Identifier;
 
 import java.util.List;
 
 public class AutoMixingCategory extends CreateCategory {
     @Override
-    public Component getDisplayName() {
+    public Text getDisplayName() {
         return CreateLang.translateDirect("recipe.automatic_shapeless");
     }
 
@@ -34,16 +34,16 @@ public class AutoMixingCategory extends CreateCategory {
 
     @Override
     public ItemStack getIcon() {
-        return AllItems.MECHANICAL_MIXER.getDefaultInstance();
+        return AllItems.MECHANICAL_MIXER.getDefaultStack();
     }
 
     @Override
     public ItemStack getSubIcon() {
-        return Items.CRAFTING_TABLE.getDefaultInstance();
+        return Items.CRAFTING_TABLE.getDefaultStack();
     }
 
     @Override
     public List<ItemStack> getCraftReferences() {
-        return List.of(AllItems.MECHANICAL_MIXER.getDefaultInstance(), AllItems.BASIN.getDefaultInstance());
+        return List.of(AllItems.MECHANICAL_MIXER.getDefaultStack(), AllItems.BASIN.getDefaultStack());
     }
 }

@@ -3,30 +3,33 @@ package com.zurrtum.create.content.redstone.displayLink.source;
 import com.zurrtum.create.content.contraptions.actors.seat.SeatEntity;
 import com.zurrtum.create.content.redstone.displayLink.DisplayLinkContext;
 import com.zurrtum.create.content.redstone.displayLink.target.DisplayTargetStats;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.phys.AABB;
+import net.minecraft.entity.Entity;
+import net.minecraft.text.MutableText;
+import net.minecraft.text.Text;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Box;
 
 import java.util.List;
 
 public class EntityNameDisplaySource extends SingleLineDisplaySource {
     @Override
-    protected MutableComponent provideLine(DisplayLinkContext context, DisplayTargetStats stats) {
-        List<SeatEntity> seats = context.level().getEntitiesOfClass(SeatEntity.class, new AABB(context.getSourcePos()));
+    protected MutableText provideLine(DisplayLinkContext context, DisplayTargetStats stats) {
+        BlockPos pos = context.getSourcePos();
+        int x = pos.getX();
+        int y = pos.getY();
+        int z = pos.getZ();
+        List<SeatEntity> seats = context.level().getNonSpectatingEntities(SeatEntity.class, new Box(x, y - 0.1f, z, x + 1, y + 1, z + 1));
 
-        if (seats.isEmpty()) {
+        if (seats.isEmpty())
             return EMPTY_LINE;
-        }
 
         SeatEntity seatEntity = seats.getFirst();
-        List<Entity> passengers = seatEntity.getPassengers();
+        List<Entity> passengers = seatEntity.getPassengerList();
 
-        if (passengers.isEmpty()) {
+        if (passengers.isEmpty())
             return EMPTY_LINE;
-        }
 
-        return Component.literal(passengers.getFirst().getDisplayName().getString());
+        return Text.literal(passengers.getFirst().getDisplayName().getString());
     }
 
     @Override

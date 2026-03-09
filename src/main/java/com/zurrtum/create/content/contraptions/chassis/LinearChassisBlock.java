@@ -1,83 +1,80 @@
 package com.zurrtum.create.content.contraptions.chassis;
 
 import com.zurrtum.create.AllBlocks;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.core.Direction.AxisDirection;
-import net.minecraft.util.RandomSource;
-import net.minecraft.world.item.context.BlockPlaceContext;
-import net.minecraft.world.level.BlockGetter;
-import net.minecraft.world.level.LevelReader;
-import net.minecraft.world.level.ScheduledTickAccess;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.StateDefinition.Builder;
-import net.minecraft.world.level.block.state.properties.BooleanProperty;
+import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
+import net.minecraft.item.ItemPlacementContext;
+import net.minecraft.state.StateManager.Builder;
+import net.minecraft.state.property.BooleanProperty;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Direction.AxisDirection;
+import net.minecraft.util.math.random.Random;
+import net.minecraft.world.BlockView;
+import net.minecraft.world.WorldView;
+import net.minecraft.world.tick.ScheduledTickView;
 
 public class LinearChassisBlock extends AbstractChassisBlock {
 
-    public static final BooleanProperty STICKY_TOP = BooleanProperty.create("sticky_top");
-    public static final BooleanProperty STICKY_BOTTOM = BooleanProperty.create("sticky_bottom");
+    public static final BooleanProperty STICKY_TOP = BooleanProperty.of("sticky_top");
+    public static final BooleanProperty STICKY_BOTTOM = BooleanProperty.of("sticky_bottom");
 
-    public LinearChassisBlock(Properties properties) {
+    public LinearChassisBlock(Settings properties) {
         super(properties);
-        registerDefaultState(defaultBlockState().setValue(STICKY_TOP, false).setValue(STICKY_BOTTOM, false));
+        setDefaultState(getDefaultState().with(STICKY_TOP, false).with(STICKY_BOTTOM, false));
     }
 
     @Override
-    protected void createBlockStateDefinition(Builder<Block, BlockState> builder) {
+    protected void appendProperties(Builder<Block, BlockState> builder) {
         builder.add(STICKY_TOP, STICKY_BOTTOM);
-        super.createBlockStateDefinition(builder);
+        super.appendProperties(builder);
     }
 
     @Override
-    public BlockState getStateForPlacement(BlockPlaceContext context) {
-        BlockPos placedOnPos = context.getClickedPos().relative(context.getClickedFace().getOpposite());
-        BlockState blockState = context.getLevel().getBlockState(placedOnPos);
+    public BlockState getPlacementState(ItemPlacementContext context) {
+        BlockPos placedOnPos = context.getBlockPos().offset(context.getSide().getOpposite());
+        BlockState blockState = context.getWorld().getBlockState(placedOnPos);
 
-        if (context.getPlayer() == null || !context.getPlayer().isShiftKeyDown()) {
-            if (isChassis(blockState)) {
-                return defaultBlockState().setValue(AXIS, blockState.getValue(AXIS));
-            }
-            return defaultBlockState().setValue(AXIS, context.getNearestLookingDirection().getAxis());
+        if (context.getPlayer() == null || !context.getPlayer().isSneaking()) {
+            if (isChassis(blockState))
+                return getDefaultState().with(AXIS, blockState.get(AXIS));
+            return getDefaultState().with(AXIS, context.getPlayerLookDirection().getAxis());
         }
-        return super.getStateForPlacement(context);
+        return super.getPlacementState(context);
     }
 
     @Override
-    public BlockState updateShape(
+    public BlockState getStateForNeighborUpdate(
         BlockState state,
-        LevelReader p_196271_4_,
-        ScheduledTickAccess tickView,
+        WorldView p_196271_4_,
+        ScheduledTickView tickView,
         BlockPos p_196271_5_,
         Direction side,
         BlockPos p_196271_6_,
         BlockState other,
-        RandomSource random
+        Random random
     ) {
         BooleanProperty property = getGlueableSide(state, side);
-        if (property == null || !sameKind(state, other) || state.getValue(AXIS) != other.getValue(AXIS)) {
+        if (property == null || !sameKind(state, other) || state.get(AXIS) != other.get(AXIS))
             return state;
-        }
-        return state.setValue(property, false);
+        return state.with(property, false);
     }
 
     @Override
     public BooleanProperty getGlueableSide(BlockState state, Direction face) {
-        if (face.getAxis() != state.getValue(AXIS)) {
+        if (face.getAxis() != state.get(AXIS))
             return null;
-        }
-        return face.getAxisDirection() == AxisDirection.POSITIVE ? STICKY_TOP : STICKY_BOTTOM;
+        return face.getDirection() == AxisDirection.POSITIVE ? STICKY_TOP : STICKY_BOTTOM;
     }
 
     @Override
-    protected boolean glueAllowedOnSide(BlockGetter world, BlockPos pos, BlockState state, Direction side) {
-        BlockState other = world.getBlockState(pos.relative(side));
-        return !sameKind(other, state) || state.getValue(AXIS) != other.getValue(AXIS);
+    protected boolean glueAllowedOnSide(BlockView world, BlockPos pos, BlockState state, Direction side) {
+        BlockState other = world.getBlockState(pos.offset(side));
+        return !sameKind(other, state) || state.get(AXIS) != other.get(AXIS);
     }
 
     public static boolean isChassis(BlockState state) {
-        return state.is(AllBlocks.LINEAR_CHASSIS) || state.is(AllBlocks.SECONDARY_LINEAR_CHASSIS);
+        return state.isOf(AllBlocks.LINEAR_CHASSIS) || state.isOf(AllBlocks.SECONDARY_LINEAR_CHASSIS);
     }
 
     public static boolean sameKind(BlockState state1, BlockState state2) {

@@ -4,34 +4,33 @@ import com.zurrtum.create.AllHandle;
 import com.zurrtum.create.AllPackets;
 import com.zurrtum.create.content.kinetics.transmission.sequencer.Instruction;
 import com.zurrtum.create.foundation.codec.CreateStreamCodecs;
-import net.minecraft.core.BlockPos;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.PacketType;
-import net.minecraft.network.protocol.game.ServerGamePacketListener;
-import net.minecraft.server.network.ServerGamePacketListenerImpl;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.listener.ServerPlayPacketListener;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.PacketType;
+import net.minecraft.server.network.ServerPlayNetworkHandler;
+import net.minecraft.util.math.BlockPos;
 
 import java.util.Vector;
 
-public record ConfigureSequencedGearshiftPacket(BlockPos pos,
-                                                Vector<Instruction> instructions) implements Packet<ServerGamePacketListener> {
+public record ConfigureSequencedGearshiftPacket(BlockPos pos, Vector<Instruction> instructions) implements Packet<ServerPlayPacketListener> {
     @SuppressWarnings("removal")
-    public static final StreamCodec<RegistryFriendlyByteBuf, ConfigureSequencedGearshiftPacket> CODEC = StreamCodec.composite(
-        BlockPos.STREAM_CODEC,
+    public static final PacketCodec<RegistryByteBuf, ConfigureSequencedGearshiftPacket> CODEC = PacketCodec.tuple(
+        BlockPos.PACKET_CODEC,
         ConfigureSequencedGearshiftPacket::pos,
-        Instruction.STREAM_CODEC.apply(CreateStreamCodecs.vector()),
+        Instruction.STREAM_CODEC.collect(CreateStreamCodecs.vector()),
         ConfigureSequencedGearshiftPacket::instructions,
         ConfigureSequencedGearshiftPacket::new
     );
 
     @Override
-    public void handle(ServerGamePacketListener listener) {
-        AllHandle.onConfigureSequencedGearshift((ServerGamePacketListenerImpl) listener, this);
+    public void apply(ServerPlayPacketListener listener) {
+        AllHandle.onConfigureSequencedGearshift((ServerPlayNetworkHandler) listener, this);
     }
 
     @Override
-    public PacketType<ConfigureSequencedGearshiftPacket> type() {
+    public PacketType<ConfigureSequencedGearshiftPacket> getPacketType() {
         return AllPackets.CONFIGURE_SEQUENCER;
     }
 }

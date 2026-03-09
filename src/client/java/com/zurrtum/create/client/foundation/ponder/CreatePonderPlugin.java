@@ -8,7 +8,7 @@ import com.zurrtum.create.client.ponder.api.registration.*;
 import com.zurrtum.create.content.kinetics.crank.ValveHandleBlock;
 import com.zurrtum.create.content.logistics.packagePort.postbox.PostboxBlock;
 import com.zurrtum.create.content.logistics.tableCloth.TableClothBlock;
-import net.minecraft.resources.Identifier;
+import net.minecraft.util.Identifier;
 
 import static com.zurrtum.create.Create.MOD_ID;
 
@@ -37,14 +37,8 @@ public class CreatePonderPlugin implements PonderPlugin {
         helper.registerSharedText("rpm32", "32 RPM");
 
         helper.registerSharedText("movement_anchors", "With the help of Super Glue, larger structures can be moved.");
-        helper.registerSharedText(
-            "behaviour_modify_value_panel",
-            "This behaviour can be modified using the value panel"
-        );
-        helper.registerSharedText(
-            "storage_on_contraption",
-            "Inventories attached to the Contraption will pick up their drops automatically"
-        );
+        helper.registerSharedText("behaviour_modify_value_panel", "This behaviour can be modified using the value panel");
+        helper.registerSharedText("storage_on_contraption", "Inventories attached to the Contraption will pick up their drops automatically");
     }
 
     @Override

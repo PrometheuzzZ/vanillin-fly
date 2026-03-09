@@ -15,33 +15,33 @@ import mezz.jei.api.gui.ingredient.IRecipeSlotsView;
 import mezz.jei.api.recipe.IFocusGroup;
 import mezz.jei.api.recipe.RecipeIngredientRole;
 import mezz.jei.api.recipe.types.IRecipeType;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.network.chat.Component;
-import net.minecraft.world.item.crafting.Ingredient;
-import net.minecraft.world.item.crafting.RecipeHolder;
-import net.minecraft.world.item.crafting.RecipeMap;
-import net.minecraft.world.item.crafting.ShapedRecipePattern;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.recipe.Ingredient;
+import net.minecraft.recipe.PreparedRecipes;
+import net.minecraft.recipe.RawShapedRecipe;
+import net.minecraft.recipe.RecipeEntry;
+import net.minecraft.text.Text;
 import org.jetbrains.annotations.NotNull;
 import org.joml.Matrix3x2f;
 
 import java.util.List;
 import java.util.Optional;
 
-public class MechanicalCraftingCategory extends CreateCategory<RecipeHolder<MechanicalCraftingRecipe>> {
-    public static List<RecipeHolder<MechanicalCraftingRecipe>> getRecipes(RecipeMap preparedRecipes) {
-        return preparedRecipes.byType(AllRecipeTypes.MECHANICAL_CRAFTING).stream().toList();
+public class MechanicalCraftingCategory extends CreateCategory<RecipeEntry<MechanicalCraftingRecipe>> {
+    public static List<RecipeEntry<MechanicalCraftingRecipe>> getRecipes(PreparedRecipes preparedRecipes) {
+        return preparedRecipes.getAll(AllRecipeTypes.MECHANICAL_CRAFTING).stream().toList();
     }
 
     @Override
     @NotNull
-    public IRecipeType<RecipeHolder<MechanicalCraftingRecipe>> getRecipeType() {
+    public IRecipeType<RecipeEntry<MechanicalCraftingRecipe>> getRecipeType() {
         return JeiClientPlugin.MECHANICAL_CRAFTING;
     }
 
     @Override
     @NotNull
-    public Component getTitle() {
+    public Text getTitle() {
         return CreateLang.translateDirect("recipe.mechanical_crafting");
     }
 
@@ -56,16 +56,12 @@ public class MechanicalCraftingCategory extends CreateCategory<RecipeHolder<Mech
     }
 
     @Override
-    public void setRecipe(
-        IRecipeLayoutBuilder builder,
-        RecipeHolder<MechanicalCraftingRecipe> entry,
-        IFocusGroup focuses
-    ) {
+    public void setRecipe(IRecipeLayoutBuilder builder, RecipeEntry<MechanicalCraftingRecipe> entry, IFocusGroup focuses) {
         MechanicalCraftingRecipe recipe = entry.value();
-        ShapedRecipePattern raw = recipe.raw();
-        int width = raw.width();
-        int height = raw.height();
-        List<Optional<Ingredient>> layout = raw.ingredients();
+        RawShapedRecipe raw = recipe.raw();
+        int width = raw.getWidth();
+        int height = raw.getHeight();
+        List<Optional<Ingredient>> layout = raw.getIngredients();
         int left = 7;
         if (width < 5) {
             left += (19 * (5 - width)) / 2;
@@ -80,8 +76,7 @@ public class MechanicalCraftingCategory extends CreateCategory<RecipeHolder<Mech
                 if (ingredient.isEmpty()) {
                     continue;
                 }
-                builder.addInputSlot(left + 16 * w + (w * 3), top + 16 * h + (h * 3)).setBackground(SLOT, -1, -1)
-                    .add(ingredient.get());
+                builder.addInputSlot(left + 16 * w + (w * 3), top + 16 * h + (h * 3)).setBackground(SLOT, -1, -1).add(ingredient.get());
             }
         }
         builder.addOutputSlot(133, 80).setBackground(SLOT, -1, -1).add(recipe.result());
@@ -89,20 +84,16 @@ public class MechanicalCraftingCategory extends CreateCategory<RecipeHolder<Mech
 
     @Override
     public void draw(
-        RecipeHolder<MechanicalCraftingRecipe> entry,
+        RecipeEntry<MechanicalCraftingRecipe> entry,
         IRecipeSlotsView recipeSlotsView,
-        GuiGraphics graphics,
+        DrawContext graphics,
         double mouseX,
         double mouseY
     ) {
         AllGuiTextures.JEI_DOWN_ARROW.render(graphics, 128, 59);
         AllGuiTextures.JEI_SHADOW.render(graphics, 113, 38);
-        graphics.guiRenderState.submitPicturesInPictureState(new CrafterRenderState(
-            new Matrix3x2f(graphics.pose()),
-            124,
-            18
-        ));
+        graphics.state.addSpecialElement(new CrafterRenderState(new Matrix3x2f(graphics.getMatrices()), 124, 18));
         int size = recipeSlotsView.getSlotViews(RecipeIngredientRole.INPUT).size();
-        graphics.drawString(Minecraft.getInstance().font, String.valueOf(size), 142, 39, 0xFFFFFFFF, true);
+        graphics.drawText(MinecraftClient.getInstance().textRenderer, String.valueOf(size), 142, 39, 0xFFFFFFFF, true);
     }
 }

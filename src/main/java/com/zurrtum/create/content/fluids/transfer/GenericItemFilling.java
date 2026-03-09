@@ -6,22 +6,20 @@ import com.zurrtum.create.content.fluids.potion.PotionFluidHandler;
 import com.zurrtum.create.foundation.fluid.FluidHelper;
 import com.zurrtum.create.infrastructure.fluids.FluidItemInventory;
 import com.zurrtum.create.infrastructure.fluids.FluidStack;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
-import net.minecraft.world.item.alchemy.PotionContents;
-import net.minecraft.world.item.alchemy.Potions;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.material.Fluid;
-import net.minecraft.world.level.material.Fluids;
+import net.minecraft.component.type.PotionContentsComponent;
+import net.minecraft.fluid.Fluid;
+import net.minecraft.fluid.Fluids;
+import net.minecraft.item.ItemStack;
+import net.minecraft.item.Items;
+import net.minecraft.potion.Potions;
+import net.minecraft.world.World;
 
 public class GenericItemFilling {
-    public static boolean canItemBeFilled(Level world, ItemStack stack) {
-        if (stack.getItem() == Items.GLASS_BOTTLE) {
+    public static boolean canItemBeFilled(World world, ItemStack stack) {
+        if (stack.getItem() == Items.GLASS_BOTTLE)
             return true;
-        }
-        if (stack.getItem() == Items.MILK_BUCKET) {
+        if (stack.getItem() == Items.MILK_BUCKET)
             return false;
-        }
 
         try (FluidItemInventory capability = FluidHelper.getFluidInventory(stack)) {
             if (capability == null) {
@@ -37,10 +35,9 @@ public class GenericItemFilling {
         }
     }
 
-    public static int getRequiredAmountForItem(Level world, ItemStack stack, FluidStack availableFluid) {
-        if (stack.getItem() == Items.GLASS_BOTTLE && canFillGlassBottleInternally(availableFluid)) {
+    public static int getRequiredAmountForItem(World world, ItemStack stack, FluidStack availableFluid) {
+        if (stack.getItem() == Items.GLASS_BOTTLE && canFillGlassBottleInternally(availableFluid))
             return PotionFluidHandler.getRequiredAmountForFilledBottle(stack, availableFluid);
-        }
 
         try (FluidItemInventory capability = FluidHelper.getFluidInventory(stack)) {
             if (capability == null) {
@@ -52,31 +49,28 @@ public class GenericItemFilling {
 
     private static boolean canFillGlassBottleInternally(FluidStack availableFluid) {
         Fluid fluid = availableFluid.getFluid();
-        if (fluid.isSame(Fluids.WATER)) {
+        if (fluid.matchesType(Fluids.WATER))
             return true;
-        }
-        if (fluid.isSame(AllFluids.POTION)) {
+        if (fluid.matchesType(AllFluids.POTION))
             return true;
-        }
-        return fluid.isSame(AllFluids.TEA);
+        return fluid.matchesType(AllFluids.TEA);
     }
 
-    public static ItemStack fillItem(Level world, int requiredAmount, ItemStack stack, FluidStack availableFluid) {
+    public static ItemStack fillItem(World world, int requiredAmount, ItemStack stack, FluidStack availableFluid) {
         FluidStack toFill = availableFluid.copy();
         toFill.setAmount(requiredAmount);
 
         if (stack.getItem() == Items.GLASS_BOTTLE && canFillGlassBottleInternally(toFill)) {
             ItemStack fillBottle;
             Fluid fluid = toFill.getFluid();
-            if (FluidHelper.isWater(fluid)) {
-                fillBottle = PotionContents.createItemStack(Items.POTION, Potions.WATER);
-            } else if (fluid.isSame(AllFluids.TEA)) {
-                fillBottle = AllItems.BUILDERS_TEA.getDefaultInstance();
-            } else {
+            if (FluidHelper.isWater(fluid))
+                fillBottle = PotionContentsComponent.createStack(Items.POTION, Potions.WATER);
+            else if (fluid.matchesType(AllFluids.TEA))
+                fillBottle = AllItems.BUILDERS_TEA.getDefaultStack();
+            else
                 fillBottle = PotionFluidHandler.fillBottle(stack, toFill);
-            }
             availableFluid.decrement(requiredAmount);
-            stack.shrink(1);
+            stack.decrement(1);
             return fillBottle;
         }
 
@@ -89,7 +83,7 @@ public class GenericItemFilling {
                 return ItemStack.EMPTY;
             }
             availableFluid.decrement(insert);
-            stack.shrink(1);
+            stack.decrement(1);
             return capability.getContainer();
         }
     }

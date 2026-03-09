@@ -4,54 +4,44 @@ import com.zurrtum.create.infrastructure.items.BaseInventory;
 import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenCustomHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectIntPair;
-import net.minecraft.util.RandomSource;
-import net.minecraft.world.entity.item.ItemEntity;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.crafting.RecipeInput;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.entity.ItemEntity;
+import net.minecraft.item.ItemStack;
+import net.minecraft.recipe.input.RecipeInput;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.util.math.random.Random;
+import net.minecraft.world.World;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public class RecipeApplier {
-    public static <T extends RecipeInput> void applyRecipeOn(
-        ItemEntity entity,
-        T input,
-        CreateRollableRecipe<T> recipe
-    ) {
-        Level world = entity.level();
-        List<ItemStack> stacks = applyRecipeOn(world.getRandom(), entity.getItem().getCount(), input, recipe);
+    public static <T extends RecipeInput> void applyRecipeOn(ItemEntity entity, T input, CreateRollableRecipe<T> recipe) {
+        World world = entity.getEntityWorld();
+        List<ItemStack> stacks = applyRecipeOn(world.getRandom(), entity.getStack().getCount(), input, recipe);
         int size = stacks.size();
         if (size == 0) {
             entity.discard();
             return;
         }
-        entity.setItem(stacks.getFirst());
+        entity.setStack(stacks.getFirst());
         if (size == 1) {
             return;
         }
         double x = entity.getX();
         double y = entity.getY();
         double z = entity.getZ();
-        Vec3 velocity = entity.getDeltaMovement();
+        Vec3d velocity = entity.getVelocity();
         for (int i = 1; i < size; i++) {
             ItemEntity entityIn = new ItemEntity(world, x, y, z, stacks.get(i));
-            entityIn.setDeltaMovement(velocity);
-            world.addFreshEntity(entityIn);
+            entityIn.setVelocity(velocity);
+            world.spawnEntity(entityIn);
         }
     }
 
-    public static <T extends RecipeInput> List<ItemStack> applyRecipeOn(
-        RandomSource random,
-        int count,
-        T input,
-        CreateRollableRecipe<T> recipe
-    ) {
-        List<ItemStack> remainders;
-        remainders = new ArrayList<>();
+    public static <T extends RecipeInput> List<ItemStack> applyRecipeOn(Random random, int count, T input, CreateRollableRecipe<T> recipe) {
+        List<ItemStack> remainders = new ArrayList<>();
         for (int i = 0, size = input.size(); i < size; i++) {
-            ItemStack recipeRemainder = input.getItem(i).getItem().getCraftingRemainder();
+            ItemStack recipeRemainder = input.getStackInSlot(i).getItem().getRecipeRemainder();
             if (recipeRemainder.isEmpty()) {
                 continue;
             }
@@ -61,18 +51,17 @@ public class RecipeApplier {
             remainders = null;
         }
         List<ItemStack> stacks = new ArrayList<>();
-        Object2ObjectMap<ItemStack, ObjectIntPair<ItemStack>> buffer = new Object2ObjectOpenCustomHashMap<>(
-            BaseInventory.ITEM_STACK_HASH_STRATEGY);
+        Object2ObjectMap<ItemStack, ObjectIntPair<ItemStack>> buffer = new Object2ObjectOpenCustomHashMap<>(BaseInventory.ITEM_STACK_HASH_STRATEGY);
         int max, amount;
         ItemStack exist;
         for (int i = 0; i < count; i++) {
-            for (ItemStack stack : recipe.assemble(input, random)) {
+            for (ItemStack stack : recipe.craft(input, random)) {
                 if (stack.isEmpty()) {
                     continue;
                 }
                 ObjectIntPair<ItemStack> item = buffer.get(stack);
                 if (item == null) {
-                    buffer.put(stack, ObjectIntPair.of(stack, stack.getMaxStackSize()));
+                    buffer.put(stack, ObjectIntPair.of(stack, stack.getMaxCount()));
                 } else {
                     max = item.rightInt();
                     exist = item.left();
@@ -91,7 +80,7 @@ public class RecipeApplier {
                     ObjectIntPair<ItemStack> item = buffer.get(stack);
                     if (item == null) {
                         stack = stack.copy();
-                        buffer.put(stack, ObjectIntPair.of(stack, stack.getMaxStackSize()));
+                        buffer.put(stack, ObjectIntPair.of(stack, stack.getMaxCount()));
                     } else {
                         max = item.rightInt();
                         exist = item.left();

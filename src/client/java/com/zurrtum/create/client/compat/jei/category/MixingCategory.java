@@ -14,29 +14,29 @@ import mezz.jei.api.gui.drawable.IDrawable;
 import mezz.jei.api.gui.ingredient.IRecipeSlotsView;
 import mezz.jei.api.recipe.IFocusGroup;
 import mezz.jei.api.recipe.types.IRecipeType;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.network.chat.Component;
-import net.minecraft.world.item.crafting.RecipeHolder;
-import net.minecraft.world.item.crafting.RecipeMap;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.recipe.PreparedRecipes;
+import net.minecraft.recipe.RecipeEntry;
+import net.minecraft.text.Text;
 import org.jetbrains.annotations.NotNull;
 import org.joml.Matrix3x2f;
 
 import java.util.List;
 
 public class MixingCategory extends BasinCategory<MixingRecipe> {
-    public static List<RecipeHolder<MixingRecipe>> getRecipes(RecipeMap preparedRecipes) {
-        return preparedRecipes.byType(AllRecipeTypes.MIXING).stream().toList();
+    public static List<RecipeEntry<MixingRecipe>> getRecipes(PreparedRecipes preparedRecipes) {
+        return preparedRecipes.getAll(AllRecipeTypes.MIXING).stream().toList();
     }
 
     @Override
     @NotNull
-    public IRecipeType<RecipeHolder<MixingRecipe>> getRecipeType() {
+    public IRecipeType<RecipeEntry<MixingRecipe>> getRecipeType() {
         return JeiClientPlugin.MIXING;
     }
 
     @Override
     @NotNull
-    public Component getTitle() {
+    public Text getTitle() {
         return CreateLang.translateDirect("recipe.mixing");
     }
 
@@ -51,7 +51,7 @@ public class MixingCategory extends BasinCategory<MixingRecipe> {
     }
 
     @Override
-    public void setRecipe(IRecipeLayoutBuilder builder, RecipeHolder<MixingRecipe> entry, IFocusGroup focuses) {
+    public void setRecipe(IRecipeLayoutBuilder builder, RecipeEntry<MixingRecipe> entry, IFocusGroup focuses) {
         MixingRecipe recipe = entry.value();
         addIngredientSlots(builder, recipe);
         List<ProcessingOutput> results = recipe.results();
@@ -67,19 +67,9 @@ public class MixingCategory extends BasinCategory<MixingRecipe> {
     }
 
     @Override
-    public void draw(
-        RecipeHolder<MixingRecipe> entry,
-        IRecipeSlotsView recipeSlotsView,
-        GuiGraphics graphics,
-        double mouseX,
-        double mouseY
-    ) {
+    public void draw(RecipeEntry<MixingRecipe> entry, IRecipeSlotsView recipeSlotsView, DrawContext graphics, double mouseX, double mouseY) {
         MixingRecipe recipe = entry.value();
         drawBackground(recipe, graphics, recipe.results().size() + recipe.fluidResults().size());
-        graphics.guiRenderState.submitPicturesInPictureState(new MixingBasinRenderState(
-            new Matrix3x2f(graphics.pose()),
-            91,
-            -5
-        ));
+        graphics.state.addSpecialElement(new MixingBasinRenderState(new Matrix3x2f(graphics.getMatrices()), 91, -5));
     }
 }

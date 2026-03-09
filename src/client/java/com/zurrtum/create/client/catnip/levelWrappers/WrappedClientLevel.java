@@ -1,56 +1,56 @@
 package com.zurrtum.create.client.catnip.levelWrappers;
 
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.multiplayer.ClientLevel;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.particles.ParticleOptions;
-import net.minecraft.sounds.SoundEvent;
-import net.minecraft.sounds.SoundSource;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.level.BlockGetter;
-import net.minecraft.world.level.ColorResolver;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.LightLayer;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.material.FluidState;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.world.ClientWorld;
+import net.minecraft.entity.Entity;
+import net.minecraft.fluid.FluidState;
+import net.minecraft.particle.ParticleEffect;
+import net.minecraft.sound.SoundCategory;
+import net.minecraft.sound.SoundEvent;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.BlockView;
+import net.minecraft.world.LightType;
+import net.minecraft.world.World;
+import net.minecraft.world.biome.ColorResolver;
 import org.jetbrains.annotations.Nullable;
 
-public class WrappedClientLevel extends ClientLevel {
-    private static final Minecraft mc = Minecraft.getInstance();
-    protected Level level;
+public class WrappedClientLevel extends ClientWorld {
+    private static final MinecraftClient mc = MinecraftClient.getInstance();
+    protected World level;
 
     public WrappedClientLevel(
-        Level level
+        World level
     ) {
         super(
-            mc.getConnection(),
-            mc.level.getLevelData(),
-            level.dimension(),
-            level.dimensionTypeRegistration(),
-            mc.getConnection().serverChunkRadius,
-            mc.level.getServerSimulationDistance(),
-            mc.levelRenderer,
-            level.isDebug(),
-            level.getBiomeManager().biomeZoomSeed,
+            mc.getNetworkHandler(),
+            mc.world.getLevelProperties(),
+            level.getRegistryKey(),
+            level.getDimensionEntry(),
+            mc.getNetworkHandler().chunkLoadDistance,
+            mc.world.getSimulationDistance(),
+            mc.worldRenderer,
+            level.isDebugWorld(),
+            level.getBiomeAccess().seed,
             level.getSeaLevel()
         );
         this.level = level;
     }
 
-    public static WrappedClientLevel of(Level level) {
+    public static WrappedClientLevel of(World level) {
         return new WrappedClientLevel(level);
     }
 
     @Override
     @SuppressWarnings("deprecation")
-    public boolean hasChunkAt(BlockPos pos) {
-        return level.hasChunkAt(pos);
+    public boolean isChunkLoaded(BlockPos pos) {
+        return level.isChunkLoaded(pos);
     }
 
     @Override
-    public boolean isLoaded(BlockPos pos) {
-        return level.isLoaded(pos);
+    public boolean isPosLoaded(BlockPos pos) {
+        return level.isPosLoaded(pos);
     }
 
     @Override
@@ -59,21 +59,21 @@ public class WrappedClientLevel extends ClientLevel {
     }
 
     @Override
-    public BlockGetter getChunkForCollisions(int x, int z) {
-        return level.getChunkForCollisions(x, z);
+    public BlockView getChunkAsView(int x, int z) {
+        return level.getChunkAsView(x, z);
     }
 
     // FIXME: blockstate#getCollisionShape with WrappedClientWorld gives unreliable
     // data (maybe)
 
     @Override
-    public int getBrightness(LightLayer type, BlockPos pos) {
-        return level.getBrightness(type, pos);
+    public int getLightLevel(LightType type, BlockPos pos) {
+        return level.getLightLevel(type, pos);
     }
 
     @Override
-    public int getLightEmission(BlockPos pos) {
-        return level.getLightEmission(pos);
+    public int getLuminance(BlockPos pos) {
+        return level.getLuminance(pos);
     }
 
     @Override
@@ -82,15 +82,15 @@ public class WrappedClientLevel extends ClientLevel {
     }
 
     @Override
-    public int getBlockTint(BlockPos p_225525_1_, ColorResolver p_225525_2_) {
-        return level.getBlockTint(p_225525_1_, p_225525_2_);
+    public int getColor(BlockPos p_225525_1_, ColorResolver p_225525_2_) {
+        return level.getColor(p_225525_1_, p_225525_2_);
     }
 
     // FIXME: Emissive Lighting might not light stuff properly
 
     @Override
-    public void addParticle(
-        ParticleOptions p_195594_1_,
+    public void addParticleClient(
+        ParticleEffect p_195594_1_,
         double p_195594_2_,
         double p_195594_4_,
         double p_195594_6_,
@@ -98,12 +98,12 @@ public class WrappedClientLevel extends ClientLevel {
         double p_195594_10_,
         double p_195594_12_
     ) {
-        level.addParticle(p_195594_1_, p_195594_2_, p_195594_4_, p_195594_6_, p_195594_8_, p_195594_10_, p_195594_12_);
+        level.addParticleClient(p_195594_1_, p_195594_2_, p_195594_4_, p_195594_6_, p_195594_8_, p_195594_10_, p_195594_12_);
     }
 
     @Override
-    public void addParticle(
-        ParticleOptions p_195590_1_,
+    public void addParticleClient(
+        ParticleEffect p_195590_1_,
         boolean p_195590_2_,
         boolean canSpawnOnMinimal,
         double p_195590_3_,
@@ -113,7 +113,7 @@ public class WrappedClientLevel extends ClientLevel {
         double p_195590_11_,
         double p_195590_13_
     ) {
-        level.addParticle(
+        level.addParticleClient(
             p_195590_1_,
             p_195590_2_,
             canSpawnOnMinimal,
@@ -127,8 +127,8 @@ public class WrappedClientLevel extends ClientLevel {
     }
 
     @Override
-    public void addAlwaysVisibleParticle(
-        ParticleOptions p_195589_1_,
+    public void addImportantParticleClient(
+        ParticleEffect p_195589_1_,
         double p_195589_2_,
         double p_195589_4_,
         double p_195589_6_,
@@ -136,20 +136,12 @@ public class WrappedClientLevel extends ClientLevel {
         double p_195589_10_,
         double p_195589_12_
     ) {
-        level.addAlwaysVisibleParticle(
-            p_195589_1_,
-            p_195589_2_,
-            p_195589_4_,
-            p_195589_6_,
-            p_195589_8_,
-            p_195589_10_,
-            p_195589_12_
-        );
+        level.addImportantParticleClient(p_195589_1_, p_195589_2_, p_195589_4_, p_195589_6_, p_195589_8_, p_195589_10_, p_195589_12_);
     }
 
     @Override
-    public void addAlwaysVisibleParticle(
-        ParticleOptions p_217404_1_,
+    public void addImportantParticleClient(
+        ParticleEffect p_217404_1_,
         boolean p_217404_2_,
         double p_217404_3_,
         double p_217404_5_,
@@ -158,39 +150,21 @@ public class WrappedClientLevel extends ClientLevel {
         double p_217404_11_,
         double p_217404_13_
     ) {
-        level.addAlwaysVisibleParticle(
-            p_217404_1_,
-            p_217404_2_,
-            p_217404_3_,
-            p_217404_5_,
-            p_217404_7_,
-            p_217404_9_,
-            p_217404_11_,
-            p_217404_13_
-        );
+        level.addImportantParticleClient(p_217404_1_, p_217404_2_, p_217404_3_, p_217404_5_, p_217404_7_, p_217404_9_, p_217404_11_, p_217404_13_);
     }
 
     @Override
-    public void playLocalSound(
+    public void playSoundClient(
         double p_184134_1_,
         double p_184134_3_,
         double p_184134_5_,
         SoundEvent p_184134_7_,
-        SoundSource p_184134_8_,
+        SoundCategory p_184134_8_,
         float p_184134_9_,
         float p_184134_10_,
         boolean p_184134_11_
     ) {
-        level.playLocalSound(
-            p_184134_1_,
-            p_184134_3_,
-            p_184134_5_,
-            p_184134_7_,
-            p_184134_8_,
-            p_184134_9_,
-            p_184134_10_,
-            p_184134_11_
-        );
+        level.playSoundClient(p_184134_1_, p_184134_3_, p_184134_5_, p_184134_7_, p_184134_8_, p_184134_9_, p_184134_10_, p_184134_11_);
     }
 
     @Override
@@ -200,20 +174,11 @@ public class WrappedClientLevel extends ClientLevel {
         double p_184148_4_,
         double p_184148_6_,
         SoundEvent p_184148_8_,
-        SoundSource p_184148_9_,
+        SoundCategory p_184148_9_,
         float p_184148_10_,
         float p_184148_11_
     ) {
-        level.playSound(
-            p_184148_1_,
-            p_184148_2_,
-            p_184148_4_,
-            p_184148_6_,
-            p_184148_8_,
-            p_184148_9_,
-            p_184148_10_,
-            p_184148_11_
-        );
+        level.playSound(p_184148_1_, p_184148_2_, p_184148_4_, p_184148_6_, p_184148_8_, p_184148_9_, p_184148_10_, p_184148_11_);
     }
 
     @Nullable
@@ -222,7 +187,7 @@ public class WrappedClientLevel extends ClientLevel {
         return level.getBlockEntity(p_175625_1_);
     }
 
-    public Level getWrappedLevel() {
+    public World getWrappedLevel() {
         return level;
     }
 }

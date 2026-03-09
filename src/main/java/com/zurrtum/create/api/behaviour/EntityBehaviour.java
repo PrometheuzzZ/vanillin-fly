@@ -2,8 +2,8 @@ package com.zurrtum.create.api.behaviour;
 
 import com.zurrtum.create.api.registry.SimpleRegistry;
 import com.zurrtum.create.foundation.blockEntity.behaviour.BehaviourType;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntityType;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.EntityType;
 
 import java.util.function.Function;
 

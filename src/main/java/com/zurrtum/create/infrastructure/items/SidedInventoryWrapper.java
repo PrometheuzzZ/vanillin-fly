@@ -1,41 +1,41 @@
 package com.zurrtum.create.infrastructure.items;
 
 import com.zurrtum.create.infrastructure.transfer.SlotRangeCache;
-import net.minecraft.core.Direction;
-import net.minecraft.world.Container;
-import net.minecraft.world.entity.ContainerUser;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.entity.ContainerUser;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.inventory.Inventory;
+import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
+import net.minecraft.util.math.Direction;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Set;
 import java.util.function.Predicate;
 
-public record SidedInventoryWrapper(Container inventory, int[] slots) implements SidedItemInventory {
-    public SidedInventoryWrapper(Container inventory) {
-        this(inventory, SlotRangeCache.get(inventory.getContainerSize()));
+public record SidedInventoryWrapper(Inventory inventory, int[] slots) implements SidedItemInventory {
+    public SidedInventoryWrapper(Inventory inventory) {
+        this(inventory, SlotRangeCache.get(inventory.size()));
     }
 
     @Override
-    public int[] getSlotsForFace(Direction side) {
+    public int[] getAvailableSlots(Direction side) {
         return slots;
     }
 
     @Override
-    public boolean canPlaceItemThroughFace(int slot, ItemStack stack, @Nullable Direction dir) {
+    public boolean canInsert(int slot, ItemStack stack, @Nullable Direction dir) {
         return true;
     }
 
     @Override
-    public boolean canTakeItemThroughFace(int slot, ItemStack stack, Direction dir) {
+    public boolean canExtract(int slot, ItemStack stack, Direction dir) {
         return true;
     }
 
     @Override
-    public int getContainerSize() {
-        return inventory.getContainerSize();
+    public int size() {
+        return inventory.size();
     }
 
     @Override
@@ -44,78 +44,78 @@ public record SidedInventoryWrapper(Container inventory, int[] slots) implements
     }
 
     @Override
-    public ItemStack getItem(int slot) {
-        return inventory.getItem(slot);
+    public ItemStack getStack(int slot) {
+        return inventory.getStack(slot);
     }
 
     @Override
-    public ItemStack removeItem(int slot, int amount) {
-        return inventory.removeItem(slot, amount);
+    public ItemStack removeStack(int slot, int amount) {
+        return inventory.removeStack(slot, amount);
     }
 
     @Override
-    public ItemStack removeItemNoUpdate(int slot) {
-        return inventory.removeItemNoUpdate(slot);
+    public ItemStack removeStack(int slot) {
+        return inventory.removeStack(slot);
     }
 
     @Override
-    public void setItem(int slot, ItemStack stack) {
-        inventory.setItem(slot, stack);
+    public void setStack(int slot, ItemStack stack) {
+        inventory.setStack(slot, stack);
     }
 
     @Override
-    public int getMaxStackSize() {
-        return inventory.getMaxStackSize();
+    public int getMaxCountPerStack() {
+        return inventory.getMaxCountPerStack();
     }
 
     @Override
-    public int getMaxStackSize(ItemStack stack) {
-        return inventory.getMaxStackSize(stack);
+    public int getMaxCount(ItemStack stack) {
+        return inventory.getMaxCount(stack);
     }
 
     @Override
-    public void setChanged() {
-        inventory.setChanged();
+    public void markDirty() {
+        inventory.markDirty();
     }
 
     @Override
-    public boolean stillValid(Player player) {
-        return inventory.stillValid(player);
+    public boolean canPlayerUse(PlayerEntity player) {
+        return inventory.canPlayerUse(player);
     }
 
     @Override
-    public void startOpen(ContainerUser player) {
-        inventory.startOpen(player);
+    public void onOpen(ContainerUser player) {
+        inventory.onOpen(player);
     }
 
     @Override
-    public void stopOpen(ContainerUser player) {
-        inventory.stopOpen(player);
+    public void onClose(ContainerUser player) {
+        inventory.onClose(player);
     }
 
     @Override
-    public boolean canPlaceItem(int slot, ItemStack stack) {
-        return inventory.canPlaceItem(slot, stack);
+    public boolean isValid(int slot, ItemStack stack) {
+        return inventory.isValid(slot, stack);
     }
 
     @Override
-    public boolean canTakeItem(Container hopperInventory, int slot, ItemStack stack) {
-        return inventory.canTakeItem(hopperInventory, slot, stack);
+    public boolean canTransferTo(Inventory hopperInventory, int slot, ItemStack stack) {
+        return inventory.canTransferTo(hopperInventory, slot, stack);
     }
 
     @Override
-    public int countItem(Item item) {
-        return inventory.countItem(item);
+    public int count(Item item) {
+        return inventory.count(item);
     }
 
     @Override
-    public boolean hasAnyOf(Set<Item> items) {
-        return inventory.hasAnyOf(items);
+    public boolean containsAny(Set<Item> items) {
+        return inventory.containsAny(items);
     }
 
     @Override
-    public boolean hasAnyMatching(Predicate<ItemStack> predicate) {
-        return inventory.hasAnyMatching(predicate);
+    public boolean containsAny(Predicate<ItemStack> predicate) {
+        return inventory.containsAny(predicate);
     }
 
     @Override

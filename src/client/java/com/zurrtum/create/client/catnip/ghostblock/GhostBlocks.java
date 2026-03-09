@@ -1,12 +1,12 @@
 package com.zurrtum.create.client.catnip.ghostblock;
 
-import com.mojang.blaze3d.vertex.PoseStack;
 import com.zurrtum.create.client.catnip.render.SuperRenderTypeBuffer;
-import net.minecraft.client.Minecraft;
-import net.minecraft.util.Mth;
-import net.minecraft.world.level.GameType;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.block.BlockState;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.GameMode;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -24,7 +24,7 @@ public class GhostBlocks {
     public static double getBreathingAlpha() {
         double period = 2500;
         double timer = System.currentTimeMillis() % period;
-        double offset = Mth.cos((float) ((2d / period) * Math.PI * timer));
+        double offset = MathHelper.cos((float) ((2d / period) * Math.PI * timer));
         return 0.55d - 0.2d * offset;
     }
 
@@ -45,9 +45,8 @@ public class GhostBlocks {
     }
 
     private Entry refresh(Object slot, GhostBlockRenderer ghost, GhostBlockParams params, int ttl) {
-        if (!ghosts.containsKey(slot)) {
+        if (!ghosts.containsKey(slot))
             ghosts.put(slot, new Entry(ghost, params, ttl));
-        }
 
         Entry e = ghosts.get(slot);
         e.ticksToLive = ttl;
@@ -65,8 +64,8 @@ public class GhostBlocks {
         ghosts.entrySet().removeIf(e -> !e.getValue().isAlive());
     }
 
-    public void renderAll(Minecraft mc, PoseStack ms, SuperRenderTypeBuffer buffer, Vec3 camera) {
-        if (mc.gameMode.getPlayerMode() == GameType.SPECTATOR) {
+    public void renderAll(MinecraftClient mc, MatrixStack ms, SuperRenderTypeBuffer buffer, Vec3d camera) {
+        if (mc.interactionManager.getCurrentGameMode() == GameMode.SPECTATOR) {
             return;
         }
         ghosts.forEach((slot, entry) -> {

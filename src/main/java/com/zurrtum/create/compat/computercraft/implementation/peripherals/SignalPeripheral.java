@@ -12,8 +12,8 @@ import com.zurrtum.create.content.trains.signal.SignalBoundary;
 import com.zurrtum.create.content.trains.signal.SignalEdgeGroup;
 import dan200.computercraft.api.lua.LuaException;
 import dan200.computercraft.api.lua.LuaFunction;
-import net.minecraft.core.BlockPos;
-import net.minecraft.world.level.Level;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.World;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Map;
@@ -32,34 +32,27 @@ public class SignalPeripheral extends SyncedPeripheral<SignalBlockEntity> {
 
     @LuaFunction
     public final boolean isForcedRed() {
-        return blockEntity.getBlockState().getValue(SignalBlock.POWERED);
+        return blockEntity.getCachedState().get(SignalBlock.POWERED);
     }
 
     @LuaFunction(mainThread = true)
     public final void setForcedRed(boolean powered) {
-        Level level = blockEntity.getLevel();
-        if (level != null) {
-            level.setBlock(
-                blockEntity.getBlockPos(),
-                blockEntity.getBlockState().setValue(SignalBlock.POWERED, powered),
-                2
-            );
-        }
+        World level = blockEntity.getWorld();
+        if (level != null)
+            level.setBlockState(blockEntity.getPos(), blockEntity.getCachedState().with(SignalBlock.POWERED, powered), 2);
     }
 
     @LuaFunction
     public final CreateLuaTable listBlockingTrainNames() throws LuaException {
         SignalBoundary signal = blockEntity.getSignal();
-        if (signal == null) {
+        if (signal == null)
             throw new LuaException("no signal");
-        }
         CreateLuaTable trainList = new CreateLuaTable();
         int trainCounter = 1;
         for (boolean current : Iterate.trueAndFalse) {
             Map<BlockPos, Boolean> set = signal.blockEntities.get(current);
-            if (!set.containsKey(blockEntity.getBlockPos())) {
+            if (!set.containsKey(blockEntity.getPos()))
                 continue;
-            }
             UUID group = signal.groups.get(current);
             Map<UUID, SignalEdgeGroup> signalEdgeGroups = Create.RAILWAYS.signalEdgeGroups;
             SignalEdgeGroup signalEdgeGroup = signalEdgeGroups.get(group);
@@ -75,7 +68,7 @@ public class SignalPeripheral extends SyncedPeripheral<SignalBlockEntity> {
     public final String getSignalType() throws LuaException {
         SignalBoundary signal = blockEntity.getSignal();
         if (signal != null) {
-            return signal.getTypeFor(blockEntity.getBlockPos()).toString();
+            return signal.getTypeFor(blockEntity.getPos()).toString();
         } else {
             throw new LuaException("no signal");
         }
@@ -85,7 +78,7 @@ public class SignalPeripheral extends SyncedPeripheral<SignalBlockEntity> {
     public final void cycleSignalType() throws LuaException {
         SignalBoundary signal = blockEntity.getSignal();
         if (signal != null) {
-            signal.cycleSignalType(blockEntity.getBlockPos());
+            signal.cycleSignalType(blockEntity.getPos());
         } else {
             throw new LuaException("no signal");
         }

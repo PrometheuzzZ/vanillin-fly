@@ -3,25 +3,26 @@ package com.zurrtum.create.infrastructure.packet.c2s;
 import com.zurrtum.create.AllHandle;
 import com.zurrtum.create.AllPackets;
 import io.netty.buffer.ByteBuf;
-import net.minecraft.core.BlockPos;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.PacketType;
-import net.minecraft.network.protocol.game.ServerGamePacketListener;
-import net.minecraft.server.network.ServerGamePacketListenerImpl;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.listener.ServerPlayPacketListener;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.PacketType;
+import net.minecraft.server.network.ServerPlayNetworkHandler;
+import net.minecraft.util.math.BlockPos;
 
-public record LogisticalStockRequestPacket(BlockPos pos) implements Packet<ServerGamePacketListener> {
-    public static final StreamCodec<ByteBuf, LogisticalStockRequestPacket> CODEC = BlockPos.STREAM_CODEC.map(LogisticalStockRequestPacket::new,
+public record LogisticalStockRequestPacket(BlockPos pos) implements Packet<ServerPlayPacketListener> {
+    public static final PacketCodec<ByteBuf, LogisticalStockRequestPacket> CODEC = BlockPos.PACKET_CODEC.xmap(
+        LogisticalStockRequestPacket::new,
         LogisticalStockRequestPacket::pos
     );
 
     @Override
-    public void handle(ServerGamePacketListener listener) {
-        AllHandle.onLogisticalStockRequest((ServerGamePacketListenerImpl) listener, this);
+    public void apply(ServerPlayPacketListener listener) {
+        AllHandle.onLogisticalStockRequest((ServerPlayNetworkHandler) listener, this);
     }
 
     @Override
-    public PacketType<LogisticalStockRequestPacket> type() {
+    public PacketType<LogisticalStockRequestPacket> getPacketType() {
         return AllPackets.LOGISTICS_STOCK_REQUEST;
     }
 }

@@ -1,19 +1,16 @@
 package com.zurrtum.create.client.flywheel.lib.model.baked;
 
-import com.mojang.blaze3d.vertex.BufferBuilder;
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
-import net.minecraft.client.renderer.block.model.BakedQuad;
-import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
+
+import net.minecraft.client.render.BlockRenderLayer;
+import net.minecraft.client.render.BufferBuilder;
+import net.minecraft.client.render.VertexConsumer;
+import net.minecraft.client.render.model.BakedQuad;
+import net.minecraft.client.util.math.MatrixStack;
 
 public class VanillinMeshEmitter extends MeshEmitter implements VertexConsumer {
     private boolean useAo;
 
-    VanillinMeshEmitter(
-        MeshEmitterManager<VanillinMeshEmitter> manager,
-        ByteBufferBuilderStack byteBufferBuilderStack,
-        ChunkSectionLayer renderType
-    ) {
+    VanillinMeshEmitter(MeshEmitterManager<VanillinMeshEmitter> manager, ByteBufferBuilderStack byteBufferBuilderStack, BlockRenderLayer renderType) {
         super(manager, byteBufferBuilderStack, renderType);
     }
 
@@ -22,25 +19,16 @@ public class VanillinMeshEmitter extends MeshEmitter implements VertexConsumer {
     }
 
     @Override
-    public void putBulkData(
-        PoseStack.Pose pose,
-        BakedQuad quad,
-        float red,
-        float green,
-        float blue,
-        float alpha,
-        int packedLight,
-        int packedOverlay
-    ) {
+    public void quad(MatrixStack.Entry pose, BakedQuad quad, float red, float green, float blue, float alpha, int packedLight, int packedOverlay) {
         BufferBuilder bufferBuilder = getBuffer(quad.shade(), useAo);
         if (bufferBuilder != null) {
-            bufferBuilder.putBulkData(pose, quad, red, green, blue, alpha, packedLight, packedOverlay);
+            bufferBuilder.quad(pose, quad, red, green, blue, alpha, packedLight, packedOverlay);
         }
     }
 
     @Override
-    public void putBulkData(
-        PoseStack.Pose pose,
+    public void quad(
+        MatrixStack.Entry pose,
         BakedQuad quad,
         float[] brightness,
         float red,
@@ -48,51 +36,47 @@ public class VanillinMeshEmitter extends MeshEmitter implements VertexConsumer {
         float blue,
         float alpha,
         int[] lightmap,
-        int packedOverlay
+        int packedOverlay,
+        boolean readAlpha
     ) {
         BufferBuilder bufferBuilder = getBuffer(quad.shade(), useAo);
         if (bufferBuilder != null) {
-            bufferBuilder.putBulkData(pose, quad, brightness, red, green, blue, alpha, lightmap, packedOverlay);
+            bufferBuilder.quad(pose, quad, brightness, red, green, blue, alpha, lightmap, packedOverlay, readAlpha);
         }
     }
 
     @Override
-    public VertexConsumer addVertex(float x, float y, float z) {
+    public VertexConsumer vertex(float x, float y, float z) {
         throw new UnsupportedOperationException("VanillinMeshEmitter only supports putBulkData!");
     }
 
     @Override
-    public VertexConsumer setColor(int color) {
+    public VertexConsumer color(int color) {
         throw new UnsupportedOperationException("VanillinMeshEmitter only supports putBulkData!");
     }
 
     @Override
-    public VertexConsumer setColor(int red, int green, int blue, int alpha) {
+    public VertexConsumer color(int red, int green, int blue, int alpha) {
         throw new UnsupportedOperationException("VanillinMeshEmitter only supports putBulkData!");
     }
 
     @Override
-    public VertexConsumer setUv(float u, float v) {
+    public VertexConsumer texture(float u, float v) {
         throw new UnsupportedOperationException("VanillinMeshEmitter only supports putBulkData!");
     }
 
     @Override
-    public VertexConsumer setUv1(int u, int v) {
+    public VertexConsumer overlay(int u, int v) {
         throw new UnsupportedOperationException("VanillinMeshEmitter only supports putBulkData!");
     }
 
     @Override
-    public VertexConsumer setUv2(int u, int v) {
+    public VertexConsumer light(int u, int v) {
         throw new UnsupportedOperationException("VanillinMeshEmitter only supports putBulkData!");
     }
 
     @Override
-    public VertexConsumer setNormal(float normalX, float normalY, float normalZ) {
-        throw new UnsupportedOperationException("VanillinMeshEmitter only supports putBulkData!");
-    }
-
-    @Override
-    public VertexConsumer setLineWidth(float width) {
+    public VertexConsumer normal(float normalX, float normalY, float normalZ) {
         throw new UnsupportedOperationException("VanillinMeshEmitter only supports putBulkData!");
     }
 }

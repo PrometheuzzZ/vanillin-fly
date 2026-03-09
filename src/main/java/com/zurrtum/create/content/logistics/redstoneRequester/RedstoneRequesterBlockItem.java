@@ -2,41 +2,39 @@ package com.zurrtum.create.content.logistics.redstoneRequester;
 
 import com.zurrtum.create.AllDataComponents;
 import com.zurrtum.create.content.logistics.packagerLink.LogisticallyLinkedBlockItem;
-import net.minecraft.ChatFormatting;
-import net.minecraft.network.chat.Component;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.TooltipFlag;
-import net.minecraft.world.item.component.TooltipDisplay;
-import net.minecraft.world.level.block.Block;
+import net.minecraft.block.Block;
+import net.minecraft.component.type.TooltipDisplayComponent;
+import net.minecraft.item.ItemStack;
+import net.minecraft.item.tooltip.TooltipType;
+import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.function.Consumer;
 
 public class RedstoneRequesterBlockItem extends LogisticallyLinkedBlockItem {
 
-    public RedstoneRequesterBlockItem(Block pBlock, Properties pProperties) {
+    public RedstoneRequesterBlockItem(Block pBlock, Settings pProperties) {
         super(pBlock, pProperties);
     }
 
     @Override
-    public void appendHoverText(
+    public void appendTooltip(
         @NotNull ItemStack stack,
         @NotNull TooltipContext tooltipContext,
-        TooltipDisplay displayComponent,
-        @NotNull Consumer<Component> textConsumer,
-        TooltipFlag type
+        TooltipDisplayComponent displayComponent,
+        @NotNull Consumer<Text> textConsumer,
+        TooltipType type
     ) {
-        if (!isTuned(stack)) {
+        if (!isTuned(stack))
+            return;
+
+        if (!stack.contains(AllDataComponents.AUTO_REQUEST_DATA)) {
+            super.appendTooltip(stack, tooltipContext, displayComponent, textConsumer, type);
             return;
         }
 
-        if (!stack.has(AllDataComponents.AUTO_REQUEST_DATA)) {
-            super.appendHoverText(stack, tooltipContext, displayComponent, textConsumer, type);
-            return;
-        }
-
-        textConsumer.accept(Component.translatable("create.logistically_linked.tooltip")
-            .withStyle(ChatFormatting.GOLD));
+        textConsumer.accept(Text.translatable("create.logistically_linked.tooltip").formatted(Formatting.GOLD));
         RedstoneRequesterBlock.appendRequesterTooltip(stack, textConsumer);
     }
 

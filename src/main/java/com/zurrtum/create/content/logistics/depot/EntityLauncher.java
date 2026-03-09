@@ -4,19 +4,17 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import com.zurrtum.create.catnip.math.AngleHelper;
 import com.zurrtum.create.catnip.math.VecHelper;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.core.Direction.Axis;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.util.Mth;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.entity.Entity;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Direction.Axis;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.Vec3d;
 
 public class EntityLauncher {
-    public static final StreamCodec<RegistryFriendlyByteBuf, EntityLauncher> PACKET_CODEC = StreamCodec.ofMember(EntityLauncher::write,
-        EntityLauncher::new
-    );
+    public static final PacketCodec<RegistryByteBuf, EntityLauncher> PACKET_CODEC = PacketCodec.of(EntityLauncher::write, EntityLauncher::new);
     public static final Codec<EntityLauncher> CODEC = RecordCodecBuilder.create(instance -> instance.group(
         Codec.INT.fieldOf("horizontalDistance").forGetter(EntityLauncher::getHorizontalDistance),
         Codec.INT.fieldOf("verticalDistance").forGetter(EntityLauncher::getVerticalDistance),
@@ -35,13 +33,7 @@ public class EntityLauncher {
         set(horizontalDistance, verticalDistance);
     }
 
-    private EntityLauncher(
-        int horizontalDistance,
-        int verticalDistance,
-        double yMotion,
-        double xMotion,
-        double totalFlyingTicks
-    ) {
+    private EntityLauncher(int horizontalDistance, int verticalDistance, double yMotion, double xMotion, double totalFlyingTicks) {
         this.horizontalDistance = horizontalDistance;
         this.verticalDistance = verticalDistance;
         this.yMotion = yMotion;
@@ -49,7 +41,7 @@ public class EntityLauncher {
         this.totalFlyingTicks = totalFlyingTicks;
     }
 
-    private EntityLauncher(RegistryFriendlyByteBuf buf) {
+    private EntityLauncher(RegistryByteBuf buf) {
         horizontalDistance = buf.readInt();
         verticalDistance = buf.readInt();
         yMotion = buf.readDouble();
@@ -57,7 +49,7 @@ public class EntityLauncher {
         totalFlyingTicks = buf.readDouble();
     }
 
-    private void write(RegistryFriendlyByteBuf buf) {
+    private void write(RegistryByteBuf buf) {
         buf.writeInt(horizontalDistance);
         buf.writeInt(verticalDistance);
         buf.writeDouble(yMotion);
@@ -66,7 +58,7 @@ public class EntityLauncher {
     }
 
     public void clamp(int max) {
-        set(Math.min(horizontalDistance, max), Mth.sign(verticalDistance) * Math.min(Math.abs(verticalDistance), max));
+        set(Math.min(horizontalDistance, max), MathHelper.sign(verticalDistance) * Math.min(Math.abs(verticalDistance), max));
     }
 
     public void set(int horizontalDistance, int verticalDistance) {
@@ -76,9 +68,9 @@ public class EntityLauncher {
     }
 
     public void applyMotion(Entity entity, Direction facing) {
-        Vec3 motionVec = new Vec3(0, yMotion, xMotion);
+        Vec3d motionVec = new Vec3d(0, yMotion, xMotion);
         motionVec = VecHelper.rotate(motionVec, AngleHelper.horizontalAngle(facing), Axis.Y);
-        entity.setDeltaMovement(motionVec.x * .91, motionVec.y * .98, motionVec.z * .91);
+        entity.setVelocity(motionVec.x * .91, motionVec.y * .98, motionVec.z * .91);
     }
 
     public int getHorizontalDistance() {
@@ -93,26 +85,22 @@ public class EntityLauncher {
         return totalFlyingTicks;
     }
 
-    public Vec3 getGlobalPos(double t, Direction d, BlockPos launcher) {
-        return getGlobalPos(t, d, new Vec3(launcher.getX() + .5f, launcher.getY() + .5f, launcher.getZ() + .5f));
+    public Vec3d getGlobalPos(double t, Direction d, BlockPos launcher) {
+        return getGlobalPos(t, d, new Vec3d(launcher.getX() + .5f, launcher.getY() + .5f, launcher.getZ() + .5f));
     }
 
-    public Vec3 getGlobalPos(double t, Direction d, Vec3 start) {
+    public Vec3d getGlobalPos(double t, Direction d, Vec3d start) {
         float xt = x(t);
         float yt = y(t);
-        double progress = Mth.clamp(t / getTotalFlyingTicks(), 0, 1);
+        double progress = MathHelper.clamp(t / getTotalFlyingTicks(), 0, 1);
         double correctionStrength = Math.pow(progress, 3);
 
-        Vec3 vec = new Vec3(
-            0,
-            yt + (verticalDistance - yt) * correctionStrength * 0.5f,
-            xt + (horizontalDistance - xt) * correctionStrength
-        );
+        Vec3d vec = new Vec3d(0, yt + (verticalDistance - yt) * correctionStrength * 0.5f, xt + (horizontalDistance - xt) * correctionStrength);
         return VecHelper.rotate(vec, 180 + AngleHelper.horizontalAngle(d), Axis.Y).add(start);
     }
 
-    public Vec3 getGlobalVelocity(double t, Direction d) {
-        return VecHelper.rotate(new Vec3(0, dy(t), dx(t)), 180 + AngleHelper.horizontalAngle(d), Axis.Y);
+    public Vec3d getGlobalVelocity(double t, Direction d) {
+        return VecHelper.rotate(new Vec3d(0, dy(t), dx(t)), 180 + AngleHelper.horizontalAngle(d), Axis.Y);
     }
 
     public float x(double t) {

@@ -2,8 +2,8 @@ package com.zurrtum.create.foundation.fluid;
 
 import com.zurrtum.create.infrastructure.fluids.FluidInventory;
 import com.zurrtum.create.infrastructure.fluids.FluidStack;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.storage.ReadView;
+import net.minecraft.storage.WriteView;
 
 import java.util.Optional;
 
@@ -59,7 +59,7 @@ public class FluidTank implements FluidInventory {
         return fluid.isEmpty();
     }
 
-    public void read(ValueInput view) {
+    public void read(ReadView view) {
         fluid = view.read("Fluid", FluidStack.CODEC).orElse(FluidStack.EMPTY);
         if (fluid.getAmount() > capacity) {
             fluid.setAmount(capacity);
@@ -79,9 +79,9 @@ public class FluidTank implements FluidInventory {
         return 1;
     }
 
-    public void write(ValueOutput view) {
+    public void write(WriteView view) {
         if (!fluid.isEmpty()) {
-            view.store("Fluid", FluidStack.CODEC, fluid);
+            view.put("Fluid", FluidStack.CODEC, fluid);
         }
     }
 }

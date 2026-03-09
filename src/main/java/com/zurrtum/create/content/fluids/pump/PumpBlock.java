@@ -10,150 +10,131 @@ import com.zurrtum.create.content.kinetics.simpleRelays.ICogWheel;
 import com.zurrtum.create.foundation.block.IBE;
 import com.zurrtum.create.foundation.block.NeighborUpdateListeningBlock;
 import com.zurrtum.create.foundation.block.ProperWaterloggedBlock;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.core.Direction.Axis;
-import net.minecraft.server.level.ServerLevel;
-import net.minecraft.util.RandomSource;
-import net.minecraft.world.item.context.BlockPlaceContext;
-import net.minecraft.world.level.BlockGetter;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.LevelReader;
-import net.minecraft.world.level.ScheduledTickAccess;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.SimpleWaterloggedBlock;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.entity.BlockEntityType;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.StateDefinition.Builder;
-import net.minecraft.world.level.block.state.properties.BlockStateProperties;
-import net.minecraft.world.level.material.FluidState;
-import net.minecraft.world.level.material.Fluids;
-import net.minecraft.world.level.pathfinder.PathComputationType;
-import net.minecraft.world.level.redstone.Orientation;
-import net.minecraft.world.phys.Vec3;
-import net.minecraft.world.phys.shapes.CollisionContext;
-import net.minecraft.world.phys.shapes.VoxelShape;
-import net.minecraft.world.ticks.TickPriority;
+import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.ShapeContext;
+import net.minecraft.block.Waterloggable;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.block.entity.BlockEntityType;
+import net.minecraft.entity.ai.pathing.NavigationType;
+import net.minecraft.fluid.FluidState;
+import net.minecraft.fluid.Fluids;
+import net.minecraft.item.ItemPlacementContext;
+import net.minecraft.server.world.ServerWorld;
+import net.minecraft.state.StateManager.Builder;
+import net.minecraft.state.property.Properties;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Direction.Axis;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.util.math.random.Random;
+import net.minecraft.util.shape.VoxelShape;
+import net.minecraft.world.BlockView;
+import net.minecraft.world.World;
+import net.minecraft.world.WorldView;
+import net.minecraft.world.block.WireOrientation;
+import net.minecraft.world.tick.ScheduledTickView;
+import net.minecraft.world.tick.TickPriority;
 import org.jetbrains.annotations.Nullable;
 
-public class PumpBlock extends DirectionalKineticBlock implements SimpleWaterloggedBlock, ICogWheel, IBE<PumpBlockEntity>, NeighborUpdateListeningBlock {
+public class PumpBlock extends DirectionalKineticBlock implements Waterloggable, ICogWheel, IBE<PumpBlockEntity>, NeighborUpdateListeningBlock {
 
-    public PumpBlock(Properties p_i48415_1_) {
+    public PumpBlock(Settings p_i48415_1_) {
         super(p_i48415_1_);
-        registerDefaultState(defaultBlockState().setValue(BlockStateProperties.WATERLOGGED, false));
+        setDefaultState(getDefaultState().with(Properties.WATERLOGGED, false));
     }
 
     @Override
     public BlockState getRotatedBlockState(BlockState originalState, Direction targetedFace) {
-        return originalState.setValue(FACING, originalState.getValue(FACING).getOpposite());
+        return originalState.with(FACING, originalState.get(FACING).getOpposite());
     }
 
     @Override
     public Axis getRotationAxis(BlockState state) {
-        return state.getValue(FACING).getAxis();
+        return state.get(FACING).getAxis();
     }
 
     @Override
-    public VoxelShape getShape(
-        BlockState state,
-        BlockGetter p_220053_2_,
-        BlockPos p_220053_3_,
-        CollisionContext p_220053_4_
-    ) {
-        return AllShapes.PUMP.get(state.getValue(FACING));
+    public VoxelShape getOutlineShape(BlockState state, BlockView p_220053_2_, BlockPos p_220053_3_, ShapeContext p_220053_4_) {
+        return AllShapes.PUMP.get(state.get(FACING));
+    }
+
+    @Override
+    public void neighborUpdate(BlockState state, World world, BlockPos pos, Block otherBlock, BlockPos neighborPos, boolean isMoving) {
+        Direction d = FluidPropagator.validateNeighbourChange(state, world, pos, otherBlock, neighborPos, isMoving);
+        if (d == null)
+            return;
+        if (!isOpenAt(state, d))
+            return;
+        world.scheduleBlockTick(pos, this, 1, TickPriority.HIGH);
     }
 
     @Override
     public void neighborUpdate(
         BlockState state,
-        Level world,
+        World world,
         BlockPos pos,
         Block otherBlock,
-        BlockPos neighborPos,
-        boolean isMoving
-    ) {
-        Direction d = FluidPropagator.validateNeighbourChange(state, world, pos, otherBlock, neighborPos, isMoving);
-        if (d == null) {
-            return;
-        }
-        if (!isOpenAt(state, d)) {
-            return;
-        }
-        world.scheduleTick(pos, this, 1, TickPriority.HIGH);
-    }
-
-    @Override
-    public void neighborChanged(
-        BlockState state,
-        Level world,
-        BlockPos pos,
-        Block otherBlock,
-        @Nullable Orientation wireOrientation,
+        @Nullable WireOrientation wireOrientation,
         boolean isMoving
     ) {
     }
 
     @Override
     public FluidState getFluidState(BlockState state) {
-        return state.getValue(BlockStateProperties.WATERLOGGED) ? Fluids.WATER.getSource(false) : Fluids.EMPTY.defaultFluidState();
+        return state.get(Properties.WATERLOGGED) ? Fluids.WATER.getStill(false) : Fluids.EMPTY.getDefaultState();
     }
 
     @Override
-    protected void createBlockStateDefinition(Builder<Block, BlockState> builder) {
-        builder.add(BlockStateProperties.WATERLOGGED);
-        super.createBlockStateDefinition(builder);
+    protected void appendProperties(Builder<Block, BlockState> builder) {
+        builder.add(Properties.WATERLOGGED);
+        super.appendProperties(builder);
     }
 
     @Override
-    public BlockState updateShape(
+    public BlockState getStateForNeighborUpdate(
         BlockState state,
-        LevelReader world,
-        ScheduledTickAccess tickView,
+        WorldView world,
+        ScheduledTickView tickView,
         BlockPos pos,
         Direction direction,
         BlockPos neighbourPos,
         BlockState neighbourState,
-        RandomSource random
+        Random random
     ) {
-        if (state.getValue(BlockStateProperties.WATERLOGGED)) {
-            tickView.scheduleTick(pos, Fluids.WATER, Fluids.WATER.getTickDelay(world));
-        }
+        if (state.get(Properties.WATERLOGGED))
+            tickView.scheduleFluidTick(pos, Fluids.WATER, Fluids.WATER.getTickRate(world));
         return state;
     }
 
     @Override
-    public BlockState getStateForPlacement(BlockPlaceContext context) {
-        BlockState toPlace = super.getStateForPlacement(context);
-        Level level = context.getLevel();
-        BlockPos pos = context.getClickedPos();
+    public BlockState getPlacementState(ItemPlacementContext context) {
+        BlockState toPlace = super.getPlacementState(context);
+        World level = context.getWorld();
+        BlockPos pos = context.getBlockPos();
 
-        boolean isShiftKeyDown = context.getPlayer() != null && context.getPlayer().isShiftKeyDown();
+        boolean isShiftKeyDown = context.getPlayer() != null && context.getPlayer().isSneaking();
         toPlace = ProperWaterloggedBlock.withWater(level, toPlace, pos);
 
-        Direction nearestLookingDirection = context.getNearestLookingDirection();
+        Direction nearestLookingDirection = context.getPlayerLookDirection();
         Direction targetDirection = isShiftKeyDown ? nearestLookingDirection : nearestLookingDirection.getOpposite();
         Direction bestConnectedDirection = null;
         double bestDistance = Double.MAX_VALUE;
 
         for (Direction d : Iterate.directions) {
-            BlockPos adjPos = pos.relative(d);
+            BlockPos adjPos = pos.offset(d);
             BlockState adjState = level.getBlockState(adjPos);
-            if (!FluidPipeBlock.canConnectTo(level, adjPos, adjState, d)) {
+            if (!FluidPipeBlock.canConnectTo(level, adjPos, adjState, d))
                 continue;
-            }
-            double distance = Vec3.atLowerCornerOf(d.getUnitVec3i())
-                .distanceTo(Vec3.atLowerCornerOf(targetDirection.getUnitVec3i()));
-            if (distance > bestDistance) {
+            double distance = Vec3d.of(d.getVector()).distanceTo(Vec3d.of(targetDirection.getVector()));
+            if (distance > bestDistance)
                 continue;
-            }
             bestDistance = distance;
             bestConnectedDirection = d;
         }
 
-        if (bestConnectedDirection != null && bestConnectedDirection.getAxis() != targetDirection.getAxis() && !isShiftKeyDown) {
-            return toPlace.setValue(FACING, bestConnectedDirection);
-        }
+        if (bestConnectedDirection != null && bestConnectedDirection.getAxis() != targetDirection.getAxis() && !isShiftKeyDown)
+            return toPlace.with(FACING, bestConnectedDirection);
 
         return toPlace;
     }
@@ -163,40 +144,37 @@ public class PumpBlock extends DirectionalKineticBlock implements SimpleWaterlog
     }
 
     @Override
-    public void onPlace(BlockState state, Level world, BlockPos pos, BlockState oldState, boolean isMoving) {
-        super.onPlace(state, world, pos, oldState, isMoving);
-        if (world.isClientSide()) {
+    public void onBlockAdded(BlockState state, World world, BlockPos pos, BlockState oldState, boolean isMoving) {
+        super.onBlockAdded(state, world, pos, oldState, isMoving);
+        if (world.isClient())
             return;
-        }
-        if (state != oldState) {
-            world.scheduleTick(pos, this, 1, TickPriority.HIGH);
-        }
+        if (state != oldState)
+            world.scheduleBlockTick(pos, this, 1, TickPriority.HIGH);
 
-        if (isPump(state) && isPump(oldState) && state.getValue(FACING) == oldState.getValue(FACING).getOpposite()) {
+        if (isPump(state) && isPump(oldState) && state.get(FACING) == oldState.get(FACING).getOpposite()) {
             BlockEntity blockEntity = world.getBlockEntity(pos);
-            if (!(blockEntity instanceof PumpBlockEntity pump)) {
+            if (!(blockEntity instanceof PumpBlockEntity pump))
                 return;
-            }
             pump.pressureUpdate = true;
         }
     }
 
     public static boolean isOpenAt(BlockState state, Direction d) {
-        return d.getAxis() == state.getValue(FACING).getAxis();
+        return d.getAxis() == state.get(FACING).getAxis();
     }
 
     @Override
-    public void tick(BlockState state, ServerLevel world, BlockPos pos, RandomSource r) {
+    public void scheduledTick(BlockState state, ServerWorld world, BlockPos pos, Random r) {
         FluidPropagator.propagateChangedPipe(world, pos, state);
     }
 
     @Override
-    public void affectNeighborsAfterRemoval(BlockState state, ServerLevel world, BlockPos pos, boolean isMoving) {
+    public void onStateReplaced(BlockState state, ServerWorld world, BlockPos pos, boolean isMoving) {
         FluidPropagator.propagateChangedPipe(world, pos, state);
     }
 
     @Override
-    protected boolean isPathfindable(BlockState state, PathComputationType pathComputationType) {
+    protected boolean canPathfindThrough(BlockState state, NavigationType pathComputationType) {
         return false;
     }
 

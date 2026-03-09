@@ -1,12 +1,12 @@
 package com.zurrtum.create.content.equipment.armor;
 
 import com.zurrtum.create.AllSynchedDatas;
-import net.minecraft.world.entity.EquipmentSlot;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.entity.EquipmentSlot;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.item.ItemStack;
 
 public class NetheriteDivingHandler {
-    public static void onEquipmentChange(Player player) {
+    public static void onEquipmentChange(PlayerEntity player) {
         if (AllSynchedDatas.FIRE_IMMUNE.get(player)) {
             if (isValidArmorSet(player)) {
                 return;
@@ -18,22 +18,22 @@ public class NetheriteDivingHandler {
 
     }
 
-    private static boolean isValidArmorSet(Player player) {
-        ItemStack head = player.getItemBySlot(EquipmentSlot.HEAD);
-        if (!(head.getItem() instanceof DivingHelmetItem) || head.canBeHurtBy(player.level().damageSources().lava())) {
+    private static boolean isValidArmorSet(PlayerEntity player) {
+        ItemStack head = player.getEquippedStack(EquipmentSlot.HEAD);
+        if (!(head.getItem() instanceof DivingHelmetItem) || head.takesDamageFrom(player.getEntityWorld().getDamageSources().lava())) {
             return false;
         }
 
-        ItemStack chest = player.getItemBySlot(EquipmentSlot.CHEST);
-        if (!(chest.getItem() instanceof BacktankItem) || chest.canBeHurtBy(player.level().damageSources()
+        ItemStack chest = player.getEquippedStack(EquipmentSlot.CHEST);
+        if (!(chest.getItem() instanceof BacktankItem) || chest.takesDamageFrom(player.getEntityWorld().getDamageSources()
             .lava()) || !BacktankUtil.hasAirRemaining(chest)) {
             return false;
         }
 
-        if (player.getItemBySlot(EquipmentSlot.LEGS).canBeHurtBy(player.level().damageSources().lava())) {
+        if (player.getEquippedStack(EquipmentSlot.LEGS).takesDamageFrom(player.getEntityWorld().getDamageSources().lava())) {
             return false;
         }
 
-        return !player.getItemBySlot(EquipmentSlot.FEET).canBeHurtBy(player.level().damageSources().lava());
+        return !player.getEquippedStack(EquipmentSlot.FEET).takesDamageFrom(player.getEntityWorld().getDamageSources().lava());
     }
 }

@@ -1,22 +1,24 @@
 package com.zurrtum.create.content.equipment.armor;
 
 import com.zurrtum.create.AllAdvancements;
-import net.minecraft.server.level.ServerLevel;
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.entity.*;
-import net.minecraft.world.entity.ai.goal.WrappedGoal;
-import net.minecraft.world.entity.ai.goal.target.TargetGoal;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.entity.*;
+import net.minecraft.entity.ai.goal.PrioritizedGoal;
+import net.minecraft.entity.ai.goal.TrackTargetGoal;
+import net.minecraft.entity.mob.Angerable;
+import net.minecraft.entity.mob.MobEntity;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.item.ItemStack;
+import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.world.ServerWorld;
+
+import java.util.UUID;
 
 public class CardboardArmorHandler {
     public static EntityDimensions playerHitboxChangesWhenHidingAsBox(Entity entity) {
-        if (!testForStealth(entity)) {
+        if (!testForStealth(entity))
             return null;
-        }
-        if (!testForStealth(entity)) {
+        if (!testForStealth(entity))
             return null;
-        }
         float scale;
         if (entity instanceof LivingEntity le) {
             scale = le.getScale();
@@ -24,75 +26,64 @@ public class CardboardArmorHandler {
             scale = 1.0F;
         }
 
-        if (!entity.level().isClientSide() && entity instanceof ServerPlayer serverPlayer) {
+        if (!entity.getEntityWorld().isClient() && entity instanceof ServerPlayerEntity serverPlayer) {
             AllAdvancements.CARDBOARD_ARMOR.trigger(serverPlayer);
         }
 
         float width = 0.6F * scale;
         float height = 0.8F * scale;
-        return new EntityDimensions(width, height, width, EntityAttachments.createDefault(width, height), true);
+        return new EntityDimensions(width, height, width, EntityAttachments.of(width, height), true);
     }
 
-    public static void playerChangesEquipment(Player player) {
-        if (player.getPose() == Pose.CROUCHING && (isCardboardArmor(player.getItemBySlot(EquipmentSlot.HEAD)) || isCardboardArmor(
-            player.getItemBySlot(EquipmentSlot.CHEST)) || isCardboardArmor(player.getItemBySlot(EquipmentSlot.LEGS)) || isCardboardArmor(
-            player.getItemBySlot(EquipmentSlot.FEET)))) {
-            player.getEntityData().set(Entity.DATA_POSE, Pose.CROUCHING, true);
+    public static void playerChangesEquipment(PlayerEntity player) {
+        if (player.getPose() == EntityPose.CROUCHING && (isCardboardArmor(player.getEquippedStack(EquipmentSlot.HEAD)) || isCardboardArmor(player.getEquippedStack(
+            EquipmentSlot.CHEST)) || isCardboardArmor(player.getEquippedStack(EquipmentSlot.LEGS)) || isCardboardArmor(player.getEquippedStack(
+            EquipmentSlot.FEET)))) {
+            player.getDataTracker().set(Entity.POSE, EntityPose.CROUCHING, true);
         }
     }
 
     public static void mobsMayLoseTargetWhenItIsWearingCardboard(Entity entity) {
-        if (!(entity instanceof Mob mob)) {
+        if (!(entity instanceof MobEntity mob))
             return;
-        }
-        if (mob.tickCount % 16 != 0) {
+        if (mob.age % 16 != 0)
             return;
-        }
 
         if (testForStealth(mob.getTarget())) {
             mob.setTarget(null);
-            if (mob.targetSelector != null) {
-                for (WrappedGoal goal : mob.targetSelector.getAvailableGoals()) {
-                    if (goal.isRunning() && goal.getGoal() instanceof TargetGoal tg) {
+            if (mob.targetSelector != null)
+                for (PrioritizedGoal goal : mob.targetSelector.getGoals()) {
+                    if (goal.isRunning() && goal.getGoal() instanceof TrackTargetGoal tg)
                         tg.stop();
-                    }
                 }
-            }
         }
 
-        if (entity instanceof NeutralMob nMob && entity.level() instanceof ServerLevel sl) {
-            LivingEntity target = EntityReference.getLivingEntity(nMob.getPersistentAngerTarget(), sl);
-            if (testForStealth(target)) {
-                nMob.stopBeingAngry();
-            }
+        if (entity instanceof Angerable nMob && entity.getEntityWorld() instanceof ServerWorld sl) {
+            UUID uuid = nMob.getAngryAt();
+            if (uuid != null && testForStealth(sl.getEntity(uuid)))
+                nMob.stopAnger();
         }
 
-        if (testForStealth(mob.getLastHurtByMob())) {
-            mob.setLastHurtByMob(null);
-            mob.setLastHurtByPlayer((EntityReference<Player>) null, 0);
+        if (testForStealth(mob.getAttacker())) {
+            mob.setAttacker(null);
+            mob.setAttacking((LazyEntityReference<PlayerEntity>) null, 0);
         }
     }
 
     public static boolean testForStealth(Entity entityIn) {
-        if (!(entityIn instanceof LivingEntity entity)) {
+        if (!(entityIn instanceof LivingEntity entity))
             return false;
-        }
-        if (entity.getPose() != Pose.CROUCHING) {
+        if (entity.getPose() != EntityPose.CROUCHING)
             return false;
-        }
-        if (entity instanceof Player player && player.getAbilities().flying) {
+        if (entity instanceof PlayerEntity player && player.getAbilities().flying)
             return false;
-        }
-        if (!isCardboardArmor(entity.getItemBySlot(EquipmentSlot.HEAD))) {
+        if (!isCardboardArmor(entity.getEquippedStack(EquipmentSlot.HEAD)))
             return false;
-        }
-        if (!isCardboardArmor(entity.getItemBySlot(EquipmentSlot.CHEST))) {
+        if (!isCardboardArmor(entity.getEquippedStack(EquipmentSlot.CHEST)))
             return false;
-        }
-        if (!isCardboardArmor(entity.getItemBySlot(EquipmentSlot.LEGS))) {
+        if (!isCardboardArmor(entity.getEquippedStack(EquipmentSlot.LEGS)))
             return false;
-        }
-        return isCardboardArmor(entity.getItemBySlot(EquipmentSlot.FEET));
+        return isCardboardArmor(entity.getEquippedStack(EquipmentSlot.FEET));
     }
 
     public static boolean isCardboardArmor(ItemStack stack) {

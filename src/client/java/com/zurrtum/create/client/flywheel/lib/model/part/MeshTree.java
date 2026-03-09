@@ -1,6 +1,5 @@
 package com.zurrtum.create.client.flywheel.lib.model.part;
 
-import com.mojang.blaze3d.vertex.PoseStack;
 import com.zurrtum.create.client.flywheel.api.model.Mesh;
 import com.zurrtum.create.client.flywheel.lib.internal.FlwLibLink;
 import com.zurrtum.create.client.flywheel.lib.memory.MemoryBlock;
@@ -8,44 +7,44 @@ import com.zurrtum.create.client.flywheel.lib.model.SimpleQuadMesh;
 import com.zurrtum.create.client.flywheel.lib.util.RendererReloadCache;
 import com.zurrtum.create.client.flywheel.lib.vertex.PosTexNormalVertexView;
 import com.zurrtum.create.client.flywheel.lib.vertex.VertexView;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.model.geom.EntityModelSet;
-import net.minecraft.client.model.geom.ModelLayerLocation;
-import net.minecraft.client.model.geom.ModelPart;
-import net.minecraft.client.model.geom.PartPose;
-import net.minecraft.client.renderer.LightTexture;
-import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.model.ModelPart;
+import net.minecraft.client.model.ModelTransform;
+import net.minecraft.client.render.LightmapTextureManager;
+import net.minecraft.client.render.OverlayTexture;
+import net.minecraft.client.render.entity.model.EntityModelLayer;
+import net.minecraft.client.render.entity.model.LoadedEntityModels;
+import net.minecraft.client.util.math.MatrixStack;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Arrays;
 import java.util.NoSuchElementException;
 
 public final class MeshTree {
-    private static final ThreadLocal<ThreadLocalObjects> THREAD_LOCAL_OBJECTS = ThreadLocal.withInitial(
-        ThreadLocalObjects::new);
-    private static final PoseStack.Pose IDENTITY_POSE = new PoseStack().last();
-    private static final RendererReloadCache<ModelLayerLocation, MeshTree> CACHE = new RendererReloadCache<>(MeshTree::convert);
+    private static final ThreadLocal<ThreadLocalObjects> THREAD_LOCAL_OBJECTS = ThreadLocal.withInitial(ThreadLocalObjects::new);
+    private static final MatrixStack.Entry IDENTITY_POSE = new MatrixStack().peek();
+    private static final RendererReloadCache<EntityModelLayer, MeshTree> CACHE = new RendererReloadCache<>(MeshTree::convert);
 
     @Nullable
     private final Mesh mesh;
-    private final PartPose initialPose;
+    private final ModelTransform initialPose;
     private final MeshTree[] children;
     private final String[] childNames;
 
-    private MeshTree(@Nullable Mesh mesh, PartPose initialPose, MeshTree[] children, String[] childNames) {
+    private MeshTree(@Nullable Mesh mesh, ModelTransform initialPose, MeshTree[] children, String[] childNames) {
         this.mesh = mesh;
         this.initialPose = initialPose;
         this.children = children;
         this.childNames = childNames;
     }
 
-    public static MeshTree of(ModelLayerLocation layer) {
+    public static MeshTree of(EntityModelLayer layer) {
         return CACHE.get(layer);
     }
 
-    private static MeshTree convert(ModelLayerLocation layer) {
-        EntityModelSet entityModels = Minecraft.getInstance().getEntityModels();
-        ModelPart modelPart = entityModels.bakeLayer(layer);
+    private static MeshTree convert(EntityModelLayer layer) {
+        LoadedEntityModels entityModels = MinecraftClient.getInstance().getLoadedEntityModels();
+        ModelPart modelPart = entityModels.getModelPart(layer);
 
         return convert(modelPart, THREAD_LOCAL_OBJECTS.get());
     }
@@ -61,7 +60,7 @@ public final class MeshTree {
             children[i] = convert(modelPartChildren.get(childNames[i]), objects);
         }
 
-        return new MeshTree(compile(modelPart, objects), modelPart.getInitialPose(), children, childNames);
+        return new MeshTree(compile(modelPart, objects), modelPart.getDefaultTransform(), children, childNames);
     }
 
     @Nullable
@@ -75,8 +74,8 @@ public final class MeshTree {
             modelPart,
             IDENTITY_POSE,
             vertexWriter,
-            LightTexture.FULL_BRIGHT,
-            OverlayTexture.NO_OVERLAY,
+            LightmapTextureManager.MAX_LIGHT_COORDINATE,
+            OverlayTexture.DEFAULT_UV,
             0xFFFFFFFF
         );
         MemoryBlock data = vertexWriter.copyDataAndReset();
@@ -91,7 +90,7 @@ public final class MeshTree {
         return mesh;
     }
 
-    public PartPose initialPose() {
+    public ModelTransform initialPose() {
         return initialPose;
     }
 

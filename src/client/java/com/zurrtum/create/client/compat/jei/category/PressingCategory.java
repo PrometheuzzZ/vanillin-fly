@@ -15,29 +15,29 @@ import mezz.jei.api.gui.drawable.IDrawable;
 import mezz.jei.api.gui.ingredient.IRecipeSlotsView;
 import mezz.jei.api.recipe.IFocusGroup;
 import mezz.jei.api.recipe.types.IRecipeType;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.network.chat.Component;
-import net.minecraft.world.item.crafting.RecipeHolder;
-import net.minecraft.world.item.crafting.RecipeMap;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.recipe.PreparedRecipes;
+import net.minecraft.recipe.RecipeEntry;
+import net.minecraft.text.Text;
 import org.jetbrains.annotations.NotNull;
 import org.joml.Matrix3x2f;
 
 import java.util.List;
 
-public class PressingCategory extends CreateCategory<RecipeHolder<PressingRecipe>> {
-    public static List<RecipeHolder<PressingRecipe>> getRecipes(RecipeMap preparedRecipes) {
-        return preparedRecipes.byType(AllRecipeTypes.PRESSING).stream().toList();
+public class PressingCategory extends CreateCategory<RecipeEntry<PressingRecipe>> {
+    public static List<RecipeEntry<PressingRecipe>> getRecipes(PreparedRecipes preparedRecipes) {
+        return preparedRecipes.getAll(AllRecipeTypes.PRESSING).stream().toList();
     }
 
     @Override
     @NotNull
-    public IRecipeType<RecipeHolder<PressingRecipe>> getRecipeType() {
+    public IRecipeType<RecipeEntry<PressingRecipe>> getRecipeType() {
         return JeiClientPlugin.PRESSING;
     }
 
     @Override
     @NotNull
-    public Component getTitle() {
+    public Text getTitle() {
         return CreateLang.translateDirect("recipe.pressing");
     }
 
@@ -52,7 +52,7 @@ public class PressingCategory extends CreateCategory<RecipeHolder<PressingRecipe
     }
 
     @Override
-    public void setRecipe(IRecipeLayoutBuilder builder, RecipeHolder<PressingRecipe> entry, IFocusGroup focuses) {
+    public void setRecipe(IRecipeLayoutBuilder builder, RecipeEntry<PressingRecipe> entry, IFocusGroup focuses) {
         PressingRecipe recipe = entry.value();
         builder.addInputSlot(27, 51).setBackground(SLOT, -1, -1).add(recipe.ingredient());
         List<ProcessingOutput> results = recipe.results();
@@ -62,19 +62,9 @@ public class PressingCategory extends CreateCategory<RecipeHolder<PressingRecipe
     }
 
     @Override
-    public void draw(
-        RecipeHolder<PressingRecipe> entry,
-        IRecipeSlotsView recipeSlotsView,
-        GuiGraphics graphics,
-        double mouseX,
-        double mouseY
-    ) {
+    public void draw(RecipeEntry<PressingRecipe> entry, IRecipeSlotsView recipeSlotsView, DrawContext graphics, double mouseX, double mouseY) {
         AllGuiTextures.JEI_SHADOW.render(graphics, 61, 41);
         AllGuiTextures.JEI_LONG_ARROW.render(graphics, 52, 54);
-        graphics.guiRenderState.submitPicturesInPictureState(new PressRenderState(
-            new Matrix3x2f(graphics.pose()),
-            73,
-            -16
-        ));
+        graphics.state.addSpecialElement(new PressRenderState(new Matrix3x2f(graphics.getMatrices()), 73, -16));
     }
 }

@@ -9,14 +9,14 @@ import com.zurrtum.create.catnip.data.IntAttached;
 import com.zurrtum.create.content.contraptions.Contraption;
 import com.zurrtum.create.content.contraptions.behaviour.MovementContext;
 import com.zurrtum.create.content.contraptions.elevator.ElevatorContraption;
-import net.minecraft.nbt.CompoundTag;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NbtCompound;
+import net.minecraft.nbt.NbtElement;
 import net.minecraft.nbt.NbtOps;
-import net.minecraft.nbt.Tag;
-import net.minecraft.network.chat.Component;
-import net.minecraft.resources.RegistryOps;
-import net.minecraft.util.Mth;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.registry.RegistryOps;
+import net.minecraft.text.Text;
+import net.minecraft.util.math.MathHelper;
 
 public class ContraptionControlsMovement extends MovementBehaviour {
 
@@ -27,55 +27,49 @@ public class ContraptionControlsMovement extends MovementBehaviour {
 
     @Override
     public void startMoving(MovementContext context) {
-        if (context.contraption instanceof ElevatorContraption && context.blockEntityData != null) {
+        if (context.contraption instanceof ElevatorContraption && context.blockEntityData != null)
             context.blockEntityData.remove("Filter");
-        }
     }
 
     @Override
     public void stopMoving(MovementContext context) {
         ItemStack filter = getFilter(context);
-        if (filter != null) {
+        if (filter != null)
             context.blockEntityData.putBoolean(
                 "Disabled",
                 context.contraption.isActorTypeDisabled(filter) || context.contraption.isActorTypeDisabled(ItemStack.EMPTY)
             );
-        }
     }
 
     public static boolean isSameFilter(ItemStack stack1, ItemStack stack2) {
-        if (stack1.isEmpty() && stack2.isEmpty()) {
+        if (stack1.isEmpty() && stack2.isEmpty())
             return true;
-        }
-        return ItemStack.isSameItemSameComponents(stack1, stack2);
+        return ItemStack.areItemsAndComponentsEqual(stack1, stack2);
     }
 
     public static ItemStack getFilter(MovementContext ctx) {
-        CompoundTag blockEntityData = ctx.blockEntityData;
-        if (blockEntityData == null) {
+        NbtCompound blockEntityData = ctx.blockEntityData;
+        if (blockEntityData == null)
             return null;
-        }
-        RegistryOps<Tag> ops = ctx.world.registryAccess().createSerializationContext(NbtOps.INSTANCE);
-        return blockEntityData.read("Filter", ItemStack.OPTIONAL_CODEC, ops).orElse(ItemStack.EMPTY);
+        RegistryOps<NbtElement> ops = ctx.world.getRegistryManager().getOps(NbtOps.INSTANCE);
+        return blockEntityData.get("Filter", ItemStack.OPTIONAL_CODEC, ops).orElse(ItemStack.EMPTY);
     }
 
     public static boolean isDisabledInitially(MovementContext ctx) {
-        return ctx.blockEntityData != null && ctx.blockEntityData.getBooleanOr("Disabled", false);
+        return ctx.blockEntityData != null && ctx.blockEntityData.getBoolean("Disabled", false);
     }
 
     @Override
     public void tick(MovementContext ctx) {
-        if (!ctx.world.isClientSide()) {
+        if (!ctx.world.isClient())
             return;
-        }
 
         Contraption contraption = ctx.contraption;
         BlockEntity blockEntity = AllClientHandle.INSTANCE.getBlockEntityClientSide(contraption, ctx.localPos);
 
         if (!(contraption instanceof ElevatorContraption ec)) {
-            if (!(blockEntity instanceof ContraptionControlsBlockEntity cbe)) {
+            if (!(blockEntity instanceof ContraptionControlsBlockEntity cbe))
                 return;
-            }
             ItemStack filter = getFilter(ctx);
             int value = contraption.isActorTypeDisabled(filter) || contraption.isActorTypeDisabled(ItemStack.EMPTY) ? 4 * 45 : 0;
             cbe.indicator.setValue(value);
@@ -84,16 +78,14 @@ public class ContraptionControlsMovement extends MovementBehaviour {
             return;
         }
 
-        if (!(ctx.temporaryData instanceof ElevatorFloorSelection)) {
+        if (!(ctx.temporaryData instanceof ElevatorFloorSelection))
             ctx.temporaryData = new ElevatorFloorSelection();
-        }
 
         ElevatorFloorSelection efs = (ElevatorFloorSelection) ctx.temporaryData;
         tickFloorSelection(efs, ec);
 
-        if (!(blockEntity instanceof ContraptionControlsBlockEntity cbe)) {
+        if (!(blockEntity instanceof ContraptionControlsBlockEntity cbe))
             return;
-        }
 
         cbe.tickAnimations();
 
@@ -112,7 +104,7 @@ public class ContraptionControlsMovement extends MovementBehaviour {
             return;
         }
 
-        int currentStage = Mth.floor(((currentIndicator % 360) + 360) % 360);
+        int currentStage = MathHelper.floor(((currentIndicator % 360) + 360) % 360);
         if (!atTargetY || currentStage / 45 != 0) {
             float increment = currentStage / 45 == (below ? 4 : 3) ? 2.25f : 33.75f;
             indicator.chase(currentIndicator + (below ? increment : -increment), 45f, Chaser.LINEAR);
@@ -132,16 +124,15 @@ public class ContraptionControlsMovement extends MovementBehaviour {
             return;
         }
 
-        efs.currentIndex = Mth.clamp(efs.currentIndex, 0, ec.namesList.size() - 1);
+        efs.currentIndex = MathHelper.clamp(efs.currentIndex, 0, ec.namesList.size() - 1);
         IntAttached<Couple<String>> entry = ec.namesList.get(efs.currentIndex);
         efs.currentTargetY = entry.getFirst();
         efs.currentShortName = entry.getSecond().getFirst();
         efs.currentLongName = entry.getSecond().getSecond();
         efs.targetYEqualsSelection = efs.currentTargetY == ec.clientYTarget;
 
-        if (ec.isTargetUnreachable(efs.currentTargetY)) {
-            efs.currentLongName = Component.translatable("create.contraption.controls.floor_unreachable").getString();
-        }
+        if (ec.isTargetUnreachable(efs.currentTargetY))
+            efs.currentLongName = Text.translatable("create.contraption.controls.floor_unreachable").getString();
     }
 
     public static class ElevatorFloorSelection {

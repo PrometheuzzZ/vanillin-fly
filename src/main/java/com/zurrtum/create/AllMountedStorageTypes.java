@@ -15,37 +15,25 @@ import com.zurrtum.create.content.logistics.crate.CreativeCrateMountedStorageTyp
 import com.zurrtum.create.content.logistics.depot.storage.DepotMountedStorageType;
 import com.zurrtum.create.content.logistics.vault.ItemVaultMountedStorageType;
 import com.zurrtum.create.impl.contraption.storage.FallbackMountedStorageType;
-import net.minecraft.core.Registry;
-import net.minecraft.resources.Identifier;
-import net.minecraft.resources.ResourceKey;
-import net.minecraft.tags.TagKey;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.Blocks;
+import net.minecraft.block.Block;
+import net.minecraft.block.Blocks;
+import net.minecraft.registry.Registry;
+import net.minecraft.registry.RegistryKey;
+import net.minecraft.registry.tag.TagKey;
+import net.minecraft.util.Identifier;
 
 import static com.zurrtum.create.Create.MOD_ID;
 
 public class AllMountedStorageTypes {
     public static final DepotMountedStorageType DEPOT = register("depot", new DepotMountedStorageType());
-    public static final CreativeCrateMountedStorageType CREATIVE_CRATE = register(
-        "creative_crate",
-        new CreativeCrateMountedStorageType()
-    );
+    public static final CreativeCrateMountedStorageType CREATIVE_CRATE = register("creative_crate", new CreativeCrateMountedStorageType());
     public static final ItemVaultMountedStorageType VAULT = register("vault", new ItemVaultMountedStorageType());
     public static final ToolboxMountedStorageType TOOLBOX = register("toolbox", new ToolboxMountedStorageType());
     public static final ChestMountedStorageType CHEST = register("chest", new ChestMountedStorageType());
-    public static final DispenserMountedStorageType DISPENSER = register(
-        "dispenser",
-        new DispenserMountedStorageType()
-    );
-    public static final SimpleMountedStorageType<SimpleMountedStorage> SIMPLE = register(
-        "simple",
-        new SimpleMountedStorageType.Impl()
-    );
+    public static final DispenserMountedStorageType DISPENSER = register("dispenser", new DispenserMountedStorageType());
+    public static final SimpleMountedStorageType<SimpleMountedStorage> SIMPLE = register("simple", new SimpleMountedStorageType.Impl());
     public static final FallbackMountedStorageType FALLBACK = register("fallback", new FallbackMountedStorageType());
-    public static final FluidTankMountedStorageType FLUID_TANK = register(
-        "fluid_tank",
-        new FluidTankMountedStorageType()
-    );
+    public static final FluidTankMountedStorageType FLUID_TANK = register("fluid_tank", new FluidTankMountedStorageType());
     public static final CreativeFluidTankMountedStorageType CREATIVE_FLUID_TANK = register(
         "creative_fluid_tank",
         new CreativeFluidTankMountedStorageType()
@@ -54,10 +42,7 @@ public class AllMountedStorageTypes {
     private static <T extends MountedItemStorageType<?>> T register(String id, T type) {
         return Registry.register(
             CreateRegistries.MOUNTED_ITEM_STORAGE_TYPE,
-            ResourceKey.create(
-                CreateRegistryKeys.MOUNTED_ITEM_STORAGE_TYPE,
-                Identifier.fromNamespaceAndPath(MOD_ID, id)
-            ),
+            RegistryKey.of(CreateRegistryKeys.MOUNTED_ITEM_STORAGE_TYPE, Identifier.of(MOD_ID, id)),
             type
         );
     }
@@ -65,10 +50,7 @@ public class AllMountedStorageTypes {
     private static <T extends MountedFluidStorageType<?>> T register(String id, T type) {
         return Registry.register(
             CreateRegistries.MOUNTED_FLUID_STORAGE_TYPE,
-            ResourceKey.create(
-                CreateRegistryKeys.MOUNTED_FLUID_STORAGE_TYPE,
-                Identifier.fromNamespaceAndPath(MOD_ID, id)
-            ),
+            RegistryKey.of(CreateRegistryKeys.MOUNTED_FLUID_STORAGE_TYPE, Identifier.of(MOD_ID, id)),
             type
         );
     }
@@ -81,7 +63,7 @@ public class AllMountedStorageTypes {
 
     @SuppressWarnings("deprecation")
     public static void register(MountedItemStorageType<?> type, TagKey<Block> tag) {
-        MountedItemStorageType.REGISTRY.registerProvider(block -> block.builtInRegistryHolder().is(tag) ? type : null);
+        MountedItemStorageType.REGISTRY.registerProvider(block -> block.getRegistryEntry().isIn(tag) ? type : null);
     }
 
     public static void register(MountedFluidStorageType<?> type, Block... blocks) {

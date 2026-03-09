@@ -1,16 +1,16 @@
 package com.zurrtum.create.content.fluids;
 
-import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.catnip.data.Iterate;
 import com.zurrtum.create.catnip.data.Pair;
 import com.zurrtum.create.catnip.math.BlockFace;
 import com.zurrtum.create.content.contraptions.actors.psi.PortableFluidInterfaceBlockEntity.InterfaceFluidHandler;
 import com.zurrtum.create.content.fluids.PipeConnection.Flow;
+import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.infrastructure.fluids.FluidInventory;
 import com.zurrtum.create.infrastructure.fluids.FluidStack;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.world.level.Level;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
 import java.lang.ref.WeakReference;
@@ -21,7 +21,7 @@ public class FluidNetwork {
 
     private static final int CYCLES_PER_TICK = 16;
 
-    Level world;
+    World world;
     BlockFace start;
 
     Supplier<FluidInventory> sourceSupplier;
@@ -36,7 +36,7 @@ public class FluidNetwork {
     List<Pair<BlockFace, FlowSource>> targets;
     Map<BlockPos, WeakReference<FluidTransportBehaviour>> cache;
 
-    public FluidNetwork(Level world, BlockFace location, Supplier<FluidInventory> sourceSupplier) {
+    public FluidNetwork(World world, BlockFace location, Supplier<FluidInventory> sourceSupplier) {
         this.world = world;
         this.start = location;
         this.sourceSupplier = sourceSupplier;
@@ -59,14 +59,12 @@ public class FluidNetwork {
             boolean shouldContinue = false;
             for (Iterator<BlockFace> iterator = queued.iterator(); iterator.hasNext(); ) {
                 BlockFace blockFace = iterator.next();
-                if (!isPresent(blockFace)) {
+                if (!isPresent(blockFace))
                     continue;
-                }
                 PipeConnection pipeConnection = get(blockFace);
                 if (pipeConnection != null) {
-                    if (blockFace.equals(start)) {
+                    if (blockFace.equals(start))
                         transferSpeed = (int) Math.max(1, pipeConnection.pressure.get(true) / 2f) * 81;
-                    }
                     frontier.add(Pair.of(blockFace, pipeConnection));
                 }
                 iterator.remove();
@@ -79,9 +77,8 @@ public class FluidNetwork {
                 BlockFace blockFace = pair.getFirst();
                 PipeConnection pipeConnection = pair.getSecond();
 
-                if (!pipeConnection.hasFlow()) {
+                if (!pipeConnection.hasFlow())
                     continue;
-                }
 
                 Flow flow = pipeConnection.flow.get();
                 if (!fluid.isEmpty() && !FluidStack.areFluidsAndComponentsEqualIgnoreCapacity(flow.fluid, fluid)) {
@@ -89,41 +86,34 @@ public class FluidNetwork {
                     continue;
                 }
                 if (!flow.inbound) {
-                    if (pipeConnection.comparePressure() >= 0) {
+                    if (pipeConnection.comparePressure() >= 0)
                         iterator.remove();
-                    }
                     continue;
                 }
-                if (!flow.complete) {
+                if (!flow.complete)
                     continue;
-                }
 
-                if (fluid.isEmpty()) {
+                if (fluid.isEmpty())
                     fluid = flow.fluid;
-                }
 
                 boolean canRemove = true;
                 for (Direction side : Iterate.directions) {
-                    if (side == blockFace.getFace()) {
+                    if (side == blockFace.getFace())
                         continue;
-                    }
                     BlockFace adjacentLocation = new BlockFace(blockFace.getPos(), side);
                     PipeConnection adjacent = get(adjacentLocation);
-                    if (adjacent == null) {
+                    if (adjacent == null)
                         continue;
-                    }
                     if (!adjacent.hasFlow()) {
                         // Branch could potentially still appear
-                        if (adjacent.hasPressure() && adjacent.pressure.getSecond() > 0) {
+                        if (adjacent.hasPressure() && adjacent.pressure.getSecond() > 0)
                             canRemove = false;
-                        }
                         continue;
                     }
                     Flow outFlow = adjacent.flow.get();
                     if (outFlow.inbound) {
-                        if (adjacent.comparePressure() > 0) {
+                        if (adjacent.comparePressure() > 0)
                             canRemove = false;
-                        }
                         continue;
                     }
                     if (!outFlow.complete) {
@@ -147,41 +137,33 @@ public class FluidNetwork {
                         shouldContinue = true;
                     }
                 }
-                if (canRemove) {
+                if (canRemove)
                     iterator.remove();
-                }
             }
-            if (!shouldContinue) {
+            if (!shouldContinue)
                 break;
-            }
         }
 
         //		drawDebugOutlines();
 
-        if (source == null) {
+        if (source == null)
             source = sourceSupplier.get();
-        }
-        if (source == null) {
+        if (source == null)
             return;
-        }
 
         keepPortableFluidInterfaceEngaged();
 
-        if (targets.isEmpty()) {
+        if (targets.isEmpty())
             return;
-        }
         for (Pair<BlockFace, FlowSource> pair : targets) {
-            if (pair.getSecond() != null && world.getGameTime() % 40 != 0) {
+            if (pair.getSecond() != null && world.getTime() % 40 != 0)
                 continue;
-            }
             PipeConnection pipeConnection = get(pair.getFirst());
-            if (pipeConnection == null) {
+            if (pipeConnection == null)
                 continue;
-            }
             pipeConnection.source.ifPresent(fs -> {
-                if (fs.isEndpoint()) {
+                if (fs.isEndpoint())
                     pair.setSecond(fs);
-                }
             });
         }
 
@@ -237,12 +219,10 @@ public class FluidNetwork {
     //	}
 
     private void keepPortableFluidInterfaceEngaged() {
-        if (!(source instanceof InterfaceFluidHandler)) {
+        if (!(source instanceof InterfaceFluidHandler))
             return;
-        }
-        if (frontier.isEmpty()) {
+        if (frontier.isEmpty())
             return;
-        }
         source.markDirty();
     }
 
@@ -260,28 +240,25 @@ public class FluidNetwork {
     private PipeConnection get(BlockFace location) {
         BlockPos pos = location.getPos();
         FluidTransportBehaviour fluidTransfer = getFluidTransfer(pos);
-        if (fluidTransfer == null) {
+        if (fluidTransfer == null)
             return null;
-        }
         return fluidTransfer.getConnection(location.getFace());
     }
 
     private boolean isPresent(BlockFace location) {
-        return world.isLoaded(location.getPos());
+        return world.isPosLoaded(location.getPos());
     }
 
     @Nullable
     private FluidTransportBehaviour getFluidTransfer(BlockPos pos) {
         WeakReference<FluidTransportBehaviour> weakReference = cache.get(pos);
         FluidTransportBehaviour behaviour = weakReference != null ? weakReference.get() : null;
-        if (behaviour != null && behaviour.blockEntity.isRemoved()) {
+        if (behaviour != null && behaviour.blockEntity.isRemoved())
             behaviour = null;
-        }
         if (behaviour == null) {
             behaviour = BlockEntityBehaviour.get(world, pos, FluidTransportBehaviour.TYPE);
-            if (behaviour != null) {
+            if (behaviour != null)
                 cache.put(pos, new WeakReference<>(behaviour));
-            }
         }
         return behaviour;
     }

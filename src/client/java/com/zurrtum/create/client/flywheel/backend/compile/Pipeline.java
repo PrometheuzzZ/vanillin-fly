@@ -4,14 +4,15 @@ import com.zurrtum.create.client.flywheel.api.instance.Instance;
 import com.zurrtum.create.client.flywheel.api.instance.InstanceType;
 import com.zurrtum.create.client.flywheel.backend.gl.shader.GlProgram;
 import com.zurrtum.create.client.flywheel.backend.glsl.SourceComponent;
-import net.minecraft.resources.Identifier;
+import net.minecraft.util.Identifier;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Objects;
 import java.util.function.Consumer;
 
-public record Pipeline(Identifier vertexMain, Identifier fragmentMain, InstanceAssembler assembler,
-                       String compilerMarker, Consumer<GlProgram> onLink) {
+public record Pipeline(
+    Identifier vertexMain, Identifier fragmentMain, InstanceAssembler assembler, String compilerMarker, Consumer<GlProgram> onLink
+) {
 
     @FunctionalInterface
     public interface InstanceAssembler {

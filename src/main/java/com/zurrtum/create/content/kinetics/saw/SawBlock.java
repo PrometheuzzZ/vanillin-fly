@@ -8,241 +8,201 @@ import com.zurrtum.create.content.kinetics.base.DirectionalAxisKineticBlock;
 import com.zurrtum.create.content.kinetics.drill.DrillBlock;
 import com.zurrtum.create.foundation.block.IBE;
 import com.zurrtum.create.infrastructure.items.ItemInventoryProvider;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.core.Direction.Axis;
-import net.minecraft.core.Direction.AxisDirection;
-import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.Container;
-import net.minecraft.world.InteractionHand;
-import net.minecraft.world.InteractionResult;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.InsideBlockEffectApplier;
-import net.minecraft.world.entity.item.ItemEntity;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.BlockItem;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.context.BlockPlaceContext;
-import net.minecraft.world.level.BlockGetter;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.LevelAccessor;
-import net.minecraft.world.level.LevelReader;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.Mirror;
-import net.minecraft.world.level.block.Rotation;
-import net.minecraft.world.level.block.entity.BlockEntityType;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.StateDefinition.Builder;
-import net.minecraft.world.level.block.state.properties.BooleanProperty;
-import net.minecraft.world.level.pathfinder.PathComputationType;
-import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.BlockHitResult;
-import net.minecraft.world.phys.shapes.CollisionContext;
-import net.minecraft.world.phys.shapes.VoxelShape;
+import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.ShapeContext;
+import net.minecraft.block.entity.BlockEntityType;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.EntityCollisionHandler;
+import net.minecraft.entity.ItemEntity;
+import net.minecraft.entity.ai.pathing.NavigationType;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.inventory.Inventory;
+import net.minecraft.item.BlockItem;
+import net.minecraft.item.ItemPlacementContext;
+import net.minecraft.item.ItemStack;
+import net.minecraft.server.world.ServerWorld;
+import net.minecraft.state.StateManager.Builder;
+import net.minecraft.state.property.BooleanProperty;
+import net.minecraft.util.ActionResult;
+import net.minecraft.util.BlockMirror;
+import net.minecraft.util.BlockRotation;
+import net.minecraft.util.Hand;
+import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Box;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Direction.Axis;
+import net.minecraft.util.math.Direction.AxisDirection;
+import net.minecraft.util.shape.VoxelShape;
+import net.minecraft.world.BlockView;
+import net.minecraft.world.World;
+import net.minecraft.world.WorldAccess;
+import net.minecraft.world.WorldView;
 
 import java.util.List;
 import java.util.function.Predicate;
 
 public class SawBlock extends DirectionalAxisKineticBlock implements IBE<SawBlockEntity>, ItemInventoryProvider<SawBlockEntity> {
-    public static final BooleanProperty FLIPPED = BooleanProperty.create("flipped");
+    public static final BooleanProperty FLIPPED = BooleanProperty.of("flipped");
 
     private static final int placementHelperId = PlacementHelpers.register(new PlacementHelper());
 
-    public SawBlock(Properties properties) {
+    public SawBlock(Settings properties) {
         super(properties);
     }
 
     @Override
-    public Container getInventory(
-        LevelAccessor world,
-        BlockPos pos,
-        BlockState state,
-        SawBlockEntity blockEntity,
-        Direction context
-    ) {
+    public Inventory getInventory(WorldAccess world, BlockPos pos, BlockState state, SawBlockEntity blockEntity, Direction context) {
         return blockEntity.inventory;
     }
 
     @Override
-    protected void createBlockStateDefinition(Builder<Block, BlockState> builder) {
-        super.createBlockStateDefinition(builder.add(FLIPPED));
+    protected void appendProperties(Builder<Block, BlockState> builder) {
+        super.appendProperties(builder.add(FLIPPED));
     }
 
     @Override
-    public BlockState getStateForPlacement(BlockPlaceContext context) {
-        BlockState stateForPlacement = super.getStateForPlacement(context);
-        Direction facing = stateForPlacement.getValue(FACING);
-        return stateForPlacement.setValue(
+    public BlockState getPlacementState(ItemPlacementContext context) {
+        BlockState stateForPlacement = super.getPlacementState(context);
+        Direction facing = stateForPlacement.get(FACING);
+        return stateForPlacement.with(
             FLIPPED,
-            facing.getAxis() == Axis.Y && context.getHorizontalDirection().getAxisDirection() == AxisDirection.POSITIVE
+            facing.getAxis() == Axis.Y && context.getHorizontalPlayerFacing().getDirection() == AxisDirection.POSITIVE
         );
     }
 
     @Override
     public BlockState getRotatedBlockState(BlockState originalState, Direction targetedFace) {
         BlockState newState = super.getRotatedBlockState(originalState, targetedFace);
-        if (newState.getValue(FACING).getAxis() != Axis.Y) {
+        if (newState.get(FACING).getAxis() != Axis.Y)
             return newState;
-        }
-        if (targetedFace.getAxis() != Axis.Y) {
+        if (targetedFace.getAxis() != Axis.Y)
             return newState;
-        }
-        if (!originalState.getValue(AXIS_ALONG_FIRST_COORDINATE)) {
+        if (!originalState.get(AXIS_ALONG_FIRST_COORDINATE))
             newState = newState.cycle(FLIPPED);
-        }
         return newState;
     }
 
     @Override
-    public BlockState rotate(BlockState state, Rotation rot) {
+    public BlockState rotate(BlockState state, BlockRotation rot) {
         BlockState newState = super.rotate(state, rot);
-        if (state.getValue(FACING).getAxis() != Axis.Y) {
+        if (state.get(FACING).getAxis() != Axis.Y)
             return newState;
-        }
 
-        if (rot.ordinal() % 2 == 1 && (rot == Rotation.CLOCKWISE_90) != state.getValue(AXIS_ALONG_FIRST_COORDINATE)) {
+        if (rot.ordinal() % 2 == 1 && (rot == BlockRotation.CLOCKWISE_90) != state.get(AXIS_ALONG_FIRST_COORDINATE))
             newState = newState.cycle(FLIPPED);
-        }
-        if (rot == Rotation.CLOCKWISE_180) {
+        if (rot == BlockRotation.CLOCKWISE_180)
             newState = newState.cycle(FLIPPED);
-        }
 
         return newState;
     }
 
     @Override
-    public BlockState mirror(BlockState state, Mirror mirrorIn) {
+    public BlockState mirror(BlockState state, BlockMirror mirrorIn) {
         BlockState newState = super.mirror(state, mirrorIn);
-        if (state.getValue(FACING).getAxis() != Axis.Y) {
+        if (state.get(FACING).getAxis() != Axis.Y)
             return newState;
-        }
 
-        boolean alongX = state.getValue(AXIS_ALONG_FIRST_COORDINATE);
-        if (alongX && mirrorIn == Mirror.FRONT_BACK) {
+        boolean alongX = state.get(AXIS_ALONG_FIRST_COORDINATE);
+        if (alongX && mirrorIn == BlockMirror.FRONT_BACK)
             newState = newState.cycle(FLIPPED);
-        }
-        if (!alongX && mirrorIn == Mirror.LEFT_RIGHT) {
+        if (!alongX && mirrorIn == BlockMirror.LEFT_RIGHT)
             newState = newState.cycle(FLIPPED);
-        }
 
         return newState;
     }
 
     @Override
-    public VoxelShape getShape(BlockState state, BlockGetter worldIn, BlockPos pos, CollisionContext context) {
-        return AllShapes.CASING_12PX.get(state.getValue(FACING));
+    public VoxelShape getOutlineShape(BlockState state, BlockView worldIn, BlockPos pos, ShapeContext context) {
+        return AllShapes.CASING_12PX.get(state.get(FACING));
     }
 
     @Override
-    protected InteractionResult useItemOn(
+    protected ActionResult onUseWithItem(
         ItemStack stack,
         BlockState state,
-        Level level,
+        World level,
         BlockPos pos,
-        Player player,
-        InteractionHand hand,
+        PlayerEntity player,
+        Hand hand,
         BlockHitResult hitResult
     ) {
         IPlacementHelper placementHelper = PlacementHelpers.get(placementHelperId);
-        if (!player.isShiftKeyDown() && player.mayBuild()) {
+        if (!player.isSneaking() && player.canModifyBlocks()) {
             if (placementHelper.matchesItem(stack) && placementHelper.getOffset(player, level, state, pos, hitResult)
-                .placeInWorld(level, (BlockItem) stack.getItem(), player, hand).consumesAction()) {
-                return InteractionResult.SUCCESS;
-            }
+                .placeInWorld(level, (BlockItem) stack.getItem(), player, hand).isAccepted())
+                return ActionResult.SUCCESS;
         }
 
-        if (player.isSpectator() || !stack.isEmpty()) {
-            return InteractionResult.TRY_WITH_EMPTY_HAND;
-        }
-        if (state.getValueOrElse(FACING, Direction.WEST) != Direction.UP) {
-            return InteractionResult.TRY_WITH_EMPTY_HAND;
-        }
+        if (player.isSpectator() || !stack.isEmpty())
+            return ActionResult.PASS_TO_DEFAULT_BLOCK_ACTION;
+        if (state.get(FACING, Direction.WEST) != Direction.UP)
+            return ActionResult.PASS_TO_DEFAULT_BLOCK_ACTION;
 
         return onBlockEntityUseItemOn(
             level, pos, be -> {
-                if (!level.isClientSide()) {
-                    for (int i = 0, size = be.inventory.getContainerSize(); i < size; i++) {
-                        ItemStack heldItemStack = be.inventory.getItem(i);
+                if (!level.isClient()) {
+                    for (int i = 0, size = be.inventory.size(); i < size; i++) {
+                        ItemStack heldItemStack = be.inventory.getStack(i);
                         if (heldItemStack.isEmpty()) {
                             continue;
                         }
-                        player.getInventory().placeItemBackInInventory(heldItemStack);
+                        player.getInventory().offerOrDrop(heldItemStack);
                     }
                 }
-                be.inventory.clearContent();
+                be.inventory.clear();
                 be.notifyUpdate();
-                return InteractionResult.SUCCESS;
+                return ActionResult.SUCCESS;
             }
         );
     }
 
     @Override
-    public void entityInside(
-        BlockState state,
-        Level worldIn,
-        BlockPos pos,
-        Entity entityIn,
-        InsideBlockEffectApplier handler,
-        boolean bl
-    ) {
-        if (worldIn.isClientSide() || entityIn instanceof ItemEntity) {
+    public void onEntityCollision(BlockState state, World worldIn, BlockPos pos, Entity entityIn, EntityCollisionHandler handler, boolean bl) {
+        if (worldIn.isClient() || entityIn instanceof ItemEntity)
             return;
-        }
-        if (!new AABB(pos).deflate(.1f).intersects(entityIn.getBoundingBox())) {
+        if (!new Box(pos).contract(.1f).intersects(entityIn.getBoundingBox()))
             return;
-        }
         withBlockEntityDo(
             worldIn, pos, be -> {
-                if (be.getSpeed() == 0) {
+                if (be.getSpeed() == 0)
                     return;
-                }
-                entityIn.hurtServer(
-                    (ServerLevel) worldIn,
-                    AllDamageSources.get(worldIn).saw,
-                    (float) DrillBlock.getDamage(be.getSpeed())
-                );
+                entityIn.damage((ServerWorld) worldIn, AllDamageSources.get(worldIn).saw, (float) DrillBlock.getDamage(be.getSpeed()));
             }
         );
     }
 
     @Override
-    public void updateEntityMovementAfterFallOn(BlockGetter worldIn, Entity entityIn) {
-        super.updateEntityMovementAfterFallOn(worldIn, entityIn);
-        if (!(entityIn instanceof ItemEntity)) {
+    public void onEntityLand(BlockView worldIn, Entity entityIn) {
+        super.onEntityLand(worldIn, entityIn);
+        if (!(entityIn instanceof ItemEntity))
             return;
-        }
-        if (entityIn.level().isClientSide()) {
+        if (entityIn.getEntityWorld().isClient())
             return;
-        }
 
-        BlockPos pos = entityIn.blockPosition();
+        BlockPos pos = entityIn.getBlockPos();
         withBlockEntityDo(
-            entityIn.level(), pos, be -> {
-                if (be.getSpeed() == 0) {
+            entityIn.getEntityWorld(), pos, be -> {
+                if (be.getSpeed() == 0)
                     return;
-                }
                 be.insertItem((ItemEntity) entityIn);
             }
         );
     }
 
     public static boolean isHorizontal(BlockState state) {
-        return state.getValue(FACING).getAxis().isHorizontal();
+        return state.get(FACING).getAxis().isHorizontal();
     }
 
     @Override
     public Axis getRotationAxis(BlockState state) {
-        return isHorizontal(state) ? state.getValue(FACING).getAxis() : super.getRotationAxis(state);
+        return isHorizontal(state) ? state.get(FACING).getAxis() : super.getRotationAxis(state);
     }
 
     @Override
-    public boolean hasShaftTowards(LevelReader world, BlockPos pos, BlockState state, Direction face) {
-        return isHorizontal(state) ? face == state.getValue(FACING).getOpposite() : super.hasShaftTowards(
-            world,
-            pos,
-            state,
-            face
-        );
+    public boolean hasShaftTowards(WorldView world, BlockPos pos, BlockState state, Direction face) {
+        return isHorizontal(state) ? face == state.get(FACING).getOpposite() : super.hasShaftTowards(world, pos, state, face);
     }
 
     @Override
@@ -256,7 +216,7 @@ public class SawBlock extends DirectionalAxisKineticBlock implements IBE<SawBloc
     }
 
     @Override
-    protected boolean isPathfindable(BlockState state, PathComputationType pathComputationType) {
+    protected boolean canPathfindThrough(BlockState state, NavigationType pathComputationType) {
         return false;
     }
 
@@ -264,37 +224,30 @@ public class SawBlock extends DirectionalAxisKineticBlock implements IBE<SawBloc
 
         @Override
         public Predicate<ItemStack> getItemPredicate() {
-            return stack -> stack.is(AllItems.MECHANICAL_SAW);
+            return stack -> stack.isOf(AllItems.MECHANICAL_SAW);
         }
 
         @Override
         public Predicate<BlockState> getStatePredicate() {
-            return state -> state.is(AllBlocks.MECHANICAL_SAW);
+            return state -> state.isOf(AllBlocks.MECHANICAL_SAW);
         }
 
         @Override
-        public PlacementOffset getOffset(
-            Player player,
-            Level world,
-            BlockState state,
-            BlockPos pos,
-            BlockHitResult ray
-        ) {
+        public PlacementOffset getOffset(PlayerEntity player, World world, BlockState state, BlockPos pos, BlockHitResult ray) {
             List<Direction> directions = IPlacementHelper.orderedByDistanceExceptAxis(
                 pos,
-                ray.getLocation(),
-                state.getValue(FACING).getAxis(),
-                dir -> world.getBlockState(pos.relative(dir)).canBeReplaced()
+                ray.getPos(),
+                state.get(FACING).getAxis(),
+                dir -> world.getBlockState(pos.offset(dir)).isReplaceable()
             );
 
-            if (directions.isEmpty()) {
+            if (directions.isEmpty())
                 return PlacementOffset.fail();
-            } else {
+            else {
                 return PlacementOffset.success(
-                    pos.relative(directions.getFirst()),
-                    s -> s.setValue(FACING, state.getValue(FACING))
-                        .setValue(AXIS_ALONG_FIRST_COORDINATE, state.getValue(AXIS_ALONG_FIRST_COORDINATE))
-                        .setValue(FLIPPED, state.getValue(FLIPPED))
+                    pos.offset(directions.getFirst()),
+                    s -> s.with(FACING, state.get(FACING)).with(AXIS_ALONG_FIRST_COORDINATE, state.get(AXIS_ALONG_FIRST_COORDINATE))
+                        .with(FLIPPED, state.get(FLIPPED))
                 );
             }
         }

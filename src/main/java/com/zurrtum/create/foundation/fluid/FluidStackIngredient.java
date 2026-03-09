@@ -4,27 +4,25 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import com.zurrtum.create.infrastructure.fluids.FluidStack;
-import net.minecraft.core.component.DataComponentPatch;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.core.registries.Registries;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.world.level.material.Fluid;
+import net.minecraft.component.ComponentChanges;
+import net.minecraft.fluid.Fluid;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.registry.Registries;
+import net.minecraft.registry.RegistryKeys;
 
 import java.util.List;
 
-public record FluidStackIngredient(Fluid fluid, DataComponentPatch components, int amount) implements FluidIngredient {
+public record FluidStackIngredient(Fluid fluid, ComponentChanges components, int amount) implements FluidIngredient {
     @Override
     public boolean test(FluidStack stack) {
-        if (stack.getFluid() != fluid) {
+        if (stack.getFluid() != fluid)
             return false;
-        }
-        if (components.isEmpty()) {
+        if (components.isEmpty())
             return true;
-        }
-        return stack.getComponentChanges().map.reference2ObjectEntrySet()
-            .containsAll(components.map.reference2ObjectEntrySet());
+        return stack.getComponentChanges().changedComponents.reference2ObjectEntrySet()
+            .containsAll(components.changedComponents.reference2ObjectEntrySet());
     }
 
     @Override
@@ -44,17 +42,16 @@ public record FluidStackIngredient(Fluid fluid, DataComponentPatch components, i
 
     public record Serializer(String type) implements FluidIngredientSerializer {
         public static final MapCodec<FluidStackIngredient> CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
-            BuiltInRegistries.FLUID.byNameCodec().fieldOf("fluid").forGetter(FluidStackIngredient::fluid),
-            DataComponentPatch.CODEC.optionalFieldOf("components", DataComponentPatch.EMPTY)
-                .forGetter(FluidStackIngredient::components),
+            Registries.FLUID.getCodec().fieldOf("fluid").forGetter(FluidStackIngredient::fluid),
+            ComponentChanges.CODEC.optionalFieldOf("components", ComponentChanges.EMPTY).forGetter(FluidStackIngredient::components),
             Codec.INT.optionalFieldOf("amount", 81000).forGetter(FluidStackIngredient::amount)
         ).apply(instance, FluidStackIngredient::new));
-        public static final StreamCodec<RegistryFriendlyByteBuf, FluidStackIngredient> PACKET_CODEC = StreamCodec.composite(
-            ByteBufCodecs.registry(Registries.FLUID),
+        public static final PacketCodec<RegistryByteBuf, FluidStackIngredient> PACKET_CODEC = PacketCodec.tuple(
+            PacketCodecs.registryValue(RegistryKeys.FLUID),
             FluidStackIngredient::fluid,
-            DataComponentPatch.STREAM_CODEC,
+            ComponentChanges.PACKET_CODEC,
             FluidStackIngredient::components,
-            ByteBufCodecs.INT,
+            PacketCodecs.INTEGER,
             FluidStackIngredient::amount,
             FluidStackIngredient::new
         );
@@ -65,7 +62,7 @@ public record FluidStackIngredient(Fluid fluid, DataComponentPatch components, i
         }
 
         @Override
-        public StreamCodec<RegistryFriendlyByteBuf, FluidStackIngredient> packetCodec() {
+        public PacketCodec<RegistryByteBuf, FluidStackIngredient> packetCodec() {
             return PACKET_CODEC;
         }
     }

@@ -1,21 +1,21 @@
 package com.zurrtum.create.foundation.blockEntity;
 
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.HolderGetter;
-import net.minecraft.core.HolderLookup;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.core.registries.Registries;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
-import net.minecraft.server.level.ServerLevel;
-import net.minecraft.util.ProblemReporter;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.entity.BlockEntityType;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.storage.TagValueOutput;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.block.entity.BlockEntityType;
+import net.minecraft.nbt.NbtCompound;
+import net.minecraft.network.packet.s2c.play.BlockEntityUpdateS2CPacket;
+import net.minecraft.registry.Registries;
+import net.minecraft.registry.RegistryEntryLookup;
+import net.minecraft.registry.RegistryKeys;
+import net.minecraft.registry.RegistryWrapper;
+import net.minecraft.server.world.ServerWorld;
+import net.minecraft.storage.NbtWriteView;
+import net.minecraft.storage.ReadView;
+import net.minecraft.storage.WriteView;
+import net.minecraft.util.ErrorReporter;
+import net.minecraft.util.math.BlockPos;
 
 import static com.zurrtum.create.Create.LOGGER;
 
@@ -25,50 +25,49 @@ public abstract class SyncedBlockEntity extends BlockEntity {
     }
 
     @Override
-    public CompoundTag getUpdateTag(HolderLookup.Provider registries) {
-        try (ProblemReporter.ScopedCollector logging = new ProblemReporter.ScopedCollector(problemPath(), LOGGER)) {
-            TagValueOutput view = TagValueOutput.createWithContext(logging, registries);
+    public NbtCompound toInitialChunkDataNbt(RegistryWrapper.WrapperLookup registries) {
+        try (ErrorReporter.Logging logging = new ErrorReporter.Logging(getReporterContext(), LOGGER)) {
+            NbtWriteView view = NbtWriteView.create(logging, registries);
             writeClient(view);
-            return view.buildResult();
+            return view.getNbt();
         }
     }
 
     @Override
-    public ClientboundBlockEntityDataPacket getUpdatePacket() {
-        return ClientboundBlockEntityDataPacket.create(this);
+    public BlockEntityUpdateS2CPacket toUpdatePacket() {
+        return BlockEntityUpdateS2CPacket.create(this);
     }
 
-    public void handleUpdateTag(ValueInput view) {
+    public void handleUpdateTag(ReadView view) {
         readClient(view);
     }
 
-    public void onDataPacket(ValueInput view) {
+    public void onDataPacket(ReadView view) {
         readClient(view);
     }
 
     // Special handling for client update packets
-    public void readClient(ValueInput view) {
-        loadAdditional(view);
+    public void readClient(ReadView view) {
+        readData(view);
     }
 
     // Special handling for client update packets
-    public void writeClient(ValueOutput view) {
-        saveAdditional(view);
+    public void writeClient(WriteView view) {
+        writeData(view);
     }
 
     public void sendData() {
-        if (level instanceof ServerLevel serverLevel) {
-            serverLevel.getChunkSource().blockChanged(getBlockPos());
-        }
+        if (world instanceof ServerWorld serverLevel)
+            serverLevel.getChunkManager().markForUpdate(getPos());
     }
 
     public void notifyUpdate() {
-        setChanged();
+        markDirty();
         sendData();
     }
 
-    public HolderGetter<Block> blockHolderGetter() {
-        return level != null ? level.holderLookup(Registries.BLOCK) : BuiltInRegistries.BLOCK;
+    public RegistryEntryLookup<Block> blockHolderGetter() {
+        return world != null ? world.createCommandRegistryWrapper(RegistryKeys.BLOCK) : Registries.BLOCK;
     }
 
 }

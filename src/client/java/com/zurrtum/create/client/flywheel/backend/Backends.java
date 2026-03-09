@@ -17,8 +17,7 @@ public final class Backends {
      * Use GPU instancing to render everything.
      */
     public static final Backend INSTANCING = SimpleBackend.builder()
-        .engineFactory((level) -> new EngineImpl(level, new InstancedDrawManager(InstancingPrograms.get()), 256))
-        .priority(500)
+        .engineFactory((level) -> new EngineImpl(level, new InstancedDrawManager(InstancingPrograms.get()), 256)).priority(500)
         .supported(() -> GlCompat.SUPPORTS_INSTANCING && InstancingPrograms.allLoaded() && !ShadersModHelper.isShaderPackInUse())
         .register(ResourceUtil.rl("instancing"));
     /**

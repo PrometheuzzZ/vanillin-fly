@@ -9,10 +9,10 @@ import me.shedaniel.rei.api.common.display.Display;
 import me.shedaniel.rei.api.common.display.DisplaySerializer;
 import me.shedaniel.rei.api.common.entry.EntryIngredient;
 import me.shedaniel.rei.api.common.util.EntryIngredients;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.resources.Identifier;
-import net.minecraft.world.item.crafting.RecipeHolder;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.recipe.RecipeEntry;
+import net.minecraft.util.Identifier;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -25,19 +25,19 @@ public record SawingDisplay(EntryIngredient input, List<ProcessingOutput> output
             EntryIngredient.codec().fieldOf("input").forGetter(SawingDisplay::input),
             ProcessingOutput.CODEC.listOf().fieldOf("outputs").forGetter(SawingDisplay::outputs),
             Identifier.CODEC.optionalFieldOf("location").forGetter(SawingDisplay::location)
-        ).apply(instance, SawingDisplay::new)), StreamCodec.composite(
+        ).apply(instance, SawingDisplay::new)), PacketCodec.tuple(
             EntryIngredient.streamCodec(),
             SawingDisplay::input,
-            ProcessingOutput.STREAM_CODEC.apply(ByteBufCodecs.list()),
+            ProcessingOutput.STREAM_CODEC.collect(PacketCodecs.toList()),
             SawingDisplay::outputs,
-            ByteBufCodecs.optional(Identifier.STREAM_CODEC),
+            PacketCodecs.optional(Identifier.PACKET_CODEC),
             SawingDisplay::location,
             SawingDisplay::new
         )
     );
 
-    public SawingDisplay(RecipeHolder<CuttingRecipe> entry) {
-        this(entry.id().identifier(), entry.value());
+    public SawingDisplay(RecipeEntry<CuttingRecipe> entry) {
+        this(entry.id().getValue(), entry.value());
     }
 
     public SawingDisplay(Identifier id, CuttingRecipe recipe) {

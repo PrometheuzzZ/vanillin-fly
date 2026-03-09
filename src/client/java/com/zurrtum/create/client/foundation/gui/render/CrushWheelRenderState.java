@@ -1,24 +1,23 @@
 package com.zurrtum.create.client.foundation.gui.render;
 
-import net.minecraft.client.gui.navigation.ScreenRectangle;
-import net.minecraft.client.gui.render.state.pip.PictureInPictureRenderState;
+import net.minecraft.client.gui.ScreenRect;
+import net.minecraft.client.gui.render.state.special.SpecialGuiElementRenderState;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix3x2f;
 
-public record CrushWheelRenderState(Matrix3x2f pose, int x0, int y0,
-                                    ScreenRectangle bounds) implements PictureInPictureRenderState {
+public record CrushWheelRenderState(Matrix3x2f pose, int x1, int y1, ScreenRect bounds) implements SpecialGuiElementRenderState {
     public CrushWheelRenderState(Matrix3x2f pose, int x, int y) {
-        this(pose, x, y, new ScreenRectangle(x, y, 92, 48).transformMaxBounds(pose));
+        this(pose, x, y, new ScreenRect(x, y, 92, 48).transformEachVertex(pose));
     }
 
     @Override
-    public int x1() {
-        return x0 + 92;
+    public int x2() {
+        return x1 + 92;
     }
 
     @Override
-    public int y1() {
-        return y0 + 48;
+    public int y2() {
+        return y1 + 48;
     }
 
     @Override
@@ -27,7 +26,7 @@ public record CrushWheelRenderState(Matrix3x2f pose, int x0, int y0,
     }
 
     @Override
-    public @Nullable ScreenRectangle scissorArea() {
+    public @Nullable ScreenRect scissorArea() {
         return null;
     }
 }

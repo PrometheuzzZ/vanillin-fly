@@ -4,8 +4,8 @@ import com.zurrtum.create.api.stress.BlockStressValues;
 import com.zurrtum.create.catnip.config.Builder;
 import com.zurrtum.create.foundation.utility.CreateResourceReloader;
 import com.zurrtum.create.infrastructure.packet.s2c.ServerConfigPacket;
-import net.minecraft.server.packs.resources.ResourceManager;
-import net.minecraft.server.packs.resources.ResourceManagerReloadListener;
+import net.minecraft.resource.ResourceManager;
+import net.minecraft.resource.SynchronousResourceReloader;
 
 import static com.zurrtum.create.Create.MOD_ID;
 
@@ -13,7 +13,7 @@ public class AllConfigs {
     private static CCommon common;
     private static CServer server;
 
-    public static final ResourceManagerReloadListener LISTENER = new ReloadListener();
+    public static final SynchronousResourceReloader LISTENER = new ReloadListener();
 
     public static CCommon common() {
         return common;
@@ -38,7 +38,7 @@ public class AllConfigs {
         }
 
         @Override
-        public void onResourceManagerReload(ResourceManager manager) {
+        public void reload(ResourceManager manager) {
             ServerConfigPacket.CACHE = null;
             server.reload(null);
         }

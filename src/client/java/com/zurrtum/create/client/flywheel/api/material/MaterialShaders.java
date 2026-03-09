@@ -1,6 +1,6 @@
 package com.zurrtum.create.client.flywheel.api.material;
 
-import net.minecraft.resources.Identifier;
+import net.minecraft.util.Identifier;
 
 /**
  * A vertex and fragment shader pair that can be attached to a material.

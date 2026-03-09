@@ -1,7 +1,7 @@
 package com.zurrtum.create.foundation.block;
 
-import net.minecraft.core.Direction;
-import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.block.BlockState;
+import net.minecraft.util.math.Direction;
 import org.jetbrains.annotations.Nullable;
 
 public interface RedStoneConnectBlock {

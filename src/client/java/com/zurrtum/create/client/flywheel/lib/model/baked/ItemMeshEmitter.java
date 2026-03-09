@@ -1,22 +1,27 @@
 package com.zurrtum.create.client.flywheel.lib.model.baked;
 
-import com.mojang.blaze3d.vertex.*;
+import com.mojang.blaze3d.vertex.VertexFormat;
 import com.zurrtum.create.client.flywheel.api.model.Mesh;
 import com.zurrtum.create.client.flywheel.lib.memory.MemoryBlock;
 import com.zurrtum.create.client.flywheel.lib.model.SimpleQuadMesh;
 import com.zurrtum.create.client.flywheel.lib.vertex.FullVertexView;
-import net.minecraft.client.model.geom.ModelPart;
-import net.minecraft.client.renderer.block.model.BakedQuad;
-import net.minecraft.client.renderer.rendertype.RenderType;
-import net.minecraft.client.renderer.texture.TextureAtlasSprite;
-import net.minecraft.util.ARGB;
+import net.minecraft.client.model.ModelPart;
+import net.minecraft.client.render.BufferBuilder;
+import net.minecraft.client.render.RenderLayer;
+import net.minecraft.client.render.VertexConsumer;
+import net.minecraft.client.render.VertexFormats;
+import net.minecraft.client.render.model.BakedQuad;
+import net.minecraft.client.texture.Sprite;
+import net.minecraft.client.util.BufferAllocator;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.util.math.ColorHelper;
 import org.jetbrains.annotations.UnknownNullability;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 
 public class ItemMeshEmitter implements VertexConsumer {
-    private final RenderType renderType;
-    private final ByteBufferBuilder byteBufferBuilder;
+    private final RenderLayer renderType;
+    private final BufferAllocator byteBufferBuilder;
     @UnknownNullability
     private BufferBuilder bufferBuilder;
 
@@ -25,9 +30,9 @@ public class ItemMeshEmitter implements VertexConsumer {
     private boolean currentShade;
     private boolean ended = true;
 
-    ItemMeshEmitter(RenderType renderType) {
+    ItemMeshEmitter(RenderLayer renderType) {
         this.renderType = renderType;
-        this.byteBufferBuilder = new ByteBufferBuilder(renderType.bufferSize());
+        this.byteBufferBuilder = new BufferAllocator(renderType.getExpectedBufferSize());
     }
 
     public void prepare(BakedItemModelBufferer.ResultConsumer resultConsumer, MeshResultConsumer meshResultConsumer) {
@@ -59,10 +64,10 @@ public class ItemMeshEmitter implements VertexConsumer {
 
     private void prepareForGeometry(boolean shade) {
         if (bufferBuilder == null) {
-            bufferBuilder = new BufferBuilder(byteBufferBuilder, VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
+            bufferBuilder = new BufferBuilder(byteBufferBuilder, VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR_TEXTURE_LIGHT_NORMAL);
         } else if (shade != currentShade) {
             emit();
-            bufferBuilder = new BufferBuilder(byteBufferBuilder, VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK);
+            bufferBuilder = new BufferBuilder(byteBufferBuilder, VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_COLOR_TEXTURE_LIGHT_NORMAL);
         }
 
         currentShade = shade;
@@ -73,7 +78,7 @@ public class ItemMeshEmitter implements VertexConsumer {
     }
 
     private void emit() {
-        var data = bufferBuilder.build();
+        var data = bufferBuilder.endNullable();
         bufferBuilder = null;
 
         if (data != null) {
@@ -82,19 +87,11 @@ public class ItemMeshEmitter implements VertexConsumer {
         }
     }
 
-    public void emit(
-        ModelPart part,
-        PoseStack stack,
-        TextureAtlasSprite meshSprite,
-        ItemMeshEmitter glintEmitter,
-        int light,
-        int overlay,
-        int color
-    ) {
-        stack.pushPose();
-        part.translateAndRotate(stack);
+    public void emit(ModelPart part, MatrixStack stack, Sprite meshSprite, ItemMeshEmitter glintEmitter, int light, int overlay, int color) {
+        stack.push();
+        part.applyTransform(stack);
         if (!part.isEmpty()) {
-            float alpha = ARGB.alphaFloat(color);
+            float alpha = ColorHelper.getAlphaFloat(color);
             boolean translucent = alpha < 1.0F;
             Mesh mesh = compile(part, stack, meshSprite, light, overlay, color, alpha);
             meshResultConsumer.accept(renderType, mesh, translucent);
@@ -105,21 +102,13 @@ public class ItemMeshEmitter implements VertexConsumer {
         for (ModelPart child : part.children.values()) {
             emit(child, stack, meshSprite, glintEmitter, light, overlay, color);
         }
-        stack.popPose();
+        stack.pop();
     }
 
-    private Mesh compile(
-        ModelPart part,
-        PoseStack stack,
-        TextureAtlasSprite meshSprite,
-        int light,
-        int overlay,
-        int color,
-        float alpha
-    ) {
+    private Mesh compile(ModelPart part, MatrixStack stack, Sprite meshSprite, int light, int overlay, int color, float alpha) {
         int vertexCount = 0;
-        for (ModelPart.Cube cuboid : part.cubes) {
-            vertexCount += cuboid.polygons.length * 4;
+        for (ModelPart.Cuboid cuboid : part.cuboids) {
+            vertexCount += cuboid.sides.length * 4;
         }
         MemoryBlock memoryBlock = MemoryBlock.mallocTracked(vertexCount * FullVertexView.STRIDE);
         FullVertexView meshVertices = new FullVertexView();
@@ -128,17 +117,17 @@ public class ItemMeshEmitter implements VertexConsumer {
         meshVertices.ptr(memoryBlock.ptr());
         meshVertices.vertexCount(vertexCount);
 
-        PoseStack.Pose entry = stack.last();
-        Matrix4f matrix4f = entry.pose();
+        MatrixStack.Entry entry = stack.peek();
+        Matrix4f matrix4f = entry.getPositionMatrix();
         Vector3f vector3f = new Vector3f();
         int index = 0;
-        float red = ARGB.redFloat(color);
-        float green = ARGB.greenFloat(color);
-        float blue = ARGB.blueFloat(color);
+        float red = ColorHelper.getRedFloat(color);
+        float green = ColorHelper.getGreenFloat(color);
+        float blue = ColorHelper.getBlueFloat(color);
         boolean hasUV = meshSprite != null;
-        for (ModelPart.Cube cuboid : part.cubes) {
-            for (ModelPart.Polygon quad : cuboid.polygons) {
-                Vector3f normal = entry.transformNormal(quad.normal(), vector3f);
+        for (ModelPart.Cuboid cuboid : part.cuboids) {
+            for (ModelPart.Quad quad : cuboid.sides) {
+                Vector3f normal = entry.transformNormal(quad.direction(), vector3f);
                 float x = normal.x();
                 float y = normal.y();
                 float z = normal.z();
@@ -146,15 +135,10 @@ public class ItemMeshEmitter implements VertexConsumer {
                     float u = vertex.u();
                     float v = vertex.v();
                     if (hasUV) {
-                        u = meshSprite.getU(u);
-                        v = meshSprite.getV(v);
+                        u = meshSprite.getFrameU(u);
+                        v = meshSprite.getFrameV(v);
                     }
-                    Vector3f position = matrix4f.transformPosition(
-                        vertex.x() / 16.0F,
-                        vertex.y() / 16.0F,
-                        vertex.z() / 16.0F,
-                        vector3f
-                    );
+                    Vector3f position = matrix4f.transformPosition(vertex.x() / 16.0F, vertex.y() / 16.0F, vertex.z() / 16.0F, vector3f);
                     meshVertices.x(index, position.x());
                     meshVertices.y(index, position.y());
                     meshVertices.z(index, position.z());
@@ -177,24 +161,41 @@ public class ItemMeshEmitter implements VertexConsumer {
         return new SimpleQuadMesh(meshVertices, "source=ItemMeshEmitter");
     }
 
-    @Override
-    public void putBulkData(
-        PoseStack.Pose pose,
+    public void quad(
+        MatrixStack.Entry pose,
         BakedQuad quad,
         float red,
         float green,
         float blue,
         float alpha,
-        int packedLight,
-        int packedOverlay
+        int light,
+        int overlay,
+        boolean readExistingColor
     ) {
         prepareForGeometry(quad);
-        bufferBuilder.putBulkData(pose, quad, red, green, blue, alpha, packedLight, packedOverlay);
+        bufferBuilder.quad(
+            pose,
+            quad,
+            new float[]{1.0F, 1.0F, 1.0F, 1.0F},
+            red,
+            green,
+            blue,
+            alpha,
+            new int[]{light, light, light, light},
+            overlay,
+            readExistingColor
+        );
     }
 
     @Override
-    public void putBulkData(
-        PoseStack.Pose pose,
+    public void quad(MatrixStack.Entry pose, BakedQuad quad, float red, float green, float blue, float alpha, int packedLight, int packedOverlay) {
+        prepareForGeometry(quad);
+        bufferBuilder.quad(pose, quad, red, green, blue, alpha, packedLight, packedOverlay);
+    }
+
+    @Override
+    public void quad(
+        MatrixStack.Entry pose,
         BakedQuad quad,
         float[] brightnesses,
         float red,
@@ -202,53 +203,44 @@ public class ItemMeshEmitter implements VertexConsumer {
         float blue,
         float alpha,
         int[] lights,
-        int overlay
+        int overlay,
+        boolean readExistingColor
     ) {
         prepareForGeometry(quad);
-        bufferBuilder.putBulkData(pose, quad, brightnesses, red, green, blue, alpha, lights, overlay);
+        bufferBuilder.quad(pose, quad, brightnesses, red, green, blue, alpha, lights, overlay, readExistingColor);
     }
 
     @Override
-    public VertexConsumer addVertex(float x, float y, float z) {
+    public VertexConsumer vertex(float x, float y, float z) {
         throw new UnsupportedOperationException("MeshEmitter only supports putBulkData!");
     }
 
     @Override
-    public VertexConsumer setColor(int color) {
+    public VertexConsumer color(int red, int green, int blue, int alpha) {
         throw new UnsupportedOperationException("MeshEmitter only supports putBulkData!");
     }
 
     @Override
-    public VertexConsumer setColor(int red, int green, int blue, int alpha) {
+    public VertexConsumer texture(float u, float v) {
         throw new UnsupportedOperationException("MeshEmitter only supports putBulkData!");
     }
 
     @Override
-    public VertexConsumer setUv(float u, float v) {
+    public VertexConsumer overlay(int u, int v) {
         throw new UnsupportedOperationException("MeshEmitter only supports putBulkData!");
     }
 
     @Override
-    public VertexConsumer setUv1(int u, int v) {
+    public VertexConsumer light(int u, int v) {
         throw new UnsupportedOperationException("MeshEmitter only supports putBulkData!");
     }
 
     @Override
-    public VertexConsumer setUv2(int u, int v) {
-        throw new UnsupportedOperationException("MeshEmitter only supports putBulkData!");
-    }
-
-    @Override
-    public VertexConsumer setNormal(float normalX, float normalY, float normalZ) {
-        throw new UnsupportedOperationException("MeshEmitter only supports putBulkData!");
-    }
-
-    @Override
-    public VertexConsumer setLineWidth(float width) {
+    public VertexConsumer normal(float normalX, float normalY, float normalZ) {
         throw new UnsupportedOperationException("MeshEmitter only supports putBulkData!");
     }
 
     public interface MeshResultConsumer {
-        void accept(RenderType renderType, Mesh mesh, boolean translucent);
+        void accept(RenderLayer renderType, Mesh mesh, boolean translucent);
     }
 }

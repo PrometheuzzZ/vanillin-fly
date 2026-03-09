@@ -5,17 +5,17 @@ import com.zurrtum.create.content.contraptions.behaviour.MovementContext;
 import com.zurrtum.create.content.logistics.box.PackageEntity;
 import com.zurrtum.create.content.logistics.filter.FilterItemStack;
 import com.zurrtum.create.foundation.item.ItemHelper;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.sounds.SoundEvents;
-import net.minecraft.sounds.SoundSource;
-import net.minecraft.world.Container;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.item.ItemEntity;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.ItemEntity;
+import net.minecraft.inventory.Inventory;
+import net.minecraft.item.ItemStack;
+import net.minecraft.sound.SoundCategory;
+import net.minecraft.sound.SoundEvents;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Box;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.World;
 
 import java.util.List;
 
@@ -36,50 +36,45 @@ public class FunnelMovementBehaviour extends MovementBehaviour {
     }
 
     @Override
-    public Vec3 getActiveAreaOffset(MovementContext context) {
+    public Vec3d getActiveAreaOffset(MovementContext context) {
         Direction facing = FunnelBlock.getFunnelFacing(context.state);
-        Vec3 vec = Vec3.atLowerCornerOf(facing.getUnitVec3i());
-        if (facing != Direction.UP) {
-            return vec.scale(context.state.getValue(FunnelBlock.EXTRACTING) ? .15 : .65);
-        }
+        Vec3d vec = Vec3d.of(facing.getVector());
+        if (facing != Direction.UP)
+            return vec.multiply(context.state.get(FunnelBlock.EXTRACTING) ? .15 : .65);
 
-        return vec.scale(.65);
+        return vec.multiply(.65);
     }
 
     @Override
     public void visitNewPosition(MovementContext context, BlockPos pos) {
         super.visitNewPosition(context, pos);
 
-        if (context.state.getValue(FunnelBlock.EXTRACTING)) {
+        if (context.state.get(FunnelBlock.EXTRACTING))
             extract(context, pos);
-        } else {
+        else
             succ(context, pos);
-        }
 
     }
 
     private void extract(MovementContext context, BlockPos pos) {
-        Level world = context.world;
+        World world = context.world;
 
-        Vec3 entityPos = context.position;
-        if (context.state.getValue(FunnelBlock.FACING) != Direction.DOWN) {
+        Vec3d entityPos = context.position;
+        if (context.state.get(FunnelBlock.FACING) != Direction.DOWN)
             entityPos = entityPos.add(0, -.5f, 0);
-        }
 
-        if (!world.getBlockState(pos).getCollisionShape(world, pos).isEmpty()) {
+        if (!world.getBlockState(pos).getCollisionShape(world, pos).isEmpty())
             return;
-        }
 
-        if (!world.getEntitiesOfClass(ItemEntity.class, new AABB(BlockPos.containing(entityPos))).isEmpty()) {
+        if (!world.getNonSpectatingEntities(ItemEntity.class, new Box(BlockPos.ofFloored(entityPos))).isEmpty())
             return;
-        }
 
         FilterItemStack filter = context.getFilterFromBE();
-        int filterAmount = context.blockEntityData.getIntOr("FilterAmount", 0);
-        boolean upTo = context.blockEntityData.getBooleanOr("UpTo", false);
+        int filterAmount = context.blockEntityData.getInt("FilterAmount", 0);
+        boolean upTo = context.blockEntityData.getBoolean("UpTo", false);
         filterAmount = hasFilter ? filterAmount : 1;
 
-        Container inventory = context.contraption.getStorage().getAllItems();
+        Inventory inventory = context.contraption.getStorage().getAllItems();
         ItemStack extract;
         if (upTo) {
             extract = inventory.extract(s -> filter.test(world, s), filterAmount);
@@ -87,39 +82,31 @@ public class FunnelMovementBehaviour extends MovementBehaviour {
             extract = inventory.preciseExtract(s -> filter.test(world, s), filterAmount);
         }
 
-        if (extract.isEmpty()) {
+        if (extract.isEmpty())
             return;
-        }
 
-        if (world.isClientSide()) {
+        if (world.isClient())
             return;
-        }
 
         ItemEntity entity = new ItemEntity(world, entityPos.x, entityPos.y, entityPos.z, extract);
-        entity.setDeltaMovement(Vec3.ZERO);
-        entity.setPickUpDelay(5);
-        world.playSound(null, pos, SoundEvents.ITEM_PICKUP, SoundSource.BLOCKS, 1 / 16f, .1f);
-        world.addFreshEntity(entity);
+        entity.setVelocity(Vec3d.ZERO);
+        entity.setPickupDelay(5);
+        world.playSound(null, pos, SoundEvents.ENTITY_ITEM_PICKUP, SoundCategory.BLOCKS, 1 / 16f, .1f);
+        world.spawnEntity(entity);
     }
 
     private void succ(MovementContext context, BlockPos pos) {
-        Level world = context.world;
-        List<Entity> items = world.getEntities(
-            (Entity) null,
-            new AABB(pos),
-            e -> e instanceof ItemEntity || e instanceof PackageEntity
-        );
+        World world = context.world;
+        List<Entity> items = world.getOtherEntities(null, new Box(pos), e -> e instanceof ItemEntity || e instanceof PackageEntity);
         FilterItemStack filter = context.getFilterFromBE();
 
         for (Entity entity : items) {
-            if (!entity.isAlive()) {
+            if (!entity.isAlive())
                 continue;
-            }
             ItemStack toInsert = ItemHelper.fromItemEntity(entity);
-            if (!filter.test(context.world, toInsert)) {
+            if (!filter.test(context.world, toInsert))
                 continue;
-            }
-            Container inventory = context.contraption.getStorage().getAllItems();
+            Inventory inventory = context.contraption.getStorage().getAllItems();
             int count = toInsert.getCount();
             int insert = inventory.insertExist(toInsert);
             if (insert == count) {
@@ -127,7 +114,7 @@ public class FunnelMovementBehaviour extends MovementBehaviour {
             } else if (insert > 0) {
                 toInsert.setCount(count - insert);
                 if (entity instanceof ItemEntity item) {
-                    item.setItem(toInsert);
+                    item.setStack(toInsert);
                 }
             }
         }

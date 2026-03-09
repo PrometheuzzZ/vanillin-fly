@@ -3,36 +3,37 @@ package com.zurrtum.create.infrastructure.packet.c2s;
 import com.zurrtum.create.AllHandle;
 import com.zurrtum.create.AllPackets;
 import com.zurrtum.create.infrastructure.component.PackageOrderWithCrafts;
-import net.minecraft.core.BlockPos;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.PacketType;
-import net.minecraft.network.protocol.game.ServerGamePacketListener;
-import net.minecraft.server.network.ServerGamePacketListenerImpl;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.network.listener.ServerPlayPacketListener;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.PacketType;
+import net.minecraft.server.network.ServerPlayNetworkHandler;
+import net.minecraft.util.math.BlockPos;
 
-public record PackageOrderRequestPacket(BlockPos pos, PackageOrderWithCrafts order, String address,
-                                        boolean encodeRequester) implements Packet<ServerGamePacketListener> {
-    public static final StreamCodec<RegistryFriendlyByteBuf, PackageOrderRequestPacket> CODEC = StreamCodec.composite(
-        BlockPos.STREAM_CODEC,
+public record PackageOrderRequestPacket(
+    BlockPos pos, PackageOrderWithCrafts order, String address, boolean encodeRequester
+) implements Packet<ServerPlayPacketListener> {
+    public static final PacketCodec<RegistryByteBuf, PackageOrderRequestPacket> CODEC = PacketCodec.tuple(
+        BlockPos.PACKET_CODEC,
         PackageOrderRequestPacket::pos,
         PackageOrderWithCrafts.STREAM_CODEC,
         PackageOrderRequestPacket::order,
-        ByteBufCodecs.STRING_UTF8,
+        PacketCodecs.STRING,
         PackageOrderRequestPacket::address,
-        ByteBufCodecs.BOOL,
+        PacketCodecs.BOOLEAN,
         PackageOrderRequestPacket::encodeRequester,
         PackageOrderRequestPacket::new
     );
 
     @Override
-    public void handle(ServerGamePacketListener listener) {
-        AllHandle.onPackageOrderRequest((ServerGamePacketListenerImpl) listener, this);
+    public void apply(ServerPlayPacketListener listener) {
+        AllHandle.onPackageOrderRequest((ServerPlayNetworkHandler) listener, this);
     }
 
     @Override
-    public PacketType<PackageOrderRequestPacket> type() {
+    public PacketType<PackageOrderRequestPacket> getPacketType() {
         return AllPackets.LOGISTICS_PACKAGE_REQUEST;
     }
 }

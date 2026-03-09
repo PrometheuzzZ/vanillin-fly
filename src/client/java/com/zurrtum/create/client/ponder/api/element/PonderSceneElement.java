@@ -1,42 +1,42 @@
 package com.zurrtum.create.client.ponder.api.element;
 
-import com.mojang.blaze3d.vertex.PoseStack;
 import com.zurrtum.create.client.ponder.api.level.PonderLevel;
-import net.minecraft.client.Camera;
-import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.SubmitNodeCollector;
-import net.minecraft.client.renderer.block.BlockRenderDispatcher;
-import net.minecraft.client.renderer.blockentity.BlockEntityRenderDispatcher;
-import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
-import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
-import net.minecraft.client.renderer.item.ItemModelResolver;
-import net.minecraft.client.renderer.state.CameraRenderState;
+import net.minecraft.client.item.ItemModelManager;
+import net.minecraft.client.render.BlockRenderLayer;
+import net.minecraft.client.render.Camera;
+import net.minecraft.client.render.VertexConsumerProvider;
+import net.minecraft.client.render.block.BlockRenderManager;
+import net.minecraft.client.render.block.entity.BlockEntityRenderManager;
+import net.minecraft.client.render.command.OrderedRenderCommandQueue;
+import net.minecraft.client.render.entity.EntityRenderManager;
+import net.minecraft.client.render.state.CameraRenderState;
+import net.minecraft.client.util.math.MatrixStack;
 
 public interface PonderSceneElement extends PonderElement {
 
     void renderFirst(
-        BlockEntityRenderDispatcher blockEntityRenderDispatcher,
-        BlockRenderDispatcher blockRenderManager,
+        BlockEntityRenderManager blockEntityRenderDispatcher,
+        BlockRenderManager blockRenderManager,
         PonderLevel world,
-        MultiBufferSource buffer,
-        SubmitNodeCollector queue,
+        VertexConsumerProvider buffer,
+        OrderedRenderCommandQueue queue,
         Camera camera,
         CameraRenderState cameraRenderState,
-        PoseStack ms,
+        MatrixStack ms,
         float pt
     );
 
-    void renderLayer(PonderLevel world, MultiBufferSource buffer, ChunkSectionLayer type, PoseStack ms, float pt);
+    void renderLayer(PonderLevel world, VertexConsumerProvider buffer, BlockRenderLayer type, MatrixStack ms, float pt);
 
     void renderLast(
-        EntityRenderDispatcher entityRenderManager,
-        ItemModelResolver itemModelManager,
+        EntityRenderManager entityRenderManager,
+        ItemModelManager itemModelManager,
         PonderLevel world,
-        MultiBufferSource buffer,
-        SubmitNodeCollector queue,
+        VertexConsumerProvider buffer,
+        OrderedRenderCommandQueue queue,
         Camera camera,
         CameraRenderState cameraRenderState,
-        PoseStack ms,
+        MatrixStack ms,
         float pt
     );
 

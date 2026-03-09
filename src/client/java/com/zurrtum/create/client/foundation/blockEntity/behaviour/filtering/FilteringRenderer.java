@@ -1,8 +1,6 @@
 package com.zurrtum.create.client.foundation.blockEntity.behaviour.filtering;
 
-import com.mojang.blaze3d.vertex.PoseStack;
 import com.zurrtum.create.AllBlocks;
-import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.catnip.data.Iterate;
 import com.zurrtum.create.catnip.data.Pair;
 import com.zurrtum.create.client.AllSpecialTextures;
@@ -17,48 +15,47 @@ import com.zurrtum.create.client.foundation.blockEntity.behaviour.ValueBoxTransf
 import com.zurrtum.create.content.logistics.factoryBoard.FactoryPanelBlockEntity;
 import com.zurrtum.create.content.logistics.filter.FilterItem;
 import com.zurrtum.create.foundation.blockEntity.SmartBlockEntity;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.multiplayer.ClientLevel;
-import net.minecraft.client.renderer.SubmitNodeCollector;
-import net.minecraft.client.renderer.item.ItemModelResolver;
-import net.minecraft.client.renderer.item.ItemStackRenderState;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.world.InteractionHand;
-import net.minecraft.world.item.ItemDisplayContext;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.BlockHitResult;
-import net.minecraft.world.phys.HitResult;
-import net.minecraft.world.phys.Vec3;
+import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
+import net.minecraft.block.BlockState;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.item.ItemModelManager;
+import net.minecraft.client.render.command.OrderedRenderCommandQueue;
+import net.minecraft.client.render.item.ItemRenderState;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.client.world.ClientWorld;
+import net.minecraft.item.ItemDisplayContext;
+import net.minecraft.item.ItemStack;
+import net.minecraft.text.MutableText;
+import net.minecraft.text.Text;
+import net.minecraft.util.Hand;
+import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.util.hit.HitResult;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Box;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public class FilteringRenderer {
-    public static void tick(Minecraft mc) {
-        HitResult target = mc.hitResult;
-        if (!(target instanceof BlockHitResult result)) {
+    public static void tick(MinecraftClient mc) {
+        HitResult target = mc.crosshairTarget;
+        if (!(target instanceof BlockHitResult result))
             return;
-        }
 
-        ClientLevel world = mc.level;
+        ClientWorld world = mc.world;
         BlockPos pos = result.getBlockPos();
         BlockState state = world.getBlockState(pos);
 
-        if (mc.player.isShiftKeyDown()) {
+        if (mc.player.isSneaking())
             return;
-        }
-        if (!(world.getBlockEntity(pos) instanceof SmartBlockEntity sbe)) {
+        if (!(world.getBlockEntity(pos) instanceof SmartBlockEntity sbe))
             return;
-        }
 
-        ItemStack mainhandItem = mc.player.getItemInHand(InteractionHand.MAIN_HAND);
+        ItemStack mainhandItem = mc.player.getStackInHand(Hand.MAIN_HAND);
 
         List<FilteringBehaviour<?>> behaviours;
         if (sbe instanceof FactoryPanelBlockEntity fpbe) {
@@ -66,7 +63,7 @@ public class FilteringRenderer {
         } else {
             FilteringBehaviour<?> behaviour = sbe.getBehaviour(FilteringBehaviour.TYPE);
             if (behaviour instanceof SidedFilteringBehaviour sidedBehaviour) {
-                behaviour = sidedBehaviour.get(result.getDirection());
+                behaviour = sidedBehaviour.get(result.getSide());
             }
             if (behaviour == null) {
                 return;
@@ -75,51 +72,38 @@ public class FilteringRenderer {
         }
 
         for (FilteringBehaviour<?> behaviour : behaviours) {
-            if (!behaviour.isActive()) {
+            if (!behaviour.isActive())
                 continue;
-            }
-            if (behaviour.slotPositioning instanceof ValueBoxTransform.Sided) {
-                ((Sided) behaviour.slotPositioning).fromSide(result.getDirection());
-            }
-            if (!behaviour.slotPositioning.shouldRender(state)) {
+            if (behaviour.slotPositioning instanceof ValueBoxTransform.Sided)
+                ((Sided) behaviour.slotPositioning).fromSide(result.getSide());
+            if (!behaviour.slotPositioning.shouldRender(state))
                 continue;
-            }
-            if (!behaviour.mayInteract(mc.player)) {
+            if (!behaviour.mayInteract(mc.player))
                 continue;
-            }
 
             ItemStack filter = behaviour.getFilter();
             boolean isFilterSlotted = filter.getItem() instanceof FilterItem;
             boolean showCount = behaviour.isCountVisible();
-            Component label = behaviour.getLabel();
-            boolean hit = behaviour.slotPositioning.testHit(
-                world,
-                pos,
-                state,
-                target.getLocation().subtract(Vec3.atLowerCornerOf(pos))
-            );
+            Text label = behaviour.getLabel();
+            boolean hit = behaviour.slotPositioning.testHit(world, pos, state, target.getPos().subtract(Vec3d.of(pos)));
 
-            AABB emptyBB = new AABB(Vec3.ZERO, Vec3.ZERO);
-            AABB bb = isFilterSlotted ? emptyBB.inflate(.45f, .31f, .2f) : emptyBB.inflate(.25f);
+            Box emptyBB = new Box(Vec3d.ZERO, Vec3d.ZERO);
+            Box bb = isFilterSlotted ? emptyBB.expand(.45f, .31f, .2f) : emptyBB.expand(.25f);
 
             ValueBox box = new ItemValueBox(label, bb, pos, filter, behaviour.getCountLabelForValueBox());
             box.passive(!hit || behaviour.bypassesInput(mainhandItem));
 
-            Outliner.getInstance()
-                .showOutline(Pair.of("filter" + behaviour.netId(), pos), box.transform(behaviour.slotPositioning))
-                .lineWidth(1 / 64f).withFaceTexture(hit ? AllSpecialTextures.THIN_CHECKERED : null)
-                .highlightFace(result.getDirection());
+            Outliner.getInstance().showOutline(Pair.of("filter" + behaviour.netId(), pos), box.transform(behaviour.slotPositioning))
+                .lineWidth(1 / 64f).withFaceTexture(hit ? AllSpecialTextures.THIN_CHECKERED : null).highlightFace(result.getSide());
 
-            if (!hit) {
+            if (!hit)
                 continue;
-            }
 
-            List<MutableComponent> tip = new ArrayList<>();
+            List<MutableText> tip = new ArrayList<>();
             tip.add(label.copy());
             tip.add(behaviour.getTip());
-            if (showCount) {
+            if (showCount)
                 tip.add(behaviour.getAmountTip());
-            }
 
             Create.VALUE_SETTINGS_HANDLER.showHoverTip(mc, tip);
         }
@@ -129,7 +113,7 @@ public class FilteringRenderer {
     public static FilterRenderState getFilterRenderState(
         SmartBlockEntity be,
         BlockState blockState,
-        ItemModelResolver itemModelManager,
+        ItemModelManager itemModelManager,
         double distance
     ) {
         if (be instanceof FactoryPanelBlockEntity) {
@@ -151,12 +135,7 @@ public class FilteringRenderer {
                             if (list == null) {
                                 list = new ArrayList<>(4);
                             }
-                            list.add(SingleFilterRenderState.create(
-                                slotPositioning,
-                                itemModelManager,
-                                filter,
-                                be.getLevel()
-                            ));
+                            list.add(SingleFilterRenderState.create(slotPositioning, itemModelManager, filter, be.getWorld()));
                         }
                     }
                     if (++count == 4) {
@@ -170,14 +149,11 @@ public class FilteringRenderer {
         if (behaviour == null) {
             return null;
         }
-        if (!be.isVirtual() && (behaviour.behaviour == null || !behaviour.isActive() || isOutOfRange(
-            behaviour,
-            distance
-        ))) {
+        if (!be.isVirtual() && (behaviour.behaviour == null || !behaviour.isActive() || isOutOfRange(behaviour, distance))) {
             return null;
         }
         if (behaviour instanceof SidedFilteringBehaviour sidedFilteringBehaviour) {
-            return SidedFilterRenderState.create(sidedFilteringBehaviour, blockState, itemModelManager, be.getLevel());
+            return SidedFilterRenderState.create(sidedFilteringBehaviour, blockState, itemModelManager, be.getWorld());
         }
         ItemStack filter = behaviour.getFilter();
         if (filter.isEmpty()) {
@@ -185,9 +161,9 @@ public class FilteringRenderer {
         }
         ValueBoxTransform slotPositioning = behaviour.getSlotPositioning();
         if (slotPositioning instanceof Sided sided) {
-            return SidedSingleFilterRenderState.create(sided, blockState, itemModelManager, filter, be.getLevel());
+            return SidedSingleFilterRenderState.create(sided, blockState, itemModelManager, filter, be.getWorld());
         }
-        return SingleFilterRenderState.create(slotPositioning, itemModelManager, filter, be.getLevel());
+        return SingleFilterRenderState.create(slotPositioning, itemModelManager, filter, be.getWorld());
     }
 
     private static boolean isOutOfRange(FilteringBehaviour<?> behaviour, double distance) {
@@ -199,64 +175,60 @@ public class FilteringRenderer {
     }
 
     public interface FilterRenderState {
-        void render(BlockState blockState, SubmitNodeCollector queue, PoseStack ms, int light);
+        void render(BlockState blockState, OrderedRenderCommandQueue queue, MatrixStack ms, int light);
     }
 
     public record FactoryPanelRenderState(List<SingleFilterRenderState> states) implements FilterRenderState {
         @Override
-        public void render(BlockState blockState, SubmitNodeCollector queue, PoseStack ms, int light) {
+        public void render(BlockState blockState, OrderedRenderCommandQueue queue, MatrixStack ms, int light) {
             for (SingleFilterRenderState state : states) {
                 state.render(blockState, queue, ms, light);
             }
         }
     }
 
-    public record SingleFilterRenderState(ValueBoxTransform slotPositioning, ItemStackRenderState state,
-                                          float offset) implements FilterRenderState {
+    public record SingleFilterRenderState(ValueBoxTransform slotPositioning, ItemRenderState state, float offset) implements FilterRenderState {
         public static SingleFilterRenderState create(
             ValueBoxTransform slotPositioning,
-            ItemModelResolver itemModelManager,
+            ItemModelManager itemModelManager,
             ItemStack stack,
-            Level world
+            World world
         ) {
-            ItemStackRenderState renderState = new ItemStackRenderState();
+            ItemRenderState renderState = new ItemRenderState();
             renderState.displayContext = ItemDisplayContext.FIXED;
-            itemModelManager.appendItemLayers(renderState, stack, ItemDisplayContext.FIXED, world, null, 0);
-            return new SingleFilterRenderState(
-                slotPositioning,
-                renderState,
-                ValueBoxRenderer.customZOffset(stack.getItem())
-            );
+            itemModelManager.update(renderState, stack, ItemDisplayContext.FIXED, world, null, 0);
+            return new SingleFilterRenderState(slotPositioning, renderState, ValueBoxRenderer.customZOffset(stack.getItem()));
         }
 
         @Override
-        public void render(BlockState blockState, SubmitNodeCollector queue, PoseStack ms, int light) {
-            ms.pushPose();
+        public void render(BlockState blockState, OrderedRenderCommandQueue queue, MatrixStack ms, int light) {
+            ms.push();
             slotPositioning.transform(blockState, ms);
             ValueBoxRenderer.renderItemIntoValueBox(state, queue, ms, light, offset);
-            ms.popPose();
+            ms.pop();
         }
     }
 
-    public record SidedSingleFilterRenderState(Sided sided, Direction side, ItemStackRenderState state, Float offset,
-                                               List<Direction> sides) implements FilterRenderState {
+    public record SidedSingleFilterRenderState(
+        Sided sided, Direction side, ItemRenderState state, Float offset, List<Direction> sides
+    ) implements FilterRenderState {
         public static SidedSingleFilterRenderState create(
             Sided sided,
             BlockState blockState,
-            ItemModelResolver itemModelManager,
+            ItemModelManager itemModelManager,
             ItemStack filter,
-            Level world
+            World world
         ) {
-            ItemStackRenderState renderState = new ItemStackRenderState();
+            ItemRenderState renderState = new ItemRenderState();
             Float offset;
-            if (blockState.is(AllBlocks.CONTRAPTION_CONTROLS)) {
+            if (blockState.isOf(AllBlocks.CONTRAPTION_CONTROLS)) {
                 renderState.displayContext = ItemDisplayContext.GUI;
                 offset = null;
             } else {
                 renderState.displayContext = ItemDisplayContext.FIXED;
                 offset = ValueBoxRenderer.customZOffset(filter.getItem());
             }
-            itemModelManager.appendItemLayers(renderState, filter, renderState.displayContext, world, null, 0);
+            itemModelManager.update(renderState, filter, renderState.displayContext, world, null, 0);
             Direction side = sided.getSide();
             List<Direction> sides = new ArrayList<>();
             for (Direction direction : Iterate.directions) {
@@ -270,10 +242,10 @@ public class FilteringRenderer {
         }
 
         @Override
-        public void render(BlockState blockState, SubmitNodeCollector queue, PoseStack ms, int light) {
+        public void render(BlockState blockState, OrderedRenderCommandQueue queue, MatrixStack ms, int light) {
             boolean flat = offset == null;
             for (Direction side : sides) {
-                ms.pushPose();
+                ms.push();
                 sided.fromSide(side);
                 sided.transform(blockState, ms);
                 if (flat) {
@@ -281,42 +253,41 @@ public class FilteringRenderer {
                 } else {
                     ValueBoxRenderer.renderItemIntoValueBox(state, queue, ms, light, offset);
                 }
-                ms.popPose();
+                ms.pop();
             }
             sided.fromSide(side);
         }
     }
 
-    public record SidedFilterRenderState(Sided slotPositioning, Direction side,
-                                         List<BoxRenderState> boxes) implements FilterRenderState {
+    public record SidedFilterRenderState(
+        Sided slotPositioning, Direction side, List<BoxRenderState> boxes
+    ) implements FilterRenderState {
         @Nullable
         public static FilterRenderState create(
             SidedFilteringBehaviour behaviour,
             BlockState blockState,
-            ItemModelResolver itemModelManager,
-            Level world
+            ItemModelManager itemModelManager,
+            World world
         ) {
-            boolean flat = blockState.is(AllBlocks.CONTRAPTION_CONTROLS);
+            boolean flat = blockState.isOf(AllBlocks.CONTRAPTION_CONTROLS);
             Sided sided = behaviour.getSlotPositioning();
             List<SidedFilterRenderState.BoxRenderState> boxes = new ArrayList<>();
             Direction side = sided.getSide();
             for (Direction direction : Iterate.directions) {
                 ItemStack filter = behaviour.getFilter(direction);
-                if (filter.isEmpty()) {
+                if (filter.isEmpty())
                     continue;
-                }
                 sided.fromSide(direction);
-                if (!sided.shouldRender(blockState)) {
+                if (!sided.shouldRender(blockState))
                     continue;
-                }
-                ItemStackRenderState renderState = new ItemStackRenderState();
+                ItemRenderState renderState = new ItemRenderState();
                 if (flat) {
                     renderState.displayContext = ItemDisplayContext.GUI;
-                    itemModelManager.appendItemLayers(renderState, filter, renderState.displayContext, world, null, 0);
+                    itemModelManager.update(renderState, filter, renderState.displayContext, world, null, 0);
                     boxes.add(new FlatBoxState(direction, renderState));
                 } else {
                     renderState.displayContext = ItemDisplayContext.FIXED;
-                    itemModelManager.appendItemLayers(renderState, filter, renderState.displayContext, world, null, 0);
+                    itemModelManager.update(renderState, filter, renderState.displayContext, world, null, 0);
                     boxes.add(new BoxState(direction, renderState, ValueBoxRenderer.customZOffset(filter.getItem())));
                 }
             }
@@ -325,13 +296,13 @@ public class FilteringRenderer {
         }
 
         @Override
-        public void render(BlockState blockState, SubmitNodeCollector queue, PoseStack ms, int light) {
+        public void render(BlockState blockState, OrderedRenderCommandQueue queue, MatrixStack ms, int light) {
             for (BoxRenderState box : boxes) {
-                ms.pushPose();
+                ms.push();
                 slotPositioning.fromSide(box.side());
                 slotPositioning.transform(blockState, ms);
                 box.render(queue, ms, light);
-                ms.popPose();
+                ms.pop();
             }
             slotPositioning.fromSide(side);
         }
@@ -339,19 +310,19 @@ public class FilteringRenderer {
         public interface BoxRenderState {
             Direction side();
 
-            void render(SubmitNodeCollector queue, PoseStack ms, int light);
+            void render(OrderedRenderCommandQueue queue, MatrixStack ms, int light);
         }
 
-        record FlatBoxState(Direction side, ItemStackRenderState state) implements BoxRenderState {
+        record FlatBoxState(Direction side, ItemRenderState state) implements BoxRenderState {
             @Override
-            public void render(SubmitNodeCollector queue, PoseStack ms, int light) {
+            public void render(OrderedRenderCommandQueue queue, MatrixStack ms, int light) {
                 ValueBoxRenderer.renderFlatItemIntoValueBox(state, queue, ms, light);
             }
         }
 
-        record BoxState(Direction side, ItemStackRenderState state, float offset) implements BoxRenderState {
+        record BoxState(Direction side, ItemRenderState state, float offset) implements BoxRenderState {
             @Override
-            public void render(SubmitNodeCollector queue, PoseStack ms, int light) {
+            public void render(OrderedRenderCommandQueue queue, MatrixStack ms, int light) {
                 ValueBoxRenderer.renderItemIntoValueBox(state, queue, ms, light, offset);
             }
         }

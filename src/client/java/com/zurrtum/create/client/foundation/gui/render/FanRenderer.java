@@ -1,107 +1,102 @@
 package com.zurrtum.create.client.foundation.gui.render;
 
-import com.mojang.blaze3d.platform.Lighting;
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
-import com.mojang.math.Axis;
 import com.zurrtum.create.AllBlocks;
 import com.zurrtum.create.client.AllPartialModels;
 import com.zurrtum.create.client.catnip.animation.AnimationTickHolder;
 import com.zurrtum.create.client.catnip.render.FluidRenderHelper;
 import com.zurrtum.create.client.compat.sodium.SodiumCompat;
 import com.zurrtum.create.client.flywheel.lib.model.baked.SinglePosVirtualBlockGetter;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.render.pip.PictureInPictureRenderer;
-import net.minecraft.client.renderer.LightTexture;
-import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.Sheets;
-import net.minecraft.client.renderer.block.BlockRenderDispatcher;
-import net.minecraft.client.renderer.block.model.BlockModelPart;
-import net.minecraft.client.renderer.rendertype.RenderTypes;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.component.DataComponentPatch;
-import net.minecraft.util.RandomSource;
-import net.minecraft.world.level.block.BaseFireBlock;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.material.Fluid;
-import net.minecraft.world.level.material.FluidState;
+import net.minecraft.block.AbstractFireBlock;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.Blocks;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.render.SpecialGuiElementRenderer;
+import net.minecraft.client.render.*;
+import net.minecraft.client.render.block.BlockRenderManager;
+import net.minecraft.client.render.model.BlockModelPart;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.component.ComponentChanges;
+import net.minecraft.fluid.Fluid;
+import net.minecraft.fluid.FluidState;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.RotationAxis;
+import net.minecraft.util.math.random.Random;
 
 import java.util.List;
 
-public class FanRenderer extends PictureInPictureRenderer<FanRenderState> {
-    private static final RandomSource RANDOM = RandomSource.create();
+public class FanRenderer extends SpecialGuiElementRenderer<FanRenderState> {
+    private static final Random RANDOM = Random.create();
 
-    public FanRenderer(MultiBufferSource.BufferSource vertexConsumers) {
+    public FanRenderer(VertexConsumerProvider.Immediate vertexConsumers) {
         super(vertexConsumers);
     }
 
     @Override
-    protected void renderToTexture(FanRenderState state, PoseStack matrices) {
-        Minecraft mc = Minecraft.getInstance();
-        mc.gameRenderer.getLighting().setupFor(Lighting.Entry.ENTITY_IN_UI);
+    protected void render(FanRenderState state, MatrixStack matrices) {
+        MinecraftClient mc = MinecraftClient.getInstance();
+        mc.gameRenderer.getDiffuseLighting().setShaderLights(DiffuseLighting.Type.ENTITY_IN_UI);
         matrices.scale(1, 1, -1);
-        matrices.mulPose(Axis.XP.rotationDegrees(-15.5f));
-        matrices.mulPose(Axis.YP.rotationDegrees(22.5f));
+        matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(-15.5f));
+        matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(22.5f));
         matrices.translate(-0.92f, -0.75f, -0.5f);
         matrices.scale(1, -1, 1);
 
         BlockState blockState;
         List<BlockModelPart> parts;
-        BlockRenderDispatcher blockRenderManager = mc.getBlockRenderer();
+        BlockRenderManager blockRenderManager = mc.getBlockRenderManager();
         SinglePosVirtualBlockGetter world = SinglePosVirtualBlockGetter.createFullBright();
-        VertexConsumer buffer = bufferSource.getBuffer(Sheets.cutoutBlockSheet());
+        VertexConsumer buffer = vertexConsumers.getBuffer(TexturedRenderLayers.getEntityCutout());
 
-        matrices.pushPose();
-        blockState = Blocks.AIR.defaultBlockState();
+        matrices.push();
+        blockState = Blocks.AIR.getDefaultState();
         parts = List.of(AllPartialModels.ENCASED_FAN_INNER.get());
         matrices.translate(0.5f, 0.5f, 0.5f);
-        matrices.mulPose(Axis.ZP.rotationDegrees(getCurrentAngle() * 16));
-        matrices.mulPose(Axis.XP.rotationDegrees(180));
+        matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(getCurrentAngle() * 16));
+        matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(180));
         matrices.translate(-0.5f, -0.5f, -0.5f);
-        blockRenderManager.renderBatched(blockState, BlockPos.ZERO, world, matrices, buffer, false, parts);
-        matrices.popPose();
+        blockRenderManager.renderBlock(blockState, BlockPos.ORIGIN, world, matrices, buffer, false, parts);
+        matrices.pop();
 
-        matrices.pushPose();
-        blockState = AllBlocks.ENCASED_FAN.defaultBlockState();
+        matrices.push();
+        blockState = AllBlocks.ENCASED_FAN.getDefaultState();
         world.blockState(blockState);
-        parts = blockRenderManager.getBlockModel(blockState).collectParts(mc.level.random);
+        parts = blockRenderManager.getModel(blockState).getParts(mc.world.random);
         matrices.translate(0.5f, 0.5f, 0.5f);
-        matrices.mulPose(Axis.YP.rotationDegrees(180));
+        matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(180));
         matrices.translate(-0.5f, -0.5f, -0.5f);
-        blockRenderManager.renderBatched(blockState, BlockPos.ZERO, world, matrices, buffer, false, parts);
-        matrices.popPose();
+        blockRenderManager.renderBlock(blockState, BlockPos.ORIGIN, world, matrices, buffer, false, parts);
+        matrices.pop();
 
         matrices.translate(0, 0, 2);
         blockState = state.target();
         FluidState fluidState = blockState.getFluidState();
         if (!fluidState.isEmpty()) {
-            Fluid fluid = fluidState.getType();
+            Fluid fluid = fluidState.getFluid();
             SodiumCompat.markFluidSpriteActive(fluid);
             FluidRenderHelper.renderFluidBox(
                 fluid,
-                DataComponentPatch.EMPTY,
+                ComponentChanges.EMPTY,
                 0,
                 0,
                 0,
                 1,
                 1,
                 1,
-                bufferSource,
+                vertexConsumers,
                 matrices,
-                LightTexture.FULL_BRIGHT,
+                LightmapTextureManager.MAX_LIGHT_COORDINATE,
                 false,
                 true
             );
             return;
         }
         world.blockState(blockState);
-        RANDOM.setSeed(blockState.getSeed(BlockPos.ZERO));
-        parts = blockRenderManager.getBlockModel(blockState).collectParts(RANDOM);
-        if (blockState.getBlock() instanceof BaseFireBlock) {
-            buffer = bufferSource.getBuffer(RenderTypes.cutoutMovingBlock());
+        RANDOM.setSeed(blockState.getRenderingSeed(BlockPos.ORIGIN));
+        parts = blockRenderManager.getModel(blockState).getParts(RANDOM);
+        if (blockState.getBlock() instanceof AbstractFireBlock) {
+            buffer = vertexConsumers.getBuffer(RenderLayer.getCutout());
         }
-        blockRenderManager.renderBatched(blockState, BlockPos.ZERO, world, matrices, buffer, false, parts);
+        blockRenderManager.renderBlock(blockState, BlockPos.ORIGIN, world, matrices, buffer, false, parts);
     }
 
     public static float getCurrentAngle() {
@@ -109,12 +104,12 @@ public class FanRenderer extends PictureInPictureRenderer<FanRenderState> {
     }
 
     @Override
-    protected String getTextureLabel() {
+    protected String getName() {
         return "Fan";
     }
 
     @Override
-    public Class<FanRenderState> getRenderStateClass() {
+    public Class<FanRenderState> getElementClass() {
         return FanRenderState.class;
     }
 }

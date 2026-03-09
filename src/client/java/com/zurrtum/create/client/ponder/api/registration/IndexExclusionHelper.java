@@ -1,19 +1,19 @@
 package com.zurrtum.create.client.ponder.api.registration;
 
-import net.minecraft.world.item.Item;
-import net.minecraft.world.level.ItemLike;
-import net.minecraft.world.level.block.Block;
+import net.minecraft.block.Block;
+import net.minecraft.item.Item;
+import net.minecraft.item.ItemConvertible;
 
 import java.util.function.Predicate;
 
 public interface IndexExclusionHelper {
 
-    IndexExclusionHelper exclude(ItemLike item);
+    IndexExclusionHelper exclude(ItemConvertible item);
 
     IndexExclusionHelper excludeItemVariants(Class<? extends Item> itemClazz, Item originalVariant);
 
     IndexExclusionHelper excludeBlockVariants(Class<? extends Block> blockClazz, Block originalVariant);
 
-    IndexExclusionHelper exclude(Predicate<ItemLike> predicate);
+    IndexExclusionHelper exclude(Predicate<ItemConvertible> predicate);
 
 }

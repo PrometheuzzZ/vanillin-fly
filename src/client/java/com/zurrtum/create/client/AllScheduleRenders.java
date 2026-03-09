@@ -5,7 +5,7 @@ import com.zurrtum.create.client.content.trains.schedule.IScheduleInput;
 import com.zurrtum.create.client.content.trains.schedule.condition.*;
 import com.zurrtum.create.client.content.trains.schedule.destination.*;
 import com.zurrtum.create.content.trains.schedule.ScheduleDataEntry;
-import net.minecraft.resources.Identifier;
+import net.minecraft.util.Identifier;
 
 import java.util.HashMap;
 import java.util.Map;

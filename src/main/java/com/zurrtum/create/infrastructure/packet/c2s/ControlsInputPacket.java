@@ -4,30 +4,30 @@ import com.zurrtum.create.AllHandle;
 import com.zurrtum.create.AllPackets;
 import com.zurrtum.create.catnip.codecs.stream.CatnipStreamCodecBuilders;
 import io.netty.buffer.ByteBuf;
-import net.minecraft.core.BlockPos;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.PacketType;
-import net.minecraft.network.protocol.game.ServerGamePacketListener;
-import net.minecraft.server.network.ServerGamePacketListenerImpl;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.network.listener.ServerPlayPacketListener;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.PacketType;
+import net.minecraft.server.network.ServerPlayNetworkHandler;
+import net.minecraft.util.math.BlockPos;
 
 import java.util.Collection;
 import java.util.List;
 
-public record ControlsInputPacket(List<Integer> activatedButtons, boolean press, int contraptionEntityId,
-                                  BlockPos controlsPos,
-                                  boolean stopControlling) implements Packet<ServerGamePacketListener> {
-    public static final StreamCodec<ByteBuf, ControlsInputPacket> CODEC = StreamCodec.composite(
-        CatnipStreamCodecBuilders.list(ByteBufCodecs.VAR_INT),
+public record ControlsInputPacket(
+    List<Integer> activatedButtons, boolean press, int contraptionEntityId, BlockPos controlsPos, boolean stopControlling
+) implements Packet<ServerPlayPacketListener> {
+    public static final PacketCodec<ByteBuf, ControlsInputPacket> CODEC = PacketCodec.tuple(
+        CatnipStreamCodecBuilders.list(PacketCodecs.VAR_INT),
         ControlsInputPacket::activatedButtons,
-        ByteBufCodecs.BOOL,
+        PacketCodecs.BOOLEAN,
         ControlsInputPacket::press,
-        ByteBufCodecs.INT,
+        PacketCodecs.INTEGER,
         ControlsInputPacket::contraptionEntityId,
-        BlockPos.STREAM_CODEC,
+        BlockPos.PACKET_CODEC,
         ControlsInputPacket::controlsPos,
-        ByteBufCodecs.BOOL,
+        PacketCodecs.BOOLEAN,
         ControlsInputPacket::stopControlling,
         ControlsInputPacket::new
     );
@@ -44,12 +44,12 @@ public record ControlsInputPacket(List<Integer> activatedButtons, boolean press,
     }
 
     @Override
-    public void handle(ServerGamePacketListener listener) {
-        AllHandle.onControlsInput((ServerGamePacketListenerImpl) listener, this);
+    public void apply(ServerPlayPacketListener listener) {
+        AllHandle.onControlsInput((ServerPlayNetworkHandler) listener, this);
     }
 
     @Override
-    public PacketType<ControlsInputPacket> type() {
+    public PacketType<ControlsInputPacket> getPacketType() {
         return AllPackets.CONTROLS_INPUT;
     }
 }

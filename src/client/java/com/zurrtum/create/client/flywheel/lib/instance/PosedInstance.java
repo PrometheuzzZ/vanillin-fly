@@ -1,10 +1,10 @@
 package com.zurrtum.create.client.flywheel.lib.instance;
 
-import com.mojang.blaze3d.vertex.PoseStack;
 import com.zurrtum.create.client.flywheel.api.instance.InstanceHandle;
 import com.zurrtum.create.client.flywheel.api.instance.InstanceType;
 import com.zurrtum.create.client.flywheel.lib.transform.Transform;
-import net.minecraft.util.Mth;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.util.math.MathHelper;
 import org.joml.*;
 
 import java.lang.Math;
@@ -64,7 +64,7 @@ public class PosedInstance extends ColoredLitOverlayInstance implements Transfor
         float invX = 1.0f / x;
         float invY = 1.0f / y;
         float invZ = 1.0f / z;
-        float f = Mth.fastInvCubeRoot(Math.abs(invX * invY * invZ));
+        float f = MathHelper.fastInverseCbrt(Math.abs(invX * invY * invZ));
         normal.scale(f * invX, f * invY, f * invZ);
         return this;
     }
@@ -75,14 +75,14 @@ public class PosedInstance extends ColoredLitOverlayInstance implements Transfor
         return this;
     }
 
-    public PosedInstance setTransform(PoseStack.Pose pose) {
-        this.pose.set(pose.pose());
-        normal.set(pose.normal());
+    public PosedInstance setTransform(MatrixStack.Entry pose) {
+        this.pose.set(pose.getPositionMatrix());
+        normal.set(pose.getNormalMatrix());
         return this;
     }
 
-    public PosedInstance setTransform(PoseStack stack) {
-        return setTransform(stack.last());
+    public PosedInstance setTransform(MatrixStack stack) {
+        return setTransform(stack.peek());
     }
 
     public PosedInstance setIdentityTransform() {

@@ -6,22 +6,22 @@ import com.zurrtum.create.content.kinetics.base.KineticBlockEntity;
 import com.zurrtum.create.foundation.advancement.CreateTrigger;
 import com.zurrtum.create.foundation.blockEntity.ComparatorUtil;
 import com.zurrtum.create.infrastructure.particle.AirParticleData;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction.Axis;
-import net.minecraft.core.component.DataComponentGetter;
-import net.minecraft.core.component.DataComponentMap.Builder;
-import net.minecraft.core.component.DataComponentPatch;
-import net.minecraft.core.particles.ParticleTypes;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.ComponentSerialization;
-import net.minecraft.util.Mth;
-import net.minecraft.world.Nameable;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.properties.BlockStateProperties;
-import net.minecraft.world.level.block.state.properties.BooleanProperty;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.block.BlockState;
+import net.minecraft.component.ComponentChanges;
+import net.minecraft.component.ComponentMap.Builder;
+import net.minecraft.component.ComponentsAccess;
+import net.minecraft.particle.ParticleTypes;
+import net.minecraft.state.property.BooleanProperty;
+import net.minecraft.state.property.Properties;
+import net.minecraft.storage.ReadView;
+import net.minecraft.storage.WriteView;
+import net.minecraft.text.Text;
+import net.minecraft.text.TextCodecs;
+import net.minecraft.util.Nameable;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction.Axis;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.Vec3d;
 
 import java.util.List;
 
@@ -29,21 +29,21 @@ public class BacktankBlockEntity extends KineticBlockEntity implements Nameable 
 
     public int airLevel;
     public int airLevelTimer;
-    private final Component defaultName;
-    private Component customName;
+    private final Text defaultName;
+    private Text customName;
 
     private int capacityEnchantLevel;
 
-    private DataComponentPatch componentPatch;
+    private ComponentChanges componentPatch;
 
     public BacktankBlockEntity(BlockPos pos, BlockState state) {
         super(AllBlockEntityTypes.BACKTANK, pos, state);
         defaultName = getDefaultName(state);
-        componentPatch = DataComponentPatch.EMPTY;
+        componentPatch = ComponentChanges.EMPTY;
     }
 
-    public static Component getDefaultName(BlockState state) {
-        if (state.is(AllBlocks.NETHERITE_BACKTANK)) {
+    public static Text getDefaultName(BlockState state) {
+        if (state.isOf(AllBlocks.NETHERITE_BACKTANK)) {
             AllItems.NETHERITE_BACKTANK.getName();
         }
 
@@ -58,23 +58,20 @@ public class BacktankBlockEntity extends KineticBlockEntity implements Nameable 
     @Override
     public void onSpeedChanged(float previousSpeed) {
         super.onSpeedChanged(previousSpeed);
-        if (getSpeed() != 0) {
+        if (getSpeed() != 0)
             award(AllAdvancements.BACKTANK);
-        }
     }
 
     @Override
     public void tick() {
         super.tick();
-        if (getSpeed() == 0) {
+        if (getSpeed() == 0)
             return;
-        }
 
-        BlockState state = getBlockState();
-        BooleanProperty waterProperty = BlockStateProperties.WATERLOGGED;
-        if (state.hasProperty(waterProperty) && state.getValue(waterProperty)) {
+        BlockState state = getCachedState();
+        BooleanProperty waterProperty = Properties.WATERLOGGED;
+        if (state.contains(waterProperty) && state.get(waterProperty))
             return;
-        }
 
         if (airLevelTimer > 0) {
             airLevelTimer--;
@@ -82,31 +79,27 @@ public class BacktankBlockEntity extends KineticBlockEntity implements Nameable 
         }
 
         int max = BacktankUtil.maxAir(capacityEnchantLevel);
-        if (level.isClientSide()) {
-            Vec3 centerOf = VecHelper.getCenterOf(worldPosition);
-            Vec3 v = VecHelper.offsetRandomly(centerOf, level.random, .65f);
-            Vec3 m = centerOf.subtract(v);
-            if (airLevel != max) {
-                level.addParticle(new AirParticleData(1, .05f), v.x, v.y, v.z, m.x, m.y, m.z);
-            }
+        if (world.isClient()) {
+            Vec3d centerOf = VecHelper.getCenterOf(pos);
+            Vec3d v = VecHelper.offsetRandomly(centerOf, world.random, .65f);
+            Vec3d m = centerOf.subtract(v);
+            if (airLevel != max)
+                world.addParticleClient(new AirParticleData(1, .05f), v.x, v.y, v.z, m.x, m.y, m.z);
             return;
         }
 
-        if (airLevel == max) {
+        if (airLevel == max)
             return;
-        }
 
         int prevComparatorLevel = getComparatorOutput();
         float abs = Math.abs(getSpeed());
-        int increment = Mth.clamp(((int) abs - 100) / 20, 1, 5);
+        int increment = MathHelper.clamp(((int) abs - 100) / 20, 1, 5);
         airLevel = Math.min(max, airLevel + increment);
-        if (getComparatorOutput() != prevComparatorLevel && !level.isClientSide()) {
-            level.updateNeighbourForOutputSignal(worldPosition, state.getBlock());
-        }
-        if (airLevel == max) {
+        if (getComparatorOutput() != prevComparatorLevel && !world.isClient())
+            world.updateComparators(pos, state.getBlock());
+        if (airLevel == max)
             sendData();
-        }
-        airLevelTimer = Mth.clamp((int) (128f - abs / 5f) - 108, 0, 20);
+        airLevelTimer = MathHelper.clamp((int) (128f - abs / 5f) - 108, 0, 20);
     }
 
     public int getComparatorOutput() {
@@ -115,58 +108,56 @@ public class BacktankBlockEntity extends KineticBlockEntity implements Nameable 
     }
 
     @Override
-    protected void write(ValueOutput view, boolean clientPacket) {
+    protected void write(WriteView view, boolean clientPacket) {
         super.write(view, clientPacket);
         view.putInt("Air", airLevel);
         view.putInt("Timer", airLevelTimer);
         view.putInt("CapacityEnchantment", capacityEnchantLevel);
 
-        if (customName != null) {
-            view.store("CustomName", ComponentSerialization.CODEC, customName);
-        }
+        if (customName != null)
+            view.put("CustomName", TextCodecs.CODEC, customName);
 
-        view.store("Components", DataComponentPatch.CODEC, componentPatch);
+        view.put("Components", ComponentChanges.CODEC, componentPatch);
     }
 
     @Override
-    protected void read(ValueInput view, boolean clientPacket) {
+    protected void read(ReadView view, boolean clientPacket) {
         super.read(view, clientPacket);
         int prev = airLevel;
-        airLevel = view.getIntOr("Air", 0);
-        airLevelTimer = view.getIntOr("Timer", 0);
-        capacityEnchantLevel = view.getIntOr("CapacityEnchantment", 0);
+        airLevel = view.getInt("Air", 0);
+        airLevelTimer = view.getInt("Timer", 0);
+        capacityEnchantLevel = view.getInt("CapacityEnchantment", 0);
 
-        customName = view.read("CustomName", ComponentSerialization.CODEC).orElse(null);
-        componentPatch = view.read("Components", DataComponentPatch.CODEC).orElse(DataComponentPatch.EMPTY);
-        if (prev != 0 && prev != airLevel && airLevel == BacktankUtil.maxAir(capacityEnchantLevel) && clientPacket) {
+        customName = view.read("CustomName", TextCodecs.CODEC).orElse(null);
+        componentPatch = view.read("Components", ComponentChanges.CODEC).orElse(ComponentChanges.EMPTY);
+        if (prev != 0 && prev != airLevel && airLevel == BacktankUtil.maxAir(capacityEnchantLevel) && clientPacket)
             playFilledEffect();
-        }
     }
 
     @Override
-    protected void applyImplicitComponents(DataComponentGetter componentInput) {
+    protected void readComponents(ComponentsAccess componentInput) {
         setAirLevel(componentInput.getOrDefault(AllDataComponents.BACKTANK_AIR, 0));
     }
 
     @Override
-    protected void collectImplicitComponents(Builder components) {
-        components.set(AllDataComponents.BACKTANK_AIR, airLevel);
+    protected void addComponents(Builder components) {
+        components.add(AllDataComponents.BACKTANK_AIR, airLevel);
     }
 
     protected void playFilledEffect() {
-        AllSoundEvents.CONFIRM.playAt(level, worldPosition, 0.4f, 1, true);
-        Vec3 baseMotion = new Vec3(.25, 0.1, 0);
-        Vec3 baseVec = VecHelper.getCenterOf(worldPosition);
+        AllSoundEvents.CONFIRM.playAt(world, pos, 0.4f, 1, true);
+        Vec3d baseMotion = new Vec3d(.25, 0.1, 0);
+        Vec3d baseVec = VecHelper.getCenterOf(pos);
         for (int i = 0; i < 360; i += 10) {
-            Vec3 m = VecHelper.rotate(baseMotion, i, Axis.Y);
-            Vec3 v = baseVec.add(m.normalize().scale(.25f));
+            Vec3d m = VecHelper.rotate(baseMotion, i, Axis.Y);
+            Vec3d v = baseVec.add(m.normalize().multiply(.25f));
 
-            level.addParticle(ParticleTypes.SPIT, v.x, v.y, v.z, m.x, m.y, m.z);
+            world.addParticleClient(ParticleTypes.SPIT, v.x, v.y, v.z, m.x, m.y, m.z);
         }
     }
 
     @Override
-    public Component getName() {
+    public Text getName() {
         return this.customName != null ? this.customName : defaultName;
     }
 
@@ -179,7 +170,7 @@ public class BacktankBlockEntity extends KineticBlockEntity implements Nameable 
         sendData();
     }
 
-    public void setCustomName(Component customName) {
+    public void setCustomName(Text customName) {
         this.customName = customName;
     }
 
@@ -187,11 +178,11 @@ public class BacktankBlockEntity extends KineticBlockEntity implements Nameable 
         this.capacityEnchantLevel = capacityEnchantLevel;
     }
 
-    public void setComponentPatch(DataComponentPatch componentPatch) {
+    public void setComponentPatch(ComponentChanges componentPatch) {
         this.componentPatch = componentPatch;
     }
 
-    public DataComponentPatch getComponentPatch() {
+    public ComponentChanges getComponentPatch() {
         return componentPatch;
     }
 

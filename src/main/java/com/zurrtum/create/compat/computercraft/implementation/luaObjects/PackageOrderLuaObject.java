@@ -7,8 +7,7 @@ import com.zurrtum.create.infrastructure.component.PackageOrderWithCrafts;
 import dan200.computercraft.api.detail.VanillaDetailRegistries;
 import dan200.computercraft.api.lua.LuaException;
 import dan200.computercraft.api.lua.LuaFunction;
-import net.minecraft.core.RegistryAccess;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.item.ItemStack;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -60,12 +59,9 @@ public class PackageOrderLuaObject implements LuaComparable {
         CreateLuaTable stacks = new CreateLuaTable();
 
         int i = 0;
-        RegistryAccess registryAccess = parent.blockEntity.getLevel().registryAccess();
         for (BigItemStack bis : context.stacks()) {
             i++;
-            Map<String, Object> details = new HashMap<>(VanillaDetailRegistries.ITEM_STACK.getBasicDetails(registryAccess,
-                bis.stack
-            ));
+            Map<String, Object> details = new HashMap<>(VanillaDetailRegistries.ITEM_STACK.getBasicDetails(bis.stack));
             details.put("count", bis.count); // Use bis count
             stacks.put(i, details);
         }
@@ -89,11 +85,7 @@ public class PackageOrderLuaObject implements LuaComparable {
         }
 
         BigItemStack bis = stacks.get(slot - 1);
-        RegistryAccess registries = parent.blockEntity.getLevel().registryAccess();
-        Map<String, Object> details = new HashMap<>(VanillaDetailRegistries.ITEM_STACK.getDetails(
-            registries,
-            bis.stack
-        ));
+        Map<String, Object> details = new HashMap<>(VanillaDetailRegistries.ITEM_STACK.getDetails(bis.stack));
         details.put("count", bis.count); // Use bis count
 
         return new CreateLuaTable(details);
@@ -108,7 +100,6 @@ public class PackageOrderLuaObject implements LuaComparable {
         CreateLuaTable crafts = new CreateLuaTable();
 
         int i = 0;
-        RegistryAccess registryAccess = parent.blockEntity.getLevel().registryAccess();
         for (PackageOrderWithCrafts.CraftingEntry entry : context.orderedCrafts()) {
             CreateLuaTable craft = new CreateLuaTable();
             craft.put("count", entry.count());
@@ -118,8 +109,7 @@ public class PackageOrderLuaObject implements LuaComparable {
             for (BigItemStack bis : entry.pattern().stacks()) {
                 j++;
                 // Not sure if this is the best way to get the in game ID for the item, if there is please let me know
-                String name = VanillaDetailRegistries.ITEM_STACK.getBasicDetails(registryAccess, bis.stack).get("name")
-                    .toString();
+                String name = VanillaDetailRegistries.ITEM_STACK.getBasicDetails(bis.stack).get("name").toString();
                 recipe.put(j, name.equals("minecraft:air") ? null : name);
             }
             i++;
@@ -133,11 +123,10 @@ public class PackageOrderLuaObject implements LuaComparable {
     public final List<LuaBigItemStack> getLuaItemStacks() {
         List<LuaBigItemStack> result = new ArrayList<>();
 
-        RegistryAccess registryAccess = parent.blockEntity.getLevel().registryAccess();
         for (BigItemStack bis : context.stacks()) {
             ItemStack stack = bis.stack;
             if (!stack.isEmpty()) {
-                result.add(new LuaBigItemStack(registryAccess, bis));
+                result.add(new LuaBigItemStack(bis));
             }
         }
         return result;

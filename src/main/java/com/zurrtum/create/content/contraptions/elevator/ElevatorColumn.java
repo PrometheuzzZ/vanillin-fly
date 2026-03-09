@@ -7,11 +7,11 @@ import com.zurrtum.create.catnip.data.Couple;
 import com.zurrtum.create.catnip.data.IntAttached;
 import com.zurrtum.create.catnip.data.WorldAttached;
 import com.zurrtum.create.foundation.utility.BlockHelper;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.LevelAccessor;
-import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.world.World;
+import net.minecraft.world.WorldAccess;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
@@ -20,7 +20,7 @@ public class ElevatorColumn {
 
     public static WorldAttached<Map<ColumnCoords, ElevatorColumn>> LOADED_COLUMNS = new WorldAttached<>($ -> new HashMap<>());
 
-    protected LevelAccessor level;
+    protected WorldAccess level;
     protected ColumnCoords coords;
     public List<Integer> contacts;
     protected int targetedYLevel;
@@ -28,15 +28,15 @@ public class ElevatorColumn {
     protected boolean targetAvailable;
 
     @Nullable
-    public static ElevatorColumn get(LevelAccessor level, ColumnCoords coords) {
+    public static ElevatorColumn get(WorldAccess level, ColumnCoords coords) {
         return LOADED_COLUMNS.get(level).get(coords);
     }
 
-    public static ElevatorColumn getOrCreate(LevelAccessor level, ColumnCoords coords) {
+    public static ElevatorColumn getOrCreate(WorldAccess level, ColumnCoords coords) {
         return LOADED_COLUMNS.get(level).computeIfAbsent(coords, c -> new ElevatorColumn(level, c));
     }
 
-    public ElevatorColumn(LevelAccessor level, ColumnCoords coords) {
+    public ElevatorColumn(WorldAccess level, ColumnCoords coords) {
         this.level = level;
         this.coords = coords;
         contacts = new ArrayList<>();
@@ -46,17 +46,15 @@ public class ElevatorColumn {
     public void markDirty() {
         for (BlockPos pos : getContacts()) {
             BlockEntity blockEntity = level.getBlockEntity(pos);
-            if (blockEntity instanceof ElevatorContactBlockEntity ecbe) {
-                ecbe.setChanged();
-            }
+            if (blockEntity instanceof ElevatorContactBlockEntity ecbe)
+                ecbe.markDirty();
         }
     }
 
-    public void floorReached(LevelAccessor level, String name) {
+    public void floorReached(WorldAccess level, String name) {
         getContacts().forEach(p -> {
-            if (level.getBlockEntity(p) instanceof ElevatorContactBlockEntity ecbe) {
+            if (level.getBlockEntity(p) instanceof ElevatorContactBlockEntity ecbe)
                 ecbe.updateDisplayedFloor(name);
-            }
         });
     }
 
@@ -64,9 +62,8 @@ public class ElevatorColumn {
 
     public List<IntAttached<Couple<String>>> compileNamesList() {
         return getContacts().stream().map(p -> {
-            if (level.getBlockEntity(p) instanceof ElevatorContactBlockEntity ecbe) {
+            if (level.getBlockEntity(p) instanceof ElevatorContactBlockEntity ecbe)
                 return IntAttached.with(p.getY(), ecbe.getNames());
-            }
             return null;
         }).filter(Objects::nonNull).toList();
     }
@@ -80,10 +77,10 @@ public class ElevatorColumn {
     }
 
     public void gatherAll() {
-        BlockPos.betweenClosedStream(contactAt(level.getMinY()), contactAt(level.getMaxY()))
-            .filter(p -> coords.equals(ElevatorContactBlock.getColumnCoords(level, p))).forEach(p -> level.setBlock(
+        BlockPos.stream(contactAt(level.getBottomY()), contactAt(level.getTopYInclusive()))
+            .filter(p -> coords.equals(ElevatorContactBlock.getColumnCoords(level, p))).forEach(p -> level.setBlockState(
                 p,
-                BlockHelper.copyProperties(level.getBlockState(p), AllBlocks.ELEVATOR_CONTACT.defaultBlockState()),
+                BlockHelper.copyProperties(level.getBlockState(p), AllBlocks.ELEVATOR_CONTACT.getDefaultState()),
                 3
             ));
     }
@@ -115,44 +112,38 @@ public class ElevatorColumn {
         return targetedYLevel;
     }
 
-    public void initNames(Level level) {
+    public void initNames(World level) {
         Integer prevLevel = null;
 
         for (int i = 0; i < contacts.size(); i++) {
             Integer y = contacts.get(i);
 
             BlockPos pos = contactAt(y);
-            if (!(level.getBlockEntity(pos) instanceof ElevatorContactBlockEntity ecbe)) {
+            if (!(level.getBlockEntity(pos) instanceof ElevatorContactBlockEntity ecbe))
                 continue;
-            }
 
             Integer currentLevel = null;
 
             if (!ecbe.shortName.isBlank()) {
                 Integer tryValueOf = tryValueOf(ecbe.shortName);
-                if (tryValueOf != null) {
+                if (tryValueOf != null)
                     currentLevel = tryValueOf;
-                }
-                if (currentLevel == null) {
+                if (currentLevel == null)
                     continue;
-                }
             }
 
-            if (prevLevel != null) {
+            if (prevLevel != null)
                 currentLevel = prevLevel + 1;
-            }
 
             Integer nextLevel = null;
 
             for (int peekI = i + 1; peekI < contacts.size(); peekI++) {
                 BlockPos peekPos = contactAt(contacts.get(peekI));
-                if (!(level.getBlockEntity(peekPos) instanceof ElevatorContactBlockEntity peekEcbe)) {
+                if (!(level.getBlockEntity(peekPos) instanceof ElevatorContactBlockEntity peekEcbe))
                     continue;
-                }
                 Integer tryValueOf = tryValueOf(peekEcbe.shortName);
-                if (tryValueOf == null) {
+                if (tryValueOf == null)
                     continue;
-                }
                 if (currentLevel != null && currentLevel >= tryValueOf) {
                     peekEcbe.shortName = "";
                     break;
@@ -161,9 +152,8 @@ public class ElevatorColumn {
                 break;
             }
 
-            if (currentLevel == null) {
+            if (currentLevel == null)
                 currentLevel = nextLevel != null ? nextLevel - 1 : 0;
-            }
 
             ecbe.updateName(String.valueOf(currentLevel), ecbe.longName);
             prevLevel = currentLevel;
@@ -181,15 +171,12 @@ public class ElevatorColumn {
 
     public void add(BlockPos contactPos) {
         int coord = contactPos.getY();
-        if (contacts.contains(coord)) {
+        if (contacts.contains(coord))
             return;
-        }
         int index = 0;
-        for (; index < contacts.size(); index++) {
-            if (contacts.get(index) > coord) {
+        for (; index < contacts.size(); index++)
+            if (contacts.get(index) > coord)
                 break;
-            }
-        }
         contacts.add(index, coord);
         namesChanged();
     }
@@ -201,14 +188,14 @@ public class ElevatorColumn {
     }
 
     private void checkEmpty() {
-        if (contacts.isEmpty() && !isActive()) {
+        if (contacts.isEmpty() && !isActive())
             LOADED_COLUMNS.get(level).remove(coords);
-        }
     }
 
     public record ColumnCoords(int x, int z, Direction side) {
         public static final Codec<ColumnCoords> CODEC = RecordCodecBuilder.create(instance -> instance.group(
-            Codec.INT.fieldOf("x").forGetter(ColumnCoords::x),
+            Codec.INT.fieldOf("x")
+                .forGetter(ColumnCoords::x),
             Codec.INT.fieldOf("z").forGetter(ColumnCoords::z),
             Direction.CODEC.fieldOf("side").forGetter(ColumnCoords::side)
         ).apply(instance, ColumnCoords::new));

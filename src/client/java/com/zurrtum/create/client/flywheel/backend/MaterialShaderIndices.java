@@ -7,7 +7,7 @@ import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectList;
-import net.minecraft.resources.Identifier;
+import net.minecraft.util.Identifier;
 import org.jetbrains.annotations.Unmodifiable;
 
 import java.util.List;

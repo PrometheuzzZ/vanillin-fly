@@ -1,6 +1,5 @@
 package com.zurrtum.create.client.ponder.foundation.ui;
 
-import com.mojang.blaze3d.platform.Window;
 import com.zurrtum.create.catnip.registry.RegisteredObjectsHelper;
 import com.zurrtum.create.client.catnip.gui.NavigatableSimiScreen;
 import com.zurrtum.create.client.catnip.gui.ScreenOpener;
@@ -14,15 +13,15 @@ import com.zurrtum.create.client.ponder.Ponder;
 import com.zurrtum.create.client.ponder.foundation.PonderChapter;
 import com.zurrtum.create.client.ponder.foundation.PonderIndex;
 import com.zurrtum.create.client.ponder.foundation.PonderTag;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.Renderable;
-import net.minecraft.client.gui.components.events.GuiEventListener;
-import net.minecraft.client.renderer.Rect2i;
-import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
-import net.minecraft.util.Mth;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.ItemLike;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.Drawable;
+import net.minecraft.client.gui.Element;
+import net.minecraft.client.util.Window;
+import net.minecraft.client.util.math.Rect2i;
+import net.minecraft.item.ItemConvertible;
+import net.minecraft.item.ItemStack;
+import net.minecraft.util.Identifier;
+import net.minecraft.util.math.MathHelper;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix3x2fStack;
 
@@ -32,7 +31,6 @@ import java.util.List;
 public class PonderTagScreen extends AbstractPonderScreen {
 
     private final PonderTag tag;
-    private final PonderTag renderTag;
     protected final List<ItemEntry> items = new ArrayList<>();
     private final double itemXmult = 0.5;
     @Nullable
@@ -48,12 +46,10 @@ public class PonderTagScreen extends AbstractPonderScreen {
 
     public PonderTagScreen(Identifier tag) {
         this.tag = PonderIndex.getTagAccess().getRegisteredTag(tag);
-        renderTag = new PonderTag(this.tag, 1.66f);
     }
 
     public PonderTagScreen(PonderTag tag) {
         this.tag = tag;
-        renderTag = new PonderTag(this.tag, 1.66f);
     }
 
     @Override
@@ -62,23 +58,20 @@ public class PonderTagScreen extends AbstractPonderScreen {
 
         // items
         items.clear();
-        PonderIndex.getTagAccess().getItems(tag).stream()
-            .map(key -> new ItemEntry(RegisteredObjectsHelper.getItemOrBlock(key), key))
+        PonderIndex.getTagAccess().getItems(tag).stream().map(key -> new ItemEntry(RegisteredObjectsHelper.getItemOrBlock(key), key))
             .filter(entry -> entry.item != null).forEach(items::add);
 
-        if (!tag.getMainItem().isEmpty()) {
+        if (!tag.getMainItem().isEmpty())
             items.removeIf(entry -> entry.item == tag.getMainItem().getItem());
-        }
 
-        int rowCount = Mth.clamp((int) Math.ceil(items.size() / 11d), 1, 3);
+        int rowCount = MathHelper.clamp((int) Math.ceil(items.size() / 11d), 1, 3);
         LayoutHelper layout = LayoutHelper.centeredHorizontal(items.size(), rowCount, 28, 28, 8);
         itemArea = layout.getArea();
         int itemCenterX = (int) (width * itemXmult);
         int itemCenterY = getItemsY();
 
         for (ItemEntry entry : items) {
-            PonderButton b = new PonderButton(itemCenterX + layout.getX() + 4, itemCenterY + layout.getY() + 4).showing(
-                new ItemStack(entry.item));
+            PonderButton b = new PonderButton(itemCenterX + layout.getX() + 4, itemCenterY + layout.getY() + 4).showing(new ItemStack(entry.item));
 
             if (PonderIndex.getSceneAccess().doScenesExistForId(entry.key)) {
                 b.withCallback((mouseX, mouseY) -> {
@@ -86,20 +79,18 @@ public class PonderTagScreen extends AbstractPonderScreen {
                     ScreenOpener.transitionTo(PonderUI.of(new ItemStack(entry.item), tag));
                 });
             } else {
-                b.withBorderColors(entry.key.getNamespace()
-                        .equals("minecraft") ? PonderUI.MISSING_VANILLA_ENTRY : PonderUI.MISSING_MODDED_ENTRY)
+                b.withBorderColors(entry.key.getNamespace().equals("minecraft") ? PonderUI.MISSING_VANILLA_ENTRY : PonderUI.MISSING_MODDED_ENTRY)
                     .animateColors(false);
             }
 
-            addRenderableWidget(b);
+            addDrawableChild(b);
             layout.next();
         }
 
         if (!tag.getMainItem().isEmpty()) {
             Identifier registryName = RegisteredObjectsHelper.getKeyOrThrow(tag.getMainItem().getItem());
 
-            PonderButton b = new PonderButton(itemCenterX - layout.getTotalWidth() / 2 - 48, itemCenterY - 10).showing(
-                tag.getMainItem());
+            PonderButton b = new PonderButton(itemCenterX - layout.getTotalWidth() / 2 - 48, itemCenterY - 10).showing(tag.getMainItem());
             //b.withCustomBackground(PonderTheme.Key.PONDER_BACKGROUND_IMPORTANT.c());
 
             if (PonderIndex.getSceneAccess().doScenesExistForId(registryName)) {
@@ -108,12 +99,11 @@ public class PonderTagScreen extends AbstractPonderScreen {
                     ScreenOpener.transitionTo(PonderUI.of(tag.getMainItem(), tag));
                 });
             } else {
-                b.withBorderColors(registryName.getNamespace()
-                        .equals("minecraft") ? PonderUI.MISSING_VANILLA_ENTRY : PonderUI.MISSING_MODDED_ENTRY)
+                b.withBorderColors(registryName.getNamespace().equals("minecraft") ? PonderUI.MISSING_VANILLA_ENTRY : PonderUI.MISSING_MODDED_ENTRY)
                     .animateColors(false);
             }
 
-            addRenderableWidget(b);
+            addDrawableChild(b);
         }
 
     }
@@ -129,29 +119,27 @@ public class PonderTagScreen extends AbstractPonderScreen {
         PonderUI.ponderTicks++;
 
         hoveredItem = ItemStack.EMPTY;
-        Window w = minecraft.getWindow();
-        int mX = (int) (minecraft.mouseHandler.xpos() * (double) w.getGuiScaledWidth() / (double) w.getScreenWidth());
-        int mY = (int) (minecraft.mouseHandler.ypos() * (double) w.getGuiScaledHeight() / (double) w.getScreenHeight());
-        for (GuiEventListener child : children()) {
-            if (child == backTrack) {
+        Window w = client.getWindow();
+        int mX = (int) (client.mouse.getX() * (double) w.getScaledWidth() / (double) w.getWidth());
+        int mY = (int) (client.mouse.getY() * (double) w.getScaledHeight() / (double) w.getHeight());
+        for (Element child : children()) {
+            if (child == backTrack)
                 continue;
-            }
-            if (child instanceof PonderButton button) {
+            if (child instanceof PonderButton button)
                 if (button.isMouseOver(mX, mY)) {
                     hoveredItem = button.getItem();
                 }
-            }
         }
     }
 
     @Override
-    protected void renderWindow(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
+    protected void renderWindow(DrawContext graphics, int mouseX, int mouseY, float partialTicks) {
         super.renderWindow(graphics, mouseX, mouseY, partialTicks);
         renderItems(graphics, mouseX, mouseY, partialTicks);
 
         renderChapters(graphics, mouseX, mouseY, partialTicks);
 
-        Matrix3x2fStack poseStack = graphics.pose();
+        Matrix3x2fStack poseStack = graphics.getMatrices();
         poseStack.pushMatrix();
         poseStack.translate((float) (width / 2 - 120), (float) (height * mainYmult - 40));
 
@@ -165,11 +153,11 @@ public class PonderTagScreen extends AbstractPonderScreen {
         int streakHeight = 35;
         UIRenderHelper.streak(graphics, 0, x - 4, y - 12 + streakHeight / 2, streakHeight, 240);
         //PonderUI.renderBox(poseStack, 21, 21, 30, 30, false);
-        new BoxElement().withBackground(PonderUI.BACKGROUND_FLAT).gradientBorder(PonderUI.COLOR_IDLE).at(21, 21, 100)
-            .withBounds(30, 30).render(graphics);
+        new BoxElement().withBackground(PonderUI.BACKGROUND_FLAT).gradientBorder(PonderUI.COLOR_IDLE).at(21, 21, 100).withBounds(30, 30)
+            .render(graphics);
 
-        graphics.drawString(
-            font,
+        graphics.drawText(
+            textRenderer,
             Ponder.lang().translate(AbstractPonderScreen.PONDERING_TAG).component(),
             x,
             y - 6,
@@ -179,12 +167,13 @@ public class PonderTagScreen extends AbstractPonderScreen {
         y += 8;
         x += 0;
         poseStack.translate(x, y);
-        graphics.drawString(font, title, 0, 0, UIRenderHelper.COLOR_TEXT.getFirst().getRGB(), false);
+        graphics.drawText(textRenderer, title, 0, 0, UIRenderHelper.COLOR_TEXT.getFirst().getRGB(), false);
         poseStack.popMatrix();
 
         poseStack.pushMatrix();
-        poseStack.translate(21.5f, 22f);
-        renderTag.render(graphics, 0, 0);
+        poseStack.translate(23, 23);
+        poseStack.scale(1.66f, 1.66f);
+        tag.render(graphics, 0, 0);
         poseStack.popMatrix();
         poseStack.popMatrix();
 
@@ -194,38 +183,36 @@ public class PonderTagScreen extends AbstractPonderScreen {
         y = getItemsY() - 10 + Math.max(itemArea.getHeight(), 48);
 
         String desc = tag.getDescription();
-        int h = font.wordWrapHeight(Component.literal(desc), w);
+        int h = textRenderer.getWrappedLinesHeight(desc, w);
 
 
         //PonderUI.renderBox(poseStack, x - 3, y - 3, w + 6, h + 6, false);
-        new BoxElement().withBackground(PonderUI.BACKGROUND_FLAT).gradientBorder(PonderUI.COLOR_IDLE)
-            .at(x - 3, y - 3, 90).withBounds(w + 6, h + 6).render(graphics);
+        new BoxElement().withBackground(PonderUI.BACKGROUND_FLAT).gradientBorder(PonderUI.COLOR_IDLE).at(x - 3, y - 3, 90).withBounds(w + 6, h + 6)
+            .render(graphics);
 
-        ClientFontHelper.drawSplitString(graphics, font, desc, x, y, w, UIRenderHelper.COLOR_TEXT.getFirst().getRGB());
+        ClientFontHelper.drawSplitString(graphics, textRenderer, desc, x, y, w, UIRenderHelper.COLOR_TEXT.getFirst().getRGB());
         poseStack.popMatrix();
     }
 
-    protected void renderItems(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
-        if (items.isEmpty()) {
+    protected void renderItems(DrawContext graphics, int mouseX, int mouseY, float partialTicks) {
+        if (items.isEmpty())
             return;
-        }
 
         int x = (int) (width * itemXmult);
         int y = getItemsY();
 
         String relatedTitle = Ponder.lang().translate(AbstractPonderScreen.ASSOCIATED).string();
-        int stringWidth = font.width(relatedTitle);
+        int stringWidth = textRenderer.getWidth(relatedTitle);
 
-        Matrix3x2fStack poseStack = graphics.pose();
+        Matrix3x2fStack poseStack = graphics.getMatrices();
         poseStack.pushMatrix();
         poseStack.translate(x, y);
         new BoxElement().withBackground(PonderUI.BACKGROUND_FLAT).gradientBorder(PonderUI.COLOR_IDLE)
-            .at((windowWidth - stringWidth) / 2f - 5, itemArea.getY() - 21, 100).withBounds(stringWidth + 10, 10)
-            .render(graphics);
+            .at((windowWidth - stringWidth) / 2f - 5, itemArea.getY() - 21, 100).withBounds(stringWidth + 10, 10).render(graphics);
 
         //		UIRenderHelper.streak(0, itemArea.getX() - 10, itemArea.getY() - 20, 20, 180, 0x101010);
-        graphics.drawCenteredString(
-            font,
+        graphics.drawCenteredTextWithShadow(
+            textRenderer,
             relatedTitle,
             windowWidth / 2,
             itemArea.getY() - 20,
@@ -243,21 +230,20 @@ public class PonderTagScreen extends AbstractPonderScreen {
         return (int) (mainYmult * height + 85);
     }
 
-    protected void renderChapters(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
-        if (chapters.isEmpty()) {
+    protected void renderChapters(DrawContext graphics, int mouseX, int mouseY, float partialTicks) {
+        if (chapters.isEmpty())
             return;
-        }
 
         int chapterX = (int) (width * chapterXmult);
         int chapterY = (int) (height * chapterYmult);
 
-        Matrix3x2fStack matrices = graphics.pose();
+        Matrix3x2fStack matrices = graphics.getMatrices();
         matrices.pushMatrix();
         matrices.translate(chapterX, chapterY);
 
         UIRenderHelper.streak(graphics, 0, chapterArea.getX() - 10, chapterArea.getY() - 20, 20, 220);
-        graphics.drawString(
-            font,
+        graphics.drawText(
+            textRenderer,
             "More Topics to Ponder about",
             chapterArea.getX() - 5,
             chapterArea.getY() - 25,
@@ -269,9 +255,9 @@ public class PonderTagScreen extends AbstractPonderScreen {
     }
 
     @Override
-    protected void renderWindowForeground(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
+    protected void renderWindowForeground(DrawContext graphics, int mouseX, int mouseY, float partialTicks) {
         if (!hoveredItem.isEmpty()) {
-            graphics.setTooltipForNextFrame(font, hoveredItem, mouseX, mouseY);
+            graphics.drawItemTooltip(textRenderer, hoveredItem, mouseX, mouseY);
         }
     }
 
@@ -286,14 +272,13 @@ public class PonderTagScreen extends AbstractPonderScreen {
 
     @Override
     public boolean isEquivalentTo(NavigatableSimiScreen other) {
-        if (other instanceof PonderTagScreen) {
+        if (other instanceof PonderTagScreen)
             return tag == ((PonderTagScreen) other).tag;
-        }
         return super.isEquivalentTo(other);
     }
 
     @Override
-    public boolean isPauseScreen() {
+    public boolean shouldPause() {
         return true;
     }
 
@@ -305,15 +290,14 @@ public class PonderTagScreen extends AbstractPonderScreen {
     public void removed() {
         super.removed();
         hoveredItem = ItemStack.EMPTY;
-        for (Renderable drawable : renderables) {
+        for (Drawable drawable : drawables) {
             if (drawable instanceof ElementWidget widget) {
                 widget.getRenderElement().clear();
             }
         }
-        renderTag.clear();
     }
 
-    public record ItemEntry(@Nullable ItemLike item, Identifier key) {
+    public record ItemEntry(@Nullable ItemConvertible item, Identifier key) {
     }
 
 }

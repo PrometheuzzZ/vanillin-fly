@@ -1,7 +1,7 @@
 package com.zurrtum.create.infrastructure.fluids;
 
-import net.minecraft.core.Direction;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.item.ItemStack;
+import net.minecraft.util.math.Direction;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.NoSuchElementException;
@@ -146,7 +146,7 @@ public abstract class FluidItemInventoryWrapper implements FluidItemInventory {
 
     @NotNull
     public java.util.Iterator<FluidStack> iterator() {
-        return new FluidItemInventoryWrapper.Iterator(this);
+        return new Iterator(this);
     }
 
     public static class Iterator implements java.util.Iterator<FluidStack> {

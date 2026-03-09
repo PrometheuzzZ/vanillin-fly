@@ -42,9 +42,7 @@ public class BufferTextureInstanceComponent extends InstanceAssemblerComponent {
 
         builder.uniform().type("usamplerBuffer").name("_flw_instances");
         builder.blankLine();
-        builder.function()
-            .signature(FnSignature.create().returnType(STRUCT_NAME).name(UNPACK_FN_NAME).arg("int", UNPACK_ARG).build())
-            .body(fnBody);
+        builder.function().signature(FnSignature.create().returnType(STRUCT_NAME).name(UNPACK_FN_NAME).arg("int", UNPACK_ARG).build()).body(fnBody);
     }
 
     @Override

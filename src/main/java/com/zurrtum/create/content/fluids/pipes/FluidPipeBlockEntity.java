@@ -1,7 +1,6 @@
 package com.zurrtum.create.content.fluids.pipes;
 
 import com.zurrtum.create.AllBlockEntityTypes;
-import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.api.contraption.transformable.TransformableBlockEntity;
 import com.zurrtum.create.content.contraptions.StructureTransform;
 import com.zurrtum.create.content.decoration.bracket.BracketedBlockEntityBehaviour;
@@ -9,12 +8,13 @@ import com.zurrtum.create.content.fluids.FluidPropagator;
 import com.zurrtum.create.content.fluids.FluidTransportBehaviour;
 import com.zurrtum.create.foundation.advancement.CreateTrigger;
 import com.zurrtum.create.foundation.blockEntity.SmartBlockEntity;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.world.level.BlockAndTintGetter;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.entity.BlockEntityType;
-import net.minecraft.world.level.block.state.BlockState;
+import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.block.entity.BlockEntityType;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.world.BlockRenderView;
 
 import java.util.List;
 
@@ -63,46 +63,33 @@ public class FluidPipeBlockEntity extends SmartBlockEntity implements Transforma
 
         @Override
         public boolean canHaveFlowToward(BlockState state, Direction direction) {
-            return (FluidPipeBlock.isPipe(state) || state.getBlock() instanceof EncasedPipeBlock) && state.getValue(
-                FluidPipeBlock.PROPERTY_BY_DIRECTION.get(direction));
+            return (FluidPipeBlock.isPipe(state) || state.getBlock() instanceof EncasedPipeBlock) && state.get(FluidPipeBlock.FACING_PROPERTIES.get(
+                direction));
         }
 
         @Override
-        public AttachmentTypes getRenderedRimAttachment(
-            BlockAndTintGetter world,
-            BlockPos pos,
-            BlockState state,
-            Direction direction
-        ) {
+        public AttachmentTypes getRenderedRimAttachment(BlockRenderView world, BlockPos pos, BlockState state, Direction direction) {
             AttachmentTypes attachment = super.getRenderedRimAttachment(world, pos, state, direction);
 
-            BlockPos offsetPos = pos.relative(direction);
+            BlockPos offsetPos = pos.offset(direction);
             BlockState otherState = world.getBlockState(offsetPos);
 
-            if (state.getBlock() instanceof EncasedPipeBlock && attachment != AttachmentTypes.DRAIN) {
+            if (state.getBlock() instanceof EncasedPipeBlock && attachment != AttachmentTypes.DRAIN)
                 return AttachmentTypes.NONE;
-            }
 
             if (attachment == AttachmentTypes.RIM) {
                 if (!FluidPipeBlock.isPipe(otherState) && !(otherState.getBlock() instanceof EncasedPipeBlock) && !(otherState.getBlock() instanceof GlassFluidPipeBlock)) {
-                    FluidTransportBehaviour pipeBehaviour = BlockEntityBehaviour.get(
-                        world,
-                        offsetPos,
-                        FluidTransportBehaviour.TYPE
-                    );
-                    if (pipeBehaviour != null && pipeBehaviour.canHaveFlowToward(otherState, direction.getOpposite())) {
+                    FluidTransportBehaviour pipeBehaviour = BlockEntityBehaviour.get(world, offsetPos, FluidTransportBehaviour.TYPE);
+                    if (pipeBehaviour != null && pipeBehaviour.canHaveFlowToward(otherState, direction.getOpposite()))
                         return AttachmentTypes.DETAILED_CONNECTION;
-                    }
                 }
 
-                if (!FluidPipeBlock.shouldDrawRim(world, pos, state, direction)) {
+                if (!FluidPipeBlock.shouldDrawRim(world, pos, state, direction))
                     return FluidPropagator.getStraightPipeAxis(state) == direction.getAxis() ? AttachmentTypes.CONNECTION : AttachmentTypes.DETAILED_CONNECTION;
-                }
             }
 
-            if (attachment == AttachmentTypes.NONE && state.getValue(FluidPipeBlock.PROPERTY_BY_DIRECTION.get(direction))) {
+            if (attachment == AttachmentTypes.NONE && state.get(FluidPipeBlock.FACING_PROPERTIES.get(direction)))
                 return AttachmentTypes.DETAILED_CONNECTION;
-            }
 
             return attachment;
         }

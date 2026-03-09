@@ -4,8 +4,8 @@ import com.zurrtum.create.catnip.animation.LerpedFloat;
 import com.zurrtum.create.client.catnip.animation.AnimationTickHolder;
 import com.zurrtum.create.client.infrastructure.config.AllConfigs;
 import com.zurrtum.create.content.trains.entity.CarriageContraptionEntity;
-import net.minecraft.client.Minecraft;
-import net.minecraft.world.entity.Entity;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.entity.Entity;
 
 public class CameraDistanceModifier {
     private static final LerpedFloat multiplier = LerpedFloat.linear().startWithValue(1);
@@ -19,7 +19,7 @@ public class CameraDistanceModifier {
     }
 
     public static void onMount(Entity entity, Entity vehicle, boolean mount) {
-        if (entity == Minecraft.getInstance().player && vehicle instanceof CarriageContraptionEntity) {
+        if (entity == MinecraftClient.getInstance().player && vehicle instanceof CarriageContraptionEntity) {
             if (mount) {
                 zoomOut();
             } else {

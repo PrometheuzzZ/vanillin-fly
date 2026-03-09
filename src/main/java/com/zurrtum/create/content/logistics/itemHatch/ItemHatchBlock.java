@@ -5,72 +5,67 @@ import com.zurrtum.create.AllBlockEntityTypes;
 import com.zurrtum.create.AllItemTags;
 import com.zurrtum.create.AllShapes;
 import com.zurrtum.create.AllSoundEvents;
-import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.api.entity.FakePlayerHandler;
 import com.zurrtum.create.content.equipment.wrench.IWrenchable;
 import com.zurrtum.create.content.logistics.box.PackageItem;
 import com.zurrtum.create.foundation.block.IBE;
 import com.zurrtum.create.foundation.block.ProperWaterloggedBlock;
+import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.foundation.blockEntity.behaviour.filtering.ServerFilteringBehaviour;
 import com.zurrtum.create.foundation.item.ItemHelper;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.network.chat.Component;
-import net.minecraft.server.level.ServerLevel;
-import net.minecraft.util.RandomSource;
-import net.minecraft.world.Container;
-import net.minecraft.world.InteractionHand;
-import net.minecraft.world.InteractionResult;
-import net.minecraft.world.entity.player.Inventory;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.context.BlockPlaceContext;
-import net.minecraft.world.level.BlockGetter;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.LevelReader;
-import net.minecraft.world.level.ScheduledTickAccess;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.HorizontalDirectionalBlock;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.entity.BlockEntityType;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.StateDefinition;
-import net.minecraft.world.level.block.state.properties.BooleanProperty;
-import net.minecraft.world.level.material.FluidState;
-import net.minecraft.world.level.pathfinder.PathComputationType;
-import net.minecraft.world.phys.BlockHitResult;
-import net.minecraft.world.phys.shapes.CollisionContext;
-import net.minecraft.world.phys.shapes.VoxelShape;
+import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.HorizontalFacingBlock;
+import net.minecraft.block.ShapeContext;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.block.entity.BlockEntityType;
+import net.minecraft.entity.ai.pathing.NavigationType;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.entity.player.PlayerInventory;
+import net.minecraft.fluid.FluidState;
+import net.minecraft.inventory.Inventory;
+import net.minecraft.item.ItemPlacementContext;
+import net.minecraft.item.ItemStack;
+import net.minecraft.server.world.ServerWorld;
+import net.minecraft.state.StateManager;
+import net.minecraft.state.property.BooleanProperty;
+import net.minecraft.text.Text;
+import net.minecraft.util.ActionResult;
+import net.minecraft.util.Hand;
+import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.random.Random;
+import net.minecraft.util.shape.VoxelShape;
+import net.minecraft.world.BlockView;
+import net.minecraft.world.World;
+import net.minecraft.world.WorldView;
+import net.minecraft.world.tick.ScheduledTickView;
 
-public class ItemHatchBlock extends HorizontalDirectionalBlock implements IBE<ItemHatchBlockEntity>, IWrenchable, ProperWaterloggedBlock {
-    public static final MapCodec<ItemHatchBlock> CODEC = simpleCodec(ItemHatchBlock::new);
+public class ItemHatchBlock extends HorizontalFacingBlock implements IBE<ItemHatchBlockEntity>, IWrenchable, ProperWaterloggedBlock {
+    public static final MapCodec<ItemHatchBlock> CODEC = createCodec(ItemHatchBlock::new);
 
-    public static final BooleanProperty OPEN = BooleanProperty.create("open");
+    public static final BooleanProperty OPEN = BooleanProperty.of("open");
 
-    public ItemHatchBlock(Properties pProperties) {
+    public ItemHatchBlock(Settings pProperties) {
         super(pProperties);
-        registerDefaultState(defaultBlockState().setValue(OPEN, false).setValue(WATERLOGGED, false));
+        setDefaultState(getDefaultState().with(OPEN, false).with(WATERLOGGED, false));
     }
 
     @Override
-    protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> pBuilder) {
-        super.createBlockStateDefinition(pBuilder.add(OPEN, FACING, WATERLOGGED));
+    protected void appendProperties(StateManager.Builder<Block, BlockState> pBuilder) {
+        super.appendProperties(pBuilder.add(OPEN, FACING, WATERLOGGED));
     }
 
     @Override
-    public BlockState getStateForPlacement(BlockPlaceContext pContext) {
-        BlockState state = super.getStateForPlacement(pContext);
-        if (state == null) {
+    public BlockState getPlacementState(ItemPlacementContext pContext) {
+        BlockState state = super.getPlacementState(pContext);
+        if (state == null)
             return state;
-        }
-        if (pContext.getClickedFace().getAxis().isVertical()) {
+        if (pContext.getSide().getAxis().isVertical())
             return null;
-        }
 
-        return withWater(
-            state.setValue(FACING, pContext.getClickedFace().getOpposite()).setValue(OPEN, false),
-            pContext
-        );
+        return withWater(state.with(FACING, pContext.getSide().getOpposite()).with(OPEN, false), pContext);
     }
 
     @Override
@@ -79,77 +74,68 @@ public class ItemHatchBlock extends HorizontalDirectionalBlock implements IBE<It
     }
 
     @Override
-    public BlockState updateShape(
+    public BlockState getStateForNeighborUpdate(
         BlockState pState,
-        LevelReader pLevel,
-        ScheduledTickAccess tickView,
+        WorldView pLevel,
+        ScheduledTickView tickView,
         BlockPos pPos,
         Direction pDirection,
         BlockPos pNeighborPos,
         BlockState pNeighborState,
-        RandomSource random
+        Random random
     ) {
         updateWater(pLevel, tickView, pState, pPos);
         return pState;
     }
 
     @Override
-    protected InteractionResult useItemOn(
+    protected ActionResult onUseWithItem(
         ItemStack stack,
         BlockState state,
-        Level level,
+        World level,
         BlockPos pos,
-        Player player,
-        InteractionHand hand,
+        PlayerEntity player,
+        Hand hand,
         BlockHitResult hitResult
     ) {
-        if (level.isClientSide()) {
-            return InteractionResult.SUCCESS;
-        }
-        if (FakePlayerHandler.has(player)) {
-            return InteractionResult.SUCCESS;
-        }
+        if (level.isClient())
+            return ActionResult.SUCCESS;
+        if (FakePlayerHandler.has(player))
+            return ActionResult.SUCCESS;
 
-        BlockEntity blockEntity = level.getBlockEntity(pos.relative(state.getValue(FACING)));
-        if (blockEntity == null) {
-            return InteractionResult.FAIL;
-        }
-        Container targetInv = ItemHelper.getInventory(level, blockEntity.getBlockPos(), null, blockEntity, null);
-        if (targetInv == null) {
-            return InteractionResult.FAIL;
-        }
+        BlockEntity blockEntity = level.getBlockEntity(pos.offset(state.get(FACING)));
+        if (blockEntity == null)
+            return ActionResult.FAIL;
+        Inventory targetInv = ItemHelper.getInventory(level, blockEntity.getPos(), null, blockEntity, null);
+        if (targetInv == null)
+            return ActionResult.FAIL;
 
         ServerFilteringBehaviour filter = BlockEntityBehaviour.get(level, pos, ServerFilteringBehaviour.TYPE);
-        if (filter == null) {
-            return InteractionResult.FAIL;
-        }
+        if (filter == null)
+            return ActionResult.FAIL;
 
-        Inventory inventory = player.getInventory();
+        PlayerInventory inventory = player.getInventory();
         boolean anyInserted = false;
-        boolean depositItemInHand = !player.isShiftKeyDown();
+        boolean depositItemInHand = !player.isSneaking();
 
-        if (!depositItemInHand && stack.is(AllItemTags.TOOLS_WRENCH)) {
-            return InteractionResult.TRY_WITH_EMPTY_HAND;
-        }
+        if (!depositItemInHand && stack.isIn(AllItemTags.TOOLS_WRENCH))
+            return ActionResult.PASS_TO_DEFAULT_BLOCK_ACTION;
 
         int start, end;
         if (depositItemInHand) {
             start = end = inventory.getSelectedSlot();
         } else {
-            start = Inventory.getSelectionSize();
-            end = Inventory.INVENTORY_SIZE - 1;
+            start = PlayerInventory.getHotbarSize();
+            end = PlayerInventory.MAIN_SIZE - 1;
         }
         for (int i = start; i <= end; i++) {
-            ItemStack item = inventory.getItem(i);
-            if (item.isEmpty()) {
+            ItemStack item = inventory.getStack(i);
+            if (item.isEmpty())
                 continue;
-            }
-            if (!item.getItem().canFitInsideContainerItems() && !PackageItem.isPackage(item)) {
+            if (!item.getItem().canBeNested() && !PackageItem.isPackage(item))
                 continue;
-            }
-            if (!filter.getFilter().isEmpty() && !filter.test(item)) {
+            if (!filter.getFilter().isEmpty() && !filter.test(item))
                 continue;
-            }
 
             int count = item.getCount();
             int insert = targetInv.insertExist(item, count);
@@ -158,37 +144,32 @@ public class ItemHatchBlock extends HorizontalDirectionalBlock implements IBE<It
             }
             anyInserted = true;
             if (insert == count) {
-                inventory.setItem(i, ItemStack.EMPTY);
+                inventory.setStack(i, ItemStack.EMPTY);
             } else {
-                inventory.setItem(i, item.copyWithCount(count - insert));
+                inventory.setStack(i, item.copyWithCount(count - insert));
             }
         }
 
-        if (!anyInserted) {
-            return InteractionResult.SUCCESS;
-        }
+        if (!anyInserted)
+            return ActionResult.SUCCESS;
 
         AllSoundEvents.ITEM_HATCH.playOnServer(level, pos);
-        level.setBlockAndUpdate(pos, state.setValue(OPEN, true));
-        level.scheduleTick(pos, this, 10);
+        level.setBlockState(pos, state.with(OPEN, true));
+        level.scheduleBlockTick(pos, this, 10);
 
-        player.displayClientMessage(
-            Component.translatable(depositItemInHand ? "create.item_hatch.deposit_item" : "create.item_hatch.deposit_inventory"),
-            true
-        );
-        return InteractionResult.SUCCESS;
+        player.sendMessage(Text.translatable(depositItemInHand ? "create.item_hatch.deposit_item" : "create.item_hatch.deposit_inventory"), true);
+        return ActionResult.SUCCESS;
     }
 
     @Override
-    public VoxelShape getShape(BlockState pState, BlockGetter pLevel, BlockPos pPos, CollisionContext pContext) {
-        return AllShapes.ITEM_HATCH.get(pState.getValue(FACING).getOpposite());
+    public VoxelShape getOutlineShape(BlockState pState, BlockView pLevel, BlockPos pPos, ShapeContext pContext) {
+        return AllShapes.ITEM_HATCH.get(pState.get(FACING).getOpposite());
     }
 
     @Override
-    public void tick(BlockState pState, ServerLevel pLevel, BlockPos pPos, RandomSource pRandom) {
-        if (pState.getValue(OPEN)) {
-            pLevel.setBlockAndUpdate(pPos, pState.setValue(OPEN, false));
-        }
+    public void scheduledTick(BlockState pState, ServerWorld pLevel, BlockPos pPos, Random pRandom) {
+        if (pState.get(OPEN))
+            pLevel.setBlockState(pPos, pState.with(OPEN, false));
     }
 
     @Override
@@ -202,12 +183,12 @@ public class ItemHatchBlock extends HorizontalDirectionalBlock implements IBE<It
     }
 
     @Override
-    protected boolean isPathfindable(BlockState state, PathComputationType pathComputationType) {
+    protected boolean canPathfindThrough(BlockState state, NavigationType pathComputationType) {
         return false;
     }
 
     @Override
-    protected MapCodec<? extends HorizontalDirectionalBlock> codec() {
+    protected MapCodec<? extends HorizontalFacingBlock> getCodec() {
         return CODEC;
     }
 }

@@ -2,13 +2,15 @@ package com.zurrtum.create.content.trains.schedule.condition;
 
 import com.zurrtum.create.content.trains.entity.Carriage;
 import com.zurrtum.create.content.trains.entity.Train;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.resources.Identifier;
-import net.minecraft.world.level.Level;
+import net.minecraft.nbt.NbtCompound;
+import net.minecraft.util.Identifier;
+import net.minecraft.world.World;
 
 public abstract class CargoThresholdCondition extends LazyTickedScheduleCondition {
     public enum Ops {
-        GREATER(">"), LESS("<"), EQUAL("=");
+        GREATER(">"),
+        LESS("<"),
+        EQUAL("=");
 
         public final String formatted;
 
@@ -31,32 +33,29 @@ public abstract class CargoThresholdCondition extends LazyTickedScheduleConditio
     }
 
     @Override
-    public boolean lazyTickCompletion(Level level, Train train, CompoundTag context) {
-        int lastChecked = context.contains("LastChecked") ? context.getIntOr("LastChecked", 0) : -1;
+    public boolean lazyTickCompletion(World level, Train train, NbtCompound context) {
+        int lastChecked = context.contains("LastChecked") ? context.getInt("LastChecked", 0) : -1;
         int status = 0;
-        for (Carriage carriage : train.carriages) {
+        for (Carriage carriage : train.carriages)
             status += carriage.storage.getVersion();
-        }
-        if (status == lastChecked) {
+        if (status == lastChecked)
             return false;
-        }
         context.putInt("LastChecked", status);
         return test(level, train, context);
     }
 
-    protected void requestStatusToUpdate(int amount, CompoundTag context) {
+    protected void requestStatusToUpdate(int amount, NbtCompound context) {
         context.putInt("CurrentDisplay", amount);
         super.requestStatusToUpdate(context);
     }
 
-    protected int getLastDisplaySnapshot(CompoundTag context) {
-        if (!context.contains("CurrentDisplay")) {
+    protected int getLastDisplaySnapshot(NbtCompound context) {
+        if (!context.contains("CurrentDisplay"))
             return -1;
-        }
-        return context.getIntOr("CurrentDisplay", 0);
+        return context.getInt("CurrentDisplay", 0);
     }
 
-    protected abstract boolean test(Level level, Train train, CompoundTag context);
+    protected abstract boolean test(World level, Train train, NbtCompound context);
 
     public Ops getOperator() {
         return enumData("Operator", Ops.class);

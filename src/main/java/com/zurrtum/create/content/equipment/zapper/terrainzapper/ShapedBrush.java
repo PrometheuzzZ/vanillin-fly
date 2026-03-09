@@ -1,9 +1,9 @@
 package com.zurrtum.create.content.equipment.zapper.terrainzapper;
 
 import com.zurrtum.create.infrastructure.component.TerrainTools;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.world.WorldAccess;
 
 import java.util.Collection;
 import java.util.List;
@@ -16,19 +16,17 @@ public abstract class ShapedBrush extends Brush {
 
     @Override
     public Collection<BlockPos> addToGlobalPositions(
-        LevelAccessor world,
+        WorldAccess world,
         BlockPos targetPos,
         Direction targetFace,
         Collection<BlockPos> affectedPositions,
         TerrainTools usedTool
     ) {
         List<BlockPos> includedPositions = getIncludedPositions();
-        if (includedPositions == null) {
+        if (includedPositions == null)
             return affectedPositions;
-        }
-        for (BlockPos blockPos : includedPositions) {
-            affectedPositions.add(targetPos.offset(blockPos));
-        }
+        for (BlockPos blockPos : includedPositions)
+            affectedPositions.add(targetPos.add(blockPos));
         return affectedPositions;
     }
 

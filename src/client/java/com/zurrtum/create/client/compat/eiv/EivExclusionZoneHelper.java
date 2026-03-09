@@ -2,8 +2,8 @@ package com.zurrtum.create.client.compat.eiv;
 
 import de.crafty.eiv.common.overlay.BlockingGuiComponent;
 import de.crafty.eiv.common.overlay.OverlayManager;
-import net.minecraft.client.renderer.Rect2i;
-import net.minecraft.resources.Identifier;
+import net.minecraft.client.util.math.Rect2i;
+import net.minecraft.util.Identifier;
 
 import java.util.List;
 import java.util.function.Consumer;
@@ -34,7 +34,7 @@ public class EivExclusionZoneHelper {
             for (int i = 0, size = extraAreas.size(); i < size; i++) {
                 Rect2i rect = extraAreas.get(i);
                 list.add(new BlockingGuiComponent(
-                    Identifier.fromNamespaceAndPath(MOD_ID, "exclusion_zone_" + i),
+                    Identifier.of(MOD_ID, "exclusion_zone_" + i),
                     rect.getX(),
                     rect.getY(),
                     rect.getWidth(),

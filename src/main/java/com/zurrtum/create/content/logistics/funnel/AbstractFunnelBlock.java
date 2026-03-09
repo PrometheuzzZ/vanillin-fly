@@ -1,52 +1,46 @@
 package com.zurrtum.create.content.logistics.funnel;
 
 import com.zurrtum.create.AllBlockEntityTypes;
-import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.content.equipment.wrench.IWrenchable;
 import com.zurrtum.create.foundation.block.IBE;
 import com.zurrtum.create.foundation.block.NeighborUpdateListeningBlock;
 import com.zurrtum.create.foundation.block.ProperWaterloggedBlock;
+import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.foundation.blockEntity.behaviour.filtering.ServerFilteringBehaviour;
 import com.zurrtum.create.foundation.blockEntity.behaviour.inventory.InvManipulationBehaviour;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.server.level.ServerLevel;
-import net.minecraft.util.RandomSource;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.context.BlockPlaceContext;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.LevelReader;
-import net.minecraft.world.level.ScheduledTickAccess;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.entity.BlockEntityType;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.StateDefinition.Builder;
-import net.minecraft.world.level.block.state.properties.BlockStateProperties;
-import net.minecraft.world.level.block.state.properties.BooleanProperty;
-import net.minecraft.world.level.material.FluidState;
-import net.minecraft.world.level.pathfinder.PathComputationType;
-import net.minecraft.world.level.redstone.Orientation;
+import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.block.entity.BlockEntityType;
+import net.minecraft.entity.ai.pathing.NavigationType;
+import net.minecraft.fluid.FluidState;
+import net.minecraft.item.ItemPlacementContext;
+import net.minecraft.item.ItemStack;
+import net.minecraft.server.world.ServerWorld;
+import net.minecraft.state.StateManager.Builder;
+import net.minecraft.state.property.BooleanProperty;
+import net.minecraft.state.property.Properties;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.random.Random;
+import net.minecraft.world.World;
+import net.minecraft.world.WorldView;
+import net.minecraft.world.block.WireOrientation;
+import net.minecraft.world.tick.ScheduledTickView;
 import org.jetbrains.annotations.Nullable;
 
 public abstract class AbstractFunnelBlock extends Block implements IBE<FunnelBlockEntity>, IWrenchable, ProperWaterloggedBlock, NeighborUpdateListeningBlock {
 
-    public static final BooleanProperty POWERED = BlockStateProperties.POWERED;
+    public static final BooleanProperty POWERED = Properties.POWERED;
 
-    protected AbstractFunnelBlock(Properties p_i48377_1_) {
+    protected AbstractFunnelBlock(Settings p_i48377_1_) {
         super(p_i48377_1_);
-        registerDefaultState(defaultBlockState().setValue(POWERED, false).setValue(WATERLOGGED, false));
+        setDefaultState(getDefaultState().with(POWERED, false).with(WATERLOGGED, false));
     }
 
     @Override
-    public BlockState getStateForPlacement(BlockPlaceContext context) {
-        return withWater(
-            defaultBlockState().setValue(
-                POWERED,
-                context.getLevel().hasNeighborSignal(context.getClickedPos())
-            ),
-            context
-        );
+    public BlockState getPlacementState(ItemPlacementContext context) {
+        return withWater(getDefaultState().with(POWERED, context.getWorld().isReceivingRedstonePower(context.getBlockPos())), context);
     }
 
     @Override
@@ -55,102 +49,86 @@ public abstract class AbstractFunnelBlock extends Block implements IBE<FunnelBlo
     }
 
     @Override
-    public BlockState updateShape(
+    public BlockState getStateForNeighborUpdate(
         BlockState pState,
-        LevelReader pLevel,
-        ScheduledTickAccess tickView,
+        WorldView pLevel,
+        ScheduledTickView tickView,
         BlockPos pCurrentPos,
         Direction pDirection,
         BlockPos pNeighborPos,
         BlockState pNeighborState,
-        RandomSource random
+        Random random
     ) {
         updateWater(pLevel, tickView, pState, pCurrentPos);
         return pState;
     }
 
     @Override
-    protected boolean isPathfindable(BlockState state, PathComputationType pathComputationType) {
+    protected boolean canPathfindThrough(BlockState state, NavigationType pathComputationType) {
         return false;
     }
 
     @Override
-    protected void createBlockStateDefinition(Builder<Block, BlockState> builder) {
-        super.createBlockStateDefinition(builder.add(POWERED, WATERLOGGED));
+    protected void appendProperties(Builder<Block, BlockState> builder) {
+        super.appendProperties(builder.add(POWERED, WATERLOGGED));
+    }
+
+    @Override
+    public void neighborUpdate(BlockState state, World level, BlockPos pos, Block sourceBlock, BlockPos fromPos, boolean isMoving) {
+        if (level.isClient())
+            return;
+        InvManipulationBehaviour behaviour = BlockEntityBehaviour.get(level, pos, InvManipulationBehaviour.TYPE);
+        if (behaviour != null)
+            behaviour.onNeighborChanged(fromPos);
     }
 
     @Override
     public void neighborUpdate(
         BlockState state,
-        Level level,
-        BlockPos pos,
-        Block sourceBlock,
-        BlockPos fromPos,
-        boolean isMoving
-    ) {
-        if (level.isClientSide()) {
-            return;
-        }
-        InvManipulationBehaviour behaviour = BlockEntityBehaviour.get(level, pos, InvManipulationBehaviour.TYPE);
-        if (behaviour != null) {
-            behaviour.onNeighborChanged(fromPos);
-        }
-    }
-
-    @Override
-    public void neighborChanged(
-        BlockState state,
-        Level level,
+        World level,
         BlockPos pos,
         Block block,
-        @Nullable Orientation wireOrientation,
+        @Nullable WireOrientation wireOrientation,
         boolean isMoving
     ) {
-        if (level.isClientSide()) {
+        if (level.isClient())
             return;
-        }
-        if (!level.getBlockTicks().willTickThisTick(pos, this)) {
-            level.scheduleTick(pos, this, 1);
-        }
+        if (!level.getBlockTickScheduler().isTicking(pos, this))
+            level.scheduleBlockTick(pos, this, 1);
     }
 
     @Override
-    public void tick(BlockState state, ServerLevel worldIn, BlockPos pos, RandomSource r) {
-        boolean previouslyPowered = state.getValue(POWERED);
-        if (previouslyPowered != worldIn.hasNeighborSignal(pos)) {
-            worldIn.setBlock(pos, state.cycle(POWERED), Block.UPDATE_CLIENTS);
-        }
+    public void scheduledTick(BlockState state, ServerWorld worldIn, BlockPos pos, Random r) {
+        boolean previouslyPowered = state.get(POWERED);
+        if (previouslyPowered != worldIn.isReceivingRedstonePower(pos))
+            worldIn.setBlockState(pos, state.cycle(POWERED), Block.NOTIFY_LISTENERS);
     }
 
-    public static ItemStack tryInsert(Level worldIn, BlockPos pos, ItemStack toInsert, boolean simulate) {
+    public static ItemStack tryInsert(World worldIn, BlockPos pos, ItemStack toInsert, boolean simulate) {
         ServerFilteringBehaviour filter = BlockEntityBehaviour.get(worldIn, pos, ServerFilteringBehaviour.TYPE);
         InvManipulationBehaviour inserter = BlockEntityBehaviour.get(worldIn, pos, InvManipulationBehaviour.TYPE);
-        if (inserter == null) {
+        if (inserter == null)
             return toInsert;
-        }
-        if (filter != null && !filter.test(toInsert)) {
+        if (filter != null && !filter.test(toInsert))
             return toInsert;
-        }
-        if (simulate) {
+        if (simulate)
             inserter.simulate();
-        }
         ItemStack insert = inserter.insert(toInsert);
 
         if (!simulate && insert.getCount() != toInsert.getCount()) {
             BlockEntity blockEntity = worldIn.getBlockEntity(pos);
             if (blockEntity instanceof FunnelBlockEntity funnelBlockEntity) {
                 funnelBlockEntity.onTransfer(toInsert);
-                if (funnelBlockEntity.hasFlap()) {
+                if (funnelBlockEntity.hasFlap())
                     funnelBlockEntity.flap(true);
-                }
             }
         }
         return insert;
     }
 
     @Override
-    public boolean canSurvive(BlockState state, LevelReader world, BlockPos pos) {
-        Block block = world.getBlockState(pos.relative(getFunnelFacing(state).getOpposite())).getBlock();
+    public boolean canPlaceAt(BlockState state, WorldView world, BlockPos pos) {
+        Block block = world.getBlockState(pos.offset(getFunnelFacing(state).getOpposite())).getBlock();
         return !(block instanceof AbstractFunnelBlock);
     }
 
@@ -160,9 +138,8 @@ public abstract class AbstractFunnelBlock extends Block implements IBE<FunnelBlo
 
     @Nullable
     public static Direction getFunnelFacing(BlockState state) {
-        if (!(state.getBlock() instanceof AbstractFunnelBlock)) {
+        if (!(state.getBlock() instanceof AbstractFunnelBlock))
             return null;
-        }
         return ((AbstractFunnelBlock) state.getBlock()).getFacing(state);
     }
 

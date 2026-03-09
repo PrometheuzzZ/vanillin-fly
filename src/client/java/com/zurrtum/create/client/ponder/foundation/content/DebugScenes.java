@@ -11,16 +11,16 @@ import com.zurrtum.create.client.ponder.api.scene.PonderStoryBoard;
 import com.zurrtum.create.client.ponder.api.scene.SceneBuilder;
 import com.zurrtum.create.client.ponder.api.scene.SceneBuildingUtil;
 import com.zurrtum.create.client.ponder.api.scene.Selection;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.core.particles.ParticleTypes;
-import net.minecraft.resources.Identifier;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.RedStoneWireBlock;
-import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.block.Blocks;
+import net.minecraft.block.RedstoneWireBlock;
+import net.minecraft.item.ItemStack;
+import net.minecraft.item.Items;
+import net.minecraft.particle.ParticleTypes;
+import net.minecraft.util.Identifier;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Box;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Vec3d;
 
 public class DebugScenes {
 
@@ -41,7 +41,7 @@ public class DebugScenes {
 
     private static void add(PonderSceneRegistrationHelper<Identifier> helper, PonderStoryBoard sb) {
         String schematicPath = "debug/scene_" + index;
-        helper.addStoryBoard(Identifier.parse("spyglass"), schematicPath, sb).highlightAllTags();
+        helper.addStoryBoard(Identifier.of("spyglass"), schematicPath, sb).highlightAllTags();
         index++;
     }
 
@@ -78,15 +78,10 @@ public class DebugScenes {
         scene.idle(10);
         scene.overlay().showText(1000).independent(10).text("Blocks can be modified");
         scene.idle(20);
-        scene.world()
-            .replaceBlocks(util.select().fromTo(1, 1, 3, 2, 2, 4), Blocks.WHITE_CONCRETE.defaultBlockState(), true);
+        scene.world().replaceBlocks(util.select().fromTo(1, 1, 3, 2, 2, 4), Blocks.WHITE_CONCRETE.getDefaultState(), true);
         scene.idle(10);
         scene.addKeyframe();
-        scene.world().replaceBlocks(
-            util.select().position(3, 1, 1),
-            Blocks.REDSTONE_WIRE.defaultBlockState().setValue(RedStoneWireBlock.POWER, 15),
-            true
-        );
+        scene.world().replaceBlocks(util.select().position(3, 1, 1), Blocks.REDSTONE_WIRE.getDefaultState().with(RedstoneWireBlock.POWER, 15), true);
         scene.rotateCameraY(180);
 
         for (int i = 0; i < 20; i++) {
@@ -101,24 +96,23 @@ public class DebugScenes {
         scene.title("debug_fluids", "Showing Fluids");
         scene.showBasePlate();
         scene.idle(10);
-        Vec3 parrotPos = util.vector().topOf(1, 0, 1);
+        Vec3d parrotPos = util.vector().topOf(1, 0, 1);
         scene.special().createBirb(parrotPos, ParrotPose.FacePointOfInterestPose::new);
         scene.world().showSection(util.select().layersFrom(1), Direction.DOWN);
-        scene.overlay().showText(1000).text("Fluid rendering test.").pointAt(new Vec3(1, 2.5, 4.5));
+        scene.overlay().showText(1000).text("Fluid rendering test.").pointAt(new Vec3d(1, 2.5, 4.5));
         scene.markAsFinished();
 
         Object outlineSlot = new Object();
 
-        Vec3 vec1 = util.vector().topOf(1, 0, 0);
-        Vec3 vec2 = util.vector().topOf(0, 0, 1);
-        AABB boundingBox1 = new AABB(vec1, vec1).expandTowards(0, 2.5, 0).inflate(.15, 0, .15);
-        AABB boundingBox2 = new AABB(vec2, vec2).expandTowards(0, .125, 0).inflate(.45, 0, .45);
-        Vec3 poi1 = boundingBox1.getCenter();
-        Vec3 poi2 = boundingBox2.getCenter();
+        Vec3d vec1 = util.vector().topOf(1, 0, 0);
+        Vec3d vec2 = util.vector().topOf(0, 0, 1);
+        Box boundingBox1 = new Box(vec1, vec1).stretch(0, 2.5, 0).expand(.15, 0, .15);
+        Box boundingBox2 = new Box(vec2, vec2).stretch(0, .125, 0).expand(.45, 0, .45);
+        Vec3d poi1 = boundingBox1.getCenter();
+        Vec3d poi2 = boundingBox2.getCenter();
 
         for (int i = 0; i < 10; i++) {
-            scene.overlay()
-                .chaseBoundingBoxOutline(PonderPalette.RED, outlineSlot, i % 2 == 0 ? boundingBox1 : boundingBox2, 15);
+            scene.overlay().chaseBoundingBoxOutline(PonderPalette.RED, outlineSlot, i % 2 == 0 ? boundingBox1 : boundingBox2, 15);
             scene.idle(3);
             scene.special().movePointOfInterest(i % 2 == 0 ? poi1 : poi2);
             scene.idle(12);
@@ -149,10 +143,8 @@ public class DebugScenes {
         scene.idle(20);
         scene.addKeyframe();
 
-        scene.overlay().showOutlineWithText(out1, 100).colored(PonderPalette.BLACK)
-            .text("Blocks outside of the base plate do not affect scaling");
-        scene.overlay().showOutlineWithText(out2, 100).colored(PonderPalette.BLACK)
-            .text("configureBasePlate() makes sure of that.");
+        scene.overlay().showOutlineWithText(out1, 100).colored(PonderPalette.BLACK).text("Blocks outside of the base plate do not affect scaling");
+        scene.overlay().showOutlineWithText(out2, 100).colored(PonderPalette.BLACK).text("configureBasePlate() makes sure of that.");
         scene.markAsFinished();
     }
 
@@ -163,10 +155,9 @@ public class DebugScenes {
         scene.world().showSection(util.select().layersFrom(1), Direction.DOWN);
         scene.idle(10);
 
-        Vec3 emitterPos = util.vector().of(2.5, 2.25, 2.5);
+        Vec3d emitterPos = util.vector().of(2.5, 2.25, 2.5);
         ParticleEmitter emitter = scene.effects().simpleParticleEmitter(ParticleTypes.LAVA, util.vector().of(0, .1, 0));
-        ParticleEmitter rotation = scene.effects()
-            .simpleParticleEmitter(ParticleTypes.BUBBLE_COLUMN_UP, util.vector().of(0, .1, 0));
+        ParticleEmitter rotation = scene.effects().simpleParticleEmitter(ParticleTypes.BUBBLE_COLUMN_UP, util.vector().of(0, .1, 0));
 
         scene.overlay().showText(20).text("Incoming...").pointAt(emitterPos);
         scene.idle(30);
@@ -190,29 +181,28 @@ public class DebugScenes {
         BlockPos shaftPos = util.grid().at(3, 1, 1);
         Selection shaftSelection = util.select().position(shaftPos);
         scene.overlay().showControls(util.vector().topOf(shaftPos), Pointing.DOWN, 40).rightClick().whileSneaking()
-            .withItem(Items.SALMON.getDefaultInstance());
+            .withItem(Items.SALMON.getDefaultStack());
         scene.idle(20);
-        scene.world().replaceBlocks(shaftSelection, Blocks.BIRCH_SIGN.defaultBlockState(), true);
+        scene.world().replaceBlocks(shaftSelection, Blocks.BIRCH_SIGN.getDefaultState(), true);
 
         scene.idle(20);
         scene.world().hideSection(shaftSelection, Direction.UP);
 
         scene.idle(20);
 
-        scene.overlay().showControls(util.vector().of(1, 4.5, 3.5), Pointing.LEFT, 20).rightClick()
-            .withItem(new ItemStack(Blocks.POLISHED_ANDESITE));
+        scene.overlay().showControls(util.vector().of(1, 4.5, 3.5), Pointing.LEFT, 20).rightClick().withItem(new ItemStack(Blocks.POLISHED_ANDESITE));
         scene.world().showSection(util.select().layer(4), Direction.DOWN);
 
         scene.idle(40);
 
         BlockPos chassis = util.grid().at(1, 1, 3);
-        Vec3 chassisSurface = util.vector().blockSurface(chassis, Direction.NORTH);
+        Vec3d chassisSurface = util.vector().blockSurface(chassis, Direction.NORTH);
 
         Object chassisValueBoxHighlight = new Object();
         Object chassisEffectHighlight = new Object();
 
-        AABB point = new AABB(chassisSurface, chassisSurface);
-        AABB expanded = point.inflate(1 / 4f, 1 / 4f, 1 / 16f);
+        Box point = new Box(chassisSurface, chassisSurface);
+        Box expanded = point.expand(1 / 4f, 1 / 4f, 1 / 16f);
 
         Selection singleBlock = util.select().position(1, 2, 3);
         Selection twoBlocks = util.select().fromTo(1, 2, 3, 1, 3, 3);
@@ -225,8 +215,7 @@ public class DebugScenes {
         scene.overlay().chaseBoundingBoxOutline(PonderPalette.GREEN, chassisValueBoxHighlight, point, 1);
         scene.idle(1);
         scene.overlay().chaseBoundingBoxOutline(PonderPalette.GREEN, chassisValueBoxHighlight, expanded, 120);
-        scene.overlay().showControls(chassisSurface, Pointing.UP, 40).scroll()
-            .withItem(Items.SALMON.getDefaultInstance());
+        scene.overlay().showControls(chassisSurface, Pointing.UP, 40).scroll().withItem(Items.SALMON.getDefaultStack());
 
         PonderPalette white = PonderPalette.WHITE;
         scene.overlay().showOutline(white, chassisEffectHighlight, singleBlock, 10);
@@ -241,8 +230,7 @@ public class DebugScenes {
         scene.idle(10);
 
         scene.idle(30);
-        scene.overlay().showControls(chassisSurface, Pointing.UP, 40).whileCTRL().scroll()
-            .withItem(Items.SALMON.getDefaultInstance());
+        scene.overlay().showControls(chassisSurface, Pointing.UP, 40).whileCTRL().scroll().withItem(Items.SALMON.getDefaultStack());
 
         scene.overlay().showOutline(white, chassisEffectHighlight, singleRow, 10);
         scene.idle(10);
@@ -268,25 +256,23 @@ public class DebugScenes {
         BlockPos pos = new BlockPos(1, 2, 3);
         scene.special().createBirb(util.vector().blockSurface(pos, Direction.UP), ParrotPose.FaceCursorPose::new);
         //scene.special.birbOnSpinnyShaft(pos);
-        scene.overlay().showText(100).colored(PonderPalette.GREEN).text("More birbs = More interesting")
-            .pointAt(util.vector().topOf(pos));
+        scene.overlay().showText(100).colored(PonderPalette.GREEN).text("More birbs = More interesting").pointAt(util.vector().topOf(pos));
 
         scene.idle(10);
         scene.special().createBirb(util.vector().topOf(0, 1, 2), ParrotPose.DancePose::new);
         scene.idle(10);
 
-        scene.special()
-            .createBirb(util.vector().centerOf(3, 1, 3).add(0, 0.25f, 0), ParrotPose.FacePointOfInterestPose::new);
+        scene.special().createBirb(util.vector().centerOf(3, 1, 3).add(0, 0.25f, 0), ParrotPose.FacePointOfInterestPose::new);
         scene.idle(20);
 
         BlockPos poi1 = util.grid().at(4, 1, 0);
         BlockPos poi2 = util.grid().at(0, 1, 4);
 
-        scene.world().setBlock(poi1, Blocks.GOLD_BLOCK.defaultBlockState(), true);
+        scene.world().setBlock(poi1, Blocks.GOLD_BLOCK.getDefaultState(), true);
         scene.special().movePointOfInterest(poi1);
         scene.idle(20);
 
-        scene.world().setBlock(poi2, Blocks.GOLD_BLOCK.defaultBlockState(), true);
+        scene.world().setBlock(poi2, Blocks.GOLD_BLOCK.getDefaultState(), true);
         scene.special().movePointOfInterest(poi2);
         scene.overlay().showText(20).text("Point of Interest").pointAt(util.vector().centerOf(poi2));
         scene.idle(20);
@@ -319,8 +305,7 @@ public class DebugScenes {
 
         scene.idle(20);
 
-        scene.overlay().showText(40).colored(PonderPalette.GREEN).text("This Section got merged to base.")
-            .pointAt(util.vector().topOf(mergePos));
+        scene.overlay().showText(40).colored(PonderPalette.GREEN).text("This Section got merged to base.").pointAt(util.vector().topOf(mergePos));
         scene.idle(10);
         scene.overlay().showText(40).colored(PonderPalette.RED).text("This Section renders independently.")
             .pointAt(util.vector().topOf(independentPos));
@@ -337,11 +322,10 @@ public class DebugScenes {
 
         scene.world().hideSection(hiddenReplaceArea, Direction.UP);
         scene.idle(20);
-        scene.world().setBlocks(hiddenReplaceArea, Blocks.BLACK_CONCRETE.defaultBlockState(), false);
+        scene.world().setBlocks(hiddenReplaceArea, Blocks.BLACK_CONCRETE.getDefaultState(), false);
         scene.world().showSection(hiddenReplaceArea, Direction.DOWN);
         scene.idle(20);
-        scene.overlay().showOutlineWithText(hiddenReplaceArea, 30).colored(PonderPalette.BLUE)
-            .text("Seamless substitution of blocks");
+        scene.overlay().showOutlineWithText(hiddenReplaceArea, 30).colored(PonderPalette.BLUE).text("Seamless substitution of blocks");
 
         scene.idle(40);
 

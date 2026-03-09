@@ -4,43 +4,41 @@ import com.zurrtum.create.AllDataComponents;
 import com.zurrtum.create.content.logistics.box.PackageItem;
 import com.zurrtum.create.content.logistics.filter.FilterItemStack.PackageFilterItemStack;
 import com.zurrtum.create.foundation.gui.menu.MenuBase;
-import net.minecraft.ChatFormatting;
-import net.minecraft.core.component.DataComponentType;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.chat.Component;
-import net.minecraft.world.entity.player.Inventory;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.component.ComponentType;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.entity.player.PlayerInventory;
+import net.minecraft.item.ItemStack;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Collections;
 import java.util.List;
 
 public class PackageFilterItem extends FilterItem {
-    protected PackageFilterItem(Properties properties) {
+    protected PackageFilterItem(Settings properties) {
         super(properties);
     }
 
     @Override
-    public List<Component> makeSummary(ItemStack filter) {
+    public List<Text> makeSummary(ItemStack filter) {
         String address = PackageItem.getAddress(filter);
-        if (address.isBlank()) {
+        if (address.isBlank())
             return Collections.emptyList();
-        }
 
-        return List.of(Component.literal("-> ").withStyle(ChatFormatting.GRAY)
-            .append(Component.literal(address).withStyle(ChatFormatting.GOLD)));
+        return List.of(Text.literal("-> ").formatted(Formatting.GRAY).append(Text.literal(address).formatted(Formatting.GOLD)));
     }
 
     @Override
-    public @Nullable MenuBase<?> createMenu(int id, Inventory inv, Player player, RegistryFriendlyByteBuf extraData) {
-        ItemStack heldItem = player.getMainHandItem();
-        ItemStack.STREAM_CODEC.encode(extraData, heldItem);
+    public @Nullable MenuBase<?> createMenu(int id, PlayerInventory inv, PlayerEntity player, RegistryByteBuf extraData) {
+        ItemStack heldItem = player.getMainHandStack();
+        ItemStack.PACKET_CODEC.encode(extraData, heldItem);
         return new PackageFilterMenu(id, inv, heldItem);
     }
 
     @Override
-    public DataComponentType<?> getComponentType() {
+    public ComponentType<?> getComponentType() {
         return AllDataComponents.PACKAGE_ADDRESS;
     }
 

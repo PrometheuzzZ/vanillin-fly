@@ -13,7 +13,7 @@ import com.zurrtum.create.client.flywheel.lib.model.Models;
 import com.zurrtum.create.client.flywheel.lib.visual.SimpleDynamicVisual;
 import com.zurrtum.create.client.foundation.render.AllInstanceTypes;
 import com.zurrtum.create.content.kinetics.flywheel.FlywheelBlockEntity;
-import net.minecraft.core.Direction;
+import net.minecraft.util.math.Direction;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
 
@@ -31,19 +31,17 @@ public class FlywheelVisual extends KineticBlockEntityVisual<FlywheelBlockEntity
         super(context, blockEntity, partialTick);
 
         var axis = rotationAxis();
-        shaft = instancerProvider().instancer(AllInstanceTypes.ROTATING, Models.partial(AllPartialModels.SHAFT))
-            .createInstance();
+        shaft = instancerProvider().instancer(AllInstanceTypes.ROTATING, Models.partial(AllPartialModels.SHAFT)).createInstance();
 
         shaft.setup(FlywheelVisual.this.blockEntity).setPosition(getVisualPosition()).rotateToFace(axis).setChanged();
 
-        wheel = instancerProvider().instancer(InstanceTypes.TRANSFORMED, Models.partial(AllPartialModels.FLYWHEEL))
-            .createInstance();
+        wheel = instancerProvider().instancer(InstanceTypes.TRANSFORMED, Models.partial(AllPartialModels.FLYWHEEL)).createInstance();
 
 
-        Direction align = Direction.fromAxisAndDirection(axis, Direction.AxisDirection.POSITIVE);
+        Direction align = Direction.from(axis, Direction.AxisDirection.POSITIVE);
 
         wheel.translate(getVisualPosition()).center()
-            .rotate(new Quaternionf().rotateTo(0, 1, 0, align.getStepX(), align.getStepY(), align.getStepZ()));
+            .rotate(new Quaternionf().rotateTo(0, 1, 0, align.getOffsetX(), align.getOffsetY(), align.getOffsetZ()));
 
         baseTransform.set(wheel.pose);
 
@@ -58,9 +56,8 @@ public class FlywheelVisual extends KineticBlockEntityVisual<FlywheelBlockEntity
         float speed = blockEntity.visualSpeed.getValue(partialTicks) * 3 / 10f;
         float angle = blockEntity.angle + speed * partialTicks;
 
-        if (Math.abs(angle - lastAngle) < 0.001) {
+        if (Math.abs(angle - lastAngle) < 0.001)
             return;
-        }
 
         animate(angle);
 

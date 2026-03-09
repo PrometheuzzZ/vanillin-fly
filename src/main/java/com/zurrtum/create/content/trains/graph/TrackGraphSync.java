@@ -11,7 +11,7 @@ import com.zurrtum.create.infrastructure.packet.s2c.TrackGraphPacket;
 import com.zurrtum.create.infrastructure.packet.s2c.TrackGraphRollCallPacket;
 import com.zurrtum.create.infrastructure.packet.s2c.TrackGraphSyncPacket;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.network.ServerPlayerEntity;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
@@ -26,23 +26,20 @@ public class TrackGraphSync {
 
         if (!queuedPackets.isEmpty()) {
             for (TrackGraphPacket packet : queuedPackets) {
-                if (!packet.packetDeletesGraph && !Create.RAILWAYS.trackNetworks.containsKey(packet.graphId)) {
+                if (!packet.packetDeletesGraph && !Create.RAILWAYS.trackNetworks.containsKey(packet.graphId))
                     continue;
-                }
-                server.getPlayerList().broadcastAll(packet);
+                server.getPlayerManager().sendToAll(packet);
                 rollCallIn = 3;
             }
 
             queuedPackets.clear();
         }
 
-        if (rollCallIn <= 0) {
+        if (rollCallIn <= 0)
             return;
-        }
         rollCallIn--;
-        if (rollCallIn > 0) {
+        if (rollCallIn > 0)
             return;
-        }
 
         sendRollCall(server);
     }
@@ -58,10 +55,8 @@ public class TrackGraphSync {
     public void edgeAdded(TrackGraph graph, TrackNode node1, TrackNode node2, TrackEdge edge) {
         flushGraphPacket(graph);
         currentGraphSyncPacket.addedEdges.add(Pair.of(
-            Pair.of(
-                Couple.create(node1.getNetId(), node2.getNetId()),
-                edge.getTrackMaterial()
-            ), edge.getTurn()
+            Pair.of(Couple.create(node1.getNetId(), node2.getNetId()), edge.getTrackMaterial()),
+            edge.getTurn()
         ));
         currentPayload++;
     }
@@ -81,9 +76,8 @@ public class TrackGraphSync {
     public void nodeRemoved(TrackGraph graph, TrackNode node) {
         flushGraphPacket(graph);
         int nodeId = node.getNetId();
-        if (currentGraphSyncPacket.addedNodes.remove(nodeId) == null) {
+        if (currentGraphSyncPacket.addedNodes.remove(nodeId) == null)
             currentGraphSyncPacket.removedNodes.add(nodeId);
-        }
         currentGraphSyncPacket.addedEdges.removeIf(pair -> {
             Couple<Integer> ids = pair.getFirst().getFirst();
             return ids.getFirst().intValue() == nodeId || ids.getSecond().intValue() == nodeId;
@@ -93,7 +87,9 @@ public class TrackGraphSync {
     public void graphSplit(TrackGraph graph, Set<TrackGraph> additional) {
         flushGraphPacket(graph);
         additional.forEach(rg -> currentGraphSyncPacket.splitSubGraphs.put(
-            rg.nodesById.keySet().stream().findFirst().get(), Pair.of(rg.netId, rg.id)));
+            rg.nodesById.keySet().stream().findFirst().get(),
+            Pair.of(rg.netId, rg.id)
+        ));
     }
 
     public void graphRemoved(TrackGraph graph) {
@@ -103,17 +99,16 @@ public class TrackGraphSync {
 
     //
 
-    public void sendEdgeGroups(List<UUID> ids, List<EdgeGroupColor> colors, ServerPlayer player) {
-        player.connection.send(new SignalEdgeGroupPacket(ids, colors, true));
+    public void sendEdgeGroups(List<UUID> ids, List<EdgeGroupColor> colors, ServerPlayerEntity player) {
+        player.networkHandler.sendPacket(new SignalEdgeGroupPacket(ids, colors, true));
     }
 
     public void edgeGroupCreated(MinecraftServer server, UUID id, EdgeGroupColor color) {
-        server.getPlayerList().broadcastAll(new SignalEdgeGroupPacket(id, color));
+        server.getPlayerManager().sendToAll(new SignalEdgeGroupPacket(id, color));
     }
 
     public void edgeGroupRemoved(MinecraftServer server, UUID id) {
-        server.getPlayerList()
-            .broadcastAll(new SignalEdgeGroupPacket(ImmutableList.of(id), Collections.emptyList(), false));
+        server.getPlayerManager().sendToAll(new SignalEdgeGroupPacket(ImmutableList.of(id), Collections.emptyList(), false));
     }
 
     //
@@ -131,7 +126,7 @@ public class TrackGraphSync {
         currentPayload++;
     }
 
-    public void sendFullGraphTo(TrackGraph graph, ServerPlayer player) {
+    public void sendFullGraphTo(TrackGraph graph, ServerPlayerEntity player) {
         TrackGraphSyncPacket packet = new TrackGraphSyncPacket(graph.id, graph.netId);
         packet.fullWipe = true;
         int sent = 0;
@@ -141,9 +136,8 @@ public class TrackGraphSync {
         for (TrackNode node : graph.nodes.values()) {
             TrackGraphSyncPacket currentPacket = packet;
             currentPacket.addedNodes.put(node.getNetId(), Pair.of(node.getLocation(), node.getNormal()));
-            if (sent++ < 1000) {
+            if (sent++ < 1000)
                 continue;
-            }
 
             sent = 0;
             packet = flushAndCreateNew(graph, player, packet);
@@ -151,9 +145,8 @@ public class TrackGraphSync {
 
         for (TrackNode node : graph.nodes.values()) {
             TrackGraphSyncPacket currentPacket = packet;
-            if (!graph.connectionsByNode.containsKey(node)) {
+            if (!graph.connectionsByNode.containsKey(node))
                 continue;
-            }
 
             for (Map.Entry<TrackNode, TrackEdge> entry : graph.connectionsByNode.get(node).entrySet()) {
                 TrackNode node2 = entry.getKey();
@@ -164,9 +157,8 @@ public class TrackGraphSync {
                 currentPacket.syncEdgeData(node, node2, edge);
 
                 for (TrackEdgePoint point : edge.edgeData.getPoints()) {
-                    if (sentPoints.contains(point)) {
+                    if (sentPoints.contains(point))
                         continue;
-                    }
 
                     sentPoints.add(point);
                     currentPacket.addedEdgePoints.add(point);
@@ -174,9 +166,8 @@ public class TrackGraphSync {
                 }
             }
 
-            if (sent++ < 1000) {
+            if (sent++ < 1000)
                 continue;
-            }
 
             sent = 0;
             packet = flushAndCreateNew(graph, player, packet);
@@ -184,33 +175,30 @@ public class TrackGraphSync {
 
         for (EdgePointType<?> type : EdgePointType.TYPES.values()) {
             for (TrackEdgePoint point : graph.getPoints(type)) {
-                if (sentPoints.contains(point)) {
+                if (sentPoints.contains(point))
                     continue;
-                }
 
                 sentPoints.add(point);
                 packet.addedEdgePoints.add(point);
 
-                if (sent++ < 1000) {
+                if (sent++ < 1000)
                     continue;
-                }
 
                 sent = 0;
                 packet = flushAndCreateNew(graph, player, packet);
             }
         }
 
-        if (sent > 0) {
+        if (sent > 0)
             flushAndCreateNew(graph, player, packet);
-        }
     }
 
     private void sendRollCall(MinecraftServer server) {
-        server.getPlayerList().broadcastAll(TrackGraphRollCallPacket.ofServer());
+        server.getPlayerManager().sendToAll(TrackGraphRollCallPacket.ofServer());
     }
 
-    private TrackGraphSyncPacket flushAndCreateNew(TrackGraph graph, ServerPlayer player, TrackGraphSyncPacket packet) {
-        player.connection.send(packet);
+    private TrackGraphSyncPacket flushAndCreateNew(TrackGraph graph, ServerPlayerEntity player, TrackGraphSyncPacket packet) {
+        player.networkHandler.sendPacket(packet);
         packet = new TrackGraphSyncPacket(graph.id, graph.netId);
         return packet;
     }
@@ -230,9 +218,8 @@ public class TrackGraphSync {
 
     private void flushGraphPacket(@Nullable UUID graphId, int netId) {
         if (currentGraphSyncPacket != null) {
-            if (currentGraphSyncPacket.graphId.equals(graphId) && currentPayload < 1000) {
+            if (currentGraphSyncPacket.graphId.equals(graphId) && currentPayload < 1000)
                 return;
-            }
             queuedPackets.add(currentGraphSyncPacket);
             currentGraphSyncPacket = null;
             currentPayload = 0;

@@ -13,27 +13,23 @@ import com.zurrtum.create.content.contraptions.glue.SuperGlueItem;
 import com.zurrtum.create.content.contraptions.glue.SuperGlueSelectionHelper;
 import com.zurrtum.create.infrastructure.packet.c2s.SuperGlueRemovalPacket;
 import com.zurrtum.create.infrastructure.packet.c2s.SuperGlueSelectionPacket;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.multiplayer.ClientLevel;
-import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.core.particles.ItemParticleOption;
-import net.minecraft.core.particles.ParticleTypes;
-import net.minecraft.network.chat.CommonComponents;
-import net.minecraft.sounds.SoundEvents;
-import net.minecraft.sounds.SoundSource;
-import net.minecraft.util.Mth;
-import net.minecraft.world.entity.ai.attributes.Attributes;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.BlockHitResult;
-import net.minecraft.world.phys.HitResult;
-import net.minecraft.world.phys.HitResult.Type;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.block.BlockState;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.network.ClientPlayerEntity;
+import net.minecraft.client.world.ClientWorld;
+import net.minecraft.entity.attribute.EntityAttributes;
+import net.minecraft.item.ItemStack;
+import net.minecraft.item.Items;
+import net.minecraft.particle.ItemStackParticleEffect;
+import net.minecraft.particle.ParticleTypes;
+import net.minecraft.screen.ScreenTexts;
+import net.minecraft.sound.SoundCategory;
+import net.minecraft.sound.SoundEvents;
+import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.util.hit.HitResult;
+import net.minecraft.util.hit.HitResult.Type;
+import net.minecraft.util.math.*;
+import net.minecraft.world.World;
 
 import java.util.List;
 import java.util.Optional;
@@ -57,82 +53,75 @@ public class SuperGlueSelectionHandler {
     private SuperGlueEntity selected;
     private BlockPos soundSourceForRemoval;
 
-    public void tick(Minecraft mc) {
-        LocalPlayer player = mc.player;
+    public void tick(MinecraftClient mc) {
+        ClientPlayerEntity player = mc.player;
         BlockPos hovered = null;
-        ItemStack stack = player.getMainHandItem();
+        ItemStack stack = player.getMainHandStack();
 
         if (!isGlue(stack)) {
-            if (firstPos != null) {
+            if (firstPos != null)
                 discard(player);
-            }
             return;
         }
 
         if (clusterCooldown > 0) {
-            if (clusterCooldown == 25) {
-                player.displayClientMessage(CommonComponents.EMPTY, true);
-            }
+            if (clusterCooldown == 25)
+                player.sendMessage(ScreenTexts.EMPTY, true);
             Outliner.getInstance().keep(clusterOutlineSlot);
             clusterCooldown--;
         }
 
-        AABB scanArea = player.getBoundingBox().inflate(32, 16, 32);
+        Box scanArea = player.getBoundingBox().expand(32, 16, 32);
 
-        List<SuperGlueEntity> glueNearby = mc.level.getEntitiesOfClass(SuperGlueEntity.class, scanArea);
+        List<SuperGlueEntity> glueNearby = mc.world.getNonSpectatingEntities(SuperGlueEntity.class, scanArea);
 
         selected = null;
         if (firstPos == null) {
-            double range = player.getAttributeValue(Attributes.BLOCK_INTERACTION_RANGE) + 1;
-            Vec3 traceOrigin = player.getEyePosition();
-            Vec3 traceTarget = RaycastHelper.getTraceTarget(player, range, traceOrigin);
+            double range = player.getAttributeValue(EntityAttributes.BLOCK_INTERACTION_RANGE) + 1;
+            Vec3d traceOrigin = player.getEyePos();
+            Vec3d traceTarget = RaycastHelper.getTraceTarget(player, range, traceOrigin);
 
             double bestDistance = Double.MAX_VALUE;
             for (SuperGlueEntity glueEntity : glueNearby) {
-                Optional<Vec3> clip = glueEntity.getBoundingBox().clip(traceOrigin, traceTarget);
-                if (clip.isEmpty()) {
+                Optional<Vec3d> clip = glueEntity.getBoundingBox().raycast(traceOrigin, traceTarget);
+                if (clip.isEmpty())
                     continue;
-                }
-                Vec3 vec3 = clip.get();
-                double distanceToSqr = vec3.distanceToSqr(traceOrigin);
-                if (distanceToSqr > bestDistance) {
+                Vec3d vec3 = clip.get();
+                double distanceToSqr = vec3.squaredDistanceTo(traceOrigin);
+                if (distanceToSqr > bestDistance)
                     continue;
-                }
                 selected = glueEntity;
-                soundSourceForRemoval = BlockPos.containing(vec3);
+                soundSourceForRemoval = BlockPos.ofFloored(vec3);
                 bestDistance = distanceToSqr;
             }
 
             for (SuperGlueEntity glueEntity : glueNearby) {
                 boolean h = clusterCooldown == 0 && glueEntity == selected;
                 AllSpecialTextures faceTex = h ? AllSpecialTextures.GLUE : null;
-                Outliner.getInstance().showAABB(glueEntity, glueEntity.getBoundingBox())
-                    .colored(h ? HIGHLIGHT : PASSIVE).withFaceTextures(faceTex, faceTex).disableLineNormals()
-                    .lineWidth(h ? 1 / 16f : 1 / 64f);
+                Outliner.getInstance().showAABB(glueEntity, glueEntity.getBoundingBox()).colored(h ? HIGHLIGHT : PASSIVE)
+                    .withFaceTextures(faceTex, faceTex).disableLineNormals().lineWidth(h ? 1 / 16f : 1 / 64f);
             }
         }
 
-        HitResult hitResult = mc.hitResult;
-        if (hitResult != null && hitResult.getType() == Type.BLOCK) {
+        HitResult hitResult = mc.crosshairTarget;
+        if (hitResult != null && hitResult.getType() == Type.BLOCK)
             hovered = ((BlockHitResult) hitResult).getBlockPos();
-        }
 
         if (hovered == null) {
             hoveredPos = null;
             return;
         }
 
-        if (firstPos != null && !firstPos.closerThan(hovered, 24)) {
+        if (firstPos != null && !firstPos.isWithinDistance(hovered, 24)) {
             CreateLang.translate("super_glue.too_far").color(FAIL).sendStatus(player);
             return;
         }
 
-        boolean cancel = player.isShiftKeyDown();
-        if (cancel && firstPos == null) {
+        boolean cancel = player.isSneaking();
+        if (cancel && firstPos == null)
             return;
-        }
 
-        AABB currentSelectionBox = getCurrentSelectionBox();
+        Box currentSelectionBox = getCurrentSelectionBox();
 
         boolean unchanged = Objects.equal(hovered, hoveredPos);
 
@@ -156,15 +145,11 @@ public class SuperGlueSelectionHandler {
 
                 CreateLang.translate(key).color(color).sendStatus(player);
 
-                if (currentSelectionBox != null) {
-                    Outliner.getInstance().showAABB(bbOutlineSlot, currentSelectionBox)
-                        .colored(canReach && canAfford && !cancel ? HIGHLIGHT : FAIL)
-                        .withFaceTextures(AllSpecialTextures.GLUE, AllSpecialTextures.GLUE).disableLineNormals()
-                        .lineWidth(1 / 16f);
-                }
+                if (currentSelectionBox != null)
+                    Outliner.getInstance().showAABB(bbOutlineSlot, currentSelectionBox).colored(canReach && canAfford && !cancel ? HIGHLIGHT : FAIL)
+                        .withFaceTextures(AllSpecialTextures.GLUE, AllSpecialTextures.GLUE).disableLineNormals().lineWidth(1 / 16f);
 
-                Outliner.getInstance().showCluster(clusterOutlineSlot, currentCluster).colored(0x4D9162)
-                    .disableLineNormals().lineWidth(1 / 64f);
+                Outliner.getInstance().showCluster(clusterOutlineSlot, currentCluster).colored(0x4D9162).disableLineNormals().lineWidth(1 / 64f);
             }
 
             return;
@@ -172,7 +157,7 @@ public class SuperGlueSelectionHandler {
 
         hoveredPos = hovered;
 
-        Set<BlockPos> cluster = SuperGlueSelectionHelper.searchGlueGroup(mc.level, firstPos, hoveredPos, true);
+        Set<BlockPos> cluster = SuperGlueSelectionHelper.searchGlueGroup(mc.world, firstPos, hoveredPos, true);
         currentCluster = cluster;
         glueRequired = 1;
     }
@@ -181,35 +166,29 @@ public class SuperGlueSelectionHandler {
         return stack.getItem() instanceof SuperGlueItem;
     }
 
-    private AABB getCurrentSelectionBox() {
-        return firstPos == null || hoveredPos == null ? null : new AABB(
-            Vec3.atLowerCornerOf(firstPos),
-            Vec3.atLowerCornerOf(hoveredPos)
-        ).expandTowards(1, 1, 1);
+    private Box getCurrentSelectionBox() {
+        return firstPos == null || hoveredPos == null ? null : new Box(Vec3d.of(firstPos), Vec3d.of(hoveredPos)).stretch(1, 1, 1);
     }
 
-    public boolean onMouseInput(Minecraft mc, boolean attack) {
-        LocalPlayer player = mc.player;
-        ClientLevel level = mc.level;
+    public boolean onMouseInput(MinecraftClient mc, boolean attack) {
+        ClientPlayerEntity player = mc.player;
+        ClientWorld level = mc.world;
 
-        if (!isGlue(player.getMainHandItem())) {
+        if (!isGlue(player.getMainHandStack()))
             return false;
-        }
-        if (!player.mayBuild()) {
+        if (!player.canModifyBlocks())
             return false;
-        }
 
         if (attack) {
-            if (selected == null) {
+            if (selected == null)
                 return false;
-            }
-            player.connection.send(new SuperGlueRemovalPacket(selected.getId(), soundSourceForRemoval));
+            player.networkHandler.sendPacket(new SuperGlueRemovalPacket(selected.getId(), soundSourceForRemoval));
             selected = null;
             clusterCooldown = 0;
             return true;
         }
 
-        if (player.isShiftKeyDown()) {
+        if (player.isSneaking()) {
             if (firstPos != null) {
                 discard(player);
                 return true;
@@ -217,88 +196,76 @@ public class SuperGlueSelectionHandler {
             return false;
         }
 
-        if (hoveredPos == null) {
+        if (hoveredPos == null)
             return false;
-        }
 
         Direction face = null;
-        if (mc.hitResult instanceof BlockHitResult bhr) {
-            face = bhr.getDirection();
+        if (mc.crosshairTarget instanceof BlockHitResult bhr) {
+            face = bhr.getSide();
             BlockState blockState = level.getBlockState(hoveredPos);
-            if (blockState.getBlock() instanceof AbstractChassisBlock cb) {
-                if (cb.getGlueableSide(blockState, bhr.getDirection()) != null) {
+            if (blockState.getBlock() instanceof AbstractChassisBlock cb)
+                if (cb.getGlueableSide(blockState, bhr.getSide()) != null)
                     return false;
-                }
-            }
         }
 
         if (firstPos != null && currentCluster != null) {
             boolean canReach = currentCluster.contains(hoveredPos);
             boolean canAfford = SuperGlueSelectionHelper.collectGlueFromInventory(player, glueRequired, true);
 
-            if (!canReach || !canAfford) {
+            if (!canReach || !canAfford)
                 return true;
-            }
 
             confirm(player);
             return true;
         }
 
         firstPos = hoveredPos;
-        if (face != null) {
+        if (face != null)
             spawnParticles(level, firstPos, face, true);
-        }
         CreateLang.translate("super_glue.first_pos").sendStatus(player);
         AllSoundEvents.SLIME_ADDED.playAt(level, firstPos, 0.5F, 0.85F, false);
-        level.playSound(player, firstPos, SoundEvents.ITEM_FRAME_ADD_ITEM, SoundSource.BLOCKS, 0.75f, 1);
+        level.playSound(player, firstPos, SoundEvents.ENTITY_ITEM_FRAME_ADD_ITEM, SoundCategory.BLOCKS, 0.75f, 1);
         return true;
     }
 
-    public void discard(LocalPlayer player) {
+    public void discard(ClientPlayerEntity player) {
         currentCluster = null;
         firstPos = null;
         CreateLang.translate("super_glue.abort").sendStatus(player);
         clusterCooldown = 0;
     }
 
-    public void confirm(LocalPlayer player) {
-        player.connection.send(new SuperGlueSelectionPacket(firstPos, hoveredPos));
-        AllSoundEvents.SLIME_ADDED.playAt(player.level(), hoveredPos, 0.5F, 0.95F, false);
-        player.level().playSound(player, hoveredPos, SoundEvents.ITEM_FRAME_ADD_ITEM, SoundSource.BLOCKS, 0.75f, 1);
+    public void confirm(ClientPlayerEntity player) {
+        player.networkHandler.sendPacket(new SuperGlueSelectionPacket(firstPos, hoveredPos));
+        AllSoundEvents.SLIME_ADDED.playAt(player.getEntityWorld(), hoveredPos, 0.5F, 0.95F, false);
+        player.getEntityWorld().playSound(player, hoveredPos, SoundEvents.ENTITY_ITEM_FRAME_ADD_ITEM, SoundCategory.BLOCKS, 0.75f, 1);
 
-        if (currentCluster != null) {
+        if (currentCluster != null)
             Outliner.getInstance().showCluster(clusterOutlineSlot, currentCluster).colored(0xB5F2C6)
-                .withFaceTextures(AllSpecialTextures.GLUE, AllSpecialTextures.HIGHLIGHT_CHECKERED).disableLineNormals()
-                .lineWidth(1 / 24f);
-        }
+                .withFaceTextures(AllSpecialTextures.GLUE, AllSpecialTextures.HIGHLIGHT_CHECKERED).disableLineNormals().lineWidth(1 / 24f);
 
         discard(player);
         CreateLang.translate("super_glue.success").sendStatus(player);
         clusterCooldown = 40;
     }
 
-    public static void spawnParticles(Level world, BlockPos pos, Direction direction, boolean fullBlock) {
-        Vec3 vec = Vec3.atLowerCornerOf(direction.getUnitVec3i());
-        Vec3 plane = VecHelper.axisAlingedPlaneOf(vec);
-        Vec3 facePos = VecHelper.getCenterOf(pos).add(vec.scale(.5f));
+    public static void spawnParticles(World world, BlockPos pos, Direction direction, boolean fullBlock) {
+        Vec3d vec = Vec3d.of(direction.getVector());
+        Vec3d plane = VecHelper.axisAlingedPlaneOf(vec);
+        Vec3d facePos = VecHelper.getCenterOf(pos).add(vec.multiply(.5f));
 
         float distance = fullBlock ? 1f : .25f + .25f * (world.random.nextFloat() - .5f);
-        plane = plane.scale(distance);
+        plane = plane.multiply(distance);
         ItemStack stack = new ItemStack(Items.SLIME_BALL);
 
         for (int i = fullBlock ? 40 : 15; i > 0; i--) {
-            Vec3 offset = VecHelper.rotate(plane, 360 * world.random.nextFloat(), direction.getAxis());
-            Vec3 motion = offset.normalize().scale(1 / 16f);
-            if (fullBlock) {
-                offset = new Vec3(
-                    Mth.clamp(offset.x, -.5, .5),
-                    Mth.clamp(offset.y, -.5, .5),
-                    Mth.clamp(offset.z, -.5, .5)
-                );
-            }
-            Vec3 particlePos = facePos.add(offset);
-            world.addParticle(
-                new ItemParticleOption(ParticleTypes.ITEM, stack),
+            Vec3d offset = VecHelper.rotate(plane, 360 * world.random.nextFloat(), direction.getAxis());
+            Vec3d motion = offset.normalize().multiply(1 / 16f);
+            if (fullBlock)
+                offset = new Vec3d(MathHelper.clamp(offset.x, -.5, .5), MathHelper.clamp(offset.y, -.5, .5), MathHelper.clamp(offset.z, -.5, .5));
+            Vec3d particlePos = facePos.add(offset);
+            world.addParticleClient(
+                new ItemStackParticleEffect(ParticleTypes.ITEM, stack),
                 particlePos.x,
                 particlePos.y,
                 particlePos.z,

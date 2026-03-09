@@ -14,23 +14,19 @@ import com.zurrtum.create.content.logistics.packager.PackagerItemHandler;
 import com.zurrtum.create.foundation.advancement.CreateTrigger;
 import com.zurrtum.create.foundation.blockEntity.behaviour.audio.FrogportAudioBehaviour;
 import com.zurrtum.create.foundation.item.ItemHelper;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.core.particles.BlockParticleOption;
-import net.minecraft.core.particles.ParticleTypes;
-import net.minecraft.sounds.SoundEvents;
-import net.minecraft.sounds.SoundSource;
-import net.minecraft.util.Mth;
-import net.minecraft.world.Container;
-import net.minecraft.world.InteractionResult;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
-import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.inventory.Inventory;
+import net.minecraft.item.ItemStack;
+import net.minecraft.particle.BlockStateParticleEffect;
+import net.minecraft.particle.ParticleTypes;
+import net.minecraft.sound.SoundCategory;
+import net.minecraft.sound.SoundEvents;
+import net.minecraft.storage.ReadView;
+import net.minecraft.storage.WriteView;
+import net.minecraft.util.ActionResult;
+import net.minecraft.util.math.*;
 
 import java.util.List;
 
@@ -70,42 +66,36 @@ public class FrogportBlockEntity extends PackagePortBlockEntity {
     }
 
     @Override
-    public AABB getRenderBoundingBox() {
-        AABB bb = super.getRenderBoundingBox().expandTowards(0, 1, 0);
-        if (target != null) {
-            bb = bb.minmax(new AABB(BlockPos.containing(target.getExactTargetLocation(this, level, worldPosition))))
-                .inflate(0.5);
-        }
+    public Box getRenderBoundingBox() {
+        Box bb = super.getRenderBoundingBox().stretch(0, 1, 0);
+        if (target != null)
+            bb = bb.union(new Box(BlockPos.ofFloored(target.getExactTargetLocation(this, world, pos)))).expand(0.5);
         return bb;
     }
 
     @Override
     public void lazyTick() {
         super.lazyTick();
-        if (level.isClientSide() || isAnimationInProgress()) {
+        if (world.isClient() || isAnimationInProgress())
             return;
-        }
 
         boolean prevFail = failedLastExport;
         tryPushingToAdjacentInventories();
         tryPullingFromOwnAndAdjacentInventories();
 
-        if (failedLastExport != prevFail) {
+        if (failedLastExport != prevFail)
             sendData();
-        }
     }
 
     public void sendAnticipate() {
-        if (isAnimationInProgress()) {
+        if (isAnimationInProgress())
             return;
-        }
-        for (int i = 0, size = inventory.getContainerSize(); i < size; i++) {
-            if (inventory.getItem(i).isEmpty()) {
+        for (int i = 0, size = inventory.size(); i < size; i++)
+            if (inventory.getStack(i).isEmpty()) {
                 sendAnticipate = true;
                 sendData();
                 return;
             }
-        }
     }
 
     public void anticipate() {
@@ -121,9 +111,8 @@ public class FrogportBlockEntity extends PackagePortBlockEntity {
             deferAnimationStart = null;
         }
 
-        if (anticipationProgress.getValue() == 1) {
+        if (anticipationProgress.getValue() == 1)
             anticipationProgress.startWithValue(0);
-        }
 
         manualOpenAnimationProgress.updateChaseTarget(openTracker.openCount > 0 ? 1 : 0);
         boolean wasOpen = manualOpenAnimationProgress.getValue() > 0;
@@ -131,48 +120,38 @@ public class FrogportBlockEntity extends PackagePortBlockEntity {
         anticipationProgress.tickChaser();
         manualOpenAnimationProgress.tickChaser();
 
-        if (level.isClientSide() && wasOpen && manualOpenAnimationProgress.getValue() == 0) {
-            getBehaviour(FrogportAudioBehaviour.TYPE).close(level, worldPosition);
-        }
+        if (world.isClient() && wasOpen && manualOpenAnimationProgress.getValue() == 0)
+            getBehaviour(FrogportAudioBehaviour.TYPE).close(world, pos);
 
-        if (!isAnimationInProgress()) {
+        if (!isAnimationInProgress())
             return;
-        }
 
         animationProgress.tickChaser();
 
         float value = animationProgress.getValue();
         if (currentlyDepositing) {
-            if (!level.isClientSide() || isVirtual()) {
+            if (!world.isClient() || isVirtual()) {
                 if (value > 0.5 && animatedPackage != null) {
-                    if (target == null || !target.depositImmediately() && !target.export(
-                        level,
-                        worldPosition,
-                        animatedPackage,
-                        false
-                    )) {
+                    if (target == null || !target.depositImmediately() && !target.export(world, pos, animatedPackage, false))
                         drop(animatedPackage);
-                    }
                     animatedPackage = null;
                 }
             } else {
-                if (value > 0.7 && animatedPackage != null) {
+                if (value > 0.7 && animatedPackage != null)
                     animatedPackage = null;
-                }
                 if (animationProgress.getValue(0) < 0.2 && value > 0.2) {
-                    Vec3 v = target.getExactTargetLocation(this, level, worldPosition);
-                    level.playLocalSound(v.x, v.y, v.z, SoundEvents.CHAIN_STEP, SoundSource.BLOCKS, 0.25f, 1.2f, false);
+                    Vec3d v = target.getExactTargetLocation(this, world, pos);
+                    world.playSoundClient(v.x, v.y, v.z, SoundEvents.BLOCK_CHAIN_STEP, SoundCategory.BLOCKS, 0.25f, 1.2f, false);
                 }
             }
         }
 
-        if (value < 1) {
+        if (value < 1)
             return;
-        }
 
         anticipationProgress.startWithValue(0);
         animationProgress.startWithValue(0);
-        if (level.isClientSide()) {
+        if (world.isClient()) {
             //			sounds.close(level, worldPosition);
             animatedPackage = null;
             return;
@@ -196,82 +175,70 @@ public class FrogportBlockEntity extends PackagePortBlockEntity {
     }
 
     public void startAnimation(ItemStack box, boolean deposit) {
-        if (!PackageItem.isPackage(box)) {
+        if (!PackageItem.isPackage(box))
             return;
-        }
 
-        if (deposit && (target == null || target.depositImmediately() && !target.export(
-            level,
-            worldPosition,
-            box.copy(),
-            false
-        ))) {
+        if (deposit && (target == null || target.depositImmediately() && !target.export(world, pos, box.copy(), false)))
             return;
-        }
 
         animationProgress.startWithValue(0);
         animationProgress.chase(1, 0.1, Chaser.LINEAR);
         animatedPackage = box;
         currentlyDepositing = deposit;
 
-        if (level != null && !deposit && !level.isClientSide()) {
+        if (world != null && !deposit && !world.isClient())
             award(AllAdvancements.FROGPORT);
-        }
 
-        if (level != null && level.isClientSide()) {
+        if (world != null && world.isClient()) {
             FrogportAudioBehaviour sounds = getBehaviour(FrogportAudioBehaviour.TYPE);
-            sounds.open(level, worldPosition);
+            sounds.open(world, pos);
 
             if (currentlyDepositing) {
-                sounds.depositPackage(level, worldPosition);
+                sounds.depositPackage(world, pos);
 
             } else {
-                sounds.catchPackage(level, worldPosition);
-                Vec3 vec = target.getExactTargetLocation(this, level, worldPosition);
-                if (vec != null) {
-                    for (int i = 0; i < 5; i++) {
-                        level.addParticle(
-                            new BlockParticleOption(ParticleTypes.BLOCK, AllBlocks.ROPE.defaultBlockState()),
+                sounds.catchPackage(world, pos);
+                Vec3d vec = target.getExactTargetLocation(this, world, pos);
+                if (vec != null)
+                    for (int i = 0; i < 5; i++)
+                        world.addParticleClient(
+                            new BlockStateParticleEffect(ParticleTypes.BLOCK, AllBlocks.ROPE.getDefaultState()),
                             vec.x,
-                            vec.y - level.random.nextFloat() * 0.25,
+                            vec.y - world.random.nextFloat() * 0.25,
                             vec.z,
                             0,
                             0,
                             0
                         );
-                    }
-                }
             }
         }
 
-        if (level != null && !level.isClientSide()) {
-            level.blockEntityChanged(worldPosition);
+        if (world != null && !world.isClient()) {
+            world.markDirty(pos);
             sendData();
         }
     }
 
     protected void tryPushingToAdjacentInventories() {
         failedLastExport = false;
-        if (inventory.isEmpty()) {
+        if (inventory.isEmpty())
             return;
-        }
-        Container handler = getAdjacentInventory(Direction.DOWN);
-        if (handler == null) {
+        Inventory handler = getAdjacentInventory(Direction.DOWN);
+        if (handler == null)
             return;
-        }
 
         boolean dirty = false;
-        for (int i = 0, size = inventory.getContainerSize(); i < size; i++) {
-            ItemStack stack = inventory.getItem(i);
+        for (int i = 0, size = inventory.size(); i < size; i++) {
+            ItemStack stack = inventory.getStack(i);
             if (stack.isEmpty()) {
                 continue;
             }
-            if (inventory.canTakeItemThroughFace(i, stack, null)) {
+            if (inventory.canExtract(i, stack, null)) {
                 int insert = handler.insertExist(stack, 1);
                 if (insert == 1) {
                     int count = stack.getCount();
                     if (count == 1) {
-                        inventory.setItem(i, ItemStack.EMPTY);
+                        inventory.setStack(i, ItemStack.EMPTY);
                     } else {
                         stack.setCount(count - 1);
                     }
@@ -282,8 +249,8 @@ public class FrogportBlockEntity extends PackagePortBlockEntity {
             }
         }
         if (dirty) {
-            inventory.setChanged();
-            level.blockEntityChanged(worldPosition);
+            inventory.markDirty();
+            world.markDirty(pos);
         }
     }
 
@@ -292,12 +259,10 @@ public class FrogportBlockEntity extends PackagePortBlockEntity {
     }
 
     public void tryPullingFromOwnAndAdjacentInventories() {
-        if (isAnimationInProgress()) {
+        if (isAnimationInProgress())
             return;
-        }
-        if (target == null || !target.export(level, worldPosition, PackageStyles.getDefaultBox(), true)) {
+        if (target == null || !target.export(world, pos, PackageStyles.getDefaultBox(), true))
             return;
-        }
         inventory.sendMode();
         ItemStack stack = inventory.extractAny();
         inventory.receiveMode();
@@ -306,122 +271,99 @@ public class FrogportBlockEntity extends PackagePortBlockEntity {
             return;
         }
         for (Direction side : Iterate.directions) {
-            if (side != Direction.DOWN) {
+            if (side != Direction.DOWN)
                 continue;
-            }
-            Container handler = getAdjacentInventory(side);
-            if (handler == null) {
+            Inventory handler = getAdjacentInventory(side);
+            if (handler == null)
                 continue;
-            }
-            if (tryPullingFrom(handler)) {
+            if (tryPullingFrom(handler))
                 return;
-            }
         }
     }
 
-    public boolean tryPullingFrom(Container handler) {
+    public boolean tryPullingFrom(Inventory handler) {
         ItemStack extract = handler.extract(stack -> {
-            if (!PackageItem.isPackage(stack)) {
+            if (!PackageItem.isPackage(stack))
                 return false;
-            }
             String filterString = getFilterString();
-            return filterString == null || handler instanceof PackagerItemHandler || !PackageItem.matchAddress(
-                stack,
-                filterString
-            );
+            return filterString == null || handler instanceof PackagerItemHandler || !PackageItem.matchAddress(stack, filterString);
         });
-        if (extract.isEmpty()) {
+        if (extract.isEmpty())
             return false;
-        }
         startAnimation(extract, true);
         return true;
 
     }
 
-    protected Container getAdjacentInventory(Direction side) {
-        BlockPos pos = this.worldPosition.relative(side);
-        BlockEntity blockEntity = level.getBlockEntity(pos);
-        if (blockEntity == null || blockEntity instanceof FrogportBlockEntity) {
+    protected Inventory getAdjacentInventory(Direction side) {
+        BlockPos pos = this.pos.offset(side);
+        BlockEntity blockEntity = world.getBlockEntity(pos);
+        if (blockEntity == null || blockEntity instanceof FrogportBlockEntity)
             return null;
-        }
-        return ItemHelper.getInventory(level, pos, null, blockEntity, side.getOpposite());
+        return ItemHelper.getInventory(world, pos, null, blockEntity, side.getOpposite());
     }
 
     @Override
-    protected void write(ValueOutput view, boolean clientPacket) {
+    protected void write(WriteView view, boolean clientPacket) {
         super.write(view, clientPacket);
         view.putFloat("PlacedYaw", passiveYaw);
         if (animatedPackage != null && isAnimationInProgress()) {
-            view.store("AnimatedPackage", ItemStack.CODEC, animatedPackage);
+            view.put("AnimatedPackage", ItemStack.CODEC, animatedPackage);
             view.putBoolean("Deposit", currentlyDepositing);
         }
         if (sendAnticipate) {
             sendAnticipate = false;
             view.putBoolean("Anticipate", true);
         }
-        if (failedLastExport) {
+        if (failedLastExport)
             view.putBoolean("FailedLastExport", true);
-        }
-        if (goggles) {
+        if (goggles)
             view.putBoolean("Goggles", true);
-        }
     }
 
     @Override
-    protected void read(ValueInput view, boolean clientPacket) {
+    protected void read(ReadView view, boolean clientPacket) {
         super.read(view, clientPacket);
-        passiveYaw = view.getFloatOr("PlacedYaw", 0);
-        failedLastExport = view.getBooleanOr("FailedLastExport", false);
-        goggles = view.getBooleanOr("Goggles", false);
-        if (!clientPacket) {
+        passiveYaw = view.getFloat("PlacedYaw", 0);
+        failedLastExport = view.getBoolean("FailedLastExport", false);
+        goggles = view.getBoolean("Goggles", false);
+        if (!clientPacket)
             animatedPackage = null;
-        }
         view.read("AnimatedPackage", ItemStack.CODEC).ifPresent(stack -> {
-            deferAnimationInward = view.getBooleanOr("Deposit", false);
+            deferAnimationInward = view.getBoolean("Deposit", false);
             deferAnimationStart = stack;
         });
-        if (clientPacket && view.getBooleanOr("Anticipate", false)) {
+        if (clientPacket && view.getBoolean("Anticipate", false))
             anticipate();
-        }
     }
 
     public float getYaw() {
-        if (target == null) {
+        if (target == null)
             return passiveYaw;
-        }
-        Vec3 diff = target.getExactTargetLocation(this, level, worldPosition).subtract(Vec3.atCenterOf(worldPosition));
-        return (float) (Mth.atan2(diff.x, diff.z) * Mth.RAD_TO_DEG) + 180;
+        Vec3d diff = target.getExactTargetLocation(this, world, pos).subtract(Vec3d.ofCenter(pos));
+        return (float) (MathHelper.atan2(diff.x, diff.z) * MathHelper.DEGREES_PER_RADIAN) + 180;
     }
 
     @Override
     protected void onOpenedManually() {
-        if (level.isClientSide()) {
-            getBehaviour(FrogportAudioBehaviour.TYPE).open(level, worldPosition);
-        }
+        if (world.isClient())
+            getBehaviour(FrogportAudioBehaviour.TYPE).open(world, pos);
     }
 
     @Override
-    public InteractionResult use(Player player) {
-        if (player == null) {
-            return InteractionResult.TRY_WITH_EMPTY_HAND;
-        }
+    public ActionResult use(PlayerEntity player) {
+        if (player == null)
+            return ActionResult.PASS_TO_DEFAULT_BLOCK_ACTION;
 
         if (!goggles) {
-            ItemStack mainHandItem = player.getMainHandItem();
-            if (mainHandItem.is(AllItems.GOGGLES)) {
+            ItemStack mainHandItem = player.getMainHandStack();
+            if (mainHandItem.isOf(AllItems.GOGGLES)) {
                 goggles = true;
-                if (!level.isClientSide()) {
+                if (!world.isClient()) {
                     notifyUpdate();
-                    level.playSound(
-                        null,
-                        worldPosition,
-                        SoundEvents.ARMOR_EQUIP_GOLD.value(),
-                        SoundSource.BLOCKS,
-                        0.5f,
-                        1.0f
-                    );
+                    world.playSound(null, pos, SoundEvents.ITEM_ARMOR_EQUIP_GOLD.value(), SoundCategory.BLOCKS, 0.5f, 1.0f);
                 }
-                return InteractionResult.SUCCESS;
+                return ActionResult.SUCCESS;
             }
         }
 

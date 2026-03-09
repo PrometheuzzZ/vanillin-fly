@@ -31,21 +31,18 @@ public class FrogportPeripheral extends SyncedPeripheral<FrogportBlockEntity> {
 
     @LuaFunction(mainThread = true)
     public final String getConfiguration() throws LuaException {
-        if (blockEntity.target == null) {
+        if (blockEntity.target == null)
             return null;
-        }
-        if (blockEntity.acceptsPackages) {
+        if (blockEntity.acceptsPackages)
             return "send_recieve";
-        } else {
+        else
             return "send";
-        }
     }
 
     @LuaFunction(mainThread = true)
     public final boolean setConfiguration(String config) throws LuaException {
-        if (blockEntity.target == null) {
+        if (blockEntity.target == null)
             return false;
-        }
         if (config.equals("send_recieve")) {
             blockEntity.acceptsPackages = true;
             blockEntity.filterChanged();
@@ -63,12 +60,12 @@ public class FrogportPeripheral extends SyncedPeripheral<FrogportBlockEntity> {
 
     @LuaFunction(mainThread = true)
     public Map<Integer, Map<String, ?>> list() {
-        return ComputerUtil.list(blockEntity.getLevel().registryAccess(), blockEntity.inventory);
+        return ComputerUtil.list(blockEntity.inventory);
     }
 
     @LuaFunction(mainThread = true)
     public Map<String, ?> getItemDetail(int slot) throws LuaException {
-        return ComputerUtil.getItemDetail(blockEntity.getLevel().registryAccess(), blockEntity.inventory, slot);
+        return ComputerUtil.getItemDetail(blockEntity.inventory, slot);
     }
 
     @Override

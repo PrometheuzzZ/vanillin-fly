@@ -1,12 +1,12 @@
 package com.zurrtum.create.client.catnip.client.render.model;
 
-import com.mojang.blaze3d.vertex.PoseStack;
 import com.zurrtum.create.client.catnip.impl.client.render.model.BakedModelBuffererImpl;
-import net.minecraft.client.renderer.block.model.BlockModelPart;
-import net.minecraft.client.renderer.block.model.BlockStateModel;
-import net.minecraft.core.BlockPos;
-import net.minecraft.world.level.BlockAndTintGetter;
-import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.block.BlockState;
+import net.minecraft.client.render.model.BlockModelPart;
+import net.minecraft.client.render.model.BlockStateModel;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.BlockRenderView;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Iterator;
@@ -19,9 +19,9 @@ public class BakedModelBufferer {
     public static void bufferModel(
         BlockStateModel model,
         BlockPos pos,
-        BlockAndTintGetter level,
+        BlockRenderView level,
         BlockState state,
-        @Nullable PoseStack poseStack,
+        @Nullable MatrixStack poseStack,
         ShadeSeparatedBufferSource bufferSource
     ) {
         BakedModelBuffererImpl.bufferModel(model, pos, level, state, poseStack, bufferSource);
@@ -30,9 +30,9 @@ public class BakedModelBufferer {
     public static void bufferModel(
         List<BlockModelPart> parts,
         BlockPos pos,
-        BlockAndTintGetter level,
+        BlockRenderView level,
         BlockState state,
-        @Nullable PoseStack poseStack,
+        @Nullable MatrixStack poseStack,
         ShadeSeparatedResultConsumer resultConsumer
     ) {
         BakedModelBuffererImpl.bufferModel(parts, pos, level, state, poseStack, resultConsumer);
@@ -41,9 +41,9 @@ public class BakedModelBufferer {
     public static void bufferModel(
         BlockStateModel model,
         BlockPos pos,
-        BlockAndTintGetter level,
+        BlockRenderView level,
         BlockState state,
-        @Nullable PoseStack poseStack,
+        @Nullable MatrixStack poseStack,
         ShadeSeparatedResultConsumer resultConsumer
     ) {
         BakedModelBuffererImpl.bufferModel(model, pos, level, state, poseStack, resultConsumer);
@@ -51,8 +51,8 @@ public class BakedModelBufferer {
 
     public static void bufferBlocks(
         Iterator<BlockPos> posIterator,
-        BlockAndTintGetter level,
-        @Nullable PoseStack poseStack,
+        BlockRenderView level,
+        @Nullable MatrixStack poseStack,
         boolean renderFluids,
         ShadeSeparatedBufferSource bufferSource
     ) {
@@ -61,8 +61,8 @@ public class BakedModelBufferer {
 
     public static void bufferBlocks(
         Iterator<BlockPos> posIterator,
-        BlockAndTintGetter level,
-        @Nullable PoseStack poseStack,
+        BlockRenderView level,
+        @Nullable MatrixStack poseStack,
         boolean renderFluids,
         ShadeSeparatedResultConsumer resultConsumer
     ) {

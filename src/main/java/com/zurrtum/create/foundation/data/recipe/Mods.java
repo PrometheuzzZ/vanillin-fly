@@ -1,11 +1,13 @@
 package com.zurrtum.create.foundation.data.recipe;
 
-import net.minecraft.resources.Identifier;
+import net.minecraft.util.Identifier;
 
 import java.util.function.Consumer;
 
 public enum Mods {
-    ARS_N("ars_nouveau"), BTN("botania", Builder::omitWoodSuffix), DD("deeperdarker");
+    ARS_N("ars_nouveau"),
+    BTN("botania", Builder::omitWoodSuffix),
+    DD("deeperdarker");
 
     private final String id;
 
@@ -26,7 +28,7 @@ public enum Mods {
     }
 
     public Identifier asResource(String id) {
-        return Identifier.fromNamespaceAndPath(this.id, id);
+        return Identifier.of(this.id, id);
     }
 
     public String getId() {

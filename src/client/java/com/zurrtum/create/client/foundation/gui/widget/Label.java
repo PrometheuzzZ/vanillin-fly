@@ -1,25 +1,25 @@
 package com.zurrtum.create.client.foundation.gui.widget;
 
 import com.zurrtum.create.client.catnip.gui.widget.AbstractSimiWidget;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.font.TextRenderer;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.text.MutableText;
+import net.minecraft.text.Text;
 import org.jetbrains.annotations.NotNull;
 
 public class Label extends AbstractSimiWidget {
 
-    public Component text;
+    public Text text;
     public String suffix;
     protected boolean hasShadow;
     protected int color;
-    protected Font font;
+    protected TextRenderer font;
 
-    public Label(int x, int y, Component text) {
-        super(x, y, Minecraft.getInstance().font.width(text), 10);
-        font = Minecraft.getInstance().font;
-        this.text = Component.literal("Label");
+    public Label(int x, int y, Text text) {
+        super(x, y, MinecraftClient.getInstance().textRenderer.getWidth(text), 10);
+        font = MinecraftClient.getInstance().textRenderer;
+        this.text = Text.literal("Label");
         color = 0xFFFFFFFF;
         hasShadow = false;
         suffix = "";
@@ -40,16 +40,16 @@ public class Label extends AbstractSimiWidget {
         return this;
     }
 
-    public void setTextAndTrim(Component newText, boolean trimFront, int maxWidthPx) {
-        Font fontRenderer = Minecraft.getInstance().font;
+    public void setTextAndTrim(Text newText, boolean trimFront, int maxWidthPx) {
+        TextRenderer fontRenderer = MinecraftClient.getInstance().textRenderer;
 
-        if (fontRenderer.width(newText) <= maxWidthPx) {
+        if (fontRenderer.getWidth(newText) <= maxWidthPx) {
             text = newText;
             return;
         }
 
         String trim = "...";
-        int trimWidth = fontRenderer.width(trim);
+        int trimWidth = fontRenderer.getWidth(trim);
 
         String raw = newText.getString();
         StringBuilder builder = new StringBuilder(raw);
@@ -59,8 +59,8 @@ public class Label extends AbstractSimiWidget {
 
         for (int i = startIndex; i != endIndex; i += step) {
             String sub = builder.substring(trimFront ? i : startIndex, trimFront ? endIndex + 1 : i + 1);
-            if (fontRenderer.width(Component.literal(sub).setStyle(newText.getStyle())) + trimWidth <= maxWidthPx) {
-                text = Component.literal(trimFront ? trim + sub : sub + trim).setStyle(newText.getStyle());
+            if (fontRenderer.getWidth(Text.literal(sub).setStyle(newText.getStyle())) + trimWidth <= maxWidthPx) {
+                text = Text.literal(trimFront ? trim + sub : sub + trim).setStyle(newText.getStyle());
                 return;
             }
         }
@@ -68,17 +68,15 @@ public class Label extends AbstractSimiWidget {
     }
 
     @Override
-    protected void doRender(@NotNull GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
-        if (text == null || text.getString().isEmpty()) {
+    protected void doRender(@NotNull DrawContext graphics, int mouseX, int mouseY, float partialTicks) {
+        if (text == null || text.getString().isEmpty())
             return;
-        }
 
-        MutableComponent copy = text.plainCopy();
-        if (suffix != null && !suffix.isEmpty()) {
+        MutableText copy = text.copyContentOnly();
+        if (suffix != null && !suffix.isEmpty())
             copy.append(suffix);
-        }
 
-        graphics.drawString(font, copy, getX(), getY(), color, hasShadow);
+        graphics.drawText(font, copy, getX(), getY(), color, hasShadow);
     }
 
 }

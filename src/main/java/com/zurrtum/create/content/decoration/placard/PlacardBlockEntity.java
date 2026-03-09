@@ -2,17 +2,17 @@ package com.zurrtum.create.content.decoration.placard;
 
 import com.zurrtum.create.AllBlockEntityTypes;
 import com.zurrtum.create.AllBlocks;
-import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.catnip.math.VecHelper;
 import com.zurrtum.create.foundation.blockEntity.SmartBlockEntity;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.particles.DustParticleOptions;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
-import net.minecraft.world.phys.Vec3;
+import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
+import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
+import net.minecraft.item.ItemStack;
+import net.minecraft.particle.DustParticleEffect;
+import net.minecraft.storage.ReadView;
+import net.minecraft.storage.WriteView;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Vec3d;
 
 import java.util.List;
 
@@ -28,30 +28,27 @@ public class PlacardBlockEntity extends SmartBlockEntity {
     }
 
     @Override
-    public void preRemoveSideEffects(BlockPos pos, BlockState oldState) {
+    public void onBlockReplaced(BlockPos pos, BlockState oldState) {
         if (!heldItem.isEmpty()) {
-            Block.popResource(level, pos, heldItem);
+            Block.dropStack(world, pos, heldItem);
         }
     }
 
     @Override
     public void tick() {
         super.tick();
-        if (level.isClientSide()) {
+        if (world.isClient())
             return;
-        }
-        if (poweredTicks == 0) {
+        if (poweredTicks == 0)
             return;
-        }
 
         poweredTicks--;
-        if (poweredTicks > 0) {
+        if (poweredTicks > 0)
             return;
-        }
 
-        BlockState blockState = getBlockState();
-        level.setBlock(worldPosition, blockState.setValue(PlacardBlock.POWERED, false), Block.UPDATE_ALL);
-        PlacardBlock.updateNeighbours(blockState, level, worldPosition);
+        BlockState blockState = getCachedState();
+        world.setBlockState(pos, blockState.with(PlacardBlock.POWERED, false), Block.NOTIFY_ALL);
+        PlacardBlock.updateNeighbours(blockState, world, pos);
     }
 
     public ItemStack getHeldItem() {
@@ -64,41 +61,39 @@ public class PlacardBlockEntity extends SmartBlockEntity {
     }
 
     @Override
-    protected void write(ValueOutput view, boolean clientPacket) {
+    protected void write(WriteView view, boolean clientPacket) {
         view.putInt("PoweredTicks", poweredTicks);
         if (!heldItem.isEmpty()) {
-            view.store("Item", ItemStack.CODEC, heldItem);
+            view.put("Item", ItemStack.CODEC, heldItem);
         }
         super.write(view, clientPacket);
     }
 
     @Override
-    protected void read(ValueInput view, boolean clientPacket) {
+    protected void read(ReadView view, boolean clientPacket) {
         int prevTicks = poweredTicks;
-        poweredTicks = view.getIntOr("PoweredTicks", 0);
+        poweredTicks = view.getInt("PoweredTicks", 0);
         heldItem = view.read("Item", ItemStack.CODEC).orElse(ItemStack.EMPTY);
         super.read(view, clientPacket);
 
-        if (clientPacket && prevTicks < poweredTicks) {
+        if (clientPacket && prevTicks < poweredTicks)
             spawnParticles();
-        }
     }
 
     private void spawnParticles() {
-        BlockState blockState = getBlockState();
-        if (!blockState.is(AllBlocks.PLACARD)) {
+        BlockState blockState = getCachedState();
+        if (!blockState.isOf(AllBlocks.PLACARD))
             return;
-        }
 
-        DustParticleOptions pParticleData = new DustParticleOptions(0xff3300, 1);
-        Vec3 centerOf = VecHelper.getCenterOf(worldPosition);
-        Vec3 normal = Vec3.atLowerCornerOf(PlacardBlock.connectedDirection(blockState).getUnitVec3i());
-        Vec3 offset = VecHelper.axisAlingedPlaneOf(normal);
+        DustParticleEffect pParticleData = new DustParticleEffect(0xff3300, 1);
+        Vec3d centerOf = VecHelper.getCenterOf(pos);
+        Vec3d normal = Vec3d.of(PlacardBlock.connectedDirection(blockState).getVector());
+        Vec3d offset = VecHelper.axisAlingedPlaneOf(normal);
 
         for (int i = 0; i < 10; i++) {
-            Vec3 v = VecHelper.offsetRandomly(Vec3.ZERO, level.random, .5f).multiply(offset).normalize().scale(.45f)
-                .add(normal.scale(-.45f)).add(centerOf);
-            level.addParticle(pParticleData, v.x, v.y, v.z, 0, 0, 0);
+            Vec3d v = VecHelper.offsetRandomly(Vec3d.ZERO, world.random, .5f).multiply(offset).normalize().multiply(.45f).add(normal.multiply(-.45f))
+                .add(centerOf);
+            world.addParticleClient(pParticleData, v.x, v.y, v.z, 0, 0, 0);
         }
     }
 

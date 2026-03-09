@@ -3,24 +3,22 @@ package com.zurrtum.create.client.infrastructure.model;
 import com.google.common.base.Suppliers;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import net.minecraft.client.color.item.ItemTintSource;
-import net.minecraft.client.color.item.ItemTintSources;
-import net.minecraft.client.multiplayer.ClientLevel;
-import net.minecraft.client.renderer.Sheets;
-import net.minecraft.client.renderer.block.model.BakedQuad;
-import net.minecraft.client.renderer.block.model.TextureSlots;
-import net.minecraft.client.renderer.item.*;
-import net.minecraft.client.renderer.rendertype.RenderType;
-import net.minecraft.client.resources.model.BlockModelRotation;
-import net.minecraft.client.resources.model.ModelBaker;
-import net.minecraft.client.resources.model.ResolvableModel;
-import net.minecraft.client.resources.model.ResolvedModel;
-import net.minecraft.resources.Identifier;
-import net.minecraft.world.entity.ItemOwner;
-import net.minecraft.world.item.ItemDisplayContext;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.client.item.ItemModelManager;
+import net.minecraft.client.render.RenderLayer;
+import net.minecraft.client.render.TexturedRenderLayers;
+import net.minecraft.client.render.item.ItemRenderState;
+import net.minecraft.client.render.item.model.BasicItemModel;
+import net.minecraft.client.render.item.model.ItemModel;
+import net.minecraft.client.render.item.tint.TintSource;
+import net.minecraft.client.render.item.tint.TintSourceTypes;
+import net.minecraft.client.render.model.*;
+import net.minecraft.client.world.ClientWorld;
+import net.minecraft.item.ItemDisplayContext;
+import net.minecraft.item.ItemStack;
+import net.minecraft.util.HeldItemContext;
+import net.minecraft.util.Identifier;
 import org.jetbrains.annotations.Nullable;
-import org.joml.Vector3fc;
+import org.joml.Vector3f;
 
 import java.util.List;
 import java.util.function.Supplier;
@@ -28,23 +26,23 @@ import java.util.function.Supplier;
 import static com.zurrtum.create.Create.MOD_ID;
 
 public class TranslucentModel implements ItemModel {
-    public static final Identifier ID = Identifier.fromNamespaceAndPath(MOD_ID, "model/translucent");
-    private final RenderType layer = Sheets.translucentBlockItemSheet();
-    private final List<ItemTintSource> tints;
+    public static final Identifier ID = Identifier.of(MOD_ID, "model/translucent");
+    private final RenderLayer layer = TexturedRenderLayers.getItemEntityTranslucentCull();
+    private final List<TintSource> tints;
     private final List<BakedQuad> quads;
-    private final Supplier<Vector3fc[]> vector;
-    private final ModelRenderProperties settings;
+    private final Supplier<Vector3f[]> vector;
+    private final ModelSettings settings;
     private final boolean animated;
 
-    public TranslucentModel(List<ItemTintSource> tints, List<BakedQuad> quads, ModelRenderProperties settings) {
+    public TranslucentModel(List<TintSource> tints, List<BakedQuad> quads, ModelSettings settings) {
         this.tints = tints;
         this.quads = quads;
         this.settings = settings;
-        this.vector = Suppliers.memoize(() -> BlockModelWrapper.computeExtents(quads));
+        this.vector = Suppliers.memoize(() -> BasicItemModel.bakeQuads(quads));
         boolean bl = false;
 
         for (BakedQuad bakedQuad : quads) {
-            if (bakedQuad.sprite().contents().isAnimated()) {
+            if (bakedQuad.sprite().getContents().isAnimated()) {
                 bl = true;
                 break;
             }
@@ -55,69 +53,63 @@ public class TranslucentModel implements ItemModel {
 
     @Override
     public void update(
-        ItemStackRenderState state,
+        ItemRenderState state,
         ItemStack stack,
-        ItemModelResolver resolver,
+        ItemModelManager resolver,
         ItemDisplayContext displayContext,
-        @Nullable ClientLevel world,
-        @Nullable ItemOwner heldItemContext,
+        @Nullable ClientWorld world,
+        @Nullable HeldItemContext heldItemContext,
         int seed
     ) {
-        state.appendModelIdentityElement(this);
-        ItemStackRenderState.LayerRenderState layerRenderState = state.newLayer();
-        if (stack.hasFoil()) {
-            layerRenderState.setFoilType(ItemStackRenderState.FoilType.STANDARD);
-            state.setAnimated();
-            state.appendModelIdentityElement(ItemStackRenderState.FoilType.STANDARD);
+        state.addModelKey(this);
+        ItemRenderState.LayerRenderState layerRenderState = state.newLayer();
+        if (stack.hasGlint()) {
+            layerRenderState.setGlint(ItemRenderState.Glint.STANDARD);
+            state.markAnimated();
+            state.addModelKey(ItemRenderState.Glint.STANDARD);
         }
 
         int i = tints.size();
-        int[] is = layerRenderState.prepareTintLayers(i);
+        int[] is = layerRenderState.initTints(i);
 
         for (int j = 0; j < i; j++) {
-            int k = tints.get(j)
-                .calculate(stack, world, heldItemContext == null ? null : heldItemContext.asLivingEntity());
+            int k = tints.get(j).getTint(stack, world, heldItemContext == null ? null : heldItemContext.getEntity());
             is[j] = k;
-            state.appendModelIdentityElement(k);
+            state.addModelKey(k);
         }
 
-        layerRenderState.setExtents(vector);
-        layerRenderState.setRenderType(layer);
-        settings.applyToLayer(layerRenderState, displayContext);
-        layerRenderState.prepareQuadList().addAll(quads);
+        layerRenderState.setVertices(vector);
+        layerRenderState.setRenderLayer(layer);
+        settings.addSettings(layerRenderState, displayContext);
+        layerRenderState.getQuads().addAll(quads);
         if (animated) {
-            state.setAnimated();
+            state.markAnimated();
         }
     }
 
-    public record Unbaked(Identifier model, List<ItemTintSource> tints) implements ItemModel.Unbaked {
+    public record Unbaked(Identifier model, List<TintSource> tints) implements ItemModel.Unbaked {
         public static final MapCodec<Unbaked> CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
             Identifier.CODEC.fieldOf("model").forGetter(Unbaked::model),
-            ItemTintSources.CODEC.listOf().optionalFieldOf("tints", List.of()).forGetter(Unbaked::tints)
+            TintSourceTypes.CODEC.listOf().optionalFieldOf("tints", List.of()).forGetter(Unbaked::tints)
         ).apply(instance, Unbaked::new));
 
         @Override
-        public void resolveDependencies(ResolvableModel.Resolver resolver) {
+        public void resolve(ResolvableModel.Resolver resolver) {
             resolver.markDependency(model);
         }
 
         @Override
-        public ItemModel bake(ItemModel.BakingContext context) {
-            ModelBaker baker = context.blockModelBaker();
-            ResolvedModel bakedSimpleModel = baker.getModel(model);
-            TextureSlots modelTextures = bakedSimpleModel.getTopTextureSlots();
-            List<BakedQuad> list = bakedSimpleModel.bakeTopGeometry(modelTextures, baker, BlockModelRotation.IDENTITY)
-                .getAll();
-            ModelRenderProperties modelSettings = ModelRenderProperties.fromResolvedModel(
-                baker,
-                bakedSimpleModel,
-                modelTextures
-            );
+        public ItemModel bake(ItemModel.BakeContext context) {
+            Baker baker = context.blockModelBaker();
+            BakedSimpleModel bakedSimpleModel = baker.getModel(model);
+            ModelTextures modelTextures = bakedSimpleModel.getTextures();
+            List<BakedQuad> list = bakedSimpleModel.bakeGeometry(modelTextures, baker, ModelRotation.X0_Y0).getAllQuads();
+            ModelSettings modelSettings = ModelSettings.resolveSettings(baker, bakedSimpleModel, modelTextures);
             return new TranslucentModel(tints, list, modelSettings);
         }
 
         @Override
-        public MapCodec<Unbaked> type() {
+        public MapCodec<Unbaked> getCodec() {
             return CODEC;
         }
     }

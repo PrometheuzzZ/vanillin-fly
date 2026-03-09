@@ -3,121 +3,104 @@ package com.zurrtum.create.content.contraptions.actors.seat;
 import com.zurrtum.create.AllEntityTypes;
 import com.zurrtum.create.api.entity.FakePlayerHandler;
 import com.zurrtum.create.content.logistics.box.PackageEntity;
-import net.minecraft.network.syncher.SynchedEntityData;
-import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.damagesource.DamageSource;
-import net.minecraft.world.entity.*;
-import net.minecraft.world.entity.animal.feline.Cat;
-import net.minecraft.world.entity.animal.frog.Frog;
-import net.minecraft.world.entity.animal.parrot.Parrot;
-import net.minecraft.world.entity.animal.wolf.Wolf;
-import net.minecraft.world.entity.monster.Slime;
-import net.minecraft.world.entity.monster.skeleton.Skeleton;
-import net.minecraft.world.entity.monster.spider.Spider;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
-import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.EntityPose;
+import net.minecraft.entity.EntityType;
+import net.minecraft.entity.LivingEntity;
+import net.minecraft.entity.damage.DamageSource;
+import net.minecraft.entity.data.DataTracker;
+import net.minecraft.entity.mob.SkeletonEntity;
+import net.minecraft.entity.mob.SlimeEntity;
+import net.minecraft.entity.mob.SpiderEntity;
+import net.minecraft.entity.passive.*;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.server.world.ServerWorld;
+import net.minecraft.storage.ReadView;
+import net.minecraft.storage.WriteView;
+import net.minecraft.util.math.Box;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.World;
 
 public class SeatEntity extends Entity {
-    public SeatEntity(EntityType<? extends SeatEntity> entityType, Level level) {
+    public SeatEntity(EntityType<? extends SeatEntity> entityType, World level) {
         super(entityType, level);
     }
 
-    public SeatEntity(Level level) {
-        this(AllEntityTypes.SEAT, level);
-        noPhysics = true;
+    public SeatEntity(World world) {
+        this(AllEntityTypes.SEAT, world);
+        noClip = true;
     }
 
     @Override
-    public void setPos(double x, double y, double z) {
-        super.setPos(x, y, z);
-        AABB bb = getBoundingBox();
-        Vec3 diff = new Vec3(x, y, z).subtract(bb.getCenter());
-        setBoundingBox(bb.move(diff));
+    public void setPosition(double x, double y, double z) {
+        super.setPosition(x, y, z);
+        Box bb = getBoundingBox();
+        Vec3d diff = new Vec3d(x, y, z).subtract(bb.getCenter());
+        setBoundingBox(bb.offset(diff));
     }
 
     @Override
-    protected void positionRider(Entity pEntity, Entity.MoveFunction pCallback) {
-        if (!this.hasPassenger(pEntity)) {
+    protected void updatePassengerPosition(Entity pEntity, Entity.PositionUpdater pCallback) {
+        if (!this.hasPassenger(pEntity))
             return;
-        }
-        double heightOffset = getPassengerRidingPosition(pEntity).y - pEntity.getVehicleAttachmentPoint(this).y;
+        double heightOffset = getPassengerRidingPos(pEntity).y - pEntity.getVehicleAttachmentPos(this).y;
 
-        pCallback.accept(
-            pEntity,
-            this.getX(),
-            1.0 / 16.0 + heightOffset + getCustomEntitySeatOffset(pEntity),
-            this.getZ()
-        );
-        if (pEntity instanceof Player player) {
-            float diff = player.getDimensions(player.getPose()).height() - player.getDimensions(Pose.CROUCHING)
-                .height();
+        pCallback.accept(pEntity, this.getX(), 1.0 / 16.0 + heightOffset + getCustomEntitySeatOffset(pEntity), this.getZ());
+        if (pEntity instanceof PlayerEntity player) {
+            float diff = player.getDimensions(player.getPose()).height() - player.getDimensions(EntityPose.CROUCHING).height();
             if (diff != 0) {
-                AABB boundingBox = pEntity.getBoundingBox();
-                pEntity.setBoundingBox(boundingBox.setMinY(boundingBox.minY + diff));
+                Box boundingBox = pEntity.getBoundingBox();
+                pEntity.setBoundingBox(boundingBox.withMinY(boundingBox.minY + diff));
             }
         }
     }
 
     @Override
-    public void onPassengerTurned(Entity entity) {
-        entity.setYHeadRot(entity.getYRot());
+    public void onPassengerLookAround(Entity entity) {
+        entity.setHeadYaw(entity.getYaw());
     }
 
     public static double getCustomEntitySeatOffset(Entity entity) {
-        if (entity instanceof Slime) {
+        if (entity instanceof SlimeEntity)
             return 0.0f;
-        }
-        if (entity instanceof Parrot) {
+        if (entity instanceof ParrotEntity)
             return 1 / 12f;
-        }
-        if (entity instanceof Skeleton) {
+        if (entity instanceof SkeletonEntity)
             return 1 / 8f;
-        }
-        if (entity instanceof Cat) {
+        if (entity instanceof CatEntity)
             return 1 / 12f;
-        }
-        if (entity instanceof Wolf) {
+        if (entity instanceof WolfEntity)
             return 1 / 16f;
-        }
-        if (entity instanceof Frog) {
+        if (entity instanceof FrogEntity)
             return 1.5 / 16f;
-        }
-        if (entity instanceof Spider) {
+        if (entity instanceof SpiderEntity)
             return 1 / 8.0;
-        }
-        if (entity instanceof PackageEntity) {
+        if (entity instanceof PackageEntity)
             return 3 / 32f;
-        }
         return 0;
     }
 
     @Override
-    public void setDeltaMovement(Vec3 p_213317_1_) {
+    public void setVelocity(Vec3d vec) {
     }
 
     @Override
     public void tick() {
-        if (level().isClientSide()) {
+        if (getEntityWorld().isClient())
             return;
-        }
-        boolean blockPresent = level().getBlockState(blockPosition()).getBlock() instanceof SeatBlock;
-        if (isVehicle() && blockPresent) {
+        boolean blockPresent = getEntityWorld().getBlockState(getBlockPos()).getBlock() instanceof SeatBlock;
+        if (hasPassengers() && blockPresent)
             return;
-        }
         this.discard();
     }
 
     @Override
-    public boolean hurtServer(ServerLevel world, DamageSource source, float amount) {
+    public boolean damage(ServerWorld world, DamageSource source, float amount) {
         return false;
     }
 
     @Override
-    protected boolean canRide(Entity entity) {
+    protected boolean canStartRiding(Entity entity) {
         // Fake Players (tested with deployers) have a BUNCH of weird issues, don't let
         // them ride seats
         return !(FakePlayerHandler.has(entity));
@@ -126,25 +109,24 @@ public class SeatEntity extends Entity {
     @Override
     protected void removePassenger(Entity entity) {
         super.removePassenger(entity);
-        if (entity instanceof TamableAnimal ta) {
+        if (entity instanceof TameableEntity ta)
             ta.setInSittingPose(false);
-        }
     }
 
     @Override
-    public Vec3 getDismountLocationForPassenger(LivingEntity pLivingEntity) {
-        return super.getDismountLocationForPassenger(pLivingEntity).add(0, 0.5f, 0);
+    public Vec3d updatePassengerForDismount(LivingEntity pLivingEntity) {
+        return super.updatePassengerForDismount(pLivingEntity).add(0, 0.5f, 0);
     }
 
     @Override
-    protected void defineSynchedData(SynchedEntityData.Builder builder) {
+    protected void initDataTracker(DataTracker.Builder builder) {
     }
 
     @Override
-    protected void readAdditionalSaveData(ValueInput view) {
+    protected void readCustomData(ReadView view) {
     }
 
     @Override
-    protected void addAdditionalSaveData(ValueOutput view) {
+    protected void writeCustomData(WriteView view) {
     }
 }

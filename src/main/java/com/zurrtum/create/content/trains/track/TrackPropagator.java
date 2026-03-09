@@ -7,12 +7,12 @@ import com.zurrtum.create.content.trains.graph.TrackGraphSync;
 import com.zurrtum.create.content.trains.graph.TrackNode;
 import com.zurrtum.create.content.trains.graph.TrackNodeLocation.DiscoveredLocation;
 import com.zurrtum.create.content.trains.signal.SignalPropagator;
-import net.minecraft.core.BlockPos;
+import net.minecraft.block.BlockState;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.util.Mth;
-import net.minecraft.world.level.LevelAccessor;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.WorldAccess;
 
 import java.util.*;
 
@@ -30,10 +30,9 @@ public class TrackPropagator {
         }
     }
 
-    public static void onRailRemoved(LevelAccessor reader, BlockPos pos, BlockState state) {
-        if (!(state.getBlock() instanceof ITrackBlock track)) {
+    public static void onRailRemoved(WorldAccess reader, BlockPos pos, BlockState state) {
+        if (!(state.getBlock() instanceof ITrackBlock track))
             return;
-        }
 
         Collection<DiscoveredLocation> ends = track.getConnected(reader, pos, state, false, null);
         GlobalRailwayManager manager = Create.RAILWAYS;
@@ -46,49 +45,42 @@ public class TrackPropagator {
             List<TrackGraph> intersecting = manager.getGraphs(removedLocation);
             for (TrackGraph foundGraph : intersecting) {
                 TrackNode removedNode = foundGraph.locateNode(removedLocation);
-                if (removedNode == null) {
+                if (removedNode == null)
                     continue;
-                }
                 foundGraph.removeNode(reader, removedLocation);
                 sync.nodeRemoved(foundGraph, removedNode);
-                if (!foundGraph.isEmpty()) {
+                if (!foundGraph.isEmpty())
                     continue;
-                }
                 manager.removeGraphAndGroup(server, foundGraph);
                 sync.graphRemoved(foundGraph);
             }
         }
 
         Set<BlockPos> positionsToUpdate = new HashSet<>();
-        for (DiscoveredLocation removedEnd : ends) {
+        for (DiscoveredLocation removedEnd : ends)
             positionsToUpdate.addAll(removedEnd.allAdjacent());
-        }
 
         // 2. Re-run railAdded for any track that was disconnected from this track
 
         Set<TrackGraph> toUpdate = new HashSet<>();
-        for (BlockPos blockPos : positionsToUpdate) {
+        for (BlockPos blockPos : positionsToUpdate)
             if (!blockPos.equals(pos)) {
                 TrackGraph onRailAdded = onRailAdded(reader, blockPos, reader.getBlockState(blockPos));
-                if (onRailAdded != null) {
+                if (onRailAdded != null)
                     toUpdate.add(onRailAdded);
-                }
             }
-        }
 
         // 3. Ensure any affected graph gets checked for segmentation
 
-        for (TrackGraph railGraph : toUpdate) {
+        for (TrackGraph railGraph : toUpdate)
             manager.updateSplitGraph(reader, railGraph);
-        }
 
         manager.markTracksDirty();
     }
 
-    public static TrackGraph onRailAdded(LevelAccessor reader, BlockPos pos, BlockState state) {
-        if (!(state.getBlock() instanceof ITrackBlock track)) {
+    public static TrackGraph onRailAdded(WorldAccess reader, BlockPos pos, BlockState state) {
+        if (!(state.getBlock() instanceof ITrackBlock track))
             return null;
-        }
 
         // 1. Remove all immediately reachable node locations
 
@@ -101,9 +93,8 @@ public class TrackPropagator {
 
         int emergencyExit = 1000;
         while (!frontier.isEmpty()) {
-            if (emergencyExit-- == 0) {
+            if (emergencyExit-- == 0)
                 break;
-            }
 
             FrontierEntry entry = frontier.removeFirst();
             List<TrackGraph> intersecting = manager.getGraphs(entry.currentNode);
@@ -115,14 +106,12 @@ public class TrackPropagator {
                 continue;
             }
 
-            if (!intersecting.isEmpty()) {
+            if (!intersecting.isEmpty())
                 continue;
-            }
 
             Collection<DiscoveredLocation> ends = ITrackBlock.walkConnectedTracks(reader, entry.currentNode, false);
-            if (entry.prevNode != null) {
+            if (entry.prevNode != null)
                 ends.remove(entry.prevNode);
-            }
             continueSearch(frontier, visited, entry, ends);
         }
 
@@ -134,9 +123,8 @@ public class TrackPropagator {
         // Remove empty graphs
         for (Iterator<TrackGraph> iterator = connectedGraphs.iterator(); iterator.hasNext(); ) {
             TrackGraph railGraph = iterator.next();
-            if (!railGraph.isEmpty() || connectedGraphs.size() == 1) {
+            if (!railGraph.isEmpty() || connectedGraphs.size() == 1)
                 continue;
-            }
             manager.removeGraphAndGroup(server, railGraph);
             sync.graphRemoved(railGraph);
             iterator.remove();
@@ -144,22 +132,20 @@ public class TrackPropagator {
 
         // Merge graphs if more than 1
         if (connectedGraphs.size() > 1) {
-            for (TrackGraph other : connectedGraphs) {
-                if (graph == null) {
+            for (TrackGraph other : connectedGraphs)
+                if (graph == null)
                     graph = other;
-                } else {
+                else {
                     //TODO
                     //                    NeoForge.EVENT_BUS.post(new TrackGraphMergeEvent(other, graph));
                     other.transferAll(graph);
                     manager.removeGraphAndGroup(server, other);
                     sync.graphRemoved(other);
                 }
-            }
         } else if (connectedGraphs.size() == 1) {
             graph = connectedGraphs.stream().findFirst().get();
-        } else {
+        } else
             manager.putGraphWithDefaultGroup(server, graph = new TrackGraph());
-        }
 
         DiscoveredLocation startNode = null;
 
@@ -169,16 +155,14 @@ public class TrackPropagator {
 
         emergencyExit = 1000;
         while (!frontier.isEmpty()) {
-            if (emergencyExit-- == 0) {
+            if (emergencyExit-- == 0)
                 break;
-            }
 
             FrontierEntry entry = frontier.removeFirst();
             Collection<DiscoveredLocation> ends = ITrackBlock.walkConnectedTracks(reader, entry.currentNode, false);
             boolean first = entry.prevNode == null;
-            if (!first) {
+            if (!first)
                 ends.remove(entry.prevNode);
-            }
             if (isValidGraphNodeLocation(entry.currentNode, ends, first)) {
                 startNode = entry.currentNode;
                 break;
@@ -196,40 +180,36 @@ public class TrackPropagator {
 
         emergencyExit = 1000;
         while (!frontier.isEmpty()) {
-            if (emergencyExit-- == 0) {
+            if (emergencyExit-- == 0)
                 break;
-            }
 
             FrontierEntry entry = frontier.removeFirst();
             DiscoveredLocation parentNode = entry.parentNode;
             Collection<DiscoveredLocation> ends = ITrackBlock.walkConnectedTracks(reader, entry.currentNode, false);
             boolean first = entry.prevNode == null;
-            if (!first) {
+            if (!first)
                 ends.remove(entry.prevNode);
-            }
 
             if (isValidGraphNodeLocation(entry.currentNode, ends, first) && entry.currentNode != startNode) {
                 boolean nodeIsNew = graph.createNodeIfAbsent(entry.currentNode);
                 graph.connectNodes(reader, parentNode, entry.currentNode, entry.currentNode.getTurn());
                 addedNodes.add(graph.locateNode(entry.currentNode));
                 parentNode = entry.currentNode;
-                if (!nodeIsNew) {
+                if (!nodeIsNew)
                     continue;
-                }
             }
 
             continueSearchWithParent(frontier, entry, parentNode, ends);
         }
 
         manager.markTracksDirty();
-        for (TrackNode trackNode : addedNodes) {
+        for (TrackNode trackNode : addedNodes)
             SignalPropagator.notifySignalsOfNewNode(server, graph, trackNode);
-        }
         return graph;
     }
 
     private static void addInitialEndsOf(
-        LevelAccessor reader,
+        WorldAccess reader,
         BlockPos pos,
         BlockState state,
         ITrackBlock track,
@@ -247,11 +227,9 @@ public class TrackPropagator {
         FrontierEntry entry,
         Collection<DiscoveredLocation> ends
     ) {
-        for (DiscoveredLocation location : ends) {
-            if (visited.add(location)) {
+        for (DiscoveredLocation location : ends)
+            if (visited.add(location))
                 frontier.add(new FrontierEntry(null, entry.currentNode, location));
-            }
-        }
     }
 
     private static void continueSearchWithParent(
@@ -260,41 +238,30 @@ public class TrackPropagator {
         DiscoveredLocation parentNode,
         Collection<DiscoveredLocation> ends
     ) {
-        for (DiscoveredLocation location : ends) {
+        for (DiscoveredLocation location : ends)
             frontier.add(new FrontierEntry(parentNode, entry.currentNode, location));
-        }
     }
 
-    public static boolean isValidGraphNodeLocation(
-        DiscoveredLocation location,
-        Collection<DiscoveredLocation> next,
-        boolean first
-    ) {
+    public static boolean isValidGraphNodeLocation(DiscoveredLocation location, Collection<DiscoveredLocation> next, boolean first) {
         int size = next.size() - (first ? 1 : 0);
-        if (size != 1) {
+        if (size != 1)
             return true;
-        }
-        if (location.shouldForceNode()) {
+        if (location.shouldForceNode())
             return true;
-        }
-        if (location.differentMaterials()) {
+        if (location.differentMaterials())
             return true;
-        }
-        if (next.stream().anyMatch(DiscoveredLocation::shouldForceNode)) {
+        if (next.stream().anyMatch(DiscoveredLocation::shouldForceNode))
             return true;
-        }
 
-        Vec3 direction = location.getDirection();
-        if (direction != null && next.stream().anyMatch(dl -> dl.notInLineWith(direction))) {
+        Vec3d direction = location.getDirection();
+        if (direction != null && next.stream().anyMatch(dl -> dl.notInLineWith(direction)))
             return true;
-        }
 
-        Vec3 vec = location.getLocation();
-        boolean centeredX = !Mth.equal(vec.x, Math.round(vec.x));
-        boolean centeredZ = !Mth.equal(vec.z, Math.round(vec.z));
-        if (centeredX && !centeredZ) {
+        Vec3d vec = location.getLocation();
+        boolean centeredX = !MathHelper.approximatelyEquals(vec.x, Math.round(vec.x));
+        boolean centeredZ = !MathHelper.approximatelyEquals(vec.z, Math.round(vec.z));
+        if (centeredX && !centeredZ)
             return ((int) Math.round(vec.z)) % 16 == 0;
-        }
         return ((int) Math.round(vec.x)) % 16 == 0;
     }
 

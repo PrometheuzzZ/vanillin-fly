@@ -3,59 +3,51 @@ package com.zurrtum.create.client.content.contraptions.wrench;
 import com.zurrtum.create.AllItems;
 import com.zurrtum.create.client.AllKeys;
 import com.zurrtum.create.client.catnip.gui.ScreenOpener;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.input.KeyEvent;
-import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.GameType;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.BlockHitResult;
-import net.minecraft.world.phys.HitResult;
+import net.minecraft.block.BlockState;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.input.KeyInput;
+import net.minecraft.client.network.ClientPlayerEntity;
+import net.minecraft.item.ItemStack;
+import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.util.hit.HitResult;
+import net.minecraft.world.GameMode;
+import net.minecraft.world.World;
 
 public class RadialWrenchHandler {
 
     public static int COOLDOWN = 0;
 
     public static void clientTick() {
-        if (COOLDOWN > 0 && !AllKeys.ROTATE_MENU.isDown()) {
+        if (COOLDOWN > 0 && !AllKeys.ROTATE_MENU.isPressed())
             COOLDOWN--;
-        }
     }
 
-    public static void onKeyInput(Minecraft mc, KeyEvent input, boolean pressed) {
-        if (!pressed) {
+    public static void onKeyInput(MinecraftClient mc, KeyInput input, boolean pressed) {
+        if (!pressed)
             return;
-        }
 
-        if (!AllKeys.ROTATE_MENU.matches(input)) {
+        if (!AllKeys.ROTATE_MENU.matchesKey(input))
             return;
-        }
 
-        if (COOLDOWN > 0) {
+        if (COOLDOWN > 0)
             return;
-        }
 
-        if (mc.gameMode == null || mc.gameMode.getPlayerMode() == GameType.SPECTATOR) {
+        if (mc.interactionManager == null || mc.interactionManager.getCurrentGameMode() == GameMode.SPECTATOR)
             return;
-        }
 
-        LocalPlayer player = mc.player;
-        if (player == null) {
+        ClientPlayerEntity player = mc.player;
+        if (player == null)
             return;
-        }
 
-        Level level = player.level();
+        World level = player.getEntityWorld();
 
-        ItemStack heldItem = player.getMainHandItem();
-        if (!heldItem.is(AllItems.WRENCH)) {
+        ItemStack heldItem = player.getMainHandStack();
+        if (!heldItem.isOf(AllItems.WRENCH))
             return;
-        }
 
-        HitResult objectMouseOver = mc.hitResult;
-        if (!(objectMouseOver instanceof BlockHitResult blockHitResult)) {
+        HitResult objectMouseOver = mc.crosshairTarget;
+        if (!(objectMouseOver instanceof BlockHitResult blockHitResult))
             return;
-        }
 
         BlockState state = level.getBlockState(blockHitResult.getBlockPos());
 

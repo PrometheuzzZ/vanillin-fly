@@ -3,14 +3,14 @@ package com.zurrtum.create.api.behaviour.spouting;
 import com.zurrtum.create.api.registry.SimpleRegistry;
 import com.zurrtum.create.content.fluids.spout.SpoutBlockEntity;
 import com.zurrtum.create.infrastructure.fluids.FluidStack;
-import net.minecraft.core.BlockPos;
+import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.Blocks;
+import net.minecraft.fluid.Fluid;
+import net.minecraft.fluid.Fluids;
 import net.minecraft.util.Util;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.material.Fluid;
-import net.minecraft.world.level.material.Fluids;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.World;
 
 public class CauldronSpoutingBehavior implements BlockSpoutingBehaviour {
     public static final SimpleRegistry<Fluid, CauldronInfo> CAULDRON_INFO = Util.make(() -> {
@@ -21,24 +21,16 @@ public class CauldronSpoutingBehavior implements BlockSpoutingBehaviour {
     });
 
     @Override
-    public int fillBlock(
-        Level level,
-        BlockPos pos,
-        SpoutBlockEntity spout,
-        FluidStack availableFluid,
-        boolean simulate
-    ) {
+    public int fillBlock(World level, BlockPos pos, SpoutBlockEntity spout, FluidStack availableFluid, boolean simulate) {
         CauldronInfo info = CAULDRON_INFO.get(availableFluid.getFluid());
-        if (info == null) {
+        if (info == null)
             return 0;
-        }
 
-        if (availableFluid.getAmount() < info.amount) {
+        if (availableFluid.getAmount() < info.amount)
             return 0;
-        }
 
         if (!simulate) {
-            level.setBlockAndUpdate(pos, info.cauldron);
+            level.setBlockState(pos, info.cauldron);
         }
 
         return info.amount;
@@ -50,7 +42,7 @@ public class CauldronSpoutingBehavior implements BlockSpoutingBehaviour {
      */
     public record CauldronInfo(int amount, BlockState cauldron) {
         public CauldronInfo(int amount, Block block) {
-            this(amount, block.defaultBlockState());
+            this(amount, block.getDefaultState());
         }
     }
 }

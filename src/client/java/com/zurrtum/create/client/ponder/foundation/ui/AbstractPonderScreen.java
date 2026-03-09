@@ -3,7 +3,7 @@ package com.zurrtum.create.client.ponder.foundation.ui;
 import com.zurrtum.create.client.catnip.gui.NavigatableSimiScreen;
 import com.zurrtum.create.client.catnip.gui.ScreenOpener;
 import com.zurrtum.create.client.ponder.Ponder;
-import net.minecraft.network.chat.Component;
+import net.minecraft.text.Text;
 
 import static com.zurrtum.create.client.ponder.foundation.registration.PonderLocalization.UI_PREFIX;
 
@@ -35,18 +35,13 @@ public abstract class AbstractPonderScreen extends NavigatableSimiScreen {
         super.init();
 
         if (backTrack != null) {
-            backTrack.withCustomTheme(
-                PonderButton.COLOR_IDLE,
-                PonderButton.COLOR_HOVER,
-                PonderButton.COLOR_CLICK,
-                PonderButton.COLOR_DISABLED
-            );
+            backTrack.withCustomTheme(PonderButton.COLOR_IDLE, PonderButton.COLOR_HOVER, PonderButton.COLOR_CLICK, PonderButton.COLOR_DISABLED);
         }
 
     }
 
     @Override
-    protected Component backTrackingComponent() {
+    protected Text backTrackingComponent() {
         if (ScreenOpener.getBackStepScreen() instanceof NavigatableSimiScreen) {
             return Ponder.lang().translate(AbstractPonderScreen.THINK_BACK).component();
         }

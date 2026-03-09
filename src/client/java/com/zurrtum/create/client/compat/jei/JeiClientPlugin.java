@@ -45,17 +45,18 @@ import mezz.jei.api.runtime.IIngredientListOverlay;
 import mezz.jei.api.runtime.IIngredientManager;
 import mezz.jei.api.runtime.IJeiRuntime;
 import mezz.jei.common.Internal;
-import net.minecraft.core.Holder;
-import net.minecraft.core.HolderSet;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.Identifier;
-import net.minecraft.resources.ResourceKey;
-import net.minecraft.world.item.DyeColor;
-import net.minecraft.world.item.DyeItem;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.crafting.*;
+import net.minecraft.item.DyeItem;
+import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
+import net.minecraft.recipe.*;
+import net.minecraft.recipe.book.CraftingRecipeCategory;
+import net.minecraft.registry.Registries;
+import net.minecraft.registry.RegistryKey;
+import net.minecraft.registry.RegistryKeys;
+import net.minecraft.registry.entry.RegistryEntry;
+import net.minecraft.registry.entry.RegistryEntryList;
+import net.minecraft.util.DyeColor;
+import net.minecraft.util.Identifier;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -67,51 +68,37 @@ import static com.zurrtum.create.Create.MOD_ID;
 @JeiPlugin
 public class JeiClientPlugin implements IModPlugin {
     public static final Identifier ID = Create.asResource("jei_plugin");
-    public static final IRecipeType<RecipeHolder<CraftingRecipe>> AUTOMATIC_PACKING = createRecipeHolderType(
-        "automatic_packing");
-    public static final IRecipeType<RecipeHolder<CompactingRecipe>> PACKING = createRecipeHolderType("packing");
-    public static final IRecipeType<RecipeHolder<PressingRecipe>> PRESSING = createRecipeHolderType("pressing");
-    public static final IRecipeType<RecipeHolder<ShapelessRecipe>> AUTOMATIC_SHAPELESS = createRecipeHolderType(
-        "automatic_shapeless");
-    public static final IRecipeType<RecipeHolder<MixingRecipe>> MIXING = createRecipeHolderType("mixing");
-    public static final IRecipeType<RecipeHolder<MillingRecipe>> MILLING = createRecipeHolderType("milling");
-    public static final IRecipeType<RecipeHolder<CuttingRecipe>> SAWING = createRecipeHolderType("sawing");
-    public static final IRecipeType<RecipeHolder<? extends CreateSingleStackRollableRecipe>> CRUSHING = createRecipeHolderType(
-        "crushing");
-    public static final IRecipeType<RecipeHolder<ManualApplicationRecipe>> ITEM_APPLICATION = createRecipeHolderType(
-        "item_application");
-    public static final IRecipeType<RecipeHolder<? extends ItemApplicationRecipe>> DEPLOYING = createRecipeHolderType(
-        "deploying");
-    public static final IRecipeType<RecipeHolder<EmptyingRecipe>> DRAINING = createRecipeHolderType("draining");
-    public static final IRecipeType<RecipeHolder<MechanicalCraftingRecipe>> MECHANICAL_CRAFTING = createRecipeHolderType(
-        "mechanical_crafting");
-    public static final IRecipeType<RecipeHolder<FillingRecipe>> SPOUT_FILLING = createRecipeHolderType("spout_filling");
-    public static final IRecipeType<RecipeHolder<SandPaperPolishingRecipe>> SANDPAPER_POLISHING = createRecipeHolderType(
-        "sandpaper_polishing");
-    public static final IRecipeType<RecipeHolder<SequencedAssemblyRecipe>> SEQUENCED_ASSEMBLY = createRecipeHolderType(
-        "sequenced_assembly");
-    public static final IRecipeType<RecipeHolder<? extends SingleItemRecipe>> FAN_BLASTING = createRecipeHolderType(
-        "fan_blasting");
-    public static final IRecipeType<RecipeHolder<HauntingRecipe>> FAN_HAUNTING = createRecipeHolderType("fan_haunting");
-    public static final IRecipeType<RecipeHolder<SmokingRecipe>> FAN_SMOKING = createRecipeHolderType("fan_smoking");
-    public static final IRecipeType<RecipeHolder<SplashingRecipe>> FAN_WASHING = createRecipeHolderType("fan_washing");
-    public static final IRecipeType<RecipeHolder<PotionRecipe>> AUTOMATIC_BREWING = createRecipeHolderType(
-        "automatic_brewing");
+    public static final IRecipeType<RecipeEntry<CraftingRecipe>> AUTOMATIC_PACKING = createRecipeHolderType("automatic_packing");
+    public static final IRecipeType<RecipeEntry<CompactingRecipe>> PACKING = createRecipeHolderType("packing");
+    public static final IRecipeType<RecipeEntry<PressingRecipe>> PRESSING = createRecipeHolderType("pressing");
+    public static final IRecipeType<RecipeEntry<ShapelessRecipe>> AUTOMATIC_SHAPELESS = createRecipeHolderType("automatic_shapeless");
+    public static final IRecipeType<RecipeEntry<MixingRecipe>> MIXING = createRecipeHolderType("mixing");
+    public static final IRecipeType<RecipeEntry<MillingRecipe>> MILLING = createRecipeHolderType("milling");
+    public static final IRecipeType<RecipeEntry<CuttingRecipe>> SAWING = createRecipeHolderType("sawing");
+    public static final IRecipeType<RecipeEntry<? extends CreateSingleStackRollableRecipe>> CRUSHING = createRecipeHolderType("crushing");
+    public static final IRecipeType<RecipeEntry<ManualApplicationRecipe>> ITEM_APPLICATION = createRecipeHolderType("item_application");
+    public static final IRecipeType<RecipeEntry<? extends ItemApplicationRecipe>> DEPLOYING = createRecipeHolderType("deploying");
+    public static final IRecipeType<RecipeEntry<EmptyingRecipe>> DRAINING = createRecipeHolderType("draining");
+    public static final IRecipeType<RecipeEntry<MechanicalCraftingRecipe>> MECHANICAL_CRAFTING = createRecipeHolderType("mechanical_crafting");
+    public static final IRecipeType<RecipeEntry<FillingRecipe>> SPOUT_FILLING = createRecipeHolderType("spout_filling");
+    public static final IRecipeType<RecipeEntry<SandPaperPolishingRecipe>> SANDPAPER_POLISHING = createRecipeHolderType("sandpaper_polishing");
+    public static final IRecipeType<RecipeEntry<SequencedAssemblyRecipe>> SEQUENCED_ASSEMBLY = createRecipeHolderType("sequenced_assembly");
+    public static final IRecipeType<RecipeEntry<? extends SingleStackRecipe>> FAN_BLASTING = createRecipeHolderType("fan_blasting");
+    public static final IRecipeType<RecipeEntry<HauntingRecipe>> FAN_HAUNTING = createRecipeHolderType("fan_haunting");
+    public static final IRecipeType<RecipeEntry<SmokingRecipe>> FAN_SMOKING = createRecipeHolderType("fan_smoking");
+    public static final IRecipeType<RecipeEntry<SplashingRecipe>> FAN_WASHING = createRecipeHolderType("fan_washing");
+    public static final IRecipeType<RecipeEntry<PotionRecipe>> AUTOMATIC_BREWING = createRecipeHolderType("automatic_brewing");
     public static final IRecipeType<MysteriousItemConversionDisplay> MYSTERY_CONVERSION = IRecipeType.create(
         MOD_ID,
         "mystery_conversion",
         MysteriousItemConversionDisplay.class
     );
-    public static final IRecipeType<BlockCuttingDisplay> BLOCK_CUTTING = IRecipeType.create(
-        MOD_ID,
-        "block_cutting",
-        BlockCuttingDisplay.class
-    );
+    public static final IRecipeType<BlockCuttingDisplay> BLOCK_CUTTING = IRecipeType.create(MOD_ID, "block_cutting", BlockCuttingDisplay.class);
 
     @SuppressWarnings("unchecked")
     public static <T> IRecipeType<T> createRecipeHolderType(String path) {
-        Identifier uid = Identifier.fromNamespaceAndPath(MOD_ID, path);
-        return (IRecipeType<T>) IRecipeType.create(uid, RecipeHolder.class);
+        Identifier uid = Identifier.of(MOD_ID, path);
+        return (IRecipeType<T>) IRecipeType.create(uid, RecipeEntry.class);
     }
 
     @Override
@@ -173,7 +160,7 @@ public class JeiClientPlugin implements IModPlugin {
 
     @Override
     public void registerRecipes(IRecipeRegistration registration) {
-        RecipeMap preparedRecipes = Internal.getClientSyncedRecipes();
+        PreparedRecipes preparedRecipes = Internal.getClientSyncedRecipes();
         registration.addRecipes(AUTOMATIC_PACKING, AutoCompactingCategory.getRecipes(preparedRecipes));
         registration.addRecipes(PACKING, CompactingCategory.getRecipes(preparedRecipes));
         registration.addRecipes(PRESSING, PressingCategory.getRecipes(preparedRecipes));
@@ -198,53 +185,37 @@ public class JeiClientPlugin implements IModPlugin {
         registration.addRecipes(DRAINING, DrainingCategory.getRecipes(preparedRecipes, stacks.stream()));
         registration.addRecipes(
             SPOUT_FILLING,
-            SpoutFillingCategory.getRecipes(
-                preparedRecipes,
-                stacks.stream(),
-                ingredientManager.getAllIngredients(FabricTypes.FLUID_STACK).stream()
-            )
+            SpoutFillingCategory.getRecipes(preparedRecipes, stacks.stream(), ingredientManager.getAllIngredients(FabricTypes.FLUID_STACK).stream())
         );
         registerToolboxRecipes(registration);
         registration.addRecipes(BLOCK_CUTTING, BlockCuttingCategory.getRecipes(preparedRecipes));
     }
 
     public static void registerToolboxRecipes(IRecipeRegistration registration) {
-        List<Holder<Item>> toolboxes = new ArrayList<>();
-        for (Holder<Item> entry : BuiltInRegistries.ITEM.getTagOrEmpty(AllItemTags.TOOLBOXES)) {
+        List<RegistryEntry<Item>> toolboxes = new ArrayList<>();
+        for (RegistryEntry<Item> entry : Registries.ITEM.iterateEntries(AllItemTags.TOOLBOXES)) {
             toolboxes.add(entry);
         }
-        Ingredient ingredient = Ingredient.of(HolderSet.direct(toolboxes));
+        Ingredient ingredient = Ingredient.ofTag(RegistryEntryList.of(toolboxes));
         String group = "create.toolbox.color";
-        List<RecipeHolder<CraftingRecipe>> recipes = new ArrayList<>();
+        List<RecipeEntry<CraftingRecipe>> recipes = new ArrayList<>();
         for (DyeColor color : DyeColor.values()) {
-            recipes.add(new RecipeHolder<>(
-                ResourceKey.create(Registries.RECIPE, Identifier.fromNamespaceAndPath(MOD_ID, group + "/" + color)),
-                new ShapelessRecipe(
-                    group,
-                    CraftingBookCategory.MISC,
-                    ToolboxBlock.getColorBlock(color).asItem().getDefaultInstance(),
-                    List.of(Ingredient.of(DyeItem.byColor(color)), ingredient)
-                )
+            recipes.add(new RecipeEntry<>(
+                RegistryKey.of(RegistryKeys.RECIPE, Identifier.of(MOD_ID, group + "/" + color)), new ShapelessRecipe(
+                group,
+                CraftingRecipeCategory.MISC,
+                ToolboxBlock.getColorBlock(color).asItem().getDefaultStack(),
+                List.of(Ingredient.ofItem(DyeItem.byColor(color)), ingredient)
+            )
             ));
         }
         registration.addRecipes(RecipeTypes.CRAFTING, recipes);
     }
 
     @Override
-    public <T> void registerFluidSubtypes(
-        ISubtypeRegistration registration,
-        IPlatformFluidHelper<T> platformFluidHelper
-    ) {
-        registration.registerSubtypeInterpreter(
-            FabricTypes.FLUID_STACK,
-            AllFluids.POTION,
-            PotionFluidSubtypeInterpreter.INSTANCE
-        );
-        registration.registerSubtypeInterpreter(
-            FabricTypes.FLUID_STACK,
-            AllFluids.POTION.getFlowing(),
-            PotionFluidSubtypeInterpreter.INSTANCE
-        );
+    public <T> void registerFluidSubtypes(ISubtypeRegistration registration, IPlatformFluidHelper<T> platformFluidHelper) {
+        registration.registerSubtypeInterpreter(FabricTypes.FLUID_STACK, AllFluids.POTION, PotionFluidSubtypeInterpreter.INSTANCE);
+        registration.registerSubtypeInterpreter(FabricTypes.FLUID_STACK, AllFluids.POTION.getFlowing(), PotionFluidSubtypeInterpreter.INSTANCE);
     }
 
     @Override

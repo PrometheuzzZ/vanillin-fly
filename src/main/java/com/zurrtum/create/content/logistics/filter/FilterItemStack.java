@@ -9,24 +9,21 @@ import com.zurrtum.create.content.logistics.item.filter.attribute.ItemAttribute;
 import com.zurrtum.create.infrastructure.component.AttributeFilterWhitelistMode;
 import com.zurrtum.create.infrastructure.component.ItemAttributeEntry;
 import com.zurrtum.create.infrastructure.fluids.FluidStack;
-import net.minecraft.core.component.DataComponents;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.Level;
+import net.minecraft.component.DataComponentTypes;
+import net.minecraft.item.ItemStack;
+import net.minecraft.world.World;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public class FilterItemStack {
-    public static final Codec<FilterItemStack> CODEC = ItemStack.OPTIONAL_CODEC.xmap(
-        FilterItemStack::of,
-        FilterItemStack::item
-    );
+    public static final Codec<FilterItemStack> CODEC = ItemStack.OPTIONAL_CODEC.xmap(FilterItemStack::of, FilterItemStack::item);
     private final ItemStack filterItemStack;
     private boolean fluidExtracted;
     private FluidStack filterFluidStack;
 
     public static FilterItemStack of(ItemStack filter) {
-        if (!filter.getComponentsPatch().isEmpty() && filter.getItem() instanceof FilterItem item) {
+        if (!filter.getComponentChanges().isEmpty() && filter.getItem() instanceof FilterItem item) {
             trimFilterComponents(filter);
             return item.makeStackWrapper(filter);
         }
@@ -39,8 +36,8 @@ public class FilterItemStack {
     }
 
     private static void trimFilterComponents(ItemStack filter) {
-        filter.remove(DataComponents.ENCHANTMENTS);
-        filter.remove(DataComponents.ATTRIBUTE_MODIFIERS);
+        filter.remove(DataComponentTypes.ENCHANTMENTS);
+        filter.remove(DataComponentTypes.ATTRIBUTE_MODIFIERS);
     }
 
     public boolean isEmpty() {
@@ -51,7 +48,7 @@ public class FilterItemStack {
         return filterItemStack;
     }
 
-    public FluidStack fluid(Level level) {
+    public FluidStack fluid(World level) {
         resolveFluid(level);
         return filterFluidStack;
     }
@@ -62,48 +59,42 @@ public class FilterItemStack {
 
     //
 
-    public boolean test(Level world, ItemStack stack) {
+    public boolean test(World world, ItemStack stack) {
         return test(world, stack, false);
     }
 
-    public boolean test(Level world, FluidStack stack) {
+    public boolean test(World world, FluidStack stack) {
         return test(world, stack, true);
     }
 
-    public boolean test(Level world, ItemStack stack, boolean matchNBT) {
-        if (isEmpty()) {
+    public boolean test(World world, ItemStack stack, boolean matchNBT) {
+        if (isEmpty())
             return true;
-        }
         return FilterItem.testDirect(filterItemStack, stack, matchNBT);
     }
 
-    public boolean test(Level world, FluidStack stack, boolean matchNBT) {
-        if (isEmpty()) {
+    public boolean test(World world, FluidStack stack, boolean matchNBT) {
+        if (isEmpty())
             return true;
-        }
-        if (stack.isEmpty()) {
+        if (stack.isEmpty())
             return false;
-        }
 
         resolveFluid(world);
 
-        if (filterFluidStack.isEmpty()) {
+        if (filterFluidStack.isEmpty())
             return false;
-        }
-        if (!matchNBT) {
-            return filterFluidStack.getFluid().isSame(stack.getFluid());
-        }
+        if (!matchNBT)
+            return filterFluidStack.getFluid().matchesType(stack.getFluid());
         return FluidStack.areFluidsAndComponentsEqualIgnoreCapacity(filterFluidStack, stack);
     }
 
     //
 
-    private void resolveFluid(Level world) {
+    private void resolveFluid(World world) {
         if (!fluidExtracted) {
             fluidExtracted = true;
-            if (GenericItemEmptying.canItemBeEmptied(world, filterItemStack)) {
+            if (GenericItemEmptying.canItemBeEmptied(world, filterItemStack))
                 filterFluidStack = GenericItemEmptying.emptyItem(world, filterItemStack, true).getFirst();
-            }
         }
     }
 
@@ -121,13 +112,12 @@ public class FilterItemStack {
 
         public ListFilterItemStack(ItemStack filter) {
             super(filter);
-            boolean hasFilterItems = filter.has(AllDataComponents.FILTER_ITEMS);
+            boolean hasFilterItems = filter.contains(AllDataComponents.FILTER_ITEMS);
 
             containedItems = new ArrayList<>();
             for (ItemStack stack : ((ListFilterItem) filter.getItem()).getFilterItemHandler(filter)) {
-                if (!stack.isEmpty()) {
+                if (!stack.isEmpty())
                     containedItems.add(FilterItemStack.of(stack));
-                }
             }
 
             shouldRespectNBT = hasFilterItems && filter.getOrDefault(AllDataComponents.FILTER_ITEMS_RESPECT_NBT, false);
@@ -135,22 +125,18 @@ public class FilterItemStack {
         }
 
         @Override
-        public boolean test(Level world, ItemStack stack, boolean matchNBT) {
-            for (FilterItemStack filterItemStack : containedItems) {
-                if (filterItemStack.test(world, stack, shouldRespectNBT)) {
+        public boolean test(World world, ItemStack stack, boolean matchNBT) {
+            for (FilterItemStack filterItemStack : containedItems)
+                if (filterItemStack.test(world, stack, shouldRespectNBT))
                     return !isBlacklist;
-                }
-            }
             return isBlacklist;
         }
 
         @Override
-        public boolean test(Level world, FluidStack stack, boolean matchNBT) {
-            for (FilterItemStack filterItemStack : containedItems) {
-                if (filterItemStack.test(world, stack, shouldRespectNBT)) {
+        public boolean test(World world, FluidStack stack, boolean matchNBT) {
+            for (FilterItemStack filterItemStack : containedItems)
+                if (filterItemStack.test(world, stack, shouldRespectNBT))
                     return !isBlacklist;
-                }
-            }
             return isBlacklist;
         }
 
@@ -162,34 +148,29 @@ public class FilterItemStack {
 
         public AttributeFilterItemStack(ItemStack filter) {
             super(filter);
-            boolean defaults = !filter.has(AllDataComponents.ATTRIBUTE_FILTER_MATCHED_ATTRIBUTES);
+            boolean defaults = !filter.contains(AllDataComponents.ATTRIBUTE_FILTER_MATCHED_ATTRIBUTES);
 
             attributeTests = new ArrayList<>();
-            whitelistMode = filter.getOrDefault(
-                AllDataComponents.ATTRIBUTE_FILTER_WHITELIST_MODE,
-                AttributeFilterWhitelistMode.WHITELIST_DISJ
-            );
+            whitelistMode = filter.getOrDefault(AllDataComponents.ATTRIBUTE_FILTER_WHITELIST_MODE, AttributeFilterWhitelistMode.WHITELIST_DISJ);
 
             List<ItemAttributeEntry> attributes = defaults ? new ArrayList<>() : filter.get(AllDataComponents.ATTRIBUTE_FILTER_MATCHED_ATTRIBUTES);
             //noinspection DataFlowIssue
             for (ItemAttributeEntry attributeEntry : attributes) {
                 ItemAttribute attribute = attributeEntry.attribute();
-                if (attribute != null) {
+                if (attribute != null)
                     attributeTests.add(Pair.of(attribute, attributeEntry.inverted()));
-                }
             }
         }
 
         @Override
-        public boolean test(Level world, FluidStack stack, boolean matchNBT) {
+        public boolean test(World world, FluidStack stack, boolean matchNBT) {
             return false;
         }
 
         @Override
-        public boolean test(Level world, ItemStack stack, boolean matchNBT) {
-            if (attributeTests.isEmpty()) {
+        public boolean test(World world, ItemStack stack, boolean matchNBT) {
+            if (attributeTests.isEmpty())
                 return super.test(world, stack, matchNBT);
-            }
             for (Pair<ItemAttribute, Boolean> test : attributeTests) {
                 ItemAttribute attribute = test.getFirst();
                 boolean inverted = test.getSecond();
@@ -238,19 +219,15 @@ public class FilterItemStack {
         }
 
         @Override
-        public boolean test(Level world, ItemStack stack, boolean matchNBT) {
-            return (filterString.isBlank() && super.test(
-                world,
-                stack,
-                matchNBT
-            )) || PackageItem.isPackage(stack) && PackageItem.matchAddress(
+        public boolean test(World world, ItemStack stack, boolean matchNBT) {
+            return (filterString.isBlank() && super.test(world, stack, matchNBT)) || PackageItem.isPackage(stack) && PackageItem.matchAddress(
                 stack,
                 filterString
             );
         }
 
         @Override
-        public boolean test(Level world, FluidStack stack, boolean matchNBT) {
+        public boolean test(World world, FluidStack stack, boolean matchNBT) {
             return false;
         }
 

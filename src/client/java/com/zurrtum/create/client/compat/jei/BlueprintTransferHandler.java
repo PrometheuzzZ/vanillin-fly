@@ -15,53 +15,52 @@ import mezz.jei.api.recipe.transfer.IRecipeTransferError;
 import mezz.jei.api.recipe.transfer.IRecipeTransferHandler;
 import mezz.jei.api.recipe.types.IRecipeType;
 import mezz.jei.library.transfer.RecipeTransferErrorMissingSlots;
-import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.core.Holder;
-import net.minecraft.core.HolderSet;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.network.chat.Component;
-import net.minecraft.tags.TagKey;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.inventory.MenuType;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.component.ItemContainerContents;
-import net.minecraft.world.item.crafting.CraftingRecipe;
-import net.minecraft.world.item.crafting.RecipeHolder;
+import net.minecraft.client.network.ClientPlayerEntity;
+import net.minecraft.component.type.ContainerComponent;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
+import net.minecraft.recipe.CraftingRecipe;
+import net.minecraft.recipe.RecipeEntry;
+import net.minecraft.registry.Registries;
+import net.minecraft.registry.entry.RegistryEntry;
+import net.minecraft.registry.entry.RegistryEntryList;
+import net.minecraft.registry.tag.TagKey;
+import net.minecraft.screen.ScreenHandlerType;
+import net.minecraft.text.Text;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-public class BlueprintTransferHandler implements IRecipeTransferHandler<BlueprintMenu, RecipeHolder<CraftingRecipe>> {
+public class BlueprintTransferHandler implements IRecipeTransferHandler<BlueprintMenu, RecipeEntry<CraftingRecipe>> {
     @Override
     public Class<? extends BlueprintMenu> getContainerClass() {
         return BlueprintMenu.class;
     }
 
     @Override
-    public Optional<MenuType<BlueprintMenu>> getMenuType() {
+    public Optional<ScreenHandlerType<BlueprintMenu>> getMenuType() {
         return Optional.empty();
     }
 
     @Override
-    public IRecipeType<RecipeHolder<CraftingRecipe>> getRecipeType() {
+    public IRecipeType<RecipeEntry<CraftingRecipe>> getRecipeType() {
         return RecipeTypes.CRAFTING;
     }
 
     @Override
     public @Nullable IRecipeTransferError transferRecipe(
         BlueprintMenu menu,
-        RecipeHolder<CraftingRecipe> craftingRecipe,
+        RecipeEntry<CraftingRecipe> craftingRecipe,
         IRecipeSlotsView recipeSlots,
-        Player player,
+        PlayerEntity player,
         boolean maxTransfer,
         boolean doTransfer
     ) {
-        if (!doTransfer) {
+        if (!doTransfer)
             return null;
-        }
 
         List<IRecipeSlotView> inputViews = new ArrayList<>();
         List<IRecipeSlotView> outputViews = new ArrayList<>();
@@ -82,8 +81,7 @@ public class BlueprintTransferHandler implements IRecipeTransferHandler<Blueprin
             }
         }
         if (output == null) {
-            return new RecipeTransferErrorMissingSlots(
-                Component.translatable("jei.tooltip.error.recipe.transfer.missing"), outputViews);
+            return new RecipeTransferErrorMissingSlots(Text.translatable("jei.tooltip.error.recipe.transfer.missing"), outputViews);
         }
         List<TagKey<Item>> cache = new ArrayList<>();
         List<ItemStack> input = new ArrayList<>();
@@ -100,11 +98,8 @@ public class BlueprintTransferHandler implements IRecipeTransferHandler<Blueprin
             }
             TagKey<Item> tag = findTag(ingredient, cache);
             if (tag != null) {
-                ItemStack filterItem = AllItems.ATTRIBUTE_FILTER.getDefaultInstance();
-                filterItem.set(
-                    AllDataComponents.ATTRIBUTE_FILTER_WHITELIST_MODE,
-                    AttributeFilterWhitelistMode.WHITELIST_DISJ
-                );
+                ItemStack filterItem = AllItems.ATTRIBUTE_FILTER.getDefaultStack();
+                filterItem.set(AllDataComponents.ATTRIBUTE_FILTER_WHITELIST_MODE, AttributeFilterWhitelistMode.WHITELIST_DISJ);
                 filterItem.set(
                     AllDataComponents.ATTRIBUTE_FILTER_MATCHED_ATTRIBUTES,
                     List.of(new ItemAttributeEntry(new InTagAttribute(tag), false))
@@ -112,43 +107,43 @@ public class BlueprintTransferHandler implements IRecipeTransferHandler<Blueprin
                 input.add(filterItem);
                 continue;
             }
-            ItemStack filterItem = AllItems.FILTER.getDefaultInstance();
-            filterItem.set(AllDataComponents.FILTER_ITEMS, ItemContainerContents.fromItems(ingredient));
+            ItemStack filterItem = AllItems.FILTER.getDefaultStack();
+            filterItem.set(AllDataComponents.FILTER_ITEMS, ContainerComponent.fromStacks(ingredient));
             input.add(filterItem);
         }
         BlueprintAssignCompleteRecipePacket packet = new BlueprintAssignCompleteRecipePacket(input, output);
-        ((LocalPlayer) player).connection.send(packet);
+        ((ClientPlayerEntity) player).networkHandler.sendPacket(packet);
         return null;
     }
 
     @Nullable
     public static TagKey<Item> findTag(List<ItemStack> ingredient, List<TagKey<Item>> cache) {
-        List<Holder.Reference<Item>> list = getEntries(ingredient);
+        List<RegistryEntry.Reference<Item>> list = getEntries(ingredient);
         for (TagKey<Item> tag : cache) {
             if (matchTag(list, tag)) {
                 return tag;
             }
         }
         int size = list.size();
-        return BuiltInRegistries.ITEM.getTags().filter(set -> set.size() == size).map(HolderSet.Named::key)
-            .filter(t -> matchTag(list, t)).findFirst().map(tag -> {
+        return Registries.ITEM.streamTags().filter(set -> set.size() == size).map(RegistryEntryList.Named::getTag).filter(t -> matchTag(list, t))
+            .findFirst().map(tag -> {
                 cache.add(tag);
                 return tag;
             }).orElse(null);
     }
 
     @SuppressWarnings("deprecation")
-    public static List<Holder.Reference<Item>> getEntries(List<ItemStack> ingredient) {
-        List<Holder.Reference<Item>> list = new ArrayList<>(ingredient.size());
+    public static List<RegistryEntry.Reference<Item>> getEntries(List<ItemStack> ingredient) {
+        List<RegistryEntry.Reference<Item>> list = new ArrayList<>(ingredient.size());
         for (ItemStack stack : ingredient) {
-            list.add(stack.getItem().builtInRegistryHolder());
+            list.add(stack.getItem().getRegistryEntry());
         }
         return list;
     }
 
-    public static boolean matchTag(List<Holder.Reference<Item>> list, TagKey<Item> tag) {
-        for (Holder.Reference<Item> entry : list) {
-            if (entry.is(tag)) {
+    public static boolean matchTag(List<RegistryEntry.Reference<Item>> list, TagKey<Item> tag) {
+        for (RegistryEntry.Reference<Item> entry : list) {
+            if (entry.isIn(tag)) {
                 continue;
             }
             return false;

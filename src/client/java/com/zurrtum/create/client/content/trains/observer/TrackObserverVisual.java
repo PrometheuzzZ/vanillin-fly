@@ -15,10 +15,10 @@ import com.zurrtum.create.content.trains.observer.TrackObserverBlockEntity;
 import com.zurrtum.create.content.trains.track.ITrackBlock;
 import com.zurrtum.create.content.trains.track.TrackTargetingBehaviour;
 import com.zurrtum.create.content.trains.track.TrackTargetingBehaviour.RenderedTrackOverlayType;
-import net.minecraft.core.BlockPos;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.function.Consumer;
@@ -30,8 +30,7 @@ public class TrackObserverVisual extends AbstractBlockEntityVisual<TrackObserver
     public TrackObserverVisual(VisualizationContext ctx, TrackObserverBlockEntity blockEntity, float partialTick) {
         super(ctx, blockEntity, partialTick);
 
-        overlay = ctx.instancerProvider()
-            .instancer(InstanceTypes.TRANSFORMED, Models.partial(AllPartialModels.TRACK_OBSERVER_OVERLAY))
+        overlay = ctx.instancerProvider().instancer(InstanceTypes.TRANSFORMED, Models.partial(AllPartialModels.TRACK_OBSERVER_OVERLAY))
             .createInstance();
 
         setupVisual();
@@ -60,7 +59,7 @@ public class TrackObserverVisual extends AbstractBlockEntityVisual<TrackObserver
     private void setupVisual() {
         TrackTargetingBehaviour<TrackObserver> target = blockEntity.edgePoint;
         BlockPos targetPosition = target.getGlobalPosition();
-        Level level = blockEntity.getLevel();
+        World level = blockEntity.getWorld();
         BlockState trackState = level.getBlockState(targetPosition);
         Block block = trackState.getBlock();
 
@@ -77,15 +76,7 @@ public class TrackObserverVisual extends AbstractBlockEntityVisual<TrackObserver
             TrackBlockRenderer renderer = AllTrackRenders.get(trackBlock);
             if (renderer != null) {
                 RenderedTrackOverlayType type = RenderedTrackOverlayType.OBSERVER;
-                renderer.prepareTrackOverlay(
-                    overlay,
-                    level,
-                    targetPosition,
-                    trackState,
-                    target.getTargetBezier(),
-                    target.getTargetDirection(),
-                    type
-                );
+                renderer.prepareTrackOverlay(overlay, level, targetPosition, trackState, target.getTargetBezier(), target.getTargetDirection(), type);
             }
 
             overlay.setChanged();

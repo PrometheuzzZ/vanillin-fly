@@ -13,12 +13,12 @@ import com.zurrtum.create.client.ponder.api.scene.SceneBuildingUtil;
 import com.zurrtum.create.client.ponder.api.scene.Selection;
 import com.zurrtum.create.content.processing.burner.BlazeBurnerBlock;
 import com.zurrtum.create.content.trains.station.StationBlock;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
-import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.item.ItemStack;
+import net.minecraft.item.Items;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Box;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Vec3d;
 
 public class TrainScenes {
 
@@ -48,12 +48,7 @@ public class TrainScenes {
         scene.idle(15);
 
         BlockPos initialControlsPos = util.grid().at(3, 3, 4);
-        scene.overlay().chaseBoundingBoxOutline(
-            PonderPalette.WHITE,
-            train,
-            new AABB(initialControlsPos).contract(-6 / 16f, 2 / 16f, 0),
-            85
-        );
+        scene.overlay().chaseBoundingBoxOutline(PonderPalette.WHITE, train, new Box(initialControlsPos).shrink(-6 / 16f, 2 / 16f, 0), 85);
         scene.idle(15);
 
         scene.overlay().showText(70).pointAt(util.vector().of(3.35f, 3.75f, 5)).placeNearTarget().attachKeyFrame()
@@ -170,23 +165,21 @@ public class TrainScenes {
         scene.world().animateTrainStation(stationPos, true);
         scene.idle(10);
 
-        scene.overlay().showText(70).pointAt(util.vector().blockSurface(util.grid().at(3, 3, 4), Direction.WEST))
-            .placeNearTarget().attachKeyFrame().text("Schedules allow Trains to be controlled by other Drivers");
+        scene.overlay().showText(70).pointAt(util.vector().blockSurface(util.grid().at(3, 3, 4), Direction.WEST)).placeNearTarget().attachKeyFrame()
+            .text("Schedules allow Trains to be controlled by other Drivers");
         scene.idle(80);
 
-        Vec3 target = util.vector().topOf(util.grid().at(4, 0, 2));
-        scene.overlay().showControls(target, Pointing.RIGHT, 80).rightClick()
-            .withItem(AllItems.SCHEDULE.getDefaultInstance());
+        Vec3d target = util.vector().topOf(util.grid().at(4, 0, 2));
+        scene.overlay().showControls(target, Pointing.RIGHT, 80).rightClick().withItem(AllItems.SCHEDULE.getDefaultStack());
         scene.overlay().showText(80).pointAt(target).placeNearTarget().attachKeyFrame().colored(PonderPalette.BLUE)
             .text("Right-click with the item in hand to open its Interface");
         scene.idle(100);
 
         scene.overlay().showControls(util.vector().topOf(util.grid().at(3, 3, 4)), Pointing.DOWN, 80).rightClick()
-            .withItem(AllItems.SCHEDULE.getDefaultInstance());
+            .withItem(AllItems.SCHEDULE.getDefaultStack());
         scene.idle(6);
         scene.world().conductorBlaze(util.grid().at(3, 3, 4), true);
-        scene.overlay().showText(70).pointAt(util.vector().blockSurface(util.grid().at(3, 3, 4), Direction.WEST))
-            .placeNearTarget().attachKeyFrame()
+        scene.overlay().showText(70).pointAt(util.vector().blockSurface(util.grid().at(3, 3, 4), Direction.WEST)).placeNearTarget().attachKeyFrame()
             .text("Once programmed, the Schedule can be handed off to a Train Driver");
         scene.idle(80);
 
@@ -200,7 +193,7 @@ public class TrainScenes {
         ElementLink<WorldSectionElement> trainElement2 = scene.world().showIndependentSection(train2, Direction.DOWN);
         scene.world().moveSection(trainElement2, util.vector().of(0, 0, -3), 0);
         scene.idle(10);
-        Vec3 birbVec = util.vector().topOf(util.grid().at(3, 0, 7));
+        Vec3d birbVec = util.vector().topOf(util.grid().at(3, 0, 7));
         ElementLink<ParrotElement> birb = scene.special().createBirb(birbVec, ParrotPose.FacePointOfInterestPose::new);
         scene.world().animateTrainStation(stationPos, true);
 
@@ -208,12 +201,10 @@ public class TrainScenes {
             .text("Any mob or blaze burner sitting in front of Train Controls is an eligible conductor");
         scene.idle(80);
 
-        scene.overlay().showControls(util.vector().centerOf(util.grid().at(3, 1, 7)), Pointing.DOWN, 30)
-            .withItem(new ItemStack(Items.LEAD));
+        scene.overlay().showControls(util.vector().centerOf(util.grid().at(3, 1, 7)), Pointing.DOWN, 30).withItem(new ItemStack(Items.LEAD));
         scene.idle(40);
         target = util.vector().centerOf(util.grid().at(3, 3, 4));
-        scene.overlay().showControls(target.add(0.5, 0, 0), Pointing.RIGHT, 30).rightClick()
-            .withItem(new ItemStack(Items.LEAD));
+        scene.overlay().showControls(target.add(0.5, 0, 0), Pointing.RIGHT, 30).rightClick().withItem(new ItemStack(Items.LEAD));
         scene.idle(6);
         scene.special().moveParrot(birb, target.subtract(birbVec), 5);
         scene.effects().indicateSuccess(util.grid().at(3, 3, 4));
@@ -223,8 +214,7 @@ public class TrainScenes {
             .text("Creatures on a lead can be given their seat more conveniently");
         scene.idle(80);
 
-        scene.overlay().showControls(util.vector().topOf(util.grid().at(3, 3, 4)), Pointing.DOWN, 15)
-            .withItem(AllItems.SCHEDULE.getDefaultInstance());
+        scene.overlay().showControls(util.vector().topOf(util.grid().at(3, 3, 4)), Pointing.DOWN, 15).withItem(AllItems.SCHEDULE.getDefaultStack());
         scene.idle(6);
         scene.special().conductorBirb(birb, true);
         scene.special().movePointOfInterest(util.grid().at(16, 4, 4));
@@ -240,8 +230,8 @@ public class TrainScenes {
         scene.special().conductorBirb(birb, false);
         scene.special().movePointOfInterest(util.grid().at(3, 4, 1));
         scene.idle(19);
-        scene.overlay().showText(70).pointAt(target.add(3, 0, 0)).placeNearTarget().colored(PonderPalette.BLUE)
-            .attachKeyFrame().text("Schedules can be retrieved from Drivers at any moment");
+        scene.overlay().showText(70).pointAt(target.add(3, 0, 0)).placeNearTarget().colored(PonderPalette.BLUE).attachKeyFrame()
+            .text("Schedules can be retrieved from Drivers at any moment");
         scene.idle(80);
 
     }

@@ -5,56 +5,54 @@ import com.zurrtum.create.catnip.nbt.NBTProcessors;
 import com.zurrtum.create.foundation.item.SwingControlItem;
 import com.zurrtum.create.foundation.utility.BlockHelper;
 import com.zurrtum.create.infrastructure.packet.s2c.ZapperBeamPacket;
-import net.minecraft.ChatFormatting;
-import net.minecraft.core.BlockPos;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.util.ProblemReporter;
-import net.minecraft.world.InteractionHand;
-import net.minecraft.world.InteractionResult;
-import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.TooltipFlag;
-import net.minecraft.world.item.component.TooltipDisplay;
-import net.minecraft.world.item.context.UseOnContext;
-import net.minecraft.world.level.ClipContext;
-import net.minecraft.world.level.ClipContext.Block;
-import net.minecraft.world.level.ClipContext.Fluid;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.storage.TagValueInput;
-import net.minecraft.world.phys.BlockHitResult;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.Blocks;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.component.type.TooltipDisplayComponent;
+import net.minecraft.entity.LivingEntity;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
+import net.minecraft.item.ItemUsageContext;
+import net.minecraft.item.tooltip.TooltipType;
+import net.minecraft.nbt.NbtCompound;
+import net.minecraft.storage.NbtReadView;
+import net.minecraft.text.MutableText;
+import net.minecraft.text.Text;
+import net.minecraft.util.ActionResult;
+import net.minecraft.util.ErrorReporter;
+import net.minecraft.util.Formatting;
+import net.minecraft.util.Hand;
+import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.RaycastContext;
+import net.minecraft.world.RaycastContext.FluidHandling;
+import net.minecraft.world.RaycastContext.ShapeType;
+import net.minecraft.world.World;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.function.Consumer;
 
 public abstract class ZapperItem extends Item implements SwingControlItem {
 
-    public ZapperItem(Properties properties) {
+    public ZapperItem(Settings properties) {
         super(properties);
     }
 
     @Override
     @SuppressWarnings("deprecation")
-    public void appendHoverText(
+    public void appendTooltip(
         ItemStack stack,
         TooltipContext context,
-        TooltipDisplay displayComponent,
-        Consumer<Component> tooltip,
-        TooltipFlag flagIn
+        TooltipDisplayComponent displayComponent,
+        Consumer<Text> tooltip,
+        TooltipType flagIn
     ) {
-        if (stack.has(AllDataComponents.SHAPER_BLOCK_USED)) {
-            MutableComponent usedBlock = stack.get(AllDataComponents.SHAPER_BLOCK_USED).getBlock().getName();
-            tooltip.accept(Component.translatable(
-                "create.terrainzapper.usingBlock",
-                usedBlock.withStyle(ChatFormatting.GRAY)
-            ).withStyle(ChatFormatting.DARK_GRAY));
+        if (stack.contains(AllDataComponents.SHAPER_BLOCK_USED)) {
+            MutableText usedBlock = stack.get(AllDataComponents.SHAPER_BLOCK_USED).getBlock().getName();
+            tooltip.accept(Text.translatable("create.terrainzapper.usingBlock", usedBlock.formatted(Formatting.GRAY))
+                .formatted(Formatting.DARK_GRAY));
         }
     }
 
@@ -73,114 +71,102 @@ public abstract class ZapperItem extends Item implements SwingControlItem {
 
     @Override
     @NotNull
-    public InteractionResult useOn(UseOnContext context) {
+    public ActionResult useOnBlock(ItemUsageContext context) {
         // Shift -> open GUI
-        if (context.getPlayer() != null && context.getPlayer().isShiftKeyDown()) {
-            if (context.getLevel().isClientSide()) {
-                openHandgunGUI(context.getItemInHand(), context.getHand());
-                context.getPlayer().getCooldowns().addCooldown(context.getItemInHand(), 10);
+        if (context.getPlayer() != null && context.getPlayer().isSneaking()) {
+            if (context.getWorld().isClient()) {
+                openHandgunGUI(context.getStack(), context.getHand());
+                context.getPlayer().getItemCooldownManager().set(context.getStack(), 10);
             }
-            return InteractionResult.SUCCESS;
+            return ActionResult.SUCCESS;
         }
-        return super.useOn(context);
+        return super.useOnBlock(context);
     }
 
     @Override
-    public InteractionResult use(Level world, Player player, InteractionHand hand) {
-        ItemStack item = player.getItemInHand(hand);
-        boolean mainHand = hand == InteractionHand.MAIN_HAND;
+    public ActionResult use(World world, PlayerEntity player, Hand hand) {
+        ItemStack item = player.getStackInHand(hand);
+        boolean mainHand = hand == Hand.MAIN_HAND;
 
         // Shift -> Open GUI
-        if (player.isShiftKeyDown()) {
-            if (world.isClientSide()) {
+        if (player.isSneaking()) {
+            if (world.isClient()) {
                 openHandgunGUI(item, hand);
-                player.getCooldowns().addCooldown(item, 10);
+                player.getItemCooldownManager().set(item, 10);
             }
-            return InteractionResult.SUCCESS;
+            return ActionResult.SUCCESS;
         }
 
-        if (ShootableGadgetItemMethods.shouldSwap(player, item, hand, this::isZapper)) {
-            return InteractionResult.FAIL;
-        }
+        if (ShootableGadgetItemMethods.shouldSwap(player, item, hand, this::isZapper))
+            return ActionResult.FAIL;
 
         // Check if can be used
-        Component msg = validateUsage(item);
+        Text msg = validateUsage(item);
         if (msg != null) {
-            AllSoundEvents.DENY.play(world, player, player.blockPosition());
-            player.displayClientMessage(msg.plainCopy().withStyle(ChatFormatting.RED), true);
-            return InteractionResult.FAIL;
+            AllSoundEvents.DENY.play(world, player, player.getBlockPos());
+            player.sendMessage(msg.copyContentOnly().formatted(Formatting.RED), true);
+            return ActionResult.FAIL;
         }
 
-        BlockState stateToUse = Blocks.AIR.defaultBlockState();
-        if (item.has(AllDataComponents.SHAPER_BLOCK_USED)) {
+        BlockState stateToUse = Blocks.AIR.getDefaultState();
+        if (item.contains(AllDataComponents.SHAPER_BLOCK_USED))
             stateToUse = item.get(AllDataComponents.SHAPER_BLOCK_USED);
-        }
         stateToUse = BlockHelper.setZeroAge(stateToUse);
-        CompoundTag data = null;
-        if (stateToUse.is(AllBlockTags.SAFE_NBT) && item.has(AllDataComponents.SHAPER_BLOCK_DATA)) {
+        NbtCompound data = null;
+        if (stateToUse.isIn(AllBlockTags.SAFE_NBT) && item.contains(AllDataComponents.SHAPER_BLOCK_DATA)) {
             data = item.get(AllDataComponents.SHAPER_BLOCK_DATA);
         }
 
         // Raytrace - Find the target
-        Vec3 start = player.position().add(0, player.getEyeHeight(), 0);
-        Vec3 range = player.getLookAngle().scale(getZappingRange(item));
-        BlockHitResult raytrace = world.clip(new ClipContext(
-            start,
-            start.add(range),
-            Block.OUTLINE,
-            Fluid.NONE,
-            player
-        ));
+        Vec3d start = player.getEntityPos().add(0, player.getStandingEyeHeight(), 0);
+        Vec3d range = player.getRotationVector().multiply(getZappingRange(item));
+        BlockHitResult raytrace = world.raycast(new RaycastContext(start, start.add(range), ShapeType.OUTLINE, FluidHandling.NONE, player));
         BlockPos pos = raytrace.getBlockPos();
         BlockState stateReplaced = world.getBlockState(pos);
 
         // No target
         if (pos == null || stateReplaced.getBlock() == Blocks.AIR) {
             ShootableGadgetItemMethods.applyCooldown(player, item, hand, this::isZapper, getCooldownDelay(item));
-            player.stopUsingItem();
-            return InteractionResult.SUCCESS;
+            player.clearActiveItem();
+            return ActionResult.SUCCESS;
         }
 
         // Find exact position of gun barrel for VFX
-        Vec3 barrelPos = ShootableGadgetItemMethods.getGunBarrelVec(player, mainHand, new Vec3(.35f, -0.1f, 1));
+        Vec3d barrelPos = ShootableGadgetItemMethods.getGunBarrelVec(player, mainHand, new Vec3d(.35f, -0.1f, 1));
 
         // Client side
-        if (world.isClientSide()) {
-            player.stopUsingItem();
+        if (world.isClient()) {
+            player.clearActiveItem();
             AllClientHandle.INSTANCE.zapperDontAnimateItem(hand);
-            return InteractionResult.SUCCESS;
+            return ActionResult.SUCCESS;
         }
 
         // Server side
         if (activate(world, player, item, stateToUse, raytrace, data)) {
             ShootableGadgetItemMethods.applyCooldown(player, item, hand, this::isZapper, getCooldownDelay(item));
-            ShootableGadgetItemMethods.sendPackets(
-                player,
-                b -> new ZapperBeamPacket(barrelPos, hand, b, raytrace.getLocation())
-            );
+            ShootableGadgetItemMethods.sendPackets(player, b -> new ZapperBeamPacket(barrelPos, hand, b, raytrace.getPos()));
         }
 
-        player.stopUsingItem();
-        return InteractionResult.SUCCESS;
+        player.clearActiveItem();
+        return ActionResult.SUCCESS;
     }
 
-    public Component validateUsage(ItemStack item) {
-        if (!canActivateWithoutSelectedBlock(item) && !item.has(AllDataComponents.SHAPER_BLOCK_USED)) {
-            return Component.translatable("create.terrainzapper.leftClickToSet");
-        }
+    public Text validateUsage(ItemStack item) {
+        if (!canActivateWithoutSelectedBlock(item) && !item.contains(AllDataComponents.SHAPER_BLOCK_USED))
+            return Text.translatable("create.terrainzapper.leftClickToSet");
         return null;
     }
 
     protected abstract boolean activate(
-        Level world,
-        Player player,
+        World world,
+        PlayerEntity player,
         ItemStack item,
         BlockState stateToUse,
         BlockHitResult raytrace,
-        CompoundTag data
+        NbtCompound data
     );
 
-    protected abstract void openHandgunGUI(ItemStack item, InteractionHand hand);
+    protected abstract void openHandgunGUI(ItemStack item, Hand hand);
 
     protected abstract int getCooldownDelay(ItemStack item);
 
@@ -191,37 +177,27 @@ public abstract class ZapperItem extends Item implements SwingControlItem {
     }
 
     @Override
-    public boolean onEntitySwing(ItemStack stack, LivingEntity entity, InteractionHand hand) {
+    public boolean onEntitySwing(ItemStack stack, LivingEntity entity, Hand hand) {
         return true;
     }
 
     @Override
-    public boolean canDestroyBlock(ItemStack stack, BlockState state, Level world, BlockPos pos, LivingEntity player) {
+    public boolean canMine(ItemStack stack, BlockState state, World world, BlockPos pos, LivingEntity player) {
         return false;
     }
 
-    public static void setBlockEntityData(
-        Level world,
-        BlockPos pos,
-        BlockState state,
-        CompoundTag data,
-        Player player
-    ) {
-        if (data != null && state.is(AllBlockTags.SAFE_NBT)) {
+    public static void setBlockEntityData(World world, BlockPos pos, BlockState state, NbtCompound data, PlayerEntity player) {
+        if (data != null && state.isIn(AllBlockTags.SAFE_NBT)) {
             BlockEntity blockEntity = world.getBlockEntity(pos);
             if (blockEntity != null) {
                 data = NBTProcessors.process(state, blockEntity, data, !player.isCreative());
-                if (data == null) {
+                if (data == null)
                     return;
-                }
                 data.putInt("x", pos.getX());
                 data.putInt("y", pos.getY());
                 data.putInt("z", pos.getZ());
-                try (ProblemReporter.ScopedCollector logging = new ProblemReporter.ScopedCollector(
-                    blockEntity.problemPath(),
-                    Create.LOGGER
-                )) {
-                    blockEntity.loadWithComponents(TagValueInput.create(logging, world.registryAccess(), data));
+                try (ErrorReporter.Logging logging = new ErrorReporter.Logging(blockEntity.getReporterContext(), Create.LOGGER)) {
+                    blockEntity.read(NbtReadView.create(logging, world.getRegistryManager(), data));
                 }
             }
         }

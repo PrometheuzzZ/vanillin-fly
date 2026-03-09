@@ -7,7 +7,7 @@ import com.zurrtum.create.client.flywheel.backend.glsl.SourceComponent;
 import com.zurrtum.create.client.flywheel.backend.glsl.SourceFile;
 import com.zurrtum.create.client.flywheel.backend.glsl.generate.*;
 import com.zurrtum.create.client.flywheel.lib.util.ResourceUtil;
-import net.minecraft.resources.Identifier;
+import net.minecraft.util.Identifier;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -52,8 +52,7 @@ public class UberShaderComponent implements SourceComponent {
         var builder = new GlslBuilder();
 
         for (var adaptedFunction : functionsToAdapt) {
-            builder.function().signature(adaptedFunction.signature())
-                .body(body -> generateAdapter(body, adaptedFunction));
+            builder.function().signature(adaptedFunction.signature()).body(body -> generateAdapter(body, adaptedFunction));
 
             builder.blankLine();
         }
@@ -151,10 +150,7 @@ public class UberShaderComponent implements SourceComponent {
             return new UberShaderComponent(name, switchArg, adaptedFunctions, transformed.build());
         }
 
-        private static ImmutableMap<String, String> createAdapterMap(
-            List<AdaptedFn> adaptedFunctions,
-            UnaryOperator<String> nameAdapter
-        ) {
+        private static ImmutableMap<String, String> createAdapterMap(List<AdaptedFn> adaptedFunctions, UnaryOperator<String> nameAdapter) {
             ImmutableMap.Builder<String, String> builder = ImmutableMap.builder();
 
             for (var adapted : adaptedFunctions) {

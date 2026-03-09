@@ -8,30 +8,36 @@ import com.zurrtum.create.api.contraption.transformable.TransformableBlockEntity
 import com.zurrtum.create.catnip.codecs.stream.CatnipStreamCodecBuilders;
 import com.zurrtum.create.catnip.codecs.stream.CatnipStreamCodecs;
 import com.zurrtum.create.catnip.math.VecHelper;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.core.Direction.Axis;
-import net.minecraft.core.Direction.AxisDirection;
-import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.world.level.block.*;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.properties.*;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.block.*;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.block.enums.Attachment;
+import net.minecraft.block.enums.BlockFace;
+import net.minecraft.block.enums.BlockHalf;
+import net.minecraft.block.enums.SlabType;
+import net.minecraft.network.PacketByteBuf;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.state.property.EnumProperty;
+import net.minecraft.state.property.Properties;
+import net.minecraft.util.BlockMirror;
+import net.minecraft.util.BlockRotation;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Direction.Axis;
+import net.minecraft.util.math.Direction.AxisDirection;
+import net.minecraft.util.math.Vec3d;
 
-import static net.minecraft.world.level.block.state.properties.BlockStateProperties.*;
+import static net.minecraft.state.property.Properties.*;
 
 public class StructureTransform {
-    public static final StreamCodec<FriendlyByteBuf, StructureTransform> STREAM_CODEC = StreamCodec.composite(
-        BlockPos.STREAM_CODEC,
+    public static final PacketCodec<PacketByteBuf, StructureTransform> STREAM_CODEC = PacketCodec.tuple(
+        BlockPos.PACKET_CODEC,
         i -> i.offset,
-        ByteBufCodecs.INT,
+        PacketCodecs.INTEGER,
         i -> i.angle,
         CatnipStreamCodecBuilders.nullable(CatnipStreamCodecs.AXIS),
         i -> i.rotationAxis,
-        CatnipStreamCodecBuilders.nullable(Rotation.STREAM_CODEC),
+        CatnipStreamCodecBuilders.nullable(BlockRotation.PACKET_CODEC),
         i -> i.rotation,
         CatnipStreamCodecBuilders.nullable(CatnipStreamCodecs.MIRROR),
         i -> i.mirror,
@@ -42,10 +48,10 @@ public class StructureTransform {
     public Axis rotationAxis;
     public BlockPos offset;
     public int angle;
-    public Rotation rotation;
-    public Mirror mirror;
+    public BlockRotation rotation;
+    public BlockMirror mirror;
 
-    private StructureTransform(BlockPos offset, int angle, Axis axis, Rotation rotation, Mirror mirror) {
+    private StructureTransform(BlockPos offset, int angle, Axis axis, BlockRotation rotation, BlockMirror mirror) {
         this.offset = offset;
         this.angle = angle;
         rotationAxis = axis;
@@ -53,8 +59,8 @@ public class StructureTransform {
         this.mirror = mirror;
     }
 
-    public StructureTransform(BlockPos offset, Axis axis, Rotation rotation, Mirror mirror) {
-        this(offset, rotation == Rotation.NONE ? 0 : (4 - rotation.ordinal()) * 90, axis, rotation, mirror);
+    public StructureTransform(BlockPos offset, Axis axis, BlockRotation rotation, BlockMirror mirror) {
+        this(offset, rotation == BlockRotation.NONE ? 0 : (4 - rotation.ordinal()) * 90, axis, rotation, mirror);
     }
 
     public StructureTransform(BlockPos offset, float xRotation, float yRotation, float zRotation) {
@@ -73,68 +79,58 @@ public class StructureTransform {
         }
 
         angle %= 360;
-        if (angle < -90) {
+        if (angle < -90)
             angle += 360;
-        }
 
-        this.rotation = Rotation.NONE;
-        if (angle == -90 || angle == 270) {
-            this.rotation = Rotation.CLOCKWISE_90;
-        }
-        if (angle == 90) {
-            this.rotation = Rotation.COUNTERCLOCKWISE_90;
-        }
-        if (angle == 180) {
-            this.rotation = Rotation.CLOCKWISE_180;
-        }
+        this.rotation = BlockRotation.NONE;
+        if (angle == -90 || angle == 270)
+            this.rotation = BlockRotation.CLOCKWISE_90;
+        if (angle == 90)
+            this.rotation = BlockRotation.COUNTERCLOCKWISE_90;
+        if (angle == 180)
+            this.rotation = BlockRotation.CLOCKWISE_180;
 
-        mirror = Mirror.NONE;
+        mirror = BlockMirror.NONE;
     }
 
-    public Vec3 applyWithoutOffsetUncentered(Vec3 localVec) {
-        Vec3 vec = localVec;
-        if (mirror != null) {
+    public Vec3d applyWithoutOffsetUncentered(Vec3d localVec) {
+        Vec3d vec = localVec;
+        if (mirror != null)
             vec = VecHelper.mirror(vec, mirror);
-        }
-        if (rotationAxis != null) {
+        if (rotationAxis != null)
             vec = VecHelper.rotate(vec, angle, rotationAxis);
-        }
         return vec;
     }
 
-    public Vec3 applyWithoutOffset(Vec3 localVec) {
-        Vec3 vec = localVec;
-        if (mirror != null) {
+    public Vec3d applyWithoutOffset(Vec3d localVec) {
+        Vec3d vec = localVec;
+        if (mirror != null)
             vec = VecHelper.mirrorCentered(vec, mirror);
-        }
-        if (rotationAxis != null) {
+        if (rotationAxis != null)
             vec = VecHelper.rotateCentered(vec, angle, rotationAxis);
-        }
         return vec;
     }
 
-    public Vec3 unapplyWithoutOffset(Vec3 globalVec) {
-        Vec3 vec = globalVec;
-        if (rotationAxis != null) {
+    public Vec3d unapplyWithoutOffset(Vec3d globalVec) {
+        Vec3d vec = globalVec;
+        if (rotationAxis != null)
             vec = VecHelper.rotateCentered(vec, -angle, rotationAxis);
-        }
-        if (mirror != null) {
+        if (mirror != null)
             vec = VecHelper.mirrorCentered(vec, mirror);
-        }
 
         return vec;
     }
 
-    public Vec3 apply(Vec3 localVec) {
-        return applyWithoutOffset(localVec).add(Vec3.atLowerCornerOf(offset));
+    public Vec3d apply(Vec3d localVec) {
+        return applyWithoutOffset(localVec).add(Vec3d.of(offset));
     }
 
     public BlockPos applyWithoutOffset(BlockPos localPos) {
-        return BlockPos.containing(applyWithoutOffset(VecHelper.getCenterOf(localPos)));
+        return BlockPos.ofFloored(applyWithoutOffset(VecHelper.getCenterOf(localPos)));
     }
 
     public BlockPos apply(BlockPos localPos) {
-        return applyWithoutOffset(localPos).offset(offset);
+        return applyWithoutOffset(localPos).add(offset);
     }
 
     public BlockPos unapply(BlockPos globalPos) {
@@ -142,7 +138,7 @@ public class StructureTransform {
     }
 
     public BlockPos unapplyWithoutOffset(BlockPos globalPos) {
-        return BlockPos.containing(unapplyWithoutOffset(VecHelper.getCenterOf(globalPos)));
+        return BlockPos.ofFloored(unapplyWithoutOffset(VecHelper.getCenterOf(globalPos)));
     }
 
     public void apply(BlockEntity be) {
@@ -168,109 +164,99 @@ public class StructureTransform {
             return transformable.transform(state, this);
         }
 
-        if (mirror != null) {
+        if (mirror != null)
             state = state.mirror(mirror);
-        }
 
         if (rotationAxis == Axis.Y) {
             if (block instanceof BellBlock) {
-                if (state.getValue(BlockStateProperties.BELL_ATTACHMENT) == BellAttachType.DOUBLE_WALL) {
-                    state = state.setValue(BlockStateProperties.BELL_ATTACHMENT, BellAttachType.SINGLE_WALL);
-                }
-                return state.setValue(BellBlock.FACING, rotation.rotate(state.getValue(BellBlock.FACING)));
+                if (state.get(Properties.ATTACHMENT) == Attachment.DOUBLE_WALL)
+                    state = state.with(Properties.ATTACHMENT, Attachment.SINGLE_WALL);
+                return state.with(BellBlock.FACING, rotation.rotate(state.get(BellBlock.FACING)));
             }
 
             return state.rotate(rotation);
         }
 
-        if (block instanceof FaceAttachedHorizontalDirectionalBlock) {
-            EnumProperty<Direction> facingProperty = FaceAttachedHorizontalDirectionalBlock.FACING;
-            EnumProperty<AttachFace> faceProperty = FaceAttachedHorizontalDirectionalBlock.FACE;
-            Direction stateFacing = state.getValue(facingProperty);
-            AttachFace stateFace = state.getValue(faceProperty);
+        if (block instanceof WallMountedBlock) {
+            EnumProperty<Direction> facingProperty = WallMountedBlock.FACING;
+            EnumProperty<BlockFace> faceProperty = WallMountedBlock.FACE;
+            Direction stateFacing = state.get(facingProperty);
+            BlockFace stateFace = state.get(faceProperty);
             boolean z = rotationAxis == Axis.Z;
             Direction forcedAxis = z ? Direction.WEST : Direction.SOUTH;
 
-            if (stateFacing.getAxis() == rotationAxis && stateFace == AttachFace.WALL) {
+            if (stateFacing.getAxis() == rotationAxis && stateFace == BlockFace.WALL)
                 return state;
-            }
 
             for (int i = 0; i < rotation.ordinal(); i++) {
-                stateFace = state.getValue(faceProperty);
-                stateFacing = state.getValue(facingProperty);
+                stateFace = state.get(faceProperty);
+                stateFacing = state.get(facingProperty);
 
-                boolean b = state.getValue(faceProperty) == AttachFace.CEILING;
-                state = state.setValue(facingProperty, b ? forcedAxis : forcedAxis.getOpposite());
+                boolean b = state.get(faceProperty) == BlockFace.CEILING;
+                state = state.with(facingProperty, b ? forcedAxis : forcedAxis.getOpposite());
 
-                if (stateFace != AttachFace.WALL) {
-                    state = state.setValue(faceProperty, AttachFace.WALL);
+                if (stateFace != BlockFace.WALL) {
+                    state = state.with(faceProperty, BlockFace.WALL);
                     continue;
                 }
 
-                if (stateFacing.getAxisDirection() == (z ? AxisDirection.NEGATIVE : AxisDirection.POSITIVE)) {
-                    state = state.setValue(faceProperty, AttachFace.FLOOR);
+                if (stateFacing.getDirection() == (z ? AxisDirection.NEGATIVE : AxisDirection.POSITIVE)) {
+                    state = state.with(faceProperty, BlockFace.FLOOR);
                     continue;
                 }
-                state = state.setValue(faceProperty, AttachFace.CEILING);
+                state = state.with(faceProperty, BlockFace.CEILING);
             }
 
             return state;
         }
 
-        boolean halfTurn = rotation == Rotation.CLOCKWISE_180;
-        if (block instanceof StairBlock) {
+        boolean halfTurn = rotation == BlockRotation.CLOCKWISE_180;
+        if (block instanceof StairsBlock) {
             state = transformStairs(state, halfTurn);
             return state;
         }
 
-        if (state.hasProperty(FACING)) {
-            state = state.setValue(FACING, rotateFacing(state.getValue(FACING)));
-        } else if (state.hasProperty(AXIS)) {
-            state = state.setValue(AXIS, rotateAxis(state.getValue(AXIS)));
+        if (state.contains(FACING)) {
+            state = state.with(FACING, rotateFacing(state.get(FACING)));
+        } else if (state.contains(AXIS)) {
+            state = state.with(AXIS, rotateAxis(state.get(AXIS)));
         } else if (halfTurn) {
-            if (state.hasProperty(HORIZONTAL_FACING)) {
-                Direction stateFacing = state.getValue(HORIZONTAL_FACING);
-                if (stateFacing.getAxis() == rotationAxis) {
+            if (state.contains(HORIZONTAL_FACING)) {
+                Direction stateFacing = state.get(HORIZONTAL_FACING);
+                if (stateFacing.getAxis() == rotationAxis)
                     return state;
-                }
             }
 
             state = state.rotate(rotation);
 
-            if (state.hasProperty(SlabBlock.TYPE) && state.getValue(SlabBlock.TYPE) != SlabType.DOUBLE) {
-                state = state.setValue(
-                    SlabBlock.TYPE,
-                    state.getValue(SlabBlock.TYPE) == SlabType.BOTTOM ? SlabType.TOP : SlabType.BOTTOM
-                );
-            }
+            if (state.contains(SlabBlock.TYPE) && state.get(SlabBlock.TYPE) != SlabType.DOUBLE)
+                state = state.with(SlabBlock.TYPE, state.get(SlabBlock.TYPE) == SlabType.BOTTOM ? SlabType.TOP : SlabType.BOTTOM);
         }
 
         return state;
     }
 
     protected BlockState transformStairs(BlockState state, boolean halfTurn) {
-        if (state.getValue(StairBlock.FACING).getAxis() != rotationAxis) {
+        if (state.get(StairsBlock.FACING).getAxis() != rotationAxis) {
             for (int i = 0; i < rotation.ordinal(); i++) {
-                Direction direction = state.getValue(StairBlock.FACING);
-                Half half = state.getValue(StairBlock.HALF);
-                if (direction.getAxisDirection() == AxisDirection.POSITIVE ^ half == Half.BOTTOM ^ direction.getAxis() == Axis.Z) {
-                    state = state.cycle(StairBlock.HALF);
-                } else {
-                    state = state.setValue(StairBlock.FACING, direction.getOpposite());
-                }
+                Direction direction = state.get(StairsBlock.FACING);
+                BlockHalf half = state.get(StairsBlock.HALF);
+                if (direction.getDirection() == AxisDirection.POSITIVE ^ half == BlockHalf.BOTTOM ^ direction.getAxis() == Axis.Z)
+                    state = state.cycle(StairsBlock.HALF);
+                else
+                    state = state.with(StairsBlock.FACING, direction.getOpposite());
             }
         } else {
             if (halfTurn) {
-                state = state.cycle(StairBlock.HALF);
+                state = state.cycle(StairsBlock.HALF);
             }
         }
         return state;
     }
 
     public Direction mirrorFacing(Direction facing) {
-        if (mirror != null) {
-            return mirror.mirror(facing);
-        }
+        if (mirror != null)
+            return mirror.apply(facing);
         return facing;
     }
 
@@ -280,9 +266,8 @@ public class StructureTransform {
     }
 
     public Direction rotateFacing(Direction facing) {
-        for (int i = 0; i < rotation.ordinal(); i++) {
-            facing = facing.getClockWise(rotationAxis);
-        }
+        for (int i = 0; i < rotation.ordinal(); i++)
+            facing = facing.rotateClockwise(rotationAxis);
         return facing;
     }
 }

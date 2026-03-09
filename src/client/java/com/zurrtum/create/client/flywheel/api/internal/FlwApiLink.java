@@ -7,11 +7,11 @@ import com.zurrtum.create.client.flywheel.api.visualization.BlockEntityVisualize
 import com.zurrtum.create.client.flywheel.api.visualization.EntityVisualizer;
 import com.zurrtum.create.client.flywheel.api.visualization.VisualizationManager;
 import com.zurrtum.create.client.flywheel.impl.FlwApiLinkImpl;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.level.LevelAccessor;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.block.entity.BlockEntityType;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.EntityType;
+import net.minecraft.world.WorldAccess;
 import org.jetbrains.annotations.Nullable;
 
 public interface FlwApiLink {
@@ -29,20 +29,17 @@ public interface FlwApiLink {
 
     LayoutBuilder createLayoutBuilder();
 
-    boolean supportsVisualization(@Nullable LevelAccessor level);
+    boolean supportsVisualization(@Nullable WorldAccess level);
 
-    @Nullable VisualizationManager getVisualizationManager(@Nullable LevelAccessor level);
+    @Nullable VisualizationManager getVisualizationManager(@Nullable WorldAccess level);
 
-    VisualizationManager getVisualizationManagerOrThrow(@Nullable LevelAccessor level);
+    VisualizationManager getVisualizationManagerOrThrow(@Nullable WorldAccess level);
 
     <T extends BlockEntity> @Nullable BlockEntityVisualizer<? super T> getVisualizer(BlockEntityType<T> type);
 
     <T extends Entity> @Nullable EntityVisualizer<? super T> getVisualizer(EntityType<T> type);
 
-    <T extends BlockEntity> void setVisualizer(
-        BlockEntityType<T> type,
-        @Nullable BlockEntityVisualizer<? super T> visualizer
-    );
+    <T extends BlockEntity> void setVisualizer(BlockEntityType<T> type, @Nullable BlockEntityVisualizer<? super T> visualizer);
 
     <T extends Entity> void setVisualizer(EntityType<T> type, @Nullable EntityVisualizer<? super T> visualizer);
 }

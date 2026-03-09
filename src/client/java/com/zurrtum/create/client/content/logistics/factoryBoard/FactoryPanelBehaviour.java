@@ -13,13 +13,13 @@ import com.zurrtum.create.content.logistics.factoryBoard.PanelSlot;
 import com.zurrtum.create.content.logistics.factoryBoard.ServerFactoryPanelBehaviour;
 import com.zurrtum.create.foundation.blockEntity.behaviour.BehaviourType;
 import com.zurrtum.create.foundation.blockEntity.behaviour.ValueSettings;
-import net.minecraft.ChatFormatting;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.level.BlockAndTintGetter;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.text.MutableText;
+import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
+import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.world.BlockRenderView;
+import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -65,13 +65,11 @@ public class FactoryPanelBehaviour extends FilteringBehaviour<ServerFactoryPanel
     }
 
     @Nullable
-    public static FactoryPanelBehaviour at(BlockAndTintGetter world, FactoryPanelPosition pos) {
-        if (world instanceof Level l && !l.isLoaded(pos.pos())) {
+    public static FactoryPanelBehaviour at(BlockRenderView world, FactoryPanelPosition pos) {
+        if (world instanceof World l && !l.isPosLoaded(pos.pos()))
             return null;
-        }
-        if (!(world.getBlockEntity(pos.pos()) instanceof FactoryPanelBlockEntity fpbe)) {
+        if (!(world.getBlockEntity(pos.pos()) instanceof FactoryPanelBlockEntity fpbe))
             return null;
-        }
         FactoryPanelBehaviour factoryPanel = fpbe.getBehaviour(getTypeForSlot(pos.slot()));
         if (factoryPanel.behaviour.isActive()) {
             return factoryPanel;
@@ -109,16 +107,16 @@ public class FactoryPanelBehaviour extends FilteringBehaviour<ServerFactoryPanel
     }
 
     @Override
-    public MutableComponent formatValue(ValueSettings value) {
+    public MutableText formatValue(ValueSettings value) {
         if (value.value() == 0) {
             return CreateLang.translateDirect("gui.factory_panel.inactive");
         } else {
-            return Component.literal(Math.max(0, value.value()) + ((value.row() == 0) ? "" : "▤"));
+            return Text.literal(Math.max(0, value.value()) + ((value.row() == 0) ? "" : "▤"));
         }
     }
 
     @Override
-    public ValueSettingsBoard createBoard(Player player, BlockHitResult hitResult) {
+    public ValueSettingsBoard createBoard(PlayerEntity player, BlockHitResult hitResult) {
         int maxAmount = 100;
         return new ValueSettingsBoard(
             CreateLang.translate("factory_panel.target_amount").component(), maxAmount, 10, List.of(
@@ -129,30 +127,27 @@ public class FactoryPanelBehaviour extends FilteringBehaviour<ServerFactoryPanel
     }
 
     @Override
-    public MutableComponent getLabel() {
+    public MutableText getLabel() {
         String key = "";
 
-        if (!behaviour.targetedBy.isEmpty() && behaviour.count == 0) {
-            return CreateLang.translate("gui.factory_panel.no_target_amount_set").style(ChatFormatting.RED).component();
-        }
+        if (!behaviour.targetedBy.isEmpty() && behaviour.count == 0)
+            return CreateLang.translate("gui.factory_panel.no_target_amount_set").style(Formatting.RED).component();
 
-        if (behaviour.isMissingAddress()) {
-            return CreateLang.translate("gui.factory_panel.address_missing").style(ChatFormatting.RED).component();
-        }
+        if (behaviour.isMissingAddress())
+            return CreateLang.translate("gui.factory_panel.address_missing").style(Formatting.RED).component();
 
-        if (getFilter().isEmpty()) {
+        if (getFilter().isEmpty())
             key = "factory_panel.new_factory_task";
-        } else if (behaviour.waitingForNetwork) {
+        else if (behaviour.waitingForNetwork)
             key = "factory_panel.some_links_unloaded";
-        } else if (behaviour.getAmount() == 0 || behaviour.targetedBy.isEmpty()) {
-            return behaviour.getFilter().getHoverName().plainCopy();
-        } else {
-            key = behaviour.getFilter().getHoverName().getString();
-            if (behaviour.redstonePowered) {
+        else if (behaviour.getAmount() == 0 || behaviour.targetedBy.isEmpty())
+            return behaviour.getFilter().getName().copyContentOnly();
+        else {
+            key = behaviour.getFilter().getName().getString();
+            if (behaviour.redstonePowered)
                 key += " " + CreateLang.translate("factory_panel.redstone_paused").string();
-            } else if (!behaviour.satisfied) {
+            else if (!behaviour.satisfied)
                 key += " " + CreateLang.translate("factory_panel.in_progress").string();
-            }
             return CreateLang.text(key).component();
         }
 
@@ -160,27 +155,26 @@ public class FactoryPanelBehaviour extends FilteringBehaviour<ServerFactoryPanel
     }
 
     @Override
-    public MutableComponent getTip() {
+    public MutableText getTip() {
         return CreateLang.translateDirect(getFilter().isEmpty() ? "logistics.filter.click_to_set" : "factory_panel.click_to_configure");
     }
 
     @Override
-    public MutableComponent getAmountTip() {
+    public MutableText getAmountTip() {
         return CreateLang.translateDirect("factory_panel.hold_to_set_amount");
     }
 
     @Override
-    public MutableComponent getCountLabelForValueBox() {
-        if (getFilter().isEmpty()) {
-            return Component.empty();
-        }
+    public MutableText getCountLabelForValueBox() {
+        if (getFilter().isEmpty())
+            return Text.empty();
         if (behaviour.waitingForNetwork) {
-            return Component.literal("?");
+            return Text.literal("?");
         }
 
         int levelInStorage = behaviour.getLevelInStorage();
         boolean inf = levelInStorage >= BigItemStack.INF;
-        int inStorage = levelInStorage / (behaviour.upTo ? 1 : getFilter().getMaxStackSize());
+        int inStorage = levelInStorage / (behaviour.upTo ? 1 : getFilter().getMaxCount());
         int promised = behaviour.getPromised();
         String stacks = behaviour.upTo ? "" : "▤";
 
@@ -189,9 +183,8 @@ public class FactoryPanelBehaviour extends FilteringBehaviour<ServerFactoryPanel
         }
 
         return CreateLang.text(inf ? "  ∞" : "   " + inStorage + stacks)
-            .color(behaviour.satisfied ? 0xD7FFA8 : behaviour.promisedSatisfied ? 0xffcd75 : 0xFFBFA8)
-            .add(CreateLang.text(promised == 0 ? "" : "⏶")).add(CreateLang.text("/").style(ChatFormatting.WHITE))
-            .add(CreateLang.text(behaviour.count + stacks + "  ").color(0xF1EFE8)).component();
+            .color(behaviour.satisfied ? 0xD7FFA8 : behaviour.promisedSatisfied ? 0xffcd75 : 0xFFBFA8).add(CreateLang.text(promised == 0 ? "" : "⏶"))
+            .add(CreateLang.text("/").style(Formatting.WHITE)).add(CreateLang.text(behaviour.count + stacks + "  ").color(0xF1EFE8)).component();
     }
 
     @Override

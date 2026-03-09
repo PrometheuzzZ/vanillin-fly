@@ -6,38 +6,37 @@ import com.zurrtum.create.AllPackets;
 import com.zurrtum.create.catnip.codecs.stream.CatnipStreamCodecBuilders;
 import com.zurrtum.create.content.logistics.tunnel.BeltTunnelBlockEntity;
 import io.netty.buffer.ByteBuf;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.PacketType;
-import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.network.listener.ClientPlayPacketListener;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.PacketType;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public record TunnelFlapPacket(BlockPos pos,
-                               List<Pair<Direction, Boolean>> flaps) implements Packet<ClientGamePacketListener> {
-    public static final StreamCodec<ByteBuf, TunnelFlapPacket> CODEC = StreamCodec.composite(
-        BlockPos.STREAM_CODEC,
+public record TunnelFlapPacket(BlockPos pos, List<Pair<Direction, Boolean>> flaps) implements Packet<ClientPlayPacketListener> {
+    public static final PacketCodec<ByteBuf, TunnelFlapPacket> CODEC = PacketCodec.tuple(
+        BlockPos.PACKET_CODEC,
         TunnelFlapPacket::pos,
-        CatnipStreamCodecBuilders.list(CatnipStreamCodecBuilders.pair(Direction.STREAM_CODEC, ByteBufCodecs.BOOL)),
+        CatnipStreamCodecBuilders.list(CatnipStreamCodecBuilders.pair(Direction.PACKET_CODEC, PacketCodecs.BOOLEAN)),
         TunnelFlapPacket::flaps,
         TunnelFlapPacket::new
     );
 
     public TunnelFlapPacket(BeltTunnelBlockEntity blockEntity, List<Pair<Direction, Boolean>> flaps) {
-        this(blockEntity.getBlockPos(), new ArrayList<>(flaps));
+        this(blockEntity.getPos(), new ArrayList<>(flaps));
     }
 
     @Override
-    public void handle(ClientGamePacketListener listener) {
+    public void apply(ClientPlayPacketListener listener) {
         AllClientHandle.INSTANCE.onTunnelFlap(this);
     }
 
     @Override
-    public PacketType<TunnelFlapPacket> type() {
+    public PacketType<TunnelFlapPacket> getPacketType() {
         return AllPackets.TUNNEL_FLAP;
     }
 }

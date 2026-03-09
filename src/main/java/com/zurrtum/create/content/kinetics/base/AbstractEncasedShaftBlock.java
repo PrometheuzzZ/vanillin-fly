@@ -1,49 +1,45 @@
 package com.zurrtum.create.content.kinetics.base;
 
 import com.zurrtum.create.foundation.block.WeakPowerControlBlock;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.world.item.context.BlockPlaceContext;
-import net.minecraft.world.level.LevelReader;
-import net.minecraft.world.level.SignalGetter;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.StateDefinition.Builder;
+import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
+import net.minecraft.item.ItemPlacementContext;
+import net.minecraft.state.StateManager.Builder;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.world.RedstoneView;
+import net.minecraft.world.WorldView;
 
 public abstract class AbstractEncasedShaftBlock extends RotatedPillarKineticBlock implements WeakPowerControlBlock {
-    public AbstractEncasedShaftBlock(Properties properties) {
+    public AbstractEncasedShaftBlock(Settings properties) {
         super(properties);
     }
 
     @Override
-    protected void createBlockStateDefinition(Builder<Block, BlockState> builder) {
-        super.createBlockStateDefinition(builder);
+    protected void appendProperties(Builder<Block, BlockState> builder) {
+        super.appendProperties(builder);
     }
 
     @Override
-    public BlockState getStateForPlacement(BlockPlaceContext context) {
-        if (context.getPlayer() != null && context.getPlayer().isShiftKeyDown()) {
-            return super.getStateForPlacement(context);
-        }
+    public BlockState getPlacementState(ItemPlacementContext context) {
+        if (context.getPlayer() != null && context.getPlayer().isSneaking())
+            return super.getPlacementState(context);
         Direction.Axis preferredAxis = getPreferredAxis(context);
-        return defaultBlockState().setValue(
-            AXIS,
-            preferredAxis == null ? context.getNearestLookingDirection().getAxis() : preferredAxis
-        );
+        return getDefaultState().with(AXIS, preferredAxis == null ? context.getPlayerLookDirection().getAxis() : preferredAxis);
     }
 
     @Override
-    public boolean hasShaftTowards(LevelReader world, BlockPos pos, BlockState state, Direction face) {
-        return face.getAxis() == state.getValue(AXIS);
+    public boolean hasShaftTowards(WorldView world, BlockPos pos, BlockState state, Direction face) {
+        return face.getAxis() == state.get(AXIS);
     }
 
     @Override
     public Direction.Axis getRotationAxis(BlockState state) {
-        return state.getValue(AXIS);
+        return state.get(AXIS);
     }
 
     @Override
-    public boolean shouldCheckWeakPower(BlockState state, SignalGetter level, BlockPos pos, Direction side) {
+    public boolean shouldCheckWeakPower(BlockState state, RedstoneView level, BlockPos pos, Direction side) {
         return false;
     }
 }

@@ -5,16 +5,16 @@ import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
 import com.llamalad7.mixinextras.sugar.Share;
 import com.llamalad7.mixinextras.sugar.ref.LocalRef;
-import com.mojang.blaze3d.vertex.PoseStack;
 import com.zurrtum.create.client.AllFluidConfigs;
 import com.zurrtum.create.client.infrastructure.fluid.FluidConfig;
 import com.zurrtum.create.infrastructure.fluids.FlowableFluid;
 import de.crafty.eiv.common.extra.FluidItemSpecialRenderer;
-import net.minecraft.client.renderer.SubmitNodeCollector;
-import net.minecraft.client.renderer.texture.TextureAtlasSprite;
-import net.minecraft.world.item.ItemDisplayContext;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.material.Fluid;
+import net.minecraft.client.render.command.OrderedRenderCommandQueue;
+import net.minecraft.client.texture.Sprite;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.fluid.Fluid;
+import net.minecraft.item.ItemDisplayContext;
+import net.minecraft.item.ItemStack;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -24,7 +24,7 @@ import java.awt.*;
 
 @Mixin(FluidItemSpecialRenderer.class)
 public class FluidItemSpecialRendererMixin {
-    @WrapOperation(method = "submit(Lnet/minecraft/world/item/ItemStack;Lnet/minecraft/world/item/ItemDisplayContext;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;IIZI)V", at = @At(value = "NEW", target = "java/awt/Color", ordinal = 0))
+    @WrapOperation(method = "submit(Lnet/minecraft/item/ItemStack;Lnet/minecraft/item/ItemDisplayContext;Lnet/minecraft/client/util/math/MatrixStack;Lnet/minecraft/client/render/command/OrderedRenderCommandQueue;IIZI)V", at = @At(value = "NEW", target = "java/awt/Color", ordinal = 0))
     private Color createColor(
         int rgb,
         Operation<Color> original,
@@ -36,24 +36,24 @@ public class FluidItemSpecialRendererMixin {
             FluidConfig config = AllFluidConfigs.get(fluid);
             if (config != null) {
                 fluidConfig.set(config);
-                rgb = config.tint().apply(stack.getComponentsPatch());
+                rgb = config.tint().apply(stack.getComponentChanges());
             }
         }
         return original.call(rgb);
     }
 
-    @Inject(method = "submit(Lnet/minecraft/world/item/ItemStack;Lnet/minecraft/world/item/ItemDisplayContext;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;IIZI)V", at = @At(value = "INVOKE", target = "Lde/crafty/eiv/common/CommonEIVClient;resolver()Lde/crafty/eiv/common/resolver/IEivClientResolver;", remap = false))
+    @Inject(method = "submit(Lnet/minecraft/item/ItemStack;Lnet/minecraft/item/ItemDisplayContext;Lnet/minecraft/client/util/math/MatrixStack;Lnet/minecraft/client/render/command/OrderedRenderCommandQueue;IIZI)V", at = @At(value = "INVOKE", target = "Lde/crafty/eiv/common/CommonEIVClient;resolver()Lde/crafty/eiv/common/resolver/IEivClientResolver;", remap = false))
     private void check(
         ItemStack stack,
         ItemDisplayContext itemDisplayContext,
-        PoseStack poseStack,
-        SubmitNodeCollector submitNodeCollector,
+        MatrixStack poseStack,
+        OrderedRenderCommandQueue submitNodeCollector,
         int light,
         int overlay,
         boolean bl,
         int k,
         CallbackInfo ci,
-        @Local LocalRef<TextureAtlasSprite> sprite,
+        @Local LocalRef<Sprite> sprite,
         @Share("config") LocalRef<FluidConfig> fluidConfig
     ) {
         FluidConfig config = fluidConfig.get();

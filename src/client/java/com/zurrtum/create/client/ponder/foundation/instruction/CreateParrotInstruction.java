@@ -1,7 +1,7 @@
 package com.zurrtum.create.client.ponder.foundation.instruction;
 
 import com.zurrtum.create.client.ponder.api.element.ParrotElement;
-import net.minecraft.core.Direction;
+import net.minecraft.util.math.Direction;
 
 public class CreateParrotInstruction extends FadeIntoSceneInstruction<ParrotElement> {
 

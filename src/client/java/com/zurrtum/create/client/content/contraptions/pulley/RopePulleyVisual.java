@@ -29,10 +29,7 @@ public class RopePulleyVisual extends AbstractPulleyVisual<PulleyBlockEntity> {
 
     @Override
     protected Instancer<TransformedInstance> getHalfMagnetModel() {
-        return instancerProvider().instancer(
-            InstanceTypes.TRANSFORMED,
-            Models.partial(AllPartialModels.ROPE_HALF_MAGNET)
-        );
+        return instancerProvider().instancer(InstanceTypes.TRANSFORMED, Models.partial(AllPartialModels.ROPE_HALF_MAGNET));
     }
 
     @Override

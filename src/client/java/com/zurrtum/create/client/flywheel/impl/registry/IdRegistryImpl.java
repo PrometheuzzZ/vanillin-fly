@@ -2,7 +2,7 @@ package com.zurrtum.create.client.flywheel.impl.registry;
 
 import com.zurrtum.create.client.flywheel.api.registry.IdRegistry;
 import it.unimi.dsi.fastutil.objects.*;
-import net.minecraft.resources.Identifier;
+import net.minecraft.util.Identifier;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.UnmodifiableView;
 

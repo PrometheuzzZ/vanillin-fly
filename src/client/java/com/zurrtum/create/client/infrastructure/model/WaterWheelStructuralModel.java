@@ -2,39 +2,38 @@ package com.zurrtum.create.client.infrastructure.model;
 
 import com.zurrtum.create.content.kinetics.waterwheel.LargeWaterWheelBlockEntity;
 import com.zurrtum.create.content.kinetics.waterwheel.WaterWheelStructuralBlock;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.block.model.BlockModelPart;
-import net.minecraft.client.renderer.texture.TextureAtlasSprite;
-import net.minecraft.core.BlockPos;
-import net.minecraft.util.RandomSource;
-import net.minecraft.world.level.BlockAndTintGetter;
-import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.block.BlockState;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.render.model.BlockModelPart;
+import net.minecraft.client.texture.Sprite;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.random.Random;
+import net.minecraft.world.BlockRenderView;
 
 import java.util.List;
 
 public class WaterWheelStructuralModel extends WrapperBlockStateModel {
     public static final WaterWheelStructuralModel INSTANCE = new WaterWheelStructuralModel();
 
-    public static WaterWheelStructuralModel single(BlockState state, UnbakedRoot unbaked) {
+    public static WaterWheelStructuralModel single(BlockState state, UnbakedGrouped unbaked) {
         return INSTANCE;
     }
 
     @Override
-    public TextureAtlasSprite particleSpriteWithInfo(BlockAndTintGetter world, BlockPos pos, BlockState state) {
+    public Sprite particleSpriteWithInfo(BlockRenderView world, BlockPos pos, BlockState state) {
         BlockPos master = WaterWheelStructuralBlock.getMaster(world, pos, state);
         if (world.getBlockEntity(master) instanceof LargeWaterWheelBlockEntity blockEntity) {
-            return Minecraft.getInstance().getBlockRenderer().getBlockModel(blockEntity.material).particleIcon();
+            return MinecraftClient.getInstance().getBlockRenderManager().getModel(blockEntity.material).particleSprite();
         }
-        return particleIcon();
+        return particleSprite();
     }
 
     @Override
-    public TextureAtlasSprite particleIcon() {
-        return Minecraft.getInstance().getBlockRenderer().getBlockModelShaper().getModelManager()
-            .getMissingBlockStateModel().particleIcon();
+    public Sprite particleSprite() {
+        return MinecraftClient.getInstance().getBlockRenderManager().getModels().getModelManager().getMissingModel().particleSprite();
     }
 
     @Override
-    public void collectParts(RandomSource random, List<BlockModelPart> parts) {
+    public void addParts(Random random, List<BlockModelPart> parts) {
     }
 }

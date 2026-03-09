@@ -11,10 +11,10 @@ import com.zurrtum.create.client.flywheel.lib.visual.AbstractEntityVisual;
 import com.zurrtum.create.client.flywheel.lib.visual.SimpleDynamicVisual;
 import com.zurrtum.create.content.logistics.box.PackageEntity;
 import com.zurrtum.create.content.logistics.box.PackageItem;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.util.Mth;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.item.ItemStack;
+import net.minecraft.registry.Registries;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.Vec3d;
 
 public class PackageVisual extends AbstractEntityVisual<PackageEntity> implements SimpleDynamicVisual {
     public final TransformedInstance instance;
@@ -23,10 +23,9 @@ public class PackageVisual extends AbstractEntityVisual<PackageEntity> implement
         super(ctx, entity, partialTick);
 
         ItemStack box = entity.box;
-        if (box.isEmpty() || !PackageItem.isPackage(box)) {
-            box = AllItems.CARDBOARD_BLOCK.getDefaultInstance();
-        }
-        PartialModel model = AllPartialModels.PACKAGES.get(BuiltInRegistries.ITEM.getKey(box.getItem()));
+        if (box.isEmpty() || !PackageItem.isPackage(box))
+            box = AllItems.CARDBOARD_BLOCK.getDefaultStack();
+        PartialModel model = AllPartialModels.PACKAGES.get(Registries.ITEM.getId(box.getItem()));
 
         instance = instancerProvider().instancer(InstanceTypes.TRANSFORMED, Models.partial(model)).createInstance();
 
@@ -39,13 +38,13 @@ public class PackageVisual extends AbstractEntityVisual<PackageEntity> implement
     }
 
     private void animate(float partialTick) {
-        float yaw = Mth.lerp(partialTick, entity.yRotO, entity.getYRot());
+        float yaw = MathHelper.lerp(partialTick, entity.lastYaw, entity.getYaw());
 
-        Vec3 pos = entity.position();
+        Vec3d pos = entity.getEntityPos();
         var renderOrigin = renderOrigin();
-        var x = (float) (Mth.lerp(partialTick, entity.xo, pos.x) - renderOrigin.getX());
-        var y = (float) (Mth.lerp(partialTick, entity.yo, pos.y) - renderOrigin.getY());
-        var z = (float) (Mth.lerp(partialTick, entity.zo, pos.z) - renderOrigin.getZ());
+        var x = (float) (MathHelper.lerp(partialTick, entity.lastX, pos.x) - renderOrigin.getX());
+        var y = (float) (MathHelper.lerp(partialTick, entity.lastY, pos.y) - renderOrigin.getY());
+        var z = (float) (MathHelper.lerp(partialTick, entity.lastZ, pos.z) - renderOrigin.getZ());
 
         long randomBits = (long) entity.getId() * 31L * 493286711L;
         randomBits = randomBits * randomBits * 4392167121L + randomBits * 98761L;
@@ -53,8 +52,8 @@ public class PackageVisual extends AbstractEntityVisual<PackageEntity> implement
         float yNudge = (((float) (randomBits >> 20 & 7L) + 0.5F) / 8.0F - 0.5F) * 0.004F;
         float zNudge = (((float) (randomBits >> 24 & 7L) + 0.5F) / 8.0F - 0.5F) * 0.004F;
 
-        instance.setIdentityTransform().translate(x - 0.5 + xNudge, y + yNudge, z - 0.5 + zNudge)
-            .rotateYCenteredDegrees(-yaw - 90).light(computePackedLight(partialTick)).setChanged();
+        instance.setIdentityTransform().translate(x - 0.5 + xNudge, y + yNudge, z - 0.5 + zNudge).rotateYCenteredDegrees(-yaw - 90)
+            .light(computePackedLight(partialTick)).setChanged();
     }
 
     @Override

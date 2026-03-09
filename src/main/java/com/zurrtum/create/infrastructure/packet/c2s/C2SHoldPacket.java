@@ -1,35 +1,36 @@
 package com.zurrtum.create.infrastructure.packet.c2s;
 
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.PacketFlow;
-import net.minecraft.network.protocol.PacketType;
-import net.minecraft.network.protocol.game.ServerGamePacketListener;
-import net.minecraft.resources.Identifier;
-import net.minecraft.server.network.ServerGamePacketListenerImpl;
+import net.minecraft.network.NetworkSide;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.listener.ServerPlayPacketListener;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.PacketType;
+import net.minecraft.server.network.ServerPlayNetworkHandler;
+import net.minecraft.util.Identifier;
 
 import java.util.function.Consumer;
 
 import static com.zurrtum.create.Create.MOD_ID;
 
-public record C2SHoldPacket(PacketType<Packet<ServerGamePacketListener>> id,
-                            Consumer<ServerGamePacketListenerImpl> consumer) implements Packet<ServerGamePacketListener> {
-    public C2SHoldPacket(String id, Consumer<ServerGamePacketListenerImpl> callback) {
-        this(new PacketType<>(PacketFlow.SERVERBOUND, Identifier.fromNamespaceAndPath(MOD_ID, id)), callback);
+public record C2SHoldPacket(
+    PacketType<Packet<ServerPlayPacketListener>> id, Consumer<ServerPlayNetworkHandler> consumer
+) implements Packet<ServerPlayPacketListener> {
+    public C2SHoldPacket(String id, Consumer<ServerPlayNetworkHandler> callback) {
+        this(new PacketType<>(NetworkSide.SERVERBOUND, Identifier.of(MOD_ID, id)), callback);
     }
 
-    public StreamCodec<RegistryFriendlyByteBuf, Packet<ServerGamePacketListener>> codec() {
-        return StreamCodec.unit(this);
-    }
-
-    @Override
-    public void handle(ServerGamePacketListener listener) {
-        consumer.accept((ServerGamePacketListenerImpl) listener);
+    public PacketCodec<RegistryByteBuf, Packet<ServerPlayPacketListener>> codec() {
+        return PacketCodec.unit(this);
     }
 
     @Override
-    public PacketType<Packet<ServerGamePacketListener>> type() {
+    public void apply(ServerPlayPacketListener listener) {
+        consumer.accept((ServerPlayNetworkHandler) listener);
+    }
+
+    @Override
+    public PacketType<Packet<ServerPlayPacketListener>> getPacketType() {
         return id;
     }
 }

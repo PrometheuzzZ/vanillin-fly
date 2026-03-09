@@ -16,8 +16,8 @@ import de.crafty.eiv.common.recipe.inventory.RecipeViewMenu.SlotDefinition;
 import de.crafty.eiv.common.recipe.inventory.RecipeViewMenu.SlotFillContext;
 import de.crafty.eiv.common.recipe.inventory.RecipeViewScreen;
 import de.crafty.eiv.common.recipe.inventory.SlotContent;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.item.ItemStack;
 import org.joml.Matrix3x2f;
 
 import java.util.ArrayList;
@@ -110,32 +110,20 @@ public class CompactingView extends CreateView {
     }
 
     @Override
-    public void renderRecipe(
-        RecipeViewScreen screen,
-        RecipePosition position,
-        GuiGraphics context,
-        int mouseX,
-        int mouseY,
-        float partialTicks
-    ) {
+    public void renderRecipe(RecipeViewScreen screen, RecipePosition position, DrawContext context, int mouseX, int mouseY, float partialTicks) {
         AllGuiTextures.JEI_DOWN_ARROW.render(context, 132, 32 - (results.size() - 1) / 2 * 19);
-        Matrix3x2f pose = new Matrix3x2f(context.pose());
+        Matrix3x2f pose = new Matrix3x2f(context.getMatrices());
         if (heat == HeatCondition.NONE) {
             AllGuiTextures.JEI_NO_HEAT_BAR.render(context, 0, 80);
             AllGuiTextures.JEI_SHADOW.render(context, 77, 68);
         } else {
             AllGuiTextures.JEI_HEAT_BAR.render(context, 0, 80);
             AllGuiTextures.JEI_LIGHT.render(context, 77, 88);
-            context.guiRenderState.submitPicturesInPictureState(new BasinBlazeBurnerRenderState(
-                pose,
-                87,
-                69,
-                heat.visualizeAsBlazeBurner()
-            ));
+            context.state.addSpecialElement(new BasinBlazeBurnerRenderState(pose, 87, 69, heat.visualizeAsBlazeBurner()));
         }
-        context.guiRenderState.submitPicturesInPictureState(new PressBasinRenderState(pose, 87, -5));
-        context.drawString(
-            context.minecraft.font,
+        context.state.addSpecialElement(new PressBasinRenderState(new Matrix3x2f(context.getMatrices()), 87, -5));
+        context.drawText(
+            context.client.textRenderer,
             CreateLang.translateDirect(heat.getTranslationKey()),
             5,
             86,

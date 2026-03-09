@@ -9,59 +9,52 @@ import me.shedaniel.rei.api.common.display.Display;
 import me.shedaniel.rei.api.common.display.DisplaySerializer;
 import me.shedaniel.rei.api.common.entry.EntryIngredient;
 import me.shedaniel.rei.api.common.util.EntryIngredients;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.resources.Identifier;
-import net.minecraft.util.ExtraCodecs;
-import net.minecraft.world.item.crafting.Ingredient;
-import net.minecraft.world.item.crafting.RecipeHolder;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.recipe.Ingredient;
+import net.minecraft.recipe.RecipeEntry;
+import net.minecraft.util.Identifier;
+import net.minecraft.util.dynamic.Codecs;
 
 import java.util.List;
 import java.util.Optional;
 
-public record MechanicalCraftingDisplay(int width, int height, List<Optional<Ingredient>> inputs,
-                                        EntryIngredient output, Optional<Identifier> location) implements Display {
+public record MechanicalCraftingDisplay(
+    int width, int height, List<Optional<Ingredient>> inputs, EntryIngredient output, Optional<Identifier> location
+) implements Display {
     public static final DisplaySerializer<MechanicalCraftingDisplay> SERIALIZER = DisplaySerializer.of(
         RecordCodecBuilder.mapCodec(instance -> instance.group(
             Codec.INT.fieldOf("width").forGetter(MechanicalCraftingDisplay::width),
             Codec.INT.fieldOf("height").forGetter(MechanicalCraftingDisplay::height),
-            ExtraCodecs.optionalEmptyMap(Ingredient.CODEC).listOf().fieldOf("inputs")
-                .forGetter(MechanicalCraftingDisplay::inputs),
+            Codecs.optional(Ingredient.CODEC).listOf().fieldOf("inputs").forGetter(MechanicalCraftingDisplay::inputs),
             EntryIngredient.codec().fieldOf("output").forGetter(MechanicalCraftingDisplay::output),
             Identifier.CODEC.optionalFieldOf("location").forGetter(MechanicalCraftingDisplay::location)
-        ).apply(instance, MechanicalCraftingDisplay::new)), StreamCodec.composite(
-            ByteBufCodecs.VAR_INT,
+        ).apply(instance, MechanicalCraftingDisplay::new)), PacketCodec.tuple(
+            PacketCodecs.VAR_INT,
             MechanicalCraftingDisplay::width,
-            ByteBufCodecs.VAR_INT,
+            PacketCodecs.VAR_INT,
             MechanicalCraftingDisplay::height,
-            Ingredient.OPTIONAL_CONTENTS_STREAM_CODEC.apply(ByteBufCodecs.list()),
+            Ingredient.OPTIONAL_PACKET_CODEC.collect(PacketCodecs.toList()),
             MechanicalCraftingDisplay::inputs,
             EntryIngredient.streamCodec(),
             MechanicalCraftingDisplay::output,
-            Identifier.STREAM_CODEC.apply(ByteBufCodecs::optional),
+            Identifier.PACKET_CODEC.collect(PacketCodecs::optional),
             MechanicalCraftingDisplay::location,
             MechanicalCraftingDisplay::new
         )
     );
 
-    public MechanicalCraftingDisplay(RecipeHolder<MechanicalCraftingRecipe> entry) {
-        this(entry.id().identifier(), entry.value());
+    public MechanicalCraftingDisplay(RecipeEntry<MechanicalCraftingRecipe> entry) {
+        this(entry.id().getValue(), entry.value());
     }
 
     public MechanicalCraftingDisplay(Identifier id, MechanicalCraftingRecipe recipe) {
-        this(
-            recipe.raw().width(),
-            recipe.raw().height(),
-            recipe.raw().ingredients(),
-            EntryIngredients.of(recipe.result()),
-            Optional.of(id)
-        );
+        this(recipe.raw().getWidth(), recipe.raw().getHeight(), recipe.raw().getIngredients(), EntryIngredients.of(recipe.result()), Optional.of(id));
     }
 
     @Override
     public List<EntryIngredient> getInputEntries() {
-        return inputs.stream().filter(Optional::isPresent).map(Optional::get).map(EntryIngredients::ofIngredient)
-            .toList();
+        return inputs.stream().filter(Optional::isPresent).map(Optional::get).map(EntryIngredients::ofIngredient).toList();
     }
 
     @Override

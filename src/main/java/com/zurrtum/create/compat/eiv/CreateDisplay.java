@@ -8,19 +8,19 @@ import com.zurrtum.create.infrastructure.fluids.FluidStack;
 import de.crafty.eiv.common.api.recipe.IEivServerRecipe;
 import de.crafty.eiv.common.recipe.ServerRecipeManager;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
-import net.minecraft.core.component.DataComponents;
-import net.minecraft.nbt.CompoundTag;
+import net.minecraft.component.DataComponentTypes;
+import net.minecraft.component.type.NbtComponent;
+import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NbtCompound;
+import net.minecraft.nbt.NbtElement;
 import net.minecraft.nbt.NbtOps;
-import net.minecraft.nbt.Tag;
-import net.minecraft.resources.RegistryOps;
+import net.minecraft.recipe.Ingredient;
+import net.minecraft.recipe.display.SlotDisplayContexts;
+import net.minecraft.registry.RegistryOps;
+import net.minecraft.registry.tag.TagKey;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.tags.TagKey;
-import net.minecraft.util.context.ContextMap;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.component.CustomData;
-import net.minecraft.world.item.crafting.Ingredient;
-import net.minecraft.world.item.crafting.display.SlotDisplayContext;
+import net.minecraft.util.context.ContextParameterMap;
 
 import java.util.List;
 import java.util.Optional;
@@ -31,31 +31,27 @@ public abstract class CreateDisplay implements IEivServerRecipe {
     public static final Codec<List<FluidStack>> FLUID_STACKS_CODEC = FluidStack.CODEC.listOf();
     public static final Codec<List<FluidIngredient>> FLUID_INGREDIENTS_CODEC = FluidIngredient.CODEC.listOf();
 
-    public static RegistryOps<Tag> getServerOps() {
-        return ServerRecipeManager.INSTANCE.getServer().registryAccess().createSerializationContext(NbtOps.INSTANCE);
+    public static RegistryOps<NbtElement> getServerOps() {
+        return ServerRecipeManager.INSTANCE.getServer().getRegistryManager().getOps(NbtOps.INSTANCE);
     }
 
-    public static RegistryOps<Tag> getClientOps() {
-        return AllClientHandle.INSTANCE.getPlayer().level().registryAccess()
-            .createSerializationContext(NbtOps.INSTANCE);
+    public static RegistryOps<NbtElement> getClientOps() {
+        return AllClientHandle.INSTANCE.getPlayer().getEntityWorld().getRegistryManager().getOps(NbtOps.INSTANCE);
     }
 
     public static void addSizedIngredient(List<SizedIngredient> sizedIngredients, List<List<ItemStack>> ingredients) {
         MinecraftServer server = ServerRecipeManager.INSTANCE.getServer();
-        ContextMap context = new ContextMap.Builder().withParameter(SlotDisplayContext.FUEL_VALUES, server.fuelValues())
-            .withParameter(SlotDisplayContext.REGISTRIES, server.registryAccess()).create(SlotDisplayContext.CONTEXT);
+        ContextParameterMap context = new ContextParameterMap.Builder().add(SlotDisplayContexts.FUEL_REGISTRY, server.getFuelRegistry())
+            .add(SlotDisplayContexts.REGISTRIES, server.getRegistryManager()).build(SlotDisplayContexts.CONTEXT_TYPE);
         for (SizedIngredient ingredient : sizedIngredients) {
             ingredients.add(getItemStacks(ingredient.getIngredient(), ingredient.getCount(), context));
         }
     }
 
-    public static void addSizedIngredient(
-        Object2IntMap<Ingredient> sizedIngredients,
-        List<List<ItemStack>> ingredients
-    ) {
+    public static void addSizedIngredient(Object2IntMap<Ingredient> sizedIngredients, List<List<ItemStack>> ingredients) {
         MinecraftServer server = ServerRecipeManager.INSTANCE.getServer();
-        ContextMap context = new ContextMap.Builder().withParameter(SlotDisplayContext.FUEL_VALUES, server.fuelValues())
-            .withParameter(SlotDisplayContext.REGISTRIES, server.registryAccess()).create(SlotDisplayContext.CONTEXT);
+        ContextParameterMap context = new ContextParameterMap.Builder().add(SlotDisplayContexts.FUEL_REGISTRY, server.getFuelRegistry())
+            .add(SlotDisplayContexts.REGISTRIES, server.getRegistryManager()).build(SlotDisplayContexts.CONTEXT_TYPE);
         for (Object2IntMap.Entry<Ingredient> pair : sizedIngredients.object2IntEntrySet()) {
             ingredients.add(getItemStacks(pair.getKey(), pair.getIntValue(), context));
         }
@@ -63,16 +59,16 @@ public abstract class CreateDisplay implements IEivServerRecipe {
 
     public static List<ItemStack> getItemStacks(Ingredient ingredient) {
         MinecraftServer server = ServerRecipeManager.INSTANCE.getServer();
-        ContextMap context = new ContextMap.Builder().withParameter(SlotDisplayContext.FUEL_VALUES, server.fuelValues())
-            .withParameter(SlotDisplayContext.REGISTRIES, server.registryAccess()).create(SlotDisplayContext.CONTEXT);
+        ContextParameterMap context = new ContextParameterMap.Builder().add(SlotDisplayContexts.FUEL_REGISTRY, server.getFuelRegistry())
+            .add(SlotDisplayContexts.REGISTRIES, server.getRegistryManager()).build(SlotDisplayContexts.CONTEXT_TYPE);
         return getItemStacks(ingredient, 1, context);
     }
 
-    private static List<ItemStack> getItemStacks(Ingredient ingredient, int count, ContextMap context) {
-        List<ItemStack> stacks = ingredient.display().resolveForStacks(context);
-        Optional<TagKey<Item>> value = ingredient.values.unwrap().left();
+    private static List<ItemStack> getItemStacks(Ingredient ingredient, int count, ContextParameterMap context) {
+        List<ItemStack> stacks = ingredient.toDisplay().getStacks(context);
+        Optional<TagKey<Item>> value = ingredient.entries.getStorage().left();
         if (value.isPresent()) {
-            String tag = value.get().location().toString();
+            String tag = value.get().id().toString();
             if (count == 1) {
                 for (ItemStack stack : stacks) {
                     setEivRecipeTag(stack, tag);
@@ -92,8 +88,8 @@ public abstract class CreateDisplay implements IEivServerRecipe {
     }
 
     private static void setEivRecipeTag(ItemStack stack, String tag) {
-        CompoundTag data = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
+        NbtCompound data = stack.getOrDefault(DataComponentTypes.CUSTOM_DATA, NbtComponent.DEFAULT).copyNbt();
         data.putString("eiv_recipeTag", tag);
-        stack.set(DataComponents.CUSTOM_DATA, CustomData.of(data));
+        NbtComponent.set(DataComponentTypes.CUSTOM_DATA, stack, data);
     }
 }

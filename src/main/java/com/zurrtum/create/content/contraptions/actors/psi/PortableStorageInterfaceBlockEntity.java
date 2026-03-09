@@ -1,21 +1,21 @@
 package com.zurrtum.create.content.contraptions.actors.psi;
 
 import com.zurrtum.create.AllAdvancements;
-import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.catnip.animation.LerpedFloat;
 import com.zurrtum.create.content.contraptions.AbstractContraptionEntity;
 import com.zurrtum.create.content.contraptions.Contraption;
 import com.zurrtum.create.foundation.advancement.CreateTrigger;
 import com.zurrtum.create.foundation.blockEntity.SmartBlockEntity;
+import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.infrastructure.config.AllConfigs;
-import net.minecraft.core.BlockPos;
-import net.minecraft.util.Mth;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.level.block.entity.BlockEntityType;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
-import net.minecraft.world.phys.AABB;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.entity.BlockEntityType;
+import net.minecraft.entity.Entity;
+import net.minecraft.storage.ReadView;
+import net.minecraft.storage.WriteView;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Box;
+import net.minecraft.util.math.MathHelper;
 
 import java.util.List;
 
@@ -38,9 +38,8 @@ public abstract class PortableStorageInterfaceBlockEntity extends SmartBlockEnti
     }
 
     public void startTransferringTo(Contraption contraption, float distance) {
-        if (connectedEntity == contraption.entity) {
+        if (connectedEntity == contraption.entity)
             return;
-        }
         this.distance = Math.min(2, distance);
         connectedEntity = contraption.entity;
         startConnecting();
@@ -49,23 +48,21 @@ public abstract class PortableStorageInterfaceBlockEntity extends SmartBlockEnti
 
     protected void stopTransferring() {
         connectedEntity = null;
-        level.updateNeighborsAt(worldPosition, getBlockState().getBlock(), null);
+        world.updateNeighborsAlways(pos, getCachedState().getBlock(), null);
     }
 
     public boolean canTransfer() {
-        if (connectedEntity != null && !connectedEntity.isAlive()) {
+        if (connectedEntity != null && !connectedEntity.isAlive())
             stopTransferring();
-        }
         return connectedEntity != null && isConnected();
     }
 
     @Override
     public void initialize() {
         super.initialize();
-        powered = level.hasNeighborSignal(worldPosition);
-        if (!powered) {
+        powered = world.isReceivingRedstonePower(pos);
+        if (!powered)
             notifyContraptions();
-        }
     }
 
     @Override
@@ -77,7 +74,7 @@ public abstract class PortableStorageInterfaceBlockEntity extends SmartBlockEnti
 
         if (keepAlive > 0) {
             keepAlive--;
-            if (keepAlive == 0 && !level.isClientSide()) {
+            if (keepAlive == 0 && !world.isClient()) {
                 stopTransferring();
                 transferTimer = ANIMATION - 1;
                 sendData();
@@ -87,48 +84,43 @@ public abstract class PortableStorageInterfaceBlockEntity extends SmartBlockEnti
 
         transferTimer = Math.min(transferTimer, ANIMATION * 2 + timeUnit);
 
-        boolean timerCanDecrement = transferTimer > ANIMATION || transferTimer > 0 && keepAlive == 0 && (isVirtual() || !level.isClientSide() || transferTimer != ANIMATION);
+        boolean timerCanDecrement = transferTimer > ANIMATION || transferTimer > 0 && keepAlive == 0 && (isVirtual() || !world.isClient() || transferTimer != ANIMATION);
 
         if (timerCanDecrement && (!isVirtual() || transferTimer != ANIMATION)) {
             transferTimer--;
-            if (transferTimer == ANIMATION - 1) {
+            if (transferTimer == ANIMATION - 1)
                 sendData();
-            }
-            if (transferTimer <= 0 || powered) {
+            if (transferTimer <= 0 || powered)
                 stopTransferring();
-            }
         }
 
         boolean isConnected = isConnected();
-        if (wasConnected != isConnected && !level.isClientSide()) {
-            setChanged();
-        }
+        if (wasConnected != isConnected && !world.isClient())
+            markDirty();
 
         float progress = 0;
-        if (isConnected) {
+        if (isConnected)
             progress = 1;
-        } else if (transferTimer >= timeUnit + animation) {
-            progress = Mth.lerpInt((transferTimer - timeUnit - animation) / (float) animation, 1, 0);
-        } else if (transferTimer < animation) {
-            progress = Mth.lerpInt(transferTimer / (float) animation, 0, 1);
-        }
+        else if (transferTimer >= timeUnit + animation)
+            progress = MathHelper.lerp((transferTimer - timeUnit - animation) / (float) animation, 1, 0);
+        else if (transferTimer < animation)
+            progress = MathHelper.lerp(transferTimer / (float) animation, 0, 1);
         connectionAnimation.setValue(progress);
     }
 
     @Override
-    protected void read(ValueInput view, boolean clientPacket) {
+    protected void read(ReadView view, boolean clientPacket) {
         super.read(view, clientPacket);
-        transferTimer = view.getIntOr("Timer", 0);
-        distance = view.getFloatOr("Distance", 0);
+        transferTimer = view.getInt("Timer", 0);
+        distance = view.getFloat("Distance", 0);
         boolean poweredPreviously = powered;
-        powered = view.getBooleanOr("Powered", false);
-        if (clientPacket && powered != poweredPreviously && !powered) {
+        powered = view.getBoolean("Powered", false);
+        if (clientPacket && powered != poweredPreviously && !powered)
             notifyContraptions();
-        }
     }
 
     @Override
-    protected void write(ValueOutput view, boolean clientPacket) {
+    protected void write(WriteView view, boolean clientPacket) {
         super.write(view, clientPacket);
         view.putInt("Timer", transferTimer);
         view.putFloat("Distance", distance);
@@ -136,23 +128,19 @@ public abstract class PortableStorageInterfaceBlockEntity extends SmartBlockEnti
     }
 
     public void neighbourChanged() {
-        boolean isBlockPowered = level.hasNeighborSignal(worldPosition);
-        if (isBlockPowered == powered) {
+        boolean isBlockPowered = world.isReceivingRedstonePower(pos);
+        if (isBlockPowered == powered)
             return;
-        }
         powered = isBlockPowered;
-        if (!powered) {
+        if (!powered)
             notifyContraptions();
-        }
-        if (powered) {
+        if (powered)
             stopTransferring();
-        }
         sendData();
     }
 
     private void notifyContraptions() {
-        level.getEntitiesOfClass(AbstractContraptionEntity.class, new AABB(worldPosition).inflate(3))
-            .forEach(AbstractContraptionEntity::refreshPSIs);
+        world.getNonSpectatingEntities(AbstractContraptionEntity.class, new Box(pos).expand(3)).forEach(AbstractContraptionEntity::refreshPSIs);
     }
 
     public boolean isPowered() {
@@ -160,8 +148,8 @@ public abstract class PortableStorageInterfaceBlockEntity extends SmartBlockEnti
     }
 
     @Override
-    protected AABB createRenderBoundingBox() {
-        return super.createRenderBoundingBox().inflate(2);
+    protected Box createRenderBoundingBox() {
+        return super.createRenderBoundingBox().expand(2);
     }
 
     public boolean isTransferring() {

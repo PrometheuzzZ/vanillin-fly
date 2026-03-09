@@ -1,35 +1,30 @@
 package com.zurrtum.create.catnip.components;
 
-import net.minecraft.core.component.DataComponentType;
-import net.minecraft.core.component.DataComponents;
-import net.minecraft.core.component.TypedDataComponent;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.component.Component;
+import net.minecraft.component.ComponentType;
+import net.minecraft.component.DataComponentTypes;
+import net.minecraft.item.ItemStack;
 
 public class ComponentProcessors {
     public static ItemStack withUnsafeComponentsDiscarded(ItemStack stack) {
-        if (stack.getComponentsPatch().isEmpty()) {
+        if (stack.getComponentChanges().isEmpty())
             return stack;
-        }
         ItemStack copy = stack.copy();
-        stack.getComponents().stream().filter(ComponentProcessors::isUnsafeItemComponent).map(TypedDataComponent::type)
-            .forEach(copy::remove);
+        stack.getComponents().stream().filter(ComponentProcessors::isUnsafeItemComponent).map(Component::type).forEach(copy::remove);
         return copy;
     }
 
-    public static boolean isUnsafeItemComponent(TypedDataComponent<?> component) {
+    public static boolean isUnsafeItemComponent(Component<?> component) {
         return isUnsafeItemComponent(component.type());
     }
 
-    public static boolean isUnsafeItemComponent(DataComponentType<?> component) {
-        if (component.equals(DataComponents.ENCHANTMENTS)) {
+    public static boolean isUnsafeItemComponent(ComponentType<?> component) {
+        if (component.equals(DataComponentTypes.ENCHANTMENTS))
             return false;
-        }
-        if (component.equals(DataComponents.POTION_CONTENTS)) {
+        if (component.equals(DataComponentTypes.POTION_CONTENTS))
             return false;
-        }
-        if (component.equals(DataComponents.DAMAGE)) {
+        if (component.equals(DataComponentTypes.DAMAGE))
             return false;
-        }
-        return !component.equals(DataComponents.CUSTOM_NAME);
+        return !component.equals(DataComponentTypes.CUSTOM_NAME);
     }
 }

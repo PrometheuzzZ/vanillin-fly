@@ -24,14 +24,14 @@ import me.shedaniel.rei.api.common.category.CategoryIdentifier;
 import me.shedaniel.rei.api.common.entry.EntryIngredient;
 import me.shedaniel.rei.api.common.entry.EntryStack;
 import me.shedaniel.rei.api.common.util.EntryStacks;
-import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.core.component.DataComponentPatch;
-import net.minecraft.network.chat.Component;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.item.crafting.RecipeType;
-import net.minecraft.world.level.material.Fluid;
-import net.minecraft.world.level.material.Fluids;
+import net.minecraft.client.font.TextRenderer;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.component.ComponentChanges;
+import net.minecraft.fluid.Fluid;
+import net.minecraft.fluid.Fluids;
+import net.minecraft.item.Item;
+import net.minecraft.recipe.RecipeType;
+import net.minecraft.text.Text;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix3x2f;
 import org.joml.Matrix3x2fStack;
@@ -49,63 +49,43 @@ public class SequencedAssemblyCategory extends CreateCategory<SequencedAssemblyD
         DRAW.put(
             AllRecipeTypes.PRESSING, (graphics, i, point, stack) -> {
                 float scale = 19 / 30f;
-                Matrix3x2fStack matrices = graphics.pose();
+                Matrix3x2fStack matrices = graphics.getMatrices();
                 matrices.pushMatrix();
                 matrices.translate(point.x, point.y);
                 matrices.scale(scale, scale);
                 matrices.translate(-point.x, -point.y);
-                graphics.guiRenderState.submitPicturesInPictureState(new PressRenderState(
-                    i,
-                    new Matrix3x2f(matrices),
-                    point.x - 3,
-                    point.y + 18,
-                    i
-                ));
+                graphics.state.addSpecialElement(new PressRenderState(i, new Matrix3x2f(matrices), point.x - 3, point.y + 18, i));
                 matrices.popMatrix();
             }
         );
         DRAW.put(
             AllRecipeTypes.DEPLOYING, (graphics, i, point, stack) -> {
                 float scale = 59 / 78f;
-                Matrix3x2fStack matrices = graphics.pose();
+                Matrix3x2fStack matrices = graphics.getMatrices();
                 matrices.pushMatrix();
                 matrices.translate(point.x, point.y);
                 matrices.scale(scale, scale);
                 matrices.translate(-point.x, -point.y);
-                graphics.guiRenderState.submitPicturesInPictureState(new DeployerRenderState(
-                    i,
-                    new Matrix3x2f(matrices),
-                    point.x - 3,
-                    point.y + 18,
-                    i
-                ));
+                graphics.state.addSpecialElement(new DeployerRenderState(i, new Matrix3x2f(matrices), point.x - 3, point.y + 18, i));
                 matrices.popMatrix();
             }
         );
         DRAW.put(
             AllRecipeTypes.FILLING, (graphics, i, point, stack) -> {
                 float scale = 35 / 46f;
-                Matrix3x2fStack matrices = graphics.pose();
+                Matrix3x2fStack matrices = graphics.getMatrices();
                 matrices.pushMatrix();
                 matrices.translate(point.x, point.y);
                 matrices.scale(scale, scale);
                 matrices.translate(-point.x, -point.y);
                 Fluid fluid = Fluids.EMPTY;
-                DataComponentPatch components = DataComponentPatch.EMPTY;
+                ComponentChanges components = ComponentChanges.EMPTY;
                 if (stack != null) {
                     FluidStack fluidStack = stack.castValue();
                     fluid = fluidStack.getFluid();
-                    components = fluidStack.getComponents().asPatch();
+                    components = fluidStack.getComponents().getChanges();
                 }
-                graphics.guiRenderState.submitPicturesInPictureState(new SpoutRenderState(
-                    i,
-                    new Matrix3x2f(matrices),
-                    fluid,
-                    components,
-                    point.x - 2,
-                    point.y + 24,
-                    i
-                ));
+                graphics.state.addSpecialElement(new SpoutRenderState(i, new Matrix3x2f(matrices), fluid, components, point.x - 2, point.y + 24, i));
                 matrices.popMatrix();
             }
         );
@@ -121,7 +101,7 @@ public class SequencedAssemblyCategory extends CreateCategory<SequencedAssemblyD
     }
 
     @Override
-    public Component getTitle() {
+    public Text getTitle() {
         return CreateLang.translateDirect("recipe.sequenced_assembly");
     }
 
@@ -140,7 +120,7 @@ public class SequencedAssemblyCategory extends CreateCategory<SequencedAssemblyD
         Point output = new Point(xOffset + 137, bounds.y + 96);
         SequenceData sequences = display.sequences();
         List<EntryIngredient> ingredients = sequences.ingredients();
-        List<List<Component>> tooltips = sequences.tooltip();
+        List<List<Text>> tooltips = sequences.tooltip();
         List<RecipeType<?>> types = sequences.types();
         List<Point> points = new ArrayList<>();
         int size = ingredients.size();
@@ -151,7 +131,7 @@ public class SequencedAssemblyCategory extends CreateCategory<SequencedAssemblyD
                 noBackground[i] = true;
             }
         }
-        widgets.add(Widgets.createDrawableWidget((GuiGraphics graphics, int mouseX, int mouseY, float delta) -> {
+        widgets.add(Widgets.createDrawableWidget((DrawContext graphics, int mouseX, int mouseY, float delta) -> {
             for (int i = 0; i < size; i++) {
                 if (noBackground[i]) {
                     continue;
@@ -163,7 +143,7 @@ public class SequencedAssemblyCategory extends CreateCategory<SequencedAssemblyD
         List<Slot> slots = new ArrayList<>();
         for (int i = 0; i < size; i++) {
             Point point = points.get(i);
-            List<Component> step = tooltips.get(i);
+            List<Text> step = tooltips.get(i);
             if (noBackground[i]) {
                 widgets.add(new TooltipWidget(point.x, point.y - 14, 16, 86, step));
                 slots.add(null);
@@ -171,7 +151,7 @@ public class SequencedAssemblyCategory extends CreateCategory<SequencedAssemblyD
                 Slot slot = createInputSlot(point).disableTooltips().entries(getRenderEntryStack(ingredients.get(i)));
                 widgets.add(new TooltipWidget(
                     point.x, point.y - 14, 16, 86, mc -> {
-                    Tooltip tooltip = slot.getCurrentTooltip(TooltipContext.ofMouse(Item.TooltipContext.of(mc.level)));
+                    Tooltip tooltip = slot.getCurrentTooltip(TooltipContext.ofMouse(Item.TooltipContext.create(mc.world)));
                     if (tooltip == null) {
                         return Tooltip.create(step);
                     }
@@ -193,19 +173,12 @@ public class SequencedAssemblyCategory extends CreateCategory<SequencedAssemblyD
                 slots.add(slot);
             }
         }
-        widgets.add(Widgets.createDrawableWidget((GuiGraphics graphics, int mouseX, int mouseY, float delta) -> {
-            Font textRenderer = graphics.minecraft.font;
+        widgets.add(Widgets.createDrawableWidget((DrawContext graphics, int mouseX, int mouseY, float delta) -> {
+            TextRenderer textRenderer = graphics.client.textRenderer;
             for (int i = 0; i < size; i++) {
                 Point point = points.get(i);
                 String text = ROMANS[Math.min(i, ROMANS.length)];
-                graphics.drawString(
-                    textRenderer,
-                    text,
-                    point.x + 8 - textRenderer.width(text) / 2,
-                    point.y - 13,
-                    0xff888888,
-                    false
-                );
+                graphics.drawText(textRenderer, text, point.x + 8 - textRenderer.getWidth(text) / 2, point.y - 13, 0xff888888, false);
                 SequencedRenderer draw = DRAW.get(types.get(i));
                 if (draw != null) {
                     Slot slot = slots.get(i);
@@ -225,8 +198,8 @@ public class SequencedAssemblyCategory extends CreateCategory<SequencedAssemblyD
             AllGuiTextures.JEI_LONG_ARROW.render(graphics, xOffset + 57, bounds.y + 99);
             if (willRepeat) {
                 AllIcons.I_SEQ_REPEAT.render(graphics, xOffset + 70, bounds.y + 104);
-                Component repeat = Component.literal("x" + display.loop());
-                graphics.drawString(textRenderer, repeat, xOffset + 86, bounds.y + 109, 0xff888888, false);
+                Text repeat = Text.literal("x" + display.loop());
+                graphics.drawText(textRenderer, repeat, xOffset + 86, bounds.y + 109, 0xff888888, false);
             }
         }));
         widgets.add(createInputSlot(input).entries(display.input()));
@@ -235,13 +208,7 @@ public class SequencedAssemblyCategory extends CreateCategory<SequencedAssemblyD
             widgets.add(new JunkWidget(xOffset + 156, bounds.y + 96, 1 - chanceOutput.chance()));
         }
         if (willRepeat) {
-            widgets.add(new TooltipWidget(
-                xOffset + 57,
-                bounds.y + 99,
-                71,
-                18,
-                CreateLang.translateDirect("recipe.assembly.repeat", display.loop())
-            ));
+            widgets.add(new TooltipWidget(xOffset + 57, bounds.y + 99, 71, 18, CreateLang.translateDirect("recipe.assembly.repeat", display.loop())));
         }
     }
 
@@ -251,6 +218,6 @@ public class SequencedAssemblyCategory extends CreateCategory<SequencedAssemblyD
     }
 
     public interface SequencedRenderer {
-        void render(GuiGraphics graphics, int i, Point point, @Nullable EntryStack<?> stack);
+        void render(DrawContext graphics, int i, Point point, @Nullable EntryStack<?> stack);
     }
 }

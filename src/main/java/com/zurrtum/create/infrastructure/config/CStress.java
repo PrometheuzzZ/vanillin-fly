@@ -5,9 +5,9 @@ import com.zurrtum.create.catnip.config.ConfigBase;
 import com.zurrtum.create.catnip.config.DoubleRawValue;
 import it.unimi.dsi.fastutil.objects.Object2DoubleMap;
 import it.unimi.dsi.fastutil.objects.Object2DoubleOpenHashMap;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.Identifier;
-import net.minecraft.world.level.block.Block;
+import net.minecraft.block.Block;
+import net.minecraft.registry.Registries;
+import net.minecraft.util.Identifier;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.HashMap;
@@ -31,11 +31,11 @@ public class CStress extends ConfigBase {
     }
 
     public static void setImpact(Block block, double value) {
-        DEFAULT_IMPACTS.put(BuiltInRegistries.BLOCK.getKey(block), value);
+        DEFAULT_IMPACTS.put(Registries.BLOCK.getId(block), value);
     }
 
     public static void setCapacity(Block block, double value) {
-        DEFAULT_CAPACITIES.put(BuiltInRegistries.BLOCK.getKey(block), value);
+        DEFAULT_CAPACITIES.put(Registries.BLOCK.getId(block), value);
     }
 
     @Override
@@ -56,14 +56,14 @@ public class CStress extends ConfigBase {
 
     @Nullable
     public DoubleSupplier getImpact(Block block) {
-        Identifier id = BuiltInRegistries.BLOCK.getKey(block);
+        Identifier id = Registries.BLOCK.getId(block);
         DoubleRawValue value = this.impacts.get(id);
         return value == null ? null : value::get;
     }
 
     @Nullable
     public DoubleSupplier getCapacity(Block block) {
-        Identifier id = BuiltInRegistries.BLOCK.getKey(block);
+        Identifier id = Registries.BLOCK.getId(block);
         DoubleRawValue value = this.capacities.get(id);
         return value == null ? null : value::get;
     }

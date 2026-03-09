@@ -4,22 +4,23 @@ import com.zurrtum.create.AllHandle;
 import com.zurrtum.create.AllPackets;
 import com.zurrtum.create.content.decoration.slidingDoor.DoorControl;
 import io.netty.buffer.ByteBuf;
-import net.minecraft.core.BlockPos;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.PacketType;
-import net.minecraft.network.protocol.game.ServerGamePacketListener;
-import net.minecraft.server.network.ServerGamePacketListenerImpl;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.network.listener.ServerPlayPacketListener;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.PacketType;
+import net.minecraft.server.network.ServerPlayNetworkHandler;
+import net.minecraft.util.math.BlockPos;
 
-public record ElevatorContactEditPacket(BlockPos pos, String shortName, String longName,
-                                        DoorControl doorControl) implements Packet<ServerGamePacketListener> {
-    public static final StreamCodec<ByteBuf, ElevatorContactEditPacket> CODEC = StreamCodec.composite(
-        BlockPos.STREAM_CODEC,
+public record ElevatorContactEditPacket(
+    BlockPos pos, String shortName, String longName, DoorControl doorControl
+) implements Packet<ServerPlayPacketListener> {
+    public static final PacketCodec<ByteBuf, ElevatorContactEditPacket> CODEC = PacketCodec.tuple(
+        BlockPos.PACKET_CODEC,
         ElevatorContactEditPacket::pos,
-        ByteBufCodecs.stringUtf8(4),
+        PacketCodecs.string(4),
         ElevatorContactEditPacket::shortName,
-        ByteBufCodecs.stringUtf8(90),
+        PacketCodecs.string(90),
         ElevatorContactEditPacket::longName,
         DoorControl.STREAM_CODEC,
         ElevatorContactEditPacket::doorControl,
@@ -27,12 +28,12 @@ public record ElevatorContactEditPacket(BlockPos pos, String shortName, String l
     );
 
     @Override
-    public void handle(ServerGamePacketListener listener) {
-        AllHandle.onElevatorContactEdit((ServerGamePacketListenerImpl) listener, this);
+    public void apply(ServerPlayPacketListener listener) {
+        AllHandle.onElevatorContactEdit((ServerPlayNetworkHandler) listener, this);
     }
 
     @Override
-    public PacketType<ElevatorContactEditPacket> type() {
+    public PacketType<ElevatorContactEditPacket> getPacketType() {
         return AllPackets.CONFIGURE_ELEVATOR_CONTACT;
     }
 }

@@ -4,13 +4,13 @@ import com.zurrtum.create.compat.eiv.CreateDisplay;
 import com.zurrtum.create.compat.eiv.EivCommonPlugin;
 import com.zurrtum.create.content.kinetics.crafter.MechanicalCraftingRecipe;
 import de.crafty.eiv.common.api.recipe.EivRecipeType;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.Tag;
-import net.minecraft.resources.RegistryOps;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.crafting.Ingredient;
-import net.minecraft.world.item.crafting.RecipeHolder;
-import net.minecraft.world.item.crafting.ShapedRecipePattern;
+import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NbtCompound;
+import net.minecraft.nbt.NbtElement;
+import net.minecraft.recipe.Ingredient;
+import net.minecraft.recipe.RawShapedRecipe;
+import net.minecraft.recipe.RecipeEntry;
+import net.minecraft.registry.RegistryOps;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -26,12 +26,12 @@ public class MechanicalCraftingDisplay extends CreateDisplay {
     public MechanicalCraftingDisplay() {
     }
 
-    public MechanicalCraftingDisplay(RecipeHolder<MechanicalCraftingRecipe> entry) {
+    public MechanicalCraftingDisplay(RecipeEntry<MechanicalCraftingRecipe> entry) {
         MechanicalCraftingRecipe recipe = entry.value();
-        ShapedRecipePattern raw = recipe.raw();
-        width = raw.width();
-        height = raw.height();
-        List<Optional<Ingredient>> ingredientList = raw.ingredients();
+        RawShapedRecipe raw = recipe.raw();
+        width = raw.getWidth();
+        height = raw.getHeight();
+        List<Optional<Ingredient>> ingredientList = raw.getIngredients();
         int size = ingredientList.size();
         ingredients = new ArrayList<>(size);
         int[] emptyList = new int[size];
@@ -51,23 +51,23 @@ public class MechanicalCraftingDisplay extends CreateDisplay {
     }
 
     @Override
-    public void writeToTag(CompoundTag tag) {
-        RegistryOps<Tag> ops = getServerOps();
+    public void writeToTag(NbtCompound tag) {
+        RegistryOps<NbtElement> ops = getServerOps();
         tag.putByte("width", (byte) width);
         tag.putByte("height", (byte) height);
-        tag.store("ingredients", STACKS_LIST_CODEC, ops, ingredients);
+        tag.put("ingredients", STACKS_LIST_CODEC, ops, ingredients);
         tag.putIntArray("empty", empty);
-        tag.store("result", ItemStack.CODEC, ops, result);
+        tag.put("result", ItemStack.CODEC, ops, result);
     }
 
     @Override
-    public void loadFromTag(CompoundTag tag) {
-        RegistryOps<Tag> ops = getClientOps();
+    public void loadFromTag(NbtCompound tag) {
+        RegistryOps<NbtElement> ops = getClientOps();
         width = tag.getByte("width").orElseThrow();
         height = tag.getByte("height").orElseThrow();
-        ingredients = tag.read("ingredients", STACKS_LIST_CODEC, ops).orElseThrow();
+        ingredients = tag.get("ingredients", STACKS_LIST_CODEC, ops).orElseThrow();
         empty = tag.getIntArray("empty").orElseThrow();
-        result = tag.read("result", ItemStack.CODEC, ops).orElseThrow();
+        result = tag.get("result", ItemStack.CODEC, ops).orElseThrow();
     }
 
     @Override

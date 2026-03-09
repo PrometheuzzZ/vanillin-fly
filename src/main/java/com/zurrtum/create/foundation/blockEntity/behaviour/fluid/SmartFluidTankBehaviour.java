@@ -1,17 +1,17 @@
 package com.zurrtum.create.foundation.blockEntity.behaviour.fluid;
 
-import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.catnip.animation.LerpedFloat;
 import com.zurrtum.create.catnip.animation.LerpedFloat.Chaser;
 import com.zurrtum.create.foundation.blockEntity.SmartBlockEntity;
 import com.zurrtum.create.foundation.blockEntity.behaviour.BehaviourType;
+import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.infrastructure.fluids.FluidInventory;
 import com.zurrtum.create.infrastructure.fluids.FluidStack;
 import com.zurrtum.create.infrastructure.fluids.SidedFluidInventory;
 import com.zurrtum.create.infrastructure.transfer.SlotRangeCache;
-import net.minecraft.core.Direction;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.storage.ReadView;
+import net.minecraft.storage.WriteView;
+import net.minecraft.util.math.Direction;
 import org.apache.commons.lang3.function.TriFunction;
 import org.jetbrains.annotations.Nullable;
 
@@ -108,9 +108,8 @@ public class SmartFluidTankBehaviour extends BlockEntityBehaviour<SmartBlockEnti
     @Override
     public void initialize() {
         super.initialize();
-        if (getLevel().isClientSide()) {
+        if (getWorld().isClient())
             return;
-        }
         forEach(ts -> {
             ts.fluidLevel.forceNextSync();
             ts.markDirty();
@@ -123,16 +122,14 @@ public class SmartFluidTankBehaviour extends BlockEntityBehaviour<SmartBlockEnti
 
         if (syncCooldown > 0) {
             syncCooldown--;
-            if (syncCooldown == 0 && queuedSync) {
+            if (syncCooldown == 0 && queuedSync)
                 updateFluids();
-            }
         }
 
         forEach(be -> {
             LerpedFloat fluidLevel = be.getFluidLevel();
-            if (fluidLevel != null) {
+            if (fluidLevel != null)
                 fluidLevel.tickChaser();
-            }
         });
     }
 
@@ -155,7 +152,7 @@ public class SmartFluidTankBehaviour extends BlockEntityBehaviour<SmartBlockEnti
     protected void updateFluids() {
         fluidUpdateCallback.run();
         blockEntity.sendData();
-        blockEntity.setChanged();
+        blockEntity.markDirty();
     }
 
     public TankSegment getPrimaryHandler() {
@@ -171,18 +168,15 @@ public class SmartFluidTankBehaviour extends BlockEntityBehaviour<SmartBlockEnti
     }
 
     public boolean isEmpty() {
-        for (TankSegment tankSegment : tanks) {
-            if (!tankSegment.getFluid().isEmpty()) {
+        for (TankSegment tankSegment : tanks)
+            if (!tankSegment.getFluid().isEmpty())
                 return false;
-            }
-        }
         return true;
     }
 
     public void forEach(Consumer<TankSegment> action) {
-        for (TankSegment tankSegment : tanks) {
+        for (TankSegment tankSegment : tanks)
             action.accept(tankSegment);
-        }
     }
 
     public SidedFluidInventory getCapability() {
@@ -190,21 +184,20 @@ public class SmartFluidTankBehaviour extends BlockEntityBehaviour<SmartBlockEnti
     }
 
     @Override
-    public void write(ValueOutput view, boolean clientPacket) {
+    public void write(WriteView view, boolean clientPacket) {
         super.write(view, clientPacket);
-        ValueOutput.ValueOutputList list = view.childrenList(getType().getName() + "Tanks");
-        forEach(ts -> ts.write(list.addChild()));
+        WriteView.ListView list = view.getList(getType().getName() + "Tanks");
+        forEach(ts -> ts.write(list.add()));
     }
 
     @Override
-    public void read(ValueInput view, boolean clientPacket) {
+    public void read(ReadView view, boolean clientPacket) {
         super.read(view, clientPacket);
         int i = 0;
         int size = tanks.length;
-        for (ValueInput item : view.childrenListOrEmpty(getType().getName() + "Tanks")) {
-            if (i >= size) {
+        for (ReadView item : view.getListReadView(getType().getName() + "Tanks")) {
+            if (i >= size)
                 break;
-            }
             tanks[i].read(item, clientPacket);
             i++;
         }
@@ -369,16 +362,13 @@ public class SmartFluidTankBehaviour extends BlockEntityBehaviour<SmartBlockEnti
 
         @Override
         public void markDirty() {
-            if (!blockEntity.hasLevel()) {
+            if (!blockEntity.hasWorld())
                 return;
-            }
             fluidLevel.chase(fluid.getAmount() / (float) capacity, .25, Chaser.EXP);
-            if (!getLevel().isClientSide()) {
+            if (!getWorld().isClient())
                 sendDataLazily();
-            }
-            if (blockEntity.isVirtual() && !fluid.isEmpty()) {
+            if (blockEntity.isVirtual() && !fluid.isEmpty())
                 renderedFluid = fluid;
-            }
         }
 
         public FluidStack getRenderedFluid() {
@@ -393,23 +383,21 @@ public class SmartFluidTankBehaviour extends BlockEntityBehaviour<SmartBlockEnti
             return fluidLevel.getValue(partialTicks) * capacity;
         }
 
-        public void write(ValueOutput view) {
-            view.store("TankContent", FluidStack.OPTIONAL_CODEC, fluid);
+        public void write(WriteView view) {
+            view.put("TankContent", FluidStack.OPTIONAL_CODEC, fluid);
             fluidLevel.write(view);
         }
 
-        public void read(ValueInput view, boolean clientPacket) {
+        public void read(ReadView view, boolean clientPacket) {
             fluid = view.read("TankContent", FluidStack.OPTIONAL_CODEC).orElse(FluidStack.EMPTY);
             fluidLevel.read(view, clientPacket);
-            if (!fluid.isEmpty()) {
+            if (!fluid.isEmpty())
                 renderedFluid = fluid;
-            }
         }
 
         public boolean isEmpty(float partialTicks) {
-            if (getRenderedFluid().isEmpty()) {
+            if (getRenderedFluid().isEmpty())
                 return true;
-            }
             return getTotalUnits(partialTicks) < 1;
         }
 

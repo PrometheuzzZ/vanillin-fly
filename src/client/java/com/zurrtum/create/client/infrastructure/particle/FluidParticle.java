@@ -5,27 +5,27 @@ import com.zurrtum.create.catnip.theme.Color;
 import com.zurrtum.create.client.AllFluidConfigs;
 import com.zurrtum.create.client.infrastructure.fluid.FluidConfig;
 import com.zurrtum.create.infrastructure.particle.FluidParticleData;
-import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.client.particle.BillboardParticle;
 import net.minecraft.client.particle.Particle;
-import net.minecraft.client.particle.ParticleProvider;
-import net.minecraft.client.particle.SingleQuadParticle;
-import net.minecraft.core.component.DataComponentPatch;
-import net.minecraft.core.particles.ColorParticleOption;
-import net.minecraft.core.particles.ParticleTypes;
-import net.minecraft.util.RandomSource;
-import net.minecraft.world.level.material.Fluid;
+import net.minecraft.client.particle.ParticleFactory;
+import net.minecraft.client.world.ClientWorld;
+import net.minecraft.component.ComponentChanges;
+import net.minecraft.fluid.Fluid;
+import net.minecraft.particle.ParticleTypes;
+import net.minecraft.particle.TintedParticleEffect;
+import net.minecraft.util.math.random.Random;
 
-public class FluidParticle extends SingleQuadParticle {
+public class FluidParticle extends BillboardParticle {
     private final float uo;
     private final float vo;
     private final Fluid fluid;
-    private final DataComponentPatch components;
+    private final ComponentChanges components;
     private final FluidConfig config;
 
     public FluidParticle(
-        ClientLevel world,
+        ClientWorld world,
         Fluid fluid,
-        DataComponentPatch components,
+        ComponentChanges components,
         FluidConfig config,
         double x,
         double y,
@@ -33,7 +33,7 @@ public class FluidParticle extends SingleQuadParticle {
         double vx,
         double vy,
         double vz,
-        RandomSource random
+        Random random
     ) {
         super(world, x, y, z, vx, vy, vz, config.still().get());
 
@@ -41,79 +41,75 @@ public class FluidParticle extends SingleQuadParticle {
         this.components = components;
         this.config = config;
 
-        this.gravity = 1.0F;
+        this.gravityStrength = 1.0F;
         this.updateColor();
         this.multiplyColor(config.tint().apply(components));
 
-        this.xd = vx;
-        this.yd = vy;
-        this.zd = vz;
+        this.velocityX = vx;
+        this.velocityY = vy;
+        this.velocityZ = vz;
 
-        this.quadSize /= 2.0F;
+        this.scale /= 2.0F;
         this.uo = random.nextFloat() * 3.0F;
         this.vo = random.nextFloat() * 3.0F;
     }
 
     @Override
-    protected int getLightColor(float p_189214_1_) {
-        int brightnessForRender = super.getLightColor(p_189214_1_);
+    protected int getBrightness(float p_189214_1_) {
+        int brightnessForRender = super.getBrightness(p_189214_1_);
         int skyLight = brightnessForRender >> 20;
         int blockLight = (brightnessForRender >> 4) & 0xf;
-        blockLight = Math.max(blockLight, fluid.defaultFluidState().createLegacyBlock().getLightEmission());
+        blockLight = Math.max(blockLight, fluid.getDefaultState().getBlockState().getLuminance());
         return (skyLight << 20) | (blockLight << 4);
     }
 
     protected void updateColor() {
-        this.rCol = 0.8F;
-        this.gCol = 0.8F;
-        this.bCol = 0.8F;
+        this.red = 0.8F;
+        this.green = 0.8F;
+        this.blue = 0.8F;
     }
 
     protected void multiplyColor(int color) {
-        this.rCol *= (float) (color >> 16 & 255) / 255.0F;
-        this.gCol *= (float) (color >> 8 & 255) / 255.0F;
-        this.bCol *= (float) (color & 255) / 255.0F;
+        this.red *= (float) (color >> 16 & 255) / 255.0F;
+        this.green *= (float) (color >> 8 & 255) / 255.0F;
+        this.blue *= (float) (color & 255) / 255.0F;
     }
 
     @Override
-    protected float getU0() {
-        return this.sprite.getU((this.uo + 1.0F) / 4.0F);
+    protected float getMinU() {
+        return this.sprite.getFrameU((this.uo + 1.0F) / 4.0F);
     }
 
     @Override
-    protected float getU1() {
-        return this.sprite.getU(this.uo / 4.0F);
+    protected float getMaxU() {
+        return this.sprite.getFrameU(this.uo / 4.0F);
     }
 
     @Override
-    protected float getV0() {
-        return this.sprite.getV(this.vo / 4.0F);
+    protected float getMinV() {
+        return this.sprite.getFrameV(this.vo / 4.0F);
     }
 
     @Override
-    protected float getV1() {
-        return this.sprite.getV((this.vo + 1.0F) / 4.0F);
+    protected float getMaxV() {
+        return this.sprite.getFrameV((this.vo + 1.0F) / 4.0F);
     }
 
     @Override
     public void tick() {
         super.tick();
-        if (!canEvaporate()) {
+        if (!canEvaporate())
             return;
-        }
-        if (onGround) {
-            remove();
-        }
-        if (!removed) {
+        if (onGround)
+            markDead();
+        if (!dead)
             return;
-        }
-        if (!onGround && random.nextFloat() < 1 / 8f) {
+        if (!onGround && random.nextFloat() < 1 / 8f)
             return;
-        }
 
         Color color = new Color(config.tint().apply(components));
-        level.addParticle(
-            ColorParticleOption.create(
+        world.addParticleClient(
+            TintedParticleEffect.create(
                 ParticleTypes.ENTITY_EFFECT,
                 color.getRedAsFloat(),
                 color.getGreenAsFloat(),
@@ -133,22 +129,22 @@ public class FluidParticle extends SingleQuadParticle {
     }
 
     @Override
-    protected Layer getLayer() {
-        return SingleQuadParticle.Layer.TERRAIN;
+    protected RenderType getRenderType() {
+        return BillboardParticle.RenderType.BLOCK_ATLAS_TRANSLUCENT;
     }
 
-    public static class Factory implements ParticleProvider<FluidParticleData> {
+    public static class Factory implements ParticleFactory<FluidParticleData> {
         @Override
         public Particle createParticle(
             FluidParticleData data,
-            ClientLevel world,
+            ClientWorld world,
             double x,
             double y,
             double z,
             double vx,
             double vy,
             double vz,
-            RandomSource random
+            Random random
         ) {
             FluidConfig config = AllFluidConfigs.get(data.fluid());
             if (config == null) {

@@ -1,12 +1,12 @@
 package com.zurrtum.create.client.catnip.outliner;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.zurrtum.create.client.catnip.render.PonderRenderTypes;
 import com.zurrtum.create.client.catnip.render.SuperRenderTypeBuffer;
-import net.minecraft.client.Minecraft;
-import net.minecraft.util.Mth;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.render.VertexConsumer;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.Vec3d;
 import org.joml.Vector3d;
 import org.joml.Vector4f;
 
@@ -21,18 +21,17 @@ public class LineOutline extends Outline {
         return this;
     }
 
-    public LineOutline set(Vec3 start, Vec3 end) {
+    public LineOutline set(Vec3d start, Vec3d end) {
         this.start.set(start.x, start.y, start.z);
         this.end.set(end.x, end.y, end.z);
         return this;
     }
 
     @Override
-    public void render(Minecraft mc, PoseStack ms, SuperRenderTypeBuffer buffer, Vec3 camera, float pt) {
+    public void render(MinecraftClient mc, MatrixStack ms, SuperRenderTypeBuffer buffer, Vec3d camera, float pt) {
         float width = params.getLineWidth();
-        if (width == 0) {
+        if (width == 0)
             return;
-        }
 
         VertexConsumer consumer = buffer.getBuffer(PonderRenderTypes.outlineSolid());
         params.loadColor(colorTemp);
@@ -43,9 +42,9 @@ public class LineOutline extends Outline {
     }
 
     protected void renderInner(
-        PoseStack ms,
+        MatrixStack ms,
         VertexConsumer consumer,
-        Vec3 camera,
+        Vec3d camera,
         float pt,
         float width,
         Vector4f color,
@@ -74,16 +73,16 @@ public class LineOutline extends Outline {
 
         @Override
         protected void renderInner(
-            PoseStack ms,
+            MatrixStack ms,
             VertexConsumer consumer,
-            Vec3 camera,
+            Vec3d camera,
             float pt,
             float width,
             Vector4f color,
             int lightmap,
             boolean disableNormals
         ) {
-            float distanceToTarget = Mth.lerp(pt, prevProgress, progress);
+            float distanceToTarget = MathHelper.lerp(pt, prevProgress, progress);
 
             Vector3d end;
             if (lockStart) {

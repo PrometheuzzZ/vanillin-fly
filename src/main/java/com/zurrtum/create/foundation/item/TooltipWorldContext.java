@@ -1,7 +1,7 @@
 package com.zurrtum.create.foundation.item;
 
-import net.minecraft.world.level.Level;
+import net.minecraft.world.World;
 
 public interface TooltipWorldContext {
-    Level create$getWorld();
+    World create$getWorld();
 }

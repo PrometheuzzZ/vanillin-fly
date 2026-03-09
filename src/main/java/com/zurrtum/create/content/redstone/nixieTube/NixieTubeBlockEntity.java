@@ -10,16 +10,16 @@ import com.zurrtum.create.content.trains.signal.SignalBlockEntity;
 import com.zurrtum.create.content.trains.signal.SignalBlockEntity.SignalState;
 import com.zurrtum.create.foundation.blockEntity.SmartBlockEntity;
 import com.zurrtum.create.foundation.utility.DynamicComponent;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.network.chat.CommonComponents;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.ComponentSerialization;
-import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.screen.ScreenTexts;
+import net.minecraft.storage.ReadView;
+import net.minecraft.storage.WriteView;
+import net.minecraft.text.MutableText;
+import net.minecraft.text.Text;
+import net.minecraft.text.TextCodecs;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -74,8 +74,9 @@ public class NixieTubeBlockEntity extends SmartBlockEntity {
         }
     }
 
+
     private int redstoneStrength;
-    private Optional<Component> customText;
+    private Optional<Text> customText;
     private int nixieIndex;
     private Couple<String> displayedStrings;
 
@@ -94,13 +95,12 @@ public class NixieTubeBlockEntity extends SmartBlockEntity {
     @Override
     public void tick() {
         super.tick();
-        if (!level.isClientSide()) {
+        if (!world.isClient())
             return;
-        }
         signalState = null;
 
         if (AbstractComputerBehaviour.contains(this)) {
-            if (level.isClientSide() && cachedSignalTE.get() != null) {
+            if (world.isClient() && cachedSignalTE.get() != null) {
                 cachedSignalTE = new WeakReference<>(null);
             }
             return;
@@ -111,8 +111,8 @@ public class NixieTubeBlockEntity extends SmartBlockEntity {
         SignalBlockEntity signalBlockEntity = cachedSignalTE.get();
 
         if (signalBlockEntity == null || signalBlockEntity.isRemoved()) {
-            Direction facing = NixieTubeBlock.getFacing(getBlockState());
-            BlockEntity blockEntity = level.getBlockEntity(worldPosition.relative(facing.getOpposite()));
+            Direction facing = NixieTubeBlock.getFacing(getCachedState());
+            BlockEntity blockEntity = world.getBlockEntity(pos.offset(facing.getOpposite()));
             if (blockEntity instanceof SignalBlockEntity signal) {
                 signalState = signal.getState();
                 cachedSignalTE = new WeakReference<>(signal);
@@ -125,9 +125,8 @@ public class NixieTubeBlockEntity extends SmartBlockEntity {
 
     @Override
     public void initialize() {
-        if (level.isClientSide()) {
+        if (world.isClient())
             updateDisplayedStrings();
-        }
     }
 
     //
@@ -144,48 +143,39 @@ public class NixieTubeBlockEntity extends SmartBlockEntity {
         return displayedStrings;
     }
 
-    public MutableComponent getFullText() {
-        return customText.map(Component::copy).orElse(Component.literal("" + redstoneStrength));
+    public MutableText getFullText() {
+        return customText.map(Text::copy).orElse(Text.literal("" + redstoneStrength));
     }
 
     public void updateRedstoneStrength(int signalStrength) {
         clearCustomText();
         redstoneStrength = signalStrength;
-        DisplayLinkBlock.notifyGatherers(level, worldPosition);
+        DisplayLinkBlock.notifyGatherers(world, pos);
         notifyUpdate();
     }
 
-    public void displayCustomText(Component text, int nixiePositionInRow) {
-        if (text == null) {
+    public void displayCustomText(Text text, int nixiePositionInRow) {
+        if (text == null)
             return;
-        }
-        if (customText.filter(d -> d.equals(text)).isPresent()) {
+        if (customText.filter(d -> d.equals(text)).isPresent())
             return;
-        }
 
-        customText = Optional.ofNullable(DynamicComponent.parseCustomText(level, worldPosition, text));
+        customText = Optional.ofNullable(DynamicComponent.parseCustomText(world, pos, text));
         nixieIndex = nixiePositionInRow;
-        DisplayLinkBlock.notifyGatherers(level, worldPosition);
+        DisplayLinkBlock.notifyGatherers(world, pos);
         notifyUpdate();
     }
 
     public void displayEmptyText(int nixiePositionInRow) {
-        displayCustomText(CommonComponents.EMPTY, nixiePositionInRow);
+        displayCustomText(ScreenTexts.EMPTY, nixiePositionInRow);
     }
 
     public void updateDisplayedStrings() {
-        if (signalState != null || computerSignal != null) {
+        if (signalState != null || computerSignal != null)
             return;
-        }
-        customText.map(Component::getString).ifPresentOrElse(
-            fullText -> displayedStrings = Couple.create(
-                charOrEmpty(fullText, nixieIndex * 2),
-                charOrEmpty(fullText, nixieIndex * 2 + 1)
-            ),
-            () -> displayedStrings = Couple.create(
-                redstoneStrength < 10 ? "0" : "1",
-                String.valueOf(redstoneStrength % 10)
-            )
+        customText.map(Text::getString).ifPresentOrElse(
+            fullText -> displayedStrings = Couple.create(charOrEmpty(fullText, nixieIndex * 2), charOrEmpty(fullText, nixieIndex * 2 + 1)),
+            () -> displayedStrings = Couple.create(redstoneStrength < 10 ? "0" : "1", String.valueOf(redstoneStrength % 10))
         );
     }
 
@@ -201,22 +191,21 @@ public class NixieTubeBlockEntity extends SmartBlockEntity {
     //
 
     @Override
-    protected void read(ValueInput view, boolean clientPacket) {
+    protected void read(ReadView view, boolean clientPacket) {
         super.read(view, clientPacket);
 
-        view.read("CustomText", ComponentSerialization.CODEC).ifPresentOrElse(
+        view.read("CustomText", TextCodecs.CODEC).ifPresentOrElse(
             text -> {
                 customText = Optional.of(text);
-                nixieIndex = view.getIntOr("CustomTextIndex", 0);
-            }, () -> redstoneStrength = view.getIntOr("RedstoneStrength", 0)
+                nixieIndex = view.getInt("CustomTextIndex", 0);
+            }, () -> redstoneStrength = view.getInt("RedstoneStrength", 0)
         );
         if (clientPacket || isVirtual()) {
             view.read("ComputerSignal", Codec.BYTE_BUFFER).ifPresentOrElse(
                 t -> {
                     byte[] encodedComputerSignal = t.array();
-                    if (computerSignal == null) {
+                    if (computerSignal == null)
                         computerSignal = new ComputerSignal();
-                    }
                     computerSignal.decode(encodedComputerSignal);
                 }, () -> computerSignal = null
             );
@@ -225,17 +214,17 @@ public class NixieTubeBlockEntity extends SmartBlockEntity {
     }
 
     @Override
-    protected void write(ValueOutput view, boolean clientPacket) {
+    protected void write(WriteView view, boolean clientPacket) {
         super.write(view, clientPacket);
 
         customText.ifPresentOrElse(
             text -> {
                 view.putInt("CustomTextIndex", nixieIndex);
-                view.store("CustomText", ComponentSerialization.CODEC, text);
+                view.put("CustomText", TextCodecs.CODEC, text);
             }, () -> view.putInt("RedstoneStrength", redstoneStrength)
         );
         if (clientPacket && computerSignal != null) {
-            view.store("ComputerSignal", Codec.BYTE_BUFFER, ByteBuffer.wrap(computerSignal.encode()));
+            view.put("ComputerSignal", Codec.BYTE_BUFFER, ByteBuffer.wrap(computerSignal.encode()));
         }
     }
 

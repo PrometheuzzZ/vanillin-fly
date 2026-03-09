@@ -6,11 +6,11 @@ import com.zurrtum.create.content.kinetics.mixer.PotionRecipe;
 import com.zurrtum.create.foundation.fluid.FluidIngredient;
 import com.zurrtum.create.infrastructure.fluids.FluidStack;
 import de.crafty.eiv.common.api.recipe.EivRecipeType;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.Tag;
-import net.minecraft.resources.RegistryOps;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.crafting.RecipeHolder;
+import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NbtCompound;
+import net.minecraft.nbt.NbtElement;
+import net.minecraft.recipe.RecipeEntry;
+import net.minecraft.registry.RegistryOps;
 
 import java.util.List;
 
@@ -22,7 +22,7 @@ public class PotionDisplay extends CreateDisplay {
     public PotionDisplay() {
     }
 
-    public PotionDisplay(RecipeHolder<PotionRecipe> entry) {
+    public PotionDisplay(RecipeEntry<PotionRecipe> entry) {
         PotionRecipe recipe = entry.value();
         result = recipe.result();
         ingredient = getItemStacks(recipe.ingredient());
@@ -30,19 +30,19 @@ public class PotionDisplay extends CreateDisplay {
     }
 
     @Override
-    public void writeToTag(CompoundTag tag) {
-        RegistryOps<Tag> ops = getServerOps();
-        tag.store("result", FluidStack.CODEC, ops, result);
-        tag.store("ingredient", STACKS_CODEC, ops, ingredient);
-        tag.store("fluidIngredient", FluidIngredient.CODEC, ops, fluidIngredient);
+    public void writeToTag(NbtCompound tag) {
+        RegistryOps<NbtElement> ops = getServerOps();
+        tag.put("result", FluidStack.CODEC, ops, result);
+        tag.put("ingredient", STACKS_CODEC, ops, ingredient);
+        tag.put("fluidIngredient", FluidIngredient.CODEC, ops, fluidIngredient);
     }
 
     @Override
-    public void loadFromTag(CompoundTag tag) {
-        RegistryOps<Tag> ops = getClientOps();
-        result = tag.read("result", FluidStack.CODEC, ops).orElseThrow();
-        ingredient = tag.read("ingredient", STACKS_CODEC, ops).orElseThrow();
-        fluidIngredient = tag.read("fluidIngredient", FluidIngredient.CODEC, ops).orElseThrow();
+    public void loadFromTag(NbtCompound tag) {
+        RegistryOps<NbtElement> ops = getClientOps();
+        result = tag.get("result", FluidStack.CODEC, ops).orElseThrow();
+        ingredient = tag.get("ingredient", STACKS_CODEC, ops).orElseThrow();
+        fluidIngredient = tag.get("fluidIngredient", FluidIngredient.CODEC, ops).orElseThrow();
     }
 
     @Override

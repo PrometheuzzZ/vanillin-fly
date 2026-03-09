@@ -10,15 +10,15 @@ import com.zurrtum.create.content.trains.graph.EdgePointType;
 import com.zurrtum.create.content.trains.signal.SignalBlock.SignalType;
 import com.zurrtum.create.content.trains.track.TrackTargetingBehaviour;
 import com.zurrtum.create.foundation.blockEntity.SmartBlockEntity;
-import net.minecraft.core.BlockPos;
-import net.minecraft.util.StringRepresentable;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
-import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.storage.ReadView;
+import net.minecraft.storage.WriteView;
+import net.minecraft.util.StringIdentifiable;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Box;
+import net.minecraft.util.math.Vec3d;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
@@ -26,23 +26,28 @@ import java.util.Locale;
 
 public class SignalBlockEntity extends SmartBlockEntity implements TransformableBlockEntity {
 
-    public enum OverlayState implements StringRepresentable {
-        RENDER, SKIP, DUAL;
-        public static final Codec<OverlayState> CODEC = StringRepresentable.fromEnum(OverlayState::values);
+    public enum OverlayState implements StringIdentifiable {
+        RENDER,
+        SKIP,
+        DUAL;
+        public static final Codec<OverlayState> CODEC = StringIdentifiable.createCodec(OverlayState::values);
 
         @Override
-        public String getSerializedName() {
+        public String asString() {
             return name().toLowerCase(Locale.ROOT);
         }
     }
 
-    public enum SignalState implements StringRepresentable {
-        RED, YELLOW, GREEN, INVALID;
+    public enum SignalState implements StringIdentifiable {
+        RED,
+        YELLOW,
+        GREEN,
+        INVALID;
 
-        public static final Codec<SignalState> CODEC = StringRepresentable.fromEnum(SignalState::values);
+        public static final Codec<SignalState> CODEC = StringIdentifiable.createCodec(SignalState::values);
 
         @Override
-        public String getSerializedName() {
+        public String asString() {
             return name().toLowerCase(Locale.ROOT);
         }
 
@@ -74,19 +79,19 @@ public class SignalBlockEntity extends SmartBlockEntity implements Transformable
     }
 
     @Override
-    protected void write(ValueOutput view, boolean clientPacket) {
+    protected void write(WriteView view, boolean clientPacket) {
         super.write(view, clientPacket);
-        view.store("State", SignalState.CODEC, state);
-        view.store("Overlay", OverlayState.CODEC, overlay);
+        view.put("State", SignalState.CODEC, state);
+        view.put("Overlay", OverlayState.CODEC, overlay);
         view.putBoolean("Power", lastReportedPower);
     }
 
     @Override
-    protected void read(ValueInput view, boolean clientPacket) {
+    protected void read(ReadView view, boolean clientPacket) {
         super.read(view, clientPacket);
         state = view.read("State", SignalState.CODEC).orElse(SignalState.RED);
         overlay = view.read("Overlay", OverlayState.CODEC).orElse(OverlayState.RENDER);
-        lastReportedPower = view.getBooleanOr("Power", false);
+        lastReportedPower = view.getBoolean("Power", false);
         invalidateRenderBoundingBox();
     }
 
@@ -108,9 +113,8 @@ public class SignalBlockEntity extends SmartBlockEntity implements Transformable
     @Override
     public void tick() {
         super.tick();
-        if (level.isClientSide()) {
+        if (world.isClient())
             return;
-        }
 
         SignalBoundary boundary = getSignal();
         if (boundary == null) {
@@ -119,27 +123,26 @@ public class SignalBlockEntity extends SmartBlockEntity implements Transformable
             return;
         }
 
-        BlockState blockState = getBlockState();
+        BlockState blockState = getCachedState();
 
-        blockState.getOptionalValue(SignalBlock.POWERED).ifPresent(powered -> {
-            if (lastReportedPower == powered) {
+        blockState.getOrEmpty(SignalBlock.POWERED).ifPresent(powered -> {
+            if (lastReportedPower == powered)
                 return;
-            }
             lastReportedPower = powered;
             boundary.updateBlockEntityPower(this);
             notifyUpdate();
         });
 
-        blockState.getOptionalValue(SignalBlock.TYPE).ifPresent(stateType -> {
-            SignalType targetType = boundary.getTypeFor(worldPosition);
+        blockState.getOrEmpty(SignalBlock.TYPE).ifPresent(stateType -> {
+            SignalType targetType = boundary.getTypeFor(pos);
             if (stateType != targetType) {
-                level.setBlock(worldPosition, blockState.setValue(SignalBlock.TYPE, targetType), Block.UPDATE_ALL);
+                world.setBlockState(pos, blockState.with(SignalBlock.TYPE, targetType), Block.NOTIFY_ALL);
                 refreshBlockState();
             }
         });
 
-        enterState(boundary.getStateFor(worldPosition));
-        setOverlay(boundary.getOverlayFor(worldPosition));
+        enterState(boundary.getStateFor(pos));
+        setOverlay(boundary.getOverlayFor(pos));
     }
 
     public boolean getReportedPower() {
@@ -155,23 +158,19 @@ public class SignalBlockEntity extends SmartBlockEntity implements Transformable
     }
 
     public void setOverlay(OverlayState state) {
-        if (this.overlay == state) {
+        if (this.overlay == state)
             return;
-        }
         this.overlay = state;
         notifyUpdate();
     }
 
     public void enterState(SignalState state) {
-        if (switchToRedAfterTrainEntered > 0) {
+        if (switchToRedAfterTrainEntered > 0)
             switchToRedAfterTrainEntered--;
-        }
-        if (this.state == state) {
+        if (this.state == state)
             return;
-        }
-        if (state == SignalState.RED && switchToRedAfterTrainEntered > 0) {
+        if (state == SignalState.RED && switchToRedAfterTrainEntered > 0)
             return;
-        }
         this.state = state;
         switchToRedAfterTrainEntered = state == SignalState.GREEN || state == SignalState.YELLOW ? 15 : 0;
         AbstractComputerBehaviour computer = AbstractComputerBehaviour.get(this);
@@ -182,11 +181,8 @@ public class SignalBlockEntity extends SmartBlockEntity implements Transformable
     }
 
     @Override
-    protected AABB createRenderBoundingBox() {
-        return new AABB(
-            Vec3.atLowerCornerOf(worldPosition),
-            Vec3.atLowerCornerOf(edgePoint.getGlobalPosition())
-        ).inflate(2);
+    protected Box createRenderBoundingBox() {
+        return new Box(Vec3d.of(pos), Vec3d.of(edgePoint.getGlobalPosition())).expand(2);
     }
 
     @Override

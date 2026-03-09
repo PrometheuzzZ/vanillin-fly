@@ -1,20 +1,20 @@
 package com.zurrtum.create.foundation.blockEntity;
 
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
+import net.minecraft.structure.StructureTemplate;
+import net.minecraft.world.World;
 
 import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
 
 public class StructureEntityInfoIterator implements Iterator<StructureTemplate.StructureEntityInfo> {
-    private final Level world;
+    private final World world;
     private final List<EntityControlStructureProcessor> controls;
     private Iterator<StructureTemplate.StructureEntityInfo> iterator;
     private StructureTemplate.StructureEntityInfo next;
 
     public StructureEntityInfoIterator(
-        Level world,
+        World world,
         List<EntityControlStructureProcessor> controls,
         Iterator<StructureTemplate.StructureEntityInfo> iterator
     ) {

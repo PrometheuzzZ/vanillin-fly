@@ -1,8 +1,8 @@
 package com.zurrtum.create.content.redstone.diodes;
 
 import com.zurrtum.create.AllBlockEntityTypes;
-import net.minecraft.core.BlockPos;
-import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.block.BlockState;
+import net.minecraft.util.math.BlockPos;
 
 import static com.zurrtum.create.content.redstone.diodes.BrassDiodeBlock.POWERING;
 
@@ -14,17 +14,16 @@ public class PulseExtenderBlockEntity extends BrassDiodeBlockEntity {
 
     @Override
     protected void updateState(boolean powered, boolean powering, boolean atMax, boolean atMin) {
-        if (atMin && !powered) {
+        if (atMin && !powered)
             return;
-        }
         if (atMin || powered) {
-            level.setBlockAndUpdate(worldPosition, getBlockState().setValue(POWERING, true));
+            world.setBlockState(pos, getCachedState().with(POWERING, true));
             state = maxState.getValue();
             return;
         }
 
-        if (state == 1 && powering && !level.isClientSide()) {
-            level.setBlockAndUpdate(worldPosition, getBlockState().setValue(POWERING, false));
+        if (state == 1 && powering && !world.isClient()) {
+            world.setBlockState(pos, getCachedState().with(POWERING, false));
         }
 
         state--;

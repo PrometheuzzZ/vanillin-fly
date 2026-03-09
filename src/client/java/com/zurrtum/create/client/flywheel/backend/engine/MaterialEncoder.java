@@ -2,7 +2,7 @@ package com.zurrtum.create.client.flywheel.backend.engine;
 
 import com.zurrtum.create.client.flywheel.api.material.*;
 import com.zurrtum.create.client.flywheel.backend.MaterialShaderIndices;
-import net.minecraft.util.Mth;
+import net.minecraft.util.math.MathHelper;
 
 // Materials are unpacked in "flywheel:flywheel/internal/packed_material.glsl"
 public final class MaterialEncoder {
@@ -11,12 +11,12 @@ public final class MaterialEncoder {
     private static final int MIPMAP_LENGTH = 1;
     private static final int BACKFACE_CULLING_LENGTH = 1;
     private static final int POLYGON_OFFSET_LENGTH = 1;
-    private static final int DEPTH_TEST_LENGTH = Mth.ceillog2(DepthTest.values().length);
-    private static final int TRANSPARENCY_LENGTH = Mth.ceillog2(Transparency.values().length);
-    private static final int WRITE_MASK_LENGTH = Mth.ceillog2(WriteMask.values().length);
+    private static final int DEPTH_TEST_LENGTH = MathHelper.ceilLog2(DepthTest.values().length);
+    private static final int TRANSPARENCY_LENGTH = MathHelper.ceilLog2(Transparency.values().length);
+    private static final int WRITE_MASK_LENGTH = MathHelper.ceilLog2(WriteMask.values().length);
     private static final int USE_OVERLAY_LENGTH = 1;
     private static final int USE_LIGHT_LENGTH = 1;
-    private static final int CARDINAL_LIGHTING_MODE_LENGTH = Mth.ceillog2(CardinalLightingMode.values().length);
+    private static final int CARDINAL_LIGHTING_MODE_LENGTH = MathHelper.ceilLog2(CardinalLightingMode.values().length);
     private static final int AMBIENT_OCCLUSION_LENGTH = 1;
 
     // The bit offset of each property
@@ -42,10 +42,7 @@ public final class MaterialEncoder {
     private static final int WRITE_MASK_MASK = bitMask(WRITE_MASK_LENGTH, WRITE_MASK_OFFSET);
     private static final int USE_OVERLAY_MASK = bitMask(USE_OVERLAY_LENGTH, USE_OVERLAY_OFFSET);
     private static final int USE_LIGHT_MASK = bitMask(USE_LIGHT_LENGTH, USE_LIGHT_OFFSET);
-    private static final int CARDINAL_LIGHTING_MODE_MASK = bitMask(
-        CARDINAL_LIGHTING_MODE_LENGTH,
-        CARDINAL_LIGHTING_MODE_OFFSET
-    );
+    private static final int CARDINAL_LIGHTING_MODE_MASK = bitMask(CARDINAL_LIGHTING_MODE_LENGTH, CARDINAL_LIGHTING_MODE_OFFSET);
     private static final int AMBIENT_OCCLUSION_MASK = bitMask(AMBIENT_OCCLUSION_LENGTH, AMBIENT_OCCLUSION_OFFSET);
 
     private MaterialEncoder() {
@@ -66,32 +63,24 @@ public final class MaterialEncoder {
     public static int packProperties(Material material) {
         int bits = 0;
 
-        if (material.blur()) {
+        if (material.blur())
             bits |= BLUR_MASK;
-        }
-        if (material.mipmap()) {
+        if (material.mipmap())
             bits |= MIPMAP_MASK;
-        }
-        if (material.backfaceCulling()) {
+        if (material.backfaceCulling())
             bits |= BACKFACE_CULLING_MASK;
-        }
-        if (material.polygonOffset()) {
+        if (material.polygonOffset())
             bits |= POLYGON_OFFSET_MASK;
-        }
         bits |= (material.depthTest().ordinal() << DEPTH_TEST_OFFSET) & DEPTH_TEST_MASK;
         bits |= (material.transparency().ordinal() << TRANSPARENCY_OFFSET) & TRANSPARENCY_MASK;
         bits |= (material.writeMask().ordinal() << WRITE_MASK_OFFSET) & WRITE_MASK_MASK;
-        if (material.useOverlay()) {
+        if (material.useOverlay())
             bits |= USE_OVERLAY_MASK;
-        }
-        if (material.useLight()) {
+        if (material.useLight())
             bits |= USE_LIGHT_MASK;
-        }
-        bits |= (material.cardinalLightingMode()
-            .ordinal() << CARDINAL_LIGHTING_MODE_OFFSET) & CARDINAL_LIGHTING_MODE_MASK;
-        if (material.ambientOcclusion()) {
+        bits |= (material.cardinalLightingMode().ordinal() << CARDINAL_LIGHTING_MODE_OFFSET) & CARDINAL_LIGHTING_MODE_MASK;
+        if (material.ambientOcclusion())
             bits |= AMBIENT_OCCLUSION_MASK;
-        }
 
         return bits;
     }

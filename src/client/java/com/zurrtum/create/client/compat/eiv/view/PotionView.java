@@ -14,7 +14,7 @@ import de.crafty.eiv.common.recipe.inventory.RecipeViewMenu.SlotDefinition;
 import de.crafty.eiv.common.recipe.inventory.RecipeViewMenu.SlotFillContext;
 import de.crafty.eiv.common.recipe.inventory.RecipeViewScreen;
 import de.crafty.eiv.common.recipe.inventory.SlotContent;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.DrawContext;
 import org.joml.Matrix3x2f;
 
 import java.util.List;
@@ -64,28 +64,16 @@ public class PotionView extends CreateView {
     }
 
     @Override
-    public void renderRecipe(
-        RecipeViewScreen screen,
-        RecipePosition position,
-        GuiGraphics context,
-        int mouseX,
-        int mouseY,
-        float partialTicks
-    ) {
+    public void renderRecipe(RecipeViewScreen screen, RecipePosition position, DrawContext context, int mouseX, int mouseY, float partialTicks) {
         HeatCondition requiredHeat = HeatCondition.HEATED;
         AllGuiTextures.JEI_DOWN_ARROW.render(context, 136, 32);
-        Matrix3x2f pose = new Matrix3x2f(context.pose());
+        Matrix3x2f pose = new Matrix3x2f(context.getMatrices());
         AllGuiTextures.JEI_HEAT_BAR.render(context, 0, 80);
         AllGuiTextures.JEI_LIGHT.render(context, 77, 88);
-        context.guiRenderState.submitPicturesInPictureState(new BasinBlazeBurnerRenderState(
-            pose,
-            87,
-            69,
-            requiredHeat.visualizeAsBlazeBurner()
-        ));
-        context.guiRenderState.submitPicturesInPictureState(new MixingBasinRenderState(pose, 87, -5));
-        context.drawString(
-            context.minecraft.font,
+        context.state.addSpecialElement(new BasinBlazeBurnerRenderState(pose, 87, 69, requiredHeat.visualizeAsBlazeBurner()));
+        context.state.addSpecialElement(new MixingBasinRenderState(pose, 87, -5));
+        context.drawText(
+            context.client.textRenderer,
             CreateLang.translateDirect(requiredHeat.getTranslationKey()),
             5,
             86,

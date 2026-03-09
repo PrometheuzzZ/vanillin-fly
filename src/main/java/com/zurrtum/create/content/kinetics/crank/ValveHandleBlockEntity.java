@@ -8,11 +8,11 @@ import com.zurrtum.create.content.kinetics.transmission.sequencer.SequencedGears
 import com.zurrtum.create.content.kinetics.transmission.sequencer.SequencerInstructions;
 import com.zurrtum.create.foundation.blockEntity.behaviour.scrollValue.ServerScrollValueBehaviour;
 import com.zurrtum.create.foundation.blockEntity.behaviour.scrollValue.ServerValveScrollValueBehaviour;
-import net.minecraft.core.BlockPos;
-import net.minecraft.util.Mth;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.block.BlockState;
+import net.minecraft.storage.ReadView;
+import net.minecraft.storage.WriteView;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.MathHelper;
 
 import java.util.List;
 
@@ -44,7 +44,7 @@ public class ValveHandleBlockEntity extends HandCrankBlockEntity {
     }
 
     @Override
-    public void write(ValueOutput view, boolean clientPacket) {
+    public void write(WriteView view, boolean clientPacket) {
         super.write(view, clientPacket);
         view.putInt("TotalUseTicks", totalUseTicks);
         view.putInt("StartAngle", startAngle);
@@ -52,19 +52,18 @@ public class ValveHandleBlockEntity extends HandCrankBlockEntity {
     }
 
     @Override
-    protected void read(ValueInput view, boolean clientPacket) {
+    protected void read(ReadView view, boolean clientPacket) {
         super.read(view, clientPacket);
-        totalUseTicks = view.getIntOr("TotalUseTicks", 0);
-        startAngle = view.getIntOr("StartAngle", 0);
-        targetAngle = view.getIntOr("TargetAngle", 0);
+        totalUseTicks = view.getInt("TotalUseTicks", 0);
+        startAngle = view.getInt("StartAngle", 0);
+        targetAngle = view.getInt("TargetAngle", 0);
     }
 
     @Override
     public void tick() {
         super.tick();
-        if (inUse == 0 && cooldown > 0) {
+        if (inUse == 0 && cooldown > 0)
             cooldown--;
-        }
         independentAngle = 0;
     }
 
@@ -73,15 +72,12 @@ public class ValveHandleBlockEntity extends HandCrankBlockEntity {
     }
 
     public boolean activate(boolean sneak) {
-        if (getTheoreticalSpeed() != 0) {
+        if (getTheoreticalSpeed() != 0)
             return false;
-        }
-        if (inUse > 0 || cooldown > 0) {
+        if (inUse > 0 || cooldown > 0)
             return false;
-        }
-        if (level.isClientSide()) {
+        if (world.isClient())
             return true;
-        }
 
         // Always overshoot, target will stop early
         int value = angleInput.getValue();
@@ -91,7 +87,7 @@ public class ValveHandleBlockEntity extends HandCrankBlockEntity {
         inUse = (int) Math.ceil(target / degreesPerTick) + 2;
 
         startAngle = 0;
-        targetAngle = Math.round((startAngle + (target > 135 ? 180 : 90) * Mth.sign(value)) / 90f) * 90;
+        targetAngle = Math.round((startAngle + (target > 135 ? 180 : 90) * MathHelper.sign(value)) / 90f) * 90;
         totalUseTicks = inUse;
         backwards = sneak;
 

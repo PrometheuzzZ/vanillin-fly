@@ -4,7 +4,7 @@ import com.mojang.serialization.MapCodec;
 import com.zurrtum.create.AllMountedStorageTypes;
 import com.zurrtum.create.api.contraption.storage.item.simple.SimpleMountedStorage;
 import com.zurrtum.create.infrastructure.items.ItemStackHandler;
-import net.minecraft.world.Container;
+import net.minecraft.inventory.Inventory;
 
 import java.util.Optional;
 
@@ -16,16 +16,16 @@ import java.util.Optional;
 public class FallbackMountedStorage extends SimpleMountedStorage {
     public static final MapCodec<FallbackMountedStorage> CODEC = SimpleMountedStorage.codec(FallbackMountedStorage::new);
 
-    public FallbackMountedStorage(Container handler) {
+    public FallbackMountedStorage(Inventory handler) {
         super(AllMountedStorageTypes.FALLBACK, handler);
     }
 
     @Override
-    protected Optional<Container> validate(Container handler) {
+    protected Optional<Inventory> validate(Inventory handler) {
         return super.validate(handler).filter(FallbackMountedStorage::isValid);
     }
 
-    public static boolean isValid(Container handler) {
+    public static boolean isValid(Inventory handler) {
         return handler.getClass() == ItemStackHandler.class;
     }
 }

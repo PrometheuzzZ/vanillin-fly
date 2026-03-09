@@ -1,14 +1,14 @@
 package com.zurrtum.create.client.ponder.api.element;
 
 import com.zurrtum.create.client.ponder.api.PonderPalette;
-import net.minecraft.resources.Identifier;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.util.Identifier;
+import net.minecraft.util.math.Vec3d;
 
 public interface TextElementBuilder {
 
     TextElementBuilder colored(PonderPalette color);
 
-    TextElementBuilder pointAt(Vec3 vec);
+    TextElementBuilder pointAt(Vec3d vec);
 
     TextElementBuilder independent(int y);
 

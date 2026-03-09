@@ -3,28 +3,28 @@ package com.zurrtum.create.content.redstone.link.controller;
 import com.zurrtum.create.*;
 import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.foundation.blockEntity.SmartBlockEntity;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.core.UUIDUtil;
-import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.InteractionHand;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.ai.attributes.Attributes;
-import net.minecraft.world.entity.item.ItemEntity;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.component.ItemContainerContents;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.block.BlockState;
+import net.minecraft.component.type.ContainerComponent;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.ItemEntity;
+import net.minecraft.entity.attribute.EntityAttributes;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.item.ItemStack;
+import net.minecraft.server.world.ServerWorld;
+import net.minecraft.storage.ReadView;
+import net.minecraft.storage.WriteView;
+import net.minecraft.util.Hand;
+import net.minecraft.util.Uuids;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.World;
 
 import java.util.List;
 import java.util.UUID;
 
 public class LecternControllerBlockEntity extends SmartBlockEntity {
-    private ItemContainerContents controllerData = ItemContainerContents.EMPTY;
+    private ContainerComponent controllerData = ContainerComponent.DEFAULT;
     public UUID user;
     public UUID prevUser;    // used only on client
     private boolean deactivatedThisTick;    // used only on server
@@ -34,8 +34,8 @@ public class LecternControllerBlockEntity extends SmartBlockEntity {
     }
 
     @Override
-    public void preRemoveSideEffects(BlockPos pos, BlockState state) {
-        super.preRemoveSideEffects(pos, state);
+    public void onBlockReplaced(BlockPos pos, BlockState state) {
+        super.onBlockReplaced(pos, state);
         dropController(state);
     }
 
@@ -44,26 +44,25 @@ public class LecternControllerBlockEntity extends SmartBlockEntity {
     }
 
     @Override
-    protected void write(ValueOutput view, boolean clientPacket) {
+    protected void write(WriteView view, boolean clientPacket) {
         super.write(view, clientPacket);
-        view.store("ControllerData", ItemContainerContents.CODEC, controllerData);
-        if (user != null) {
-            view.store("User", UUIDUtil.CODEC, user);
-        }
+        view.put("ControllerData", ContainerComponent.CODEC, controllerData);
+        if (user != null)
+            view.put("User", Uuids.INT_STREAM_CODEC, user);
     }
 
     @Override
-    public void writeSafe(ValueOutput view) {
+    public void writeSafe(WriteView view) {
         super.writeSafe(view);
-        view.store("ControllerData", ItemContainerContents.CODEC, controllerData);
+        view.put("ControllerData", ContainerComponent.CODEC, controllerData);
     }
 
     @Override
-    protected void read(ValueInput view, boolean clientPacket) {
+    protected void read(ReadView view, boolean clientPacket) {
         super.read(view, clientPacket);
 
-        controllerData = view.read("ControllerData", ItemContainerContents.CODEC).orElse(ItemContainerContents.EMPTY);
-        user = view.read("User", UUIDUtil.CODEC).orElse(null);
+        controllerData = view.read("ControllerData", ContainerComponent.CODEC).orElse(ContainerComponent.DEFAULT);
+        user = view.read("User", Uuids.INT_STREAM_CODEC).orElse(null);
     }
 
     public ItemStack getController() {
@@ -74,42 +73,35 @@ public class LecternControllerBlockEntity extends SmartBlockEntity {
         return user != null;
     }
 
-    public boolean isUsedBy(Player player) {
-        return hasUser() && user.equals(player.getUUID());
+    public boolean isUsedBy(PlayerEntity player) {
+        return hasUser() && user.equals(player.getUuid());
     }
 
-    public void tryStartUsing(Player player) {
-        if (!deactivatedThisTick && !hasUser() && !playerIsUsingLectern(player) && playerInRange(
-            player,
-            level,
-            worldPosition
-        )) {
+    public void tryStartUsing(PlayerEntity player) {
+        if (!deactivatedThisTick && !hasUser() && !playerIsUsingLectern(player) && playerInRange(player, world, pos))
             startUsing(player);
-        }
     }
 
-    public void tryStopUsing(Player player) {
-        if (isUsedBy(player)) {
+    public void tryStopUsing(PlayerEntity player) {
+        if (isUsedBy(player))
             stopUsing(player);
-        }
     }
 
-    private void startUsing(Player player) {
-        user = player.getUUID();
+    private void startUsing(PlayerEntity player) {
+        user = player.getUuid();
         AllSynchedDatas.IS_USING_LECTERN_CONTROLLER.set(player, true);
         sendData();
     }
 
-    private void stopUsing(Player player) {
+    private void stopUsing(PlayerEntity player) {
         user = null;
-        if (player != null) {
+        if (player != null)
             AllSynchedDatas.IS_USING_LECTERN_CONTROLLER.set(player, false);
-        }
         deactivatedThisTick = true;
         sendData();
     }
 
-    public static boolean playerIsUsingLectern(Player player) {
+    public static boolean playerIsUsingLectern(PlayerEntity player) {
         return AllSynchedDatas.IS_USING_LECTERN_CONTROLLER.get(player);
     }
 
@@ -117,48 +109,42 @@ public class LecternControllerBlockEntity extends SmartBlockEntity {
     public void tick() {
         super.tick();
 
-        if (level.isClientSide()) {
+        if (world.isClient()) {
             AllClientHandle.INSTANCE.tryToggleActive(this);
             prevUser = user;
         }
 
-        if (!level.isClientSide()) {
+        if (!world.isClient()) {
             deactivatedThisTick = false;
 
-            if (!(level instanceof ServerLevel)) {
+            if (!(world instanceof ServerWorld))
                 return;
-            }
-            if (user == null) {
+            if (user == null)
                 return;
-            }
 
-            Entity entity = level.getEntity(user);
-            if (!(entity instanceof Player player)) {
+            Entity entity = world.getEntity(user);
+            if (!(entity instanceof PlayerEntity player)) {
                 stopUsing(null);
                 return;
             }
 
-            if (!playerInRange(player, level, worldPosition) || !playerIsUsingLectern(player)) {
+            if (!playerInRange(player, world, pos) || !playerIsUsingLectern(player))
                 stopUsing(player);
-            }
         }
     }
 
     public void setController(ItemStack newController) {
         if (newController != null) {
-            controllerData = newController.getOrDefault(
-                AllDataComponents.LINKED_CONTROLLER_ITEMS,
-                ItemContainerContents.EMPTY
-            );
-            AllSoundEvents.CONTROLLER_PUT.playOnServer(level, worldPosition);
+            controllerData = newController.getOrDefault(AllDataComponents.LINKED_CONTROLLER_ITEMS, ContainerComponent.DEFAULT);
+            AllSoundEvents.CONTROLLER_PUT.playOnServer(world, pos);
         }
     }
 
-    public void swapControllers(ItemStack stack, Player player, InteractionHand hand, BlockState state) {
+    public void swapControllers(ItemStack stack, PlayerEntity player, Hand hand, BlockState state) {
         ItemStack newController = stack.copy();
         stack.setCount(0);
-        if (player.getItemInHand(hand).isEmpty()) {
-            player.setItemInHand(hand, createLinkedController());
+        if (player.getStackInHand(hand).isEmpty()) {
+            player.setStackInHand(hand, createLinkedController());
         } else {
             dropController(state);
         }
@@ -166,29 +152,28 @@ public class LecternControllerBlockEntity extends SmartBlockEntity {
     }
 
     public void dropController(BlockState state) {
-        Entity entity = level.getEntity(user);
-        if (entity instanceof Player player) {
+        Entity entity = world.getEntity(user);
+        if (entity instanceof PlayerEntity player)
             stopUsing(player);
-        }
 
-        Direction dir = state.getValue(LecternControllerBlock.FACING);
-        double x = worldPosition.getX() + 0.5 + 0.25 * dir.getStepX();
-        double y = worldPosition.getY() + 1;
-        double z = worldPosition.getZ() + 0.5 + 0.25 * dir.getStepZ();
-        ItemEntity itementity = new ItemEntity(level, x, y, z, createLinkedController());
-        itementity.setDefaultPickUpDelay();
-        level.addFreshEntity(itementity);
-        controllerData = ItemContainerContents.EMPTY;
+        Direction dir = state.get(LecternControllerBlock.FACING);
+        double x = pos.getX() + 0.5 + 0.25 * dir.getOffsetX();
+        double y = pos.getY() + 1;
+        double z = pos.getZ() + 0.5 + 0.25 * dir.getOffsetZ();
+        ItemEntity itementity = new ItemEntity(world, x, y, z, createLinkedController());
+        itementity.setToDefaultPickupDelay();
+        world.spawnEntity(itementity);
+        controllerData = ContainerComponent.DEFAULT;
     }
 
-    public static boolean playerInRange(Player player, Level world, BlockPos pos) {
+    public static boolean playerInRange(PlayerEntity player, World world, BlockPos pos) {
         //double modifier = world.isRemote ? 0 : 1.0;
-        double reach = 0.4 * player.getAttributeValue(Attributes.BLOCK_INTERACTION_RANGE);// + modifier;
-        return player.getEyePosition().distanceToSqr(Vec3.atCenterOf(pos)) < reach * reach;
+        double reach = 0.4 * player.getAttributeValue(EntityAttributes.BLOCK_INTERACTION_RANGE);// + modifier;
+        return player.getEyePos().squaredDistanceTo(Vec3d.ofCenter(pos)) < reach * reach;
     }
 
     private ItemStack createLinkedController() {
-        ItemStack stack = AllItems.LINKED_CONTROLLER.getDefaultInstance();
+        ItemStack stack = AllItems.LINKED_CONTROLLER.getDefaultStack();
         stack.set(AllDataComponents.LINKED_CONTROLLER_ITEMS, controllerData);
         return stack;
     }

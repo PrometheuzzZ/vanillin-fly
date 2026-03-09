@@ -1,6 +1,5 @@
 package com.zurrtum.create.client.content.kinetics.press;
 
-import com.mojang.math.Axis;
 import com.zurrtum.create.catnip.math.AngleHelper;
 import com.zurrtum.create.client.AllPartialModels;
 import com.zurrtum.create.client.content.kinetics.base.ShaftVisual;
@@ -14,6 +13,7 @@ import com.zurrtum.create.client.flywheel.lib.visual.SimpleDynamicVisual;
 import com.zurrtum.create.content.kinetics.press.MechanicalPressBlock;
 import com.zurrtum.create.content.kinetics.press.MechanicalPressBlockEntity;
 import com.zurrtum.create.content.kinetics.press.PressingBehaviour;
+import net.minecraft.util.math.RotationAxis;
 import org.joml.Quaternionf;
 
 import java.util.function.Consumer;
@@ -25,12 +25,9 @@ public class PressVisual extends ShaftVisual<MechanicalPressBlockEntity> impleme
     public PressVisual(VisualizationContext context, MechanicalPressBlockEntity blockEntity, float partialTick) {
         super(context, blockEntity, partialTick);
 
-        pressHead = instancerProvider().instancer(
-            InstanceTypes.ORIENTED,
-            Models.partial(AllPartialModels.MECHANICAL_PRESS_HEAD)
-        ).createInstance();
+        pressHead = instancerProvider().instancer(InstanceTypes.ORIENTED, Models.partial(AllPartialModels.MECHANICAL_PRESS_HEAD)).createInstance();
 
-        Quaternionf q = Axis.YP.rotationDegrees(AngleHelper.horizontalAngle(blockState.getValue(MechanicalPressBlock.HORIZONTAL_FACING)));
+        Quaternionf q = RotationAxis.POSITIVE_Y.rotationDegrees(AngleHelper.horizontalAngle(blockState.get(MechanicalPressBlock.HORIZONTAL_FACING)));
 
         pressHead.rotation(q);
 

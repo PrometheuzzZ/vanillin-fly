@@ -2,18 +2,18 @@ package com.zurrtum.create.client.infrastructure.model;
 
 import com.zurrtum.create.client.compat.fabric.WrapperModel;
 import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.client.renderer.block.model.BlockModelPart;
-import net.minecraft.client.renderer.block.model.BlockStateModel;
-import net.minecraft.client.renderer.texture.TextureAtlasSprite;
-import net.minecraft.client.resources.model.ModelBaker;
-import net.minecraft.core.BlockPos;
-import net.minecraft.util.RandomSource;
-import net.minecraft.world.level.BlockAndTintGetter;
-import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.block.BlockState;
+import net.minecraft.client.render.model.Baker;
+import net.minecraft.client.render.model.BlockModelPart;
+import net.minecraft.client.render.model.BlockStateModel;
+import net.minecraft.client.texture.Sprite;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.random.Random;
+import net.minecraft.world.BlockRenderView;
 
 import java.util.List;
 
-public abstract class WrapperBlockStateModel implements BlockStateModel, BlockStateModel.UnbakedRoot {
+public abstract class WrapperBlockStateModel implements BlockStateModel, BlockStateModel.UnbakedGrouped {
     private static final boolean FABRIC = FabricLoader.getInstance().isModLoaded("fabric-model-loading-api-v1");
     protected BlockStateModel model;
     protected Entry entry;
@@ -21,36 +21,30 @@ public abstract class WrapperBlockStateModel implements BlockStateModel, BlockSt
     public WrapperBlockStateModel() {
     }
 
-    public WrapperBlockStateModel(BlockState state, UnbakedRoot unbaked) {
+    public WrapperBlockStateModel(BlockState state, UnbakedGrouped unbaked) {
         entry = new Entry(state, unbaked);
     }
 
-    public void addPartsWithInfo(
-        BlockAndTintGetter world,
-        BlockPos pos,
-        BlockState state,
-        RandomSource random,
-        List<BlockModelPart> parts
-    ) {
-        collectParts(random, parts);
+    public void addPartsWithInfo(BlockRenderView world, BlockPos pos, BlockState state, Random random, List<BlockModelPart> parts) {
+        addParts(random, parts);
     }
 
     @Override
-    public void collectParts(RandomSource random, List<BlockModelPart> parts) {
-        model.collectParts(random, parts);
+    public void addParts(Random random, List<BlockModelPart> parts) {
+        model.addParts(random, parts);
     }
 
-    public TextureAtlasSprite particleSpriteWithInfo(BlockAndTintGetter world, BlockPos pos, BlockState state) {
-        return particleIcon();
-    }
-
-    @Override
-    public TextureAtlasSprite particleIcon() {
-        return model.particleIcon();
+    public Sprite particleSpriteWithInfo(BlockRenderView world, BlockPos pos, BlockState state) {
+        return particleSprite();
     }
 
     @Override
-    public BlockStateModel bake(BlockState state, ModelBaker baker) {
+    public Sprite particleSprite() {
+        return model.particleSprite();
+    }
+
+    @Override
+    public BlockStateModel bake(BlockState state, Baker baker) {
         if (entry != null) {
             model = entry.bake(baker);
             entry = null;
@@ -59,24 +53,24 @@ public abstract class WrapperBlockStateModel implements BlockStateModel, BlockSt
     }
 
     @Override
-    public void resolveDependencies(Resolver resolver) {
+    public void resolve(Resolver resolver) {
         if (entry != null) {
             entry.resolveDependencies(resolver);
         }
     }
 
     @Override
-    public Object visualEqualityGroup(BlockState state) {
+    public Object getEqualityGroup(BlockState state) {
         return this;
     }
 
-    protected record Entry(BlockState state, UnbakedRoot unbaked) {
-        public BlockStateModel bake(ModelBaker baker) {
+    protected record Entry(BlockState state, UnbakedGrouped unbaked) {
+        public BlockStateModel bake(Baker baker) {
             return unbaked.bake(state, baker);
         }
 
         public void resolveDependencies(Resolver resolver) {
-            unbaked.resolveDependencies(resolver);
+            unbaked.resolve(resolver);
         }
     }
 

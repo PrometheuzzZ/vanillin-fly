@@ -1,7 +1,7 @@
 package com.zurrtum.create.client.ponder.api.registration;
 
-import net.minecraft.resources.Identifier;
-import net.minecraft.world.level.ItemLike;
+import net.minecraft.item.ItemConvertible;
+import net.minecraft.util.Identifier;
 
 public interface TagBuilder {
 
@@ -17,9 +17,9 @@ public interface TagBuilder {
 
     TagBuilder idAsIcon();
 
-    TagBuilder item(ItemLike item, boolean useAsIcon, boolean useAsMainItem);
+    TagBuilder item(ItemConvertible item, boolean useAsIcon, boolean useAsMainItem);
 
-    default TagBuilder item(ItemLike item) {
+    default TagBuilder item(ItemConvertible item) {
         return item(item, true, true);
     }
 

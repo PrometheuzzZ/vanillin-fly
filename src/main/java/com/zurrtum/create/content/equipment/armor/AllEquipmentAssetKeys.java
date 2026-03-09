@@ -1,19 +1,19 @@
 package com.zurrtum.create.content.equipment.armor;
 
-import net.minecraft.resources.Identifier;
-import net.minecraft.resources.ResourceKey;
-import net.minecraft.world.item.equipment.EquipmentAsset;
-import net.minecraft.world.item.equipment.EquipmentAssets;
+import net.minecraft.item.equipment.EquipmentAsset;
+import net.minecraft.item.equipment.EquipmentAssetKeys;
+import net.minecraft.registry.RegistryKey;
+import net.minecraft.util.Identifier;
 
 import static com.zurrtum.create.Create.MOD_ID;
 
 public class AllEquipmentAssetKeys {
-    public static final ResourceKey<EquipmentAsset> COPPER = register("copper");
-    public static final ResourceKey<EquipmentAsset> NETHERITE = register("netherite");
-    public static final ResourceKey<EquipmentAsset> CARDBOARD = register("cardboard");
+    public static final RegistryKey<EquipmentAsset> COPPER = register("copper");
+    public static final RegistryKey<EquipmentAsset> NETHERITE = register("netherite");
+    public static final RegistryKey<EquipmentAsset> CARDBOARD = register("cardboard");
 
-    private static ResourceKey<EquipmentAsset> register(String name) {
-        return ResourceKey.create(EquipmentAssets.ROOT_ID, Identifier.fromNamespaceAndPath(MOD_ID, name));
+    private static RegistryKey<EquipmentAsset> register(String name) {
+        return RegistryKey.of(EquipmentAssetKeys.REGISTRY_KEY, Identifier.of(MOD_ID, name));
     }
 
     public static void register() {

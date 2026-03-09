@@ -5,29 +5,29 @@ import com.zurrtum.create.Create;
 import com.zurrtum.create.catnip.nbt.NBTHelper;
 import com.zurrtum.create.catnip.registry.RegisteredObjectsHelper;
 import com.zurrtum.create.content.contraptions.glue.SuperGlueEntity;
-import net.minecraft.core.BlockPos;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.ListTag;
-import net.minecraft.nbt.Tag;
-import net.minecraft.resources.Identifier;
-import net.minecraft.util.ProblemReporter;
-import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.storage.TagValueOutput;
-import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.block.Blocks;
+import net.minecraft.entity.EntityType;
+import net.minecraft.item.Item;
+import net.minecraft.nbt.NbtCompound;
+import net.minecraft.nbt.NbtElement;
+import net.minecraft.nbt.NbtList;
+import net.minecraft.storage.NbtWriteView;
+import net.minecraft.util.ErrorReporter;
+import net.minecraft.util.Identifier;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Box;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.World;
 
 import java.util.Iterator;
 
 public class SchematicAndQuillItem extends Item {
 
-    public SchematicAndQuillItem(Properties properties) {
+    public SchematicAndQuillItem(Settings properties) {
         super(properties);
     }
 
-    public static void replaceStructureVoidWithAir(CompoundTag nbt) {
+    public static void replaceStructureVoidWithAir(NbtCompound nbt) {
         String air = RegisteredObjectsHelper.getKeyOrThrow(Blocks.AIR).toString();
         String structureVoid = RegisteredObjectsHelper.getKeyOrThrow(Blocks.STRUCTURE_VOID).toString();
 
@@ -40,34 +40,30 @@ public class SchematicAndQuillItem extends Item {
         );
     }
 
-    public static void clampGlueBoxes(Level level, AABB aabb, CompoundTag nbt) {
-        ListTag listtag = nbt.getListOrEmpty("entities").copy();
+    public static void clampGlueBoxes(World level, Box aabb, NbtCompound nbt) {
+        NbtList listtag = nbt.getListOrEmpty("entities").copy();
 
-        for (Iterator<Tag> iterator = listtag.iterator(); iterator.hasNext(); ) {
-            Tag tag = iterator.next();
-            if (!(tag instanceof CompoundTag compoundtag)) {
+        for (Iterator<NbtElement> iterator = listtag.iterator(); iterator.hasNext(); ) {
+            NbtElement tag = iterator.next();
+            if (!(tag instanceof NbtCompound compoundtag))
                 continue;
-            }
-            if (compoundtag.getCompound("nbt").flatMap(compound -> compound.read("id", Identifier.CODEC))
-                .map(id -> id.equals(EntityType.getKey(AllEntityTypes.SUPER_GLUE))).orElse(false)) {
+            if (compoundtag.getCompound("nbt").flatMap(compound -> compound.get("id", Identifier.CODEC))
+                .map(id -> id.equals(EntityType.getId(AllEntityTypes.SUPER_GLUE))).orElse(false)) {
                 iterator.remove();
             }
         }
 
         for (SuperGlueEntity entity : SuperGlueEntity.collectCropped(level, aabb)) {
-            Vec3 vec3 = new Vec3(entity.getX() - aabb.minX, entity.getY() - aabb.minY, entity.getZ() - aabb.minZ);
-            try (ProblemReporter.ScopedCollector logging = new ProblemReporter.ScopedCollector(
-                entity.problemPath(),
-                Create.LOGGER
-            )) {
-                TagValueOutput view = TagValueOutput.createWithContext(logging, entity.level().registryAccess());
-                entity.save(view);
-                BlockPos blockpos = BlockPos.containing(vec3);
+            Vec3d vec3 = new Vec3d(entity.getX() - aabb.minX, entity.getY() - aabb.minY, entity.getZ() - aabb.minZ);
+            try (ErrorReporter.Logging logging = new ErrorReporter.Logging(entity.getErrorReporterContext(), Create.LOGGER)) {
+                NbtWriteView view = NbtWriteView.create(logging, entity.getEntityWorld().getRegistryManager());
+                entity.saveData(view);
+                BlockPos blockpos = BlockPos.ofFloored(vec3);
 
-                CompoundTag entityTag = new CompoundTag();
-                entityTag.store("pos", Vec3.CODEC, vec3);
-                entityTag.store("blockPos", BlockPos.CODEC, blockpos);
-                entityTag.put("nbt", view.buildResult());
+                NbtCompound entityTag = new NbtCompound();
+                entityTag.put("pos", Vec3d.CODEC, vec3);
+                entityTag.put("blockPos", BlockPos.CODEC, blockpos);
+                entityTag.put("nbt", view.getNbt());
                 listtag.add(entityTag);
             }
         }

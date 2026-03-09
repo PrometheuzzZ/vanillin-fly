@@ -10,8 +10,8 @@ import de.crafty.eiv.common.recipe.inventory.RecipeViewMenu.SlotDefinition;
 import de.crafty.eiv.common.recipe.inventory.RecipeViewMenu.SlotFillContext;
 import de.crafty.eiv.common.recipe.inventory.RecipeViewScreen;
 import de.crafty.eiv.common.recipe.inventory.SlotContent;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.item.ItemStack;
 import org.joml.Matrix3x2f;
 
 import java.util.List;
@@ -53,22 +53,10 @@ public class SandPaperPolishingView extends CreateView {
     }
 
     @Override
-    public void renderRecipe(
-        RecipeViewScreen screen,
-        RecipePosition position,
-        GuiGraphics context,
-        int mouseX,
-        int mouseY,
-        float partialTicks
-    ) {
+    public void renderRecipe(RecipeViewScreen screen, RecipePosition position, DrawContext context, int mouseX, int mouseY, float partialTicks) {
         AllGuiTextures.JEI_SHADOW.render(context, 61, 23);
         AllGuiTextures.JEI_LONG_ARROW.render(context, 52, 34);
         ItemStack stack = ingredient.getByIndex(ingredient.index());
-        context.guiRenderState.submitPicturesInPictureState(new SandPaperRenderState(
-            new Matrix3x2f(context.pose()),
-            stack,
-            74,
-            0
-        ));
+        context.state.addSpecialElement(new SandPaperRenderState(new Matrix3x2f(context.getMatrices()), stack, 74, 0));
     }
 }

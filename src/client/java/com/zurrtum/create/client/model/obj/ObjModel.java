@@ -8,9 +8,9 @@ package com.zurrtum.create.client.model.obj;
 import com.zurrtum.create.client.model.AbstractUnbakedModel;
 import com.zurrtum.create.client.model.LayerUnbakedModel;
 import com.zurrtum.create.client.model.StandardModelParameters;
-import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
-import net.minecraft.client.resources.model.UnbakedGeometry;
-import net.minecraft.resources.Identifier;
+import net.minecraft.client.render.BlockRenderLayer;
+import net.minecraft.client.render.model.Geometry;
+import net.minecraft.util.Identifier;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -28,13 +28,13 @@ public class ObjModel extends AbstractUnbakedModel implements LayerUnbakedModel 
     }
 
     @Override
-    public UnbakedGeometry geometry() {
+    public Geometry geometry() {
         return geometry;
     }
 
     @Override
     @Nullable
-    public ChunkSectionLayer create$getBlockRenderLayer() {
+    public BlockRenderLayer create$getBlockRenderLayer() {
         return parameters.layer();
     }
 }

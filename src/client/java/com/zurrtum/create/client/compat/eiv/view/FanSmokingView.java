@@ -9,8 +9,8 @@ import de.crafty.eiv.common.api.recipe.IEivRecipeViewType;
 import de.crafty.eiv.common.recipe.inventory.RecipeViewMenu;
 import de.crafty.eiv.common.recipe.inventory.RecipeViewScreen;
 import de.crafty.eiv.common.recipe.inventory.SlotContent;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.world.level.block.Blocks;
+import net.minecraft.block.Blocks;
+import net.minecraft.client.gui.DrawContext;
 import org.joml.Matrix3x2f;
 
 import java.util.List;
@@ -52,22 +52,10 @@ public class FanSmokingView extends CreateView {
     }
 
     @Override
-    public void renderRecipe(
-        RecipeViewScreen screen,
-        RecipePosition position,
-        GuiGraphics context,
-        int mouseX,
-        int mouseY,
-        float partialTicks
-    ) {
+    public void renderRecipe(RecipeViewScreen screen, RecipePosition position, DrawContext context, int mouseX, int mouseY, float partialTicks) {
         AllGuiTextures.JEI_SHADOW.render(context, 42, 34);
         AllGuiTextures.JEI_LIGHT.render(context, 61, 46);
         AllGuiTextures.JEI_LONG_ARROW.render(context, 50, 58);
-        context.guiRenderState.submitPicturesInPictureState(new FanRenderState(
-            new Matrix3x2f(context.pose()),
-            52,
-            11,
-            Blocks.FIRE.defaultBlockState()
-        ));
+        context.state.addSpecialElement(new FanRenderState(new Matrix3x2f(context.getMatrices()), 52, 11, Blocks.FIRE.getDefaultState()));
     }
 }

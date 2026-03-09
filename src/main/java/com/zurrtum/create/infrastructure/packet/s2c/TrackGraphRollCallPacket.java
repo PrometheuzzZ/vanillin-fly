@@ -6,18 +6,18 @@ import com.zurrtum.create.Create;
 import com.zurrtum.create.catnip.codecs.stream.CatnipStreamCodecBuilders;
 import com.zurrtum.create.content.trains.graph.TrackGraph;
 import io.netty.buffer.ByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.PacketType;
-import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.network.listener.ClientPlayPacketListener;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.PacketType;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public record TrackGraphRollCallPacket(List<Entry> entries) implements Packet<ClientGamePacketListener> {
-    public static final StreamCodec<ByteBuf, TrackGraphRollCallPacket> CODEC = CatnipStreamCodecBuilders.list(Entry.STREAM_CODEC)
-        .map(TrackGraphRollCallPacket::new, TrackGraphRollCallPacket::entries);
+public record TrackGraphRollCallPacket(List<Entry> entries) implements Packet<ClientPlayPacketListener> {
+    public static final PacketCodec<ByteBuf, TrackGraphRollCallPacket> CODEC = CatnipStreamCodecBuilders.list(Entry.STREAM_CODEC)
+        .xmap(TrackGraphRollCallPacket::new, TrackGraphRollCallPacket::entries);
 
     public static TrackGraphRollCallPacket ofServer() {
         List<Entry> entries = new ArrayList<>();
@@ -28,20 +28,20 @@ public record TrackGraphRollCallPacket(List<Entry> entries) implements Packet<Cl
     }
 
     @Override
-    public void handle(ClientGamePacketListener listener) {
+    public void apply(ClientPlayPacketListener listener) {
         AllClientHandle.INSTANCE.onTrackGraphRollCall(this);
     }
 
     @Override
-    public PacketType<TrackGraphRollCallPacket> type() {
+    public PacketType<TrackGraphRollCallPacket> getPacketType() {
         return AllPackets.TRACK_GRAPH_ROLL_CALL;
     }
 
     public record Entry(int netId, int checksum) {
-        public static final StreamCodec<ByteBuf, Entry> STREAM_CODEC = StreamCodec.composite(
-            ByteBufCodecs.VAR_INT,
+        public static final PacketCodec<ByteBuf, Entry> STREAM_CODEC = PacketCodec.tuple(
+            PacketCodecs.VAR_INT,
             Entry::netId,
-            ByteBufCodecs.INT,
+            PacketCodecs.INTEGER,
             Entry::checksum,
             Entry::new
         );

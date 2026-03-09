@@ -6,10 +6,10 @@ import com.zurrtum.create.client.infrastructure.config.AllConfigs;
 import com.zurrtum.create.content.contraptions.AbstractContraptionEntity;
 import com.zurrtum.create.content.contraptions.AbstractContraptionEntity.ContraptionRotationState;
 import com.zurrtum.create.content.trains.entity.CarriageContraptionEntity;
-import net.minecraft.client.Minecraft;
-import net.minecraft.util.Mth;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.player.Player;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.util.math.MathHelper;
 
 public class ContraptionPlayerPassengerRotation {
 
@@ -22,25 +22,22 @@ public class ContraptionPlayerPassengerRotation {
         active = AllConfigs.client().rotateWhenSeated.get();
     }
 
-    public static void frame(Minecraft client) {
-        Player player = client.player;
-        if (!active) {
+    public static void frame(MinecraftClient client) {
+        PlayerEntity player = client.player;
+        if (!active)
             return;
-        }
-        if (player == null || !player.isPassenger()) {
+        if (player == null || !player.hasVehicle()) {
             prevId = 0;
             return;
         }
 
         Entity vehicle = player.getVehicle();
-        if (!(vehicle instanceof AbstractContraptionEntity contraptionEntity)) {
+        if (!(vehicle instanceof AbstractContraptionEntity contraptionEntity))
             return;
-        }
 
         ContraptionRotationState rotationState = contraptionEntity.getRotationState();
 
-        float yaw = AngleHelper.wrapAngle180((contraptionEntity instanceof CarriageContraptionEntity cce) ? cce.getViewYRot(
-            AnimationTickHolder.getPartialTicks()) : rotationState.yRotation);
+        float yaw = AngleHelper.wrapAngle180((contraptionEntity instanceof CarriageContraptionEntity cce) ? cce.getViewYRot(AnimationTickHolder.getPartialTicks()) : rotationState.yRotation);
 
         float pitch = (contraptionEntity instanceof CarriageContraptionEntity cce) ? cce.getViewXRot(AnimationTickHolder.getPartialTicks()) : 0;
 
@@ -56,16 +53,15 @@ public class ContraptionPlayerPassengerRotation {
         prevYaw = yaw;
         prevPitch = pitch;
 
-        float playerYaw = player.getYRot();
-        float yawRelativeToTrain = Mth.abs(AngleHelper.getShortestAngleDiff(playerYaw, -yaw - 90));
-        if (yawRelativeToTrain > 120) {
+        float playerYaw = player.getYaw();
+        float yawRelativeToTrain = MathHelper.abs(AngleHelper.getShortestAngleDiff(playerYaw, -yaw - 90));
+        if (yawRelativeToTrain > 120)
             pitchDiff *= -1;
-        } else if (yawRelativeToTrain > 60) {
+        else if (yawRelativeToTrain > 60)
             pitchDiff *= 0;
-        }
 
-        player.setYRot(playerYaw + yawDiff);
-        player.setXRot(player.getXRot() + pitchDiff);
+        player.setYaw(playerYaw + yawDiff);
+        player.setPitch(player.getPitch() + pitchDiff);
     }
 
 }

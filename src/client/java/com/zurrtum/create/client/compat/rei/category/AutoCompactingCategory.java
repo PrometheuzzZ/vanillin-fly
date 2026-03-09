@@ -15,9 +15,9 @@ import me.shedaniel.rei.api.client.gui.widgets.Widgets;
 import me.shedaniel.rei.api.common.category.CategoryIdentifier;
 import me.shedaniel.rei.api.common.entry.EntryIngredient;
 import me.shedaniel.rei.plugin.common.displays.crafting.CraftingDisplay;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.network.chat.Component;
-import net.minecraft.world.item.Items;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.item.Items;
+import net.minecraft.text.Text;
 import org.joml.Matrix3x2f;
 
 import java.util.ArrayList;
@@ -30,7 +30,7 @@ public class AutoCompactingCategory extends CreateCategory<CraftingDisplay> {
     }
 
     @Override
-    public Component getTitle() {
+    public Text getTitle() {
         return CreateLang.translateDirect("recipe.automatic_packing");
     }
 
@@ -44,21 +44,14 @@ public class AutoCompactingCategory extends CreateCategory<CraftingDisplay> {
         List<EntryIngredient> ingredients = display.getInputEntries().stream().filter(e -> !e.isEmpty()).toList();
         List<Point> points = new ArrayList<>();
         for (int i = 0, size = ingredients.size(), rows = size == 4 ? 2 : 3; i < size; i++) {
-            points.add(new Point(
-                bounds.x + 5 + (rows == 2 ? 27 : 18) + (i % rows) * 19,
-                bounds.y + 56 - (i / rows) * 19
-            ));
+            points.add(new Point(bounds.x + 5 + (rows == 2 ? 27 : 18) + (i % rows) * 19, bounds.y + 56 - (i / rows) * 19));
         }
         Point output = new Point(bounds.x + 147, bounds.y + 56);
-        widgets.add(Widgets.createDrawableWidget((GuiGraphics graphics, int mouseX, int mouseY, float delta) -> {
+        widgets.add(Widgets.createDrawableWidget((DrawContext graphics, int mouseX, int mouseY, float delta) -> {
             drawSlotBackground(graphics, points, output);
             AllGuiTextures.JEI_DOWN_ARROW.render(graphics, bounds.x + 141, bounds.y + 37);
             AllGuiTextures.JEI_SHADOW.render(graphics, bounds.x + 86, bounds.y + 73);
-            graphics.guiRenderState.submitPicturesInPictureState(new PressBasinRenderState(
-                new Matrix3x2f(graphics.pose()),
-                bounds.x + 96,
-                bounds.y
-            ));
+            graphics.state.addSpecialElement(new PressBasinRenderState(new Matrix3x2f(graphics.getMatrices()), bounds.x + 96, bounds.y));
         }));
         for (int i = 0, size = points.size(); i < size; i++) {
             widgets.add(createInputSlot(points.get(i)).entries(ingredients.get(i)));

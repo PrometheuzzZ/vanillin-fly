@@ -1,9 +1,9 @@
 package com.zurrtum.create.client.vanillin.config;
 
 import com.zurrtum.create.client.flywheel.lib.visualization.SimpleBlockEntityVisualizer;
-import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.block.entity.BlockEntityType;
+import net.minecraft.client.render.block.entity.BlockEntityRenderer;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Objects;

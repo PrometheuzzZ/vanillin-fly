@@ -11,8 +11,8 @@ import de.crafty.eiv.common.recipe.inventory.RecipeViewMenu.SlotFillContext;
 import de.crafty.eiv.common.recipe.inventory.RecipeViewScreen;
 import de.crafty.eiv.common.recipe.inventory.SlotContent;
 import de.crafty.eiv.common.recipe.item.FluidItem;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.item.ItemStack;
 import org.joml.Matrix3x2f;
 
 import java.util.List;
@@ -61,14 +61,7 @@ public class SpoutFillingView extends CreateView {
     }
 
     @Override
-    public void renderRecipe(
-        RecipeViewScreen screen,
-        RecipePosition position,
-        GuiGraphics context,
-        int mouseX,
-        int mouseY,
-        float partialTicks
-    ) {
+    public void renderRecipe(RecipeViewScreen screen, RecipePosition position, DrawContext context, int mouseX, int mouseY, float partialTicks) {
         AllGuiTextures.JEI_SHADOW.render(context, 62, 55);
         AllGuiTextures.JEI_DOWN_ARROW.render(context, 126, 27);
         ItemStack stack = fluidIngredient.getByIndex(fluidIngredient.index());
@@ -77,11 +70,11 @@ public class SpoutFillingView extends CreateView {
             if (i >= MAX) {
                 idGenerator.set(0);
             }
-            context.guiRenderState.submitPicturesInPictureState(new SpoutRenderState(
+            context.state.addSpecialElement(new SpoutRenderState(
                 i,
-                new Matrix3x2f(context.pose()),
+                new Matrix3x2f(context.getMatrices()),
                 item.getFluid(),
-                stack.getComponentsPatch(),
+                stack.getComponentChanges(),
                 75,
                 -1,
                 0

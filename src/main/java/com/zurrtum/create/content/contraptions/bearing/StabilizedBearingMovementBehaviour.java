@@ -2,7 +2,7 @@ package com.zurrtum.create.content.contraptions.bearing;
 
 import com.zurrtum.create.api.behaviour.movement.MovementBehaviour;
 import com.zurrtum.create.content.contraptions.behaviour.MovementContext;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.item.ItemStack;
 
 public class StabilizedBearingMovementBehaviour extends MovementBehaviour {
     @Override

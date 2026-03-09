@@ -5,21 +5,21 @@ import com.zurrtum.create.Create;
 import com.zurrtum.create.catnip.codecs.stream.CatnipStreamCodecBuilders;
 import com.zurrtum.create.content.trains.schedule.condition.ScheduleWaitCondition;
 import com.zurrtum.create.content.trains.schedule.destination.ScheduleInstruction;
-import net.minecraft.core.HolderLookup;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.util.ProblemReporter;
-import net.minecraft.world.level.storage.TagValueInput;
-import net.minecraft.world.level.storage.TagValueOutput;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.registry.RegistryWrapper;
+import net.minecraft.storage.NbtReadView;
+import net.minecraft.storage.NbtWriteView;
+import net.minecraft.storage.ReadView;
+import net.minecraft.storage.WriteView;
+import net.minecraft.util.ErrorReporter;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
 public class ScheduleEntry {
-    public static final StreamCodec<RegistryFriendlyByteBuf, ScheduleEntry> STREAM_CODEC = StreamCodec.composite(
+    public static final PacketCodec<RegistryByteBuf, ScheduleEntry> STREAM_CODEC = PacketCodec.tuple(
         ScheduleInstruction.STREAM_CODEC,
         entry -> entry.instruction,
         CatnipStreamCodecBuilders.list(CatnipStreamCodecBuilders.list(ScheduleWaitCondition.STREAM_CODEC)),
@@ -39,28 +39,24 @@ public class ScheduleEntry {
         this.conditions = conditions;
     }
 
-    public ScheduleEntry clone(HolderLookup.Provider registries) {
-        try (ProblemReporter.ScopedCollector logging = new ProblemReporter.ScopedCollector(
-            () -> "ScheduleEntry",
-            Create.LOGGER
-        )) {
-            TagValueOutput writeView = TagValueOutput.createWithContext(logging, registries);
+    public ScheduleEntry clone(RegistryWrapper.WrapperLookup registries) {
+        try (ErrorReporter.Logging logging = new ErrorReporter.Logging(() -> "ScheduleEntry", Create.LOGGER)) {
+            NbtWriteView writeView = NbtWriteView.create(logging, registries);
             write(writeView);
-            ValueInput readView = TagValueInput.create(logging, registries, writeView.buildResult());
+            ReadView readView = NbtReadView.create(logging, registries, writeView.getNbt());
             return read(readView);
         }
     }
 
-    public void write(ValueOutput view) {
-        instruction.write(view.child("Instruction"));
-        if (!instruction.supportsConditions()) {
+    public void write(WriteView view) {
+        instruction.write(view.get("Instruction"));
+        if (!instruction.supportsConditions())
             return;
-        }
-        ValueOutput.ValueOutputList outer = view.childrenList("Conditions");
+        WriteView.ListView outer = view.getList("Conditions");
         conditions.forEach(column -> {
-            ValueOutput.ValueOutputList list = outer.addChild().childrenList("Column");
+            WriteView.ListView list = outer.add().getList("Column");
             column.forEach(condition -> {
-                condition.write(list.addChild());
+                condition.write(list.add());
             });
         });
     }
@@ -68,9 +64,8 @@ public class ScheduleEntry {
     public static <T> DataResult<T> encode(final ScheduleEntry input, final DynamicOps<T> ops, final T empty) {
         RecordBuilder<T> map = ops.mapBuilder();
         map.add("Instruction", ScheduleInstruction.encode(input.instruction, ops, empty));
-        if (!input.instruction.supportsConditions()) {
+        if (!input.instruction.supportsConditions())
             return map.build(empty);
-        }
         ListBuilder<T> outer = ops.listBuilder();
         input.conditions.forEach(column -> {
             ListBuilder<T> list = ops.listBuilder();
@@ -81,14 +76,14 @@ public class ScheduleEntry {
         return map.build(empty);
     }
 
-    public static ScheduleEntry read(ValueInput view) {
+    public static ScheduleEntry read(ReadView view) {
         ScheduleEntry entry = new ScheduleEntry();
-        entry.instruction = ScheduleInstruction.read(view.childOrEmpty("Instruction"));
+        entry.instruction = ScheduleInstruction.read(view.getReadView("Instruction"));
         entry.conditions = new ArrayList<>();
         if (entry.instruction.supportsConditions()) {
-            view.childrenListOrEmpty("Conditions")
-                .forEach(column -> entry.conditions.add(column.childrenListOrEmpty("Column").stream()
-                    .map(ScheduleWaitCondition::read).collect(Collectors.toList())));
+            view.getListReadView("Conditions")
+                .forEach(column -> entry.conditions.add(column.getListReadView("Column").stream().map(ScheduleWaitCondition::read)
+                    .collect(Collectors.toList())));
         }
         return entry;
     }
@@ -100,8 +95,8 @@ public class ScheduleEntry {
         entry.conditions = new ArrayList<>();
         if (entry.instruction.supportsConditions()) {
             ops.getList(map.get("Conditions")).getOrThrow()
-                .accept(column -> entry.conditions.add(ops.getStream(column).getOrThrow()
-                    .map(item -> ScheduleWaitCondition.decode(ops, item)).collect(Collectors.toList())));
+                .accept(column -> entry.conditions.add(ops.getStream(column).getOrThrow().map(item -> ScheduleWaitCondition.decode(ops, item))
+                    .collect(Collectors.toList())));
         }
         return entry;
     }

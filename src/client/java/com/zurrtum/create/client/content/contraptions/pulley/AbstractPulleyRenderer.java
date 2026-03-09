@@ -1,7 +1,5 @@
 package com.zurrtum.create.client.content.contraptions.pulley;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.zurrtum.create.client.catnip.render.CachedBuffers;
 import com.zurrtum.create.client.catnip.render.SpriteShiftEntry;
 import com.zurrtum.create.client.catnip.render.SuperByteBuffer;
@@ -9,35 +7,32 @@ import com.zurrtum.create.client.content.kinetics.base.KineticBlockEntityRendere
 import com.zurrtum.create.client.flywheel.lib.model.baked.PartialModel;
 import com.zurrtum.create.content.kinetics.base.KineticBlockEntity;
 import com.zurrtum.create.infrastructure.config.AllConfigs;
-import net.minecraft.client.renderer.LevelRenderer;
-import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
-import net.minecraft.client.renderer.feature.ModelFeatureRenderer;
-import net.minecraft.client.renderer.rendertype.RenderType;
-import net.minecraft.client.renderer.rendertype.RenderTypes;
-import net.minecraft.core.Direction;
-import net.minecraft.core.Direction.Axis;
-import net.minecraft.core.Direction.AxisDirection;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.block.BlockState;
+import net.minecraft.client.render.RenderLayer;
+import net.minecraft.client.render.VertexConsumer;
+import net.minecraft.client.render.WorldRenderer;
+import net.minecraft.client.render.block.entity.BlockEntityRendererFactory;
+import net.minecraft.client.render.command.ModelCommandRenderer;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Direction.Axis;
+import net.minecraft.util.math.Direction.AxisDirection;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
 public abstract class AbstractPulleyRenderer<T extends KineticBlockEntity> extends KineticBlockEntityRenderer<T, AbstractPulleyRenderer.PulleyRenderState> {
     private final PartialModel halfRope;
     private final PartialModel halfMagnet;
 
-    public AbstractPulleyRenderer(
-        BlockEntityRendererProvider.Context context,
-        PartialModel halfRope,
-        PartialModel halfMagnet
-    ) {
+    public AbstractPulleyRenderer(BlockEntityRendererFactory.Context context, PartialModel halfRope, PartialModel halfMagnet) {
         super(context);
         this.halfRope = halfRope;
         this.halfMagnet = halfMagnet;
     }
 
     @Override
-    public boolean shouldRenderOffScreen() {
+    public boolean rendersOutsideBoundingBox() {
         return true;
     }
 
@@ -47,14 +42,14 @@ public abstract class AbstractPulleyRenderer<T extends KineticBlockEntity> exten
     }
 
     @Override
-    public void extractRenderState(
+    public void updateRenderState(
         T be,
         PulleyRenderState state,
         float tickProgress,
-        Vec3 cameraPos,
-        @Nullable ModelFeatureRenderer.CrumblingOverlay crumblingOverlay
+        Vec3d cameraPos,
+        @Nullable ModelCommandRenderer.CrumblingOverlayCommand crumblingOverlay
     ) {
-        super.extractRenderState(be, state, tickProgress, cameraPos, crumblingOverlay);
+        super.updateRenderState(be, state, tickProgress, cameraPos, crumblingOverlay);
         if (state.support) {
             return;
         }
@@ -63,12 +58,12 @@ public abstract class AbstractPulleyRenderer<T extends KineticBlockEntity> exten
         state.coil = getRotatedCoil(be);
         state.coilShift = getCoilShift();
         state.coilScroll = getCoilVScroll(state.coilShift, offset, 1);
-        Level world = be.getLevel();
-        BlockState blockState = be.getBlockState();
+        World world = be.getWorld();
+        BlockState blockState = be.getCachedState();
         if (running || offset == 0) {
             state.magnet = offset > .25f ? renderMagnet(be) : CachedBuffers.partial(halfMagnet, blockState);
             state.magnetOffset = -offset;
-            state.magnetLight = LevelRenderer.getLightColor(world, state.blockPos.below((int) offset));
+            state.magnetLight = WorldRenderer.getLightmapCoordinates(world, state.pos.down((int) offset));
         }
         if (offset > .75f) {
             float f = offset % 1;
@@ -76,7 +71,7 @@ public abstract class AbstractPulleyRenderer<T extends KineticBlockEntity> exten
                 state.halfRope = CachedBuffers.partial(halfRope, blockState);
                 float down = f > .75f ? f - 1 : f;
                 state.halfRopeOffset = -down;
-                state.halfRopeLight = LevelRenderer.getLightColor(world, state.blockPos.below((int) down));
+                state.halfRopeLight = WorldRenderer.getLightmapCoordinates(world, state.pos.down((int) down));
             }
         }
         if (!running || offset <= 1.25f) {
@@ -88,7 +83,7 @@ public abstract class AbstractPulleyRenderer<T extends KineticBlockEntity> exten
         int[] lights = new int[size];
         for (int i = 0; i < size; i++) {
             float down = offset - i - 1;
-            int light = LevelRenderer.getLightColor(world, state.blockPos.below((int) down));
+            int light = WorldRenderer.getLightmapCoordinates(world, state.pos.down((int) down));
             offsets[i] = -down;
             lights[i] = light;
         }
@@ -97,8 +92,8 @@ public abstract class AbstractPulleyRenderer<T extends KineticBlockEntity> exten
     }
 
     @Override
-    protected RenderType getRenderType(T be, BlockState state) {
-        return RenderTypes.solidMovingBlock();
+    protected RenderLayer getRenderType(T be, BlockState state) {
+        return RenderLayer.getSolid();
     }
 
     protected abstract Axis getShaftAxis(T be);
@@ -121,26 +116,22 @@ public abstract class AbstractPulleyRenderer<T extends KineticBlockEntity> exten
     }
 
     protected SuperByteBuffer getRotatedCoil(T be) {
-        BlockState blockState = be.getBlockState();
-        return CachedBuffers.partialFacing(
-            getCoil(),
-            blockState,
-            Direction.get(AxisDirection.POSITIVE, getShaftAxis(be))
-        );
+        BlockState blockState = be.getCachedState();
+        return CachedBuffers.partialFacing(getCoil(), blockState, Direction.get(AxisDirection.POSITIVE, getShaftAxis(be)));
     }
 
     public static float getCoilVScroll(SpriteShiftEntry coilShift, float offset, float speedModifier) {
         if (offset == 0) {
             return 0;
         }
-        float spriteSize = coilShift.getTarget().getV1() - coilShift.getTarget().getV0();
+        float spriteSize = coilShift.getTarget().getMaxV() - coilShift.getTarget().getMinV();
         offset *= speedModifier / 2;
         double coilScroll = -(offset + 3 / 16f) - Math.floor((offset + 3 / 16f) * -2) / 2;
         return (float) coilScroll * spriteSize;
     }
 
     @Override
-    public int getViewDistance() {
+    public int getRenderDistance() {
         return AllConfigs.server().kinetics.maxRopeLength.get();
     }
 
@@ -159,12 +150,12 @@ public abstract class AbstractPulleyRenderer<T extends KineticBlockEntity> exten
         public int[] lights;
 
         @Override
-        public void render(PoseStack.Pose matricesEntry, VertexConsumer vertexConsumer) {
+        public void render(MatrixStack.Entry matricesEntry, VertexConsumer vertexConsumer) {
             super.render(matricesEntry, vertexConsumer);
             if (coilScroll != 0) {
                 coil.shiftUVScrolling(coilShift, coilScroll);
             }
-            coil.light(lightCoords).renderInto(matricesEntry, vertexConsumer);
+            coil.light(lightmapCoordinates).renderInto(matricesEntry, vertexConsumer);
             if (magnet != null) {
                 magnet.translate(0, magnetOffset, 0).light(magnetLight).renderInto(matricesEntry, vertexConsumer);
             }

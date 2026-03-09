@@ -1,20 +1,20 @@
 package com.zurrtum.create.client.content.equipment.armor;
 
 import com.google.common.cache.Cache;
-import com.mojang.blaze3d.vertex.PoseStack;
 import com.zurrtum.create.client.AllPartialModels;
 import com.zurrtum.create.client.catnip.animation.AnimationTickHolder;
 import com.zurrtum.create.client.content.logistics.box.PackageRenderer;
 import com.zurrtum.create.client.flywheel.lib.model.baked.PartialModel;
 import com.zurrtum.create.content.equipment.armor.CardboardArmorHandler;
 import com.zurrtum.create.foundation.utility.TickBasedCache;
-import net.minecraft.client.player.AbstractClientPlayer;
-import net.minecraft.client.renderer.SubmitNodeCollector;
-import net.minecraft.client.renderer.entity.player.AvatarRenderer;
-import net.minecraft.client.renderer.entity.state.AvatarRenderState;
-import net.minecraft.util.Mth;
-import net.minecraft.world.entity.Pose;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.client.network.AbstractClientPlayerEntity;
+import net.minecraft.client.render.command.OrderedRenderCommandQueue;
+import net.minecraft.client.render.entity.PlayerEntityRenderer;
+import net.minecraft.client.render.entity.state.PlayerEntityRenderState;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.entity.EntityPose;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.Vec3d;
 
 import java.util.Random;
 import java.util.concurrent.ExecutionException;
@@ -23,10 +23,9 @@ public class CardboardArmorHandlerClient {
     private static final Cache<Integer, Integer> BOXES_PLAYERS_ARE_HIDING_AS = new TickBasedCache<>(20, true);
     private static final Random RANDOM = new Random();
 
-    public static void keepCacheAliveDesignDespiteNotRendering(AbstractClientPlayer player) {
-        if (!CardboardArmorHandler.testForStealth(player)) {
+    public static void keepCacheAliveDesignDespiteNotRendering(AbstractClientPlayerEntity player) {
+        if (!CardboardArmorHandler.testForStealth(player))
             return;
-        }
         try {
             getCurrentBoxIndex(player.getId());
         } catch (ExecutionException e) {
@@ -35,58 +34,51 @@ public class CardboardArmorHandlerClient {
     }
 
     public static boolean playerRendersAsBoxWhenSneaking(
-        AvatarRenderer<?> renderer,
-        AvatarRenderState state,
-        PoseStack ms,
-        SubmitNodeCollector queue
+        PlayerEntityRenderer<?> renderer,
+        PlayerEntityRenderState state,
+        MatrixStack ms,
+        OrderedRenderCommandQueue queue
     ) {
-        if (state.pose != Pose.CROUCHING || !CardboardArmorHandler.isCardboardArmor(state.headEquipment) || !CardboardArmorHandler.isCardboardArmor(
-            state.chestEquipment) || !CardboardArmorHandler.isCardboardArmor(state.legsEquipment) || !CardboardArmorHandler.isCardboardArmor(
-            state.feetEquipment)) {
+        if (state.pose != EntityPose.CROUCHING || !CardboardArmorHandler.isCardboardArmor(state.equippedHeadStack) || !CardboardArmorHandler.isCardboardArmor(
+            state.equippedChestStack) || !CardboardArmorHandler.isCardboardArmor(state.equippedLegsStack) || !CardboardArmorHandler.isCardboardArmor(
+            state.equippedFeetStack)) {
             return false;
         }
 
         CardboardRenderState renderState = (CardboardRenderState) state;
-        if (renderState.create$isFlying()) {
+        if (renderState.create$isFlying())
             return false;
-        }
 
-        if (renderState.create$isSkip()) {
+        if (renderState.create$isSkip())
             return true;
-        }
 
-        ms.pushPose();
+        ms.push();
 
-        Vec3 renderOffset = renderer.getRenderOffset(state);
+        Vec3d renderOffset = renderer.getPositionOffset(state);
         ms.translate(0, -renderOffset.y, 0);
 
         if (renderState.create$isOnGround()) {
             ms.translate(
                 0, Math.min(
-                    Math.abs(Mth.cos((AnimationTickHolder.getRenderTime() % 256) / 2.0f)) * -renderOffset.y,
+                    Math.abs(MathHelper.cos((AnimationTickHolder.getRenderTime() % 256) / 2.0f)) * -renderOffset.y,
                     renderState.create$getMovement() * 5
                 ), 0
             );
         }
 
-        float scale = state.scale;
+        float scale = state.baseScale;
         ms.scale(scale, scale, scale);
 
         try {
             PartialModel model = AllPartialModels.PACKAGES_TO_HIDE_AS.get(getCurrentBoxIndex(state.id));
             if (model != null) {
-                PackageRenderer.getBoxRenderState(
-                    state.id,
-                    renderState.create$getInterpolatedYaw(),
-                    state.lightCoords,
-                    model
-                ).render(ms, queue);
+                PackageRenderer.getBoxRenderState(state.id, renderState.create$getInterpolatedYaw(), state.light, model).render(ms, queue);
             }
         } catch (ExecutionException e) {
             e.printStackTrace();
         }
 
-        ms.popPose();
+        ms.pop();
         return true;
     }
 

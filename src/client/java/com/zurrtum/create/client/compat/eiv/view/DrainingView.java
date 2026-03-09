@@ -11,8 +11,8 @@ import de.crafty.eiv.common.recipe.inventory.RecipeViewMenu.SlotFillContext;
 import de.crafty.eiv.common.recipe.inventory.RecipeViewScreen;
 import de.crafty.eiv.common.recipe.inventory.SlotContent;
 import de.crafty.eiv.common.recipe.item.FluidItem;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.item.ItemStack;
 import org.joml.Matrix3x2f;
 
 import java.util.List;
@@ -58,22 +58,15 @@ public class DrainingView extends CreateView {
     }
 
     @Override
-    public void renderRecipe(
-        RecipeViewScreen screen,
-        RecipePosition position,
-        GuiGraphics context,
-        int mouseX,
-        int mouseY,
-        float partialTicks
-    ) {
+    public void renderRecipe(RecipeViewScreen screen, RecipePosition position, DrawContext context, int mouseX, int mouseY, float partialTicks) {
         AllGuiTextures.JEI_SHADOW.render(context, 62, 33);
         AllGuiTextures.JEI_DOWN_ARROW.render(context, 73, 0);
         ItemStack stack = fluidResult.getByIndex(fluidResult.index());
         if (stack.getItem() instanceof FluidItem item) {
-            context.guiRenderState.submitPicturesInPictureState(new DrainRenderState(
-                new Matrix3x2f(context.pose()),
+            context.state.addSpecialElement(new DrainRenderState(
+                new Matrix3x2f(context.getMatrices()),
                 item.getFluid(),
-                stack.getComponentsPatch(),
+                stack.getComponentChanges(),
                 75,
                 19
             ));

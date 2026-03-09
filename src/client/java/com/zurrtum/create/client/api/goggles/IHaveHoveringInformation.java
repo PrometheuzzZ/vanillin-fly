@@ -1,7 +1,7 @@
 package com.zurrtum.create.client.api.goggles;
 
-import net.minecraft.network.chat.Component;
-import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.text.Text;
 
 import java.util.List;
 
@@ -15,7 +15,7 @@ public non-sealed interface IHaveHoveringInformation extends IHaveCustomOverlayI
      * @return {@code true} if the tooltip creation was successful and should be
      * displayed, or {@code false} if the overlay should not be displayed
      */
-    default boolean addToTooltip(List<Component> tooltip, boolean isPlayerSneaking) {
+    default boolean addToTooltip(List<Text> tooltip, boolean isPlayerSneaking) {
         return false;
     }
 }

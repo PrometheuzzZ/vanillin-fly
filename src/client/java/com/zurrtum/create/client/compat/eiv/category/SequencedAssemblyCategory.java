@@ -4,13 +4,13 @@ import com.zurrtum.create.AllItems;
 import com.zurrtum.create.client.compat.eiv.CreateCategory;
 import com.zurrtum.create.client.foundation.utility.CreateLang;
 import com.zurrtum.create.compat.eiv.EivCommonPlugin;
-import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.item.ItemStack;
+import net.minecraft.text.Text;
+import net.minecraft.util.Identifier;
 
 public class SequencedAssemblyCategory extends CreateCategory {
     @Override
-    public Component getDisplayName() {
+    public Text getDisplayName() {
         return CreateLang.translateDirect("recipe.sequenced_assembly");
     }
 
@@ -31,6 +31,6 @@ public class SequencedAssemblyCategory extends CreateCategory {
 
     @Override
     public ItemStack getIcon() {
-        return AllItems.PRECISION_MECHANISM.getDefaultInstance();
+        return AllItems.PRECISION_MECHANISM.getDefaultStack();
     }
 }

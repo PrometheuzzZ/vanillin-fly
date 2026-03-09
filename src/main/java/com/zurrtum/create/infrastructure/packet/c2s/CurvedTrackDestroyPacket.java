@@ -3,35 +3,36 @@ package com.zurrtum.create.infrastructure.packet.c2s;
 import com.zurrtum.create.AllHandle;
 import com.zurrtum.create.AllPackets;
 import io.netty.buffer.ByteBuf;
-import net.minecraft.core.BlockPos;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.PacketType;
-import net.minecraft.network.protocol.game.ServerGamePacketListener;
-import net.minecraft.server.network.ServerGamePacketListenerImpl;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.network.listener.ServerPlayPacketListener;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.PacketType;
+import net.minecraft.server.network.ServerPlayNetworkHandler;
+import net.minecraft.util.math.BlockPos;
 
-public record CurvedTrackDestroyPacket(BlockPos pos, BlockPos targetPos, BlockPos soundSource,
-                                       boolean wrench) implements Packet<ServerGamePacketListener> {
-    public static final StreamCodec<ByteBuf, CurvedTrackDestroyPacket> CODEC = StreamCodec.composite(
-        BlockPos.STREAM_CODEC,
+public record CurvedTrackDestroyPacket(
+    BlockPos pos, BlockPos targetPos, BlockPos soundSource, boolean wrench
+) implements Packet<ServerPlayPacketListener> {
+    public static final PacketCodec<ByteBuf, CurvedTrackDestroyPacket> CODEC = PacketCodec.tuple(
+        BlockPos.PACKET_CODEC,
         CurvedTrackDestroyPacket::pos,
-        BlockPos.STREAM_CODEC,
+        BlockPos.PACKET_CODEC,
         CurvedTrackDestroyPacket::targetPos,
-        BlockPos.STREAM_CODEC,
+        BlockPos.PACKET_CODEC,
         CurvedTrackDestroyPacket::soundSource,
-        ByteBufCodecs.BOOL,
+        PacketCodecs.BOOLEAN,
         CurvedTrackDestroyPacket::wrench,
         CurvedTrackDestroyPacket::new
     );
 
     @Override
-    public void handle(ServerGamePacketListener listener) {
-        AllHandle.onCurvedTrackDestroy((ServerGamePacketListenerImpl) listener, this);
+    public void apply(ServerPlayPacketListener listener) {
+        AllHandle.onCurvedTrackDestroy((ServerPlayNetworkHandler) listener, this);
     }
 
     @Override
-    public PacketType<CurvedTrackDestroyPacket> type() {
+    public PacketType<CurvedTrackDestroyPacket> getPacketType() {
         return AllPackets.DESTROY_CURVED_TRACK;
     }
 }

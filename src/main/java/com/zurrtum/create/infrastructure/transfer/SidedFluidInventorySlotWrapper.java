@@ -5,18 +5,14 @@ import net.fabricmc.fabric.api.transfer.v1.fluid.FluidVariant;
 import net.fabricmc.fabric.api.transfer.v1.storage.StorageView;
 import net.fabricmc.fabric.api.transfer.v1.storage.base.SingleSlotStorage;
 import net.fabricmc.fabric.api.transfer.v1.transaction.TransactionContext;
-import net.minecraft.core.Direction;
+import net.minecraft.util.math.Direction;
 
 public class SidedFluidInventorySlotWrapper implements SingleSlotStorage<FluidVariant> {
     private final FluidInventorySlotWrapper slotWrapper;
     private final SidedFluidInventory sidedInventory;
     private final Direction direction;
 
-    SidedFluidInventorySlotWrapper(
-        FluidInventorySlotWrapper slotWrapper,
-        SidedFluidInventory sidedInventory,
-        Direction direction
-    ) {
+    SidedFluidInventorySlotWrapper(FluidInventorySlotWrapper slotWrapper, SidedFluidInventory sidedInventory, Direction direction) {
         this.slotWrapper = slotWrapper;
         this.sidedInventory = sidedInventory;
         this.direction = direction;
@@ -67,10 +63,6 @@ public class SidedFluidInventorySlotWrapper implements SingleSlotStorage<FluidVa
 
     @Override
     public String toString() {
-        return "SidedInventorySlotWrapper[%s#%d/%s]".formatted(
-            FluidInventoryStorage.toString(sidedInventory),
-            slotWrapper.slot,
-            direction.name()
-        );
+        return "SidedInventorySlotWrapper[%s#%d/%s]".formatted(FluidInventoryStorage.toString(sidedInventory), slotWrapper.slot, direction.name());
     }
 }

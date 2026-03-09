@@ -7,24 +7,24 @@ import com.zurrtum.create.foundation.blockEntity.SmartBlockEntity;
 import com.zurrtum.create.infrastructure.component.ClipboardContent;
 import com.zurrtum.create.infrastructure.component.ClipboardEntry;
 import com.zurrtum.create.infrastructure.component.ClipboardType;
-import net.minecraft.ChatFormatting;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.core.HolderLookup;
-import net.minecraft.core.RegistryAccess;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.network.chat.Component;
-import net.minecraft.util.ProblemReporter;
-import net.minecraft.world.InteractionHand;
-import net.minecraft.world.InteractionResult;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.storage.TagValueInput;
-import net.minecraft.world.level.storage.TagValueOutput;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
-import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NbtCompound;
+import net.minecraft.registry.DynamicRegistryManager;
+import net.minecraft.registry.RegistryWrapper;
+import net.minecraft.storage.NbtReadView;
+import net.minecraft.storage.NbtWriteView;
+import net.minecraft.storage.ReadView;
+import net.minecraft.storage.WriteView;
+import net.minecraft.text.Text;
+import net.minecraft.util.ActionResult;
+import net.minecraft.util.ErrorReporter;
+import net.minecraft.util.Formatting;
+import net.minecraft.util.Hand;
+import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.world.World;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -33,64 +33,36 @@ import static com.zurrtum.create.Create.LOGGER;
 
 public class ClipboardValueSettingsHandler {
 
-    public static InteractionResult rightClickToCopy(
-        Level world,
-        Player player,
-        ItemStack itemStack,
-        InteractionHand hand,
-        BlockHitResult hit,
-        BlockPos pos
-    ) {
-        return interact(world, player, itemStack, hit.getDirection(), pos, false);
+    public static ActionResult rightClickToCopy(World world, PlayerEntity player, ItemStack itemStack, Hand hand, BlockHitResult hit, BlockPos pos) {
+        return interact(world, player, itemStack, hit.getSide(), pos, false);
     }
 
-    public static boolean leftClickToPaste(
-        Level world,
-        Player player,
-        ItemStack itemStack,
-        Direction side,
-        BlockPos pos
-    ) {
-        return interact(world, player, itemStack, side, pos, true) == InteractionResult.SUCCESS;
+    public static boolean leftClickToPaste(World world, PlayerEntity player, ItemStack itemStack, Direction side, BlockPos pos) {
+        return interact(world, player, itemStack, side, pos, true) == ActionResult.SUCCESS;
     }
 
-    private static InteractionResult interact(
-        Level world,
-        Player player,
-        ItemStack itemStack,
-        Direction side,
-        BlockPos pos,
-        boolean paste
-    ) {
-        if (!itemStack.is(AllItems.CLIPBOARD) || player.isSpectator() || player.isShiftKeyDown()) {
+    private static ActionResult interact(World world, PlayerEntity player, ItemStack itemStack, Direction side, BlockPos pos, boolean paste) {
+        if (!itemStack.isOf(AllItems.CLIPBOARD) || player.isSpectator() || player.isSneaking())
             return null;
-        }
-        if (!(world.getBlockEntity(pos) instanceof SmartBlockEntity smartBE)) {
+        if (!(world.getBlockEntity(pos) instanceof SmartBlockEntity smartBE))
             return null;
-        }
 
-        ClipboardContent clipboardContent = itemStack.getOrDefault(
-            AllDataComponents.CLIPBOARD_CONTENT,
-            ClipboardContent.EMPTY
-        );
+        ClipboardContent clipboardContent = itemStack.getOrDefault(AllDataComponents.CLIPBOARD_CONTENT, ClipboardContent.EMPTY);
 
         if (smartBE instanceof ClipboardBlockEntity cbe) {
-            if (!world.isClientSide()) {
+            if (!world.isClient()) {
                 List<List<ClipboardEntry>> listTo = ClipboardEntry.readAll(clipboardContent);
-                List<List<ClipboardEntry>> listFrom = ClipboardEntry.readAll(cbe.components());
+                List<List<ClipboardEntry>> listFrom = ClipboardEntry.readAll(cbe.getComponents());
                 List<ClipboardEntry> toAdd = new ArrayList<>();
 
                 for (List<ClipboardEntry> page : listFrom) {
                     Copy:
                     for (ClipboardEntry entry : page) {
                         String entryToAdd = entry.text.getString();
-                        for (List<ClipboardEntry> pageTo : listTo) {
-                            for (ClipboardEntry existing : pageTo) {
-                                if (entryToAdd.equals(existing.text.getString())) {
+                        for (List<ClipboardEntry> pageTo : listTo)
+                            for (ClipboardEntry existing : pageTo)
+                                if (entryToAdd.equals(existing.text.getString()))
                                     continue Copy;
-                                }
-                            }
-                        }
                         toAdd.add(new ClipboardEntry(entry.checked, entry.text));
                     }
                 }
@@ -98,9 +70,8 @@ public class ClipboardValueSettingsHandler {
                 for (ClipboardEntry entry : toAdd) {
                     List<ClipboardEntry> page = null;
                     for (List<ClipboardEntry> freePage : listTo) {
-                        if (freePage.size() > 11) {
+                        if (freePage.size() > 11)
                             continue;
-                        }
                         page = freePage;
                         break;
                     }
@@ -118,16 +89,14 @@ public class ClipboardValueSettingsHandler {
                 itemStack.set(AllDataComponents.CLIPBOARD_CONTENT, clipboardContent);
             }
 
-            player.displayClientMessage(
-                Component.translatable(
-                    "create.clipboard.copied_from_clipboard",
-                    world.getBlockState(pos).getBlock().getName().withStyle(ChatFormatting.WHITE)
-                ).withStyle(ChatFormatting.GREEN), true
+            player.sendMessage(
+                Text.translatable("create.clipboard.copied_from_clipboard", world.getBlockState(pos).getBlock().getName().formatted(Formatting.WHITE))
+                    .formatted(Formatting.GREEN), true
             );
-            return InteractionResult.SUCCESS;
+            return ActionResult.SUCCESS;
         }
 
-        CompoundTag tag = null;
+        NbtCompound tag = null;
         if (paste) {
             tag = clipboardContent.copiedValues().orElse(null);
             if (tag == null) {
@@ -137,56 +106,49 @@ public class ClipboardValueSettingsHandler {
 
         boolean anySuccess = false;
         boolean anyValid = false;
-        try (ProblemReporter.ScopedCollector logging = new ProblemReporter.ScopedCollector(
-            smartBE.problemPath(),
-            LOGGER
-        )) {
-            RegistryAccess registryManager = world.registryAccess();
+        try (ErrorReporter.Logging logging = new ErrorReporter.Logging(smartBE.getReporterContext(), LOGGER)) {
+            DynamicRegistryManager registryManager = world.getRegistryManager();
             if (paste) {
-                ValueInput readView = TagValueInput.create(logging, registryManager, tag);
+                ReadView readView = NbtReadView.create(logging, registryManager, tag);
                 for (BlockEntityBehaviour<?> behaviour : smartBE.getAllBehaviours()) {
-                    if (!(behaviour instanceof ClipboardCloneable cc)) {
+                    if (!(behaviour instanceof ClipboardCloneable cc))
                         continue;
-                    }
                     anyValid = true;
-                    anySuccess |= paste(cc, player, readView, side, world.isClientSide());
+                    anySuccess |= paste(cc, player, readView, side, world.isClient());
                 }
                 if (smartBE instanceof ClipboardCloneable cc) {
                     anyValid = true;
-                    anySuccess |= paste(cc, player, readView, side, world.isClientSide());
+                    anySuccess |= paste(cc, player, readView, side, world.isClient());
                 }
             } else {
-                TagValueOutput writeView = TagValueOutput.createWithContext(logging, registryManager);
+                NbtWriteView writeView = NbtWriteView.create(logging, registryManager);
                 for (BlockEntityBehaviour<?> behaviour : smartBE.getAllBehaviours()) {
-                    if (!(behaviour instanceof ClipboardCloneable cc)) {
+                    if (!(behaviour instanceof ClipboardCloneable cc))
                         continue;
-                    }
                     anyValid = true;
-                    anySuccess |= write(cc, registryManager, writeView, side, world.isClientSide());
+                    anySuccess |= write(cc, registryManager, writeView, side, world.isClient());
                 }
                 if (smartBE instanceof ClipboardCloneable cc) {
                     anyValid = true;
-                    anySuccess |= write(cc, registryManager, writeView, side, world.isClientSide());
+                    anySuccess |= write(cc, registryManager, writeView, side, world.isClient());
                 }
                 if (anySuccess) {
-                    tag = writeView.buildResult();
+                    tag = writeView.getNbt();
                 }
             }
         }
 
-        if (!anyValid) {
+        if (!anyValid)
             return null;
-        }
 
-        if (world.isClientSide() || !anySuccess) {
-            return InteractionResult.SUCCESS;
-        }
+        if (world.isClient() || !anySuccess)
+            return ActionResult.SUCCESS;
 
-        player.displayClientMessage(
-            Component.translatable(
+        player.sendMessage(
+            Text.translatable(
                 paste ? "create.clipboard.pasted_to" : "create.clipboard.copied_from",
-                world.getBlockState(pos).getBlock().getName().withStyle(ChatFormatting.WHITE)
-            ).withStyle(ChatFormatting.GREEN), true
+                world.getBlockState(pos).getBlock().getName().formatted(Formatting.WHITE)
+            ).formatted(Formatting.GREEN), true
         );
 
         if (!paste) {
@@ -194,31 +156,24 @@ public class ClipboardValueSettingsHandler {
             clipboardContent = clipboardContent.setCopiedValues(tag);
             itemStack.set(AllDataComponents.CLIPBOARD_CONTENT, clipboardContent);
         }
-        return InteractionResult.SUCCESS;
+        return ActionResult.SUCCESS;
     }
 
-    private static boolean paste(
-        ClipboardCloneable cc,
-        Player player,
-        ValueInput readView,
-        Direction side,
-        boolean simulate
-    ) {
-        return readView.child(cc.getClipboardKey()).map(v -> cc.readFromClipboard(v, player, side, simulate))
-            .orElse(false);
+    private static boolean paste(ClipboardCloneable cc, PlayerEntity player, ReadView readView, Direction side, boolean simulate) {
+        return readView.getOptionalReadView(cc.getClipboardKey()).map(v -> cc.readFromClipboard(v, player, side, simulate)).orElse(false);
     }
 
     private static boolean write(
         ClipboardCloneable cc,
-        HolderLookup.Provider registryManager,
-        ValueOutput writeView,
+        RegistryWrapper.WrapperLookup registryManager,
+        WriteView writeView,
         Direction side,
         boolean simulate
     ) {
         if (simulate) {
             return cc.canWrite(registryManager, side);
         } else {
-            return cc.writeToClipboard(writeView.child(cc.getClipboardKey()), side);
+            return cc.writeToClipboard(writeView.get(cc.getClipboardKey()), side);
         }
     }
 }

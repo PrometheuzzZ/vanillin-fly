@@ -8,13 +8,13 @@ import com.zurrtum.create.client.flywheel.api.visualization.VisualizationContext
 import com.zurrtum.create.client.flywheel.lib.model.Models;
 import com.zurrtum.create.client.foundation.render.AllInstanceTypes;
 import com.zurrtum.create.content.kinetics.fan.EncasedFanBlockEntity;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.util.Mth;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.MathHelper;
 
 import java.util.function.Consumer;
 
-import static net.minecraft.world.level.block.state.properties.BlockStateProperties.FACING;
+import static net.minecraft.state.property.Properties.FACING;
 
 public class FanVisual extends KineticBlockEntityVisual<EncasedFanBlockEntity> {
 
@@ -26,30 +26,23 @@ public class FanVisual extends KineticBlockEntityVisual<EncasedFanBlockEntity> {
     public FanVisual(VisualizationContext context, EncasedFanBlockEntity blockEntity, float partialTick) {
         super(context, blockEntity, partialTick);
 
-        direction = blockState.getValue(FACING);
+        direction = blockState.get(FACING);
 
         opposite = direction.getOpposite();
-        shaft = instancerProvider().instancer(AllInstanceTypes.ROTATING, Models.partial(AllPartialModels.SHAFT_HALF))
-            .createInstance();
-        fan = instancerProvider().instancer(
-            AllInstanceTypes.ROTATING,
-            Models.partial(AllPartialModels.ENCASED_FAN_INNER)
-        ).createInstance();
+        shaft = instancerProvider().instancer(AllInstanceTypes.ROTATING, Models.partial(AllPartialModels.SHAFT_HALF)).createInstance();
+        fan = instancerProvider().instancer(AllInstanceTypes.ROTATING, Models.partial(AllPartialModels.ENCASED_FAN_INNER)).createInstance();
 
         shaft.setup(blockEntity).setPosition(getVisualPosition()).rotateToFace(Direction.SOUTH, opposite).setChanged();
 
-        fan.setup(blockEntity, getFanSpeed()).setPosition(getVisualPosition()).rotateToFace(Direction.SOUTH, opposite)
-            .setChanged();
+        fan.setup(blockEntity, getFanSpeed()).setPosition(getVisualPosition()).rotateToFace(Direction.SOUTH, opposite).setChanged();
     }
 
     private float getFanSpeed() {
         float speed = blockEntity.getSpeed() * 5;
-        if (speed > 0) {
-            speed = Mth.clamp(speed, 80, 64 * 20);
-        }
-        if (speed < 0) {
-            speed = Mth.clamp(speed, -64 * 20, -80);
-        }
+        if (speed > 0)
+            speed = MathHelper.clamp(speed, 80, 64 * 20);
+        if (speed < 0)
+            speed = MathHelper.clamp(speed, -64 * 20, -80);
         return speed;
     }
 
@@ -61,10 +54,10 @@ public class FanVisual extends KineticBlockEntityVisual<EncasedFanBlockEntity> {
 
     @Override
     public void updateLight(float partialTick) {
-        BlockPos behind = pos.relative(opposite);
+        BlockPos behind = pos.offset(opposite);
         relight(behind, shaft);
 
-        BlockPos inFront = pos.relative(direction);
+        BlockPos inFront = pos.offset(direction);
         relight(inFront, fan);
     }
 

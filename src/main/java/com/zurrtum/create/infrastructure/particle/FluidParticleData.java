@@ -3,73 +3,65 @@ package com.zurrtum.create.infrastructure.particle;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import com.zurrtum.create.AllParticleTypes;
-import net.minecraft.core.component.DataComponentPatch;
-import net.minecraft.core.particles.ParticleOptions;
-import net.minecraft.core.particles.ParticleType;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.core.registries.Registries;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.world.level.material.Fluid;
+import net.minecraft.component.ComponentChanges;
+import net.minecraft.fluid.Fluid;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.particle.ParticleEffect;
+import net.minecraft.particle.ParticleType;
+import net.minecraft.registry.Registries;
+import net.minecraft.registry.RegistryKeys;
 
-public record FluidParticleData(ParticleType<FluidParticleData> type, Fluid fluid,
-                                DataComponentPatch components) implements ParticleOptions {
+public record FluidParticleData(ParticleType<FluidParticleData> type, Fluid fluid, ComponentChanges components) implements ParticleEffect {
 
-    private static final RecordCodecBuilder<FluidParticleData, Fluid> FLUID_CODEC = BuiltInRegistries.FLUID.byNameCodec()
-        .fieldOf("fluid").forGetter(FluidParticleData::fluid);
-    private static final RecordCodecBuilder<FluidParticleData, DataComponentPatch> COMPONENTS_CODEC = DataComponentPatch.CODEC.fieldOf(
-        "components").forGetter(FluidParticleData::components);
-    public static final MapCodec<FluidParticleData> CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
-        FLUID_CODEC,
-        COMPONENTS_CODEC
-    ).apply(i, FluidParticleData::particle));
-    public static final MapCodec<FluidParticleData> BASIN_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
-        FLUID_CODEC,
-        COMPONENTS_CODEC
-    ).apply(i, FluidParticleData::basin));
-    public static final MapCodec<FluidParticleData> DRIP_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(
-        FLUID_CODEC,
-        COMPONENTS_CODEC
-    ).apply(i, FluidParticleData::drip));
+    private static final RecordCodecBuilder<FluidParticleData, Fluid> FLUID_CODEC = Registries.FLUID.getCodec().fieldOf("fluid")
+        .forGetter(FluidParticleData::fluid);
+    private static final RecordCodecBuilder<FluidParticleData, ComponentChanges> COMPONENTS_CODEC = ComponentChanges.CODEC.fieldOf("components")
+        .forGetter(FluidParticleData::components);
+    public static final MapCodec<FluidParticleData> CODEC = RecordCodecBuilder.mapCodec(i -> i.group(FLUID_CODEC, COMPONENTS_CODEC)
+        .apply(i, FluidParticleData::particle));
+    public static final MapCodec<FluidParticleData> BASIN_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(FLUID_CODEC, COMPONENTS_CODEC)
+        .apply(i, FluidParticleData::basin));
+    public static final MapCodec<FluidParticleData> DRIP_CODEC = RecordCodecBuilder.mapCodec(i -> i.group(FLUID_CODEC, COMPONENTS_CODEC)
+        .apply(i, FluidParticleData::drip));
 
-    private static final StreamCodec<RegistryFriendlyByteBuf, Fluid> FLUID_STREAM_CODEC = ByteBufCodecs.registry(
-        Registries.FLUID);
-    public static final StreamCodec<RegistryFriendlyByteBuf, FluidParticleData> STREAM_CODEC = StreamCodec.composite(
+    private static final PacketCodec<RegistryByteBuf, Fluid> FLUID_STREAM_CODEC = PacketCodecs.registryValue(RegistryKeys.FLUID);
+    public static final PacketCodec<RegistryByteBuf, FluidParticleData> STREAM_CODEC = PacketCodec.tuple(
         FLUID_STREAM_CODEC,
         FluidParticleData::fluid,
-        DataComponentPatch.STREAM_CODEC,
+        ComponentChanges.PACKET_CODEC,
         FluidParticleData::components,
         FluidParticleData::particle
     );
-    public static final StreamCodec<RegistryFriendlyByteBuf, FluidParticleData> BASIN_STREAM_CODEC = StreamCodec.composite(
+    public static final PacketCodec<RegistryByteBuf, FluidParticleData> BASIN_STREAM_CODEC = PacketCodec.tuple(
         FLUID_STREAM_CODEC,
         FluidParticleData::fluid,
-        DataComponentPatch.STREAM_CODEC,
+        ComponentChanges.PACKET_CODEC,
         FluidParticleData::components,
         FluidParticleData::basin
     );
-    public static final StreamCodec<RegistryFriendlyByteBuf, FluidParticleData> DRIP_STREAM_CODEC = StreamCodec.composite(
+    public static final PacketCodec<RegistryByteBuf, FluidParticleData> DRIP_STREAM_CODEC = PacketCodec.tuple(
         FLUID_STREAM_CODEC,
         FluidParticleData::fluid,
-        DataComponentPatch.STREAM_CODEC,
+        ComponentChanges.PACKET_CODEC,
         FluidParticleData::components,
         FluidParticleData::drip
     );
 
     public FluidParticleData(ParticleType<FluidParticleData> type, Fluid fluid) {
-        this(type, fluid, DataComponentPatch.EMPTY);
+        this(type, fluid, ComponentChanges.EMPTY);
     }
 
-    public static FluidParticleData particle(Fluid fluid, DataComponentPatch components) {
+    public static FluidParticleData particle(Fluid fluid, ComponentChanges components) {
         return new FluidParticleData(AllParticleTypes.FLUID_PARTICLE, fluid, components);
     }
 
-    public static FluidParticleData basin(Fluid fluid, DataComponentPatch components) {
+    public static FluidParticleData basin(Fluid fluid, ComponentChanges components) {
         return new FluidParticleData(AllParticleTypes.BASIN_FLUID, fluid, components);
     }
 
-    public static FluidParticleData drip(Fluid fluid, DataComponentPatch components) {
+    public static FluidParticleData drip(Fluid fluid, ComponentChanges components) {
         return new FluidParticleData(AllParticleTypes.FLUID_DRIP, fluid, components);
     }
 

@@ -14,18 +14,20 @@ import me.shedaniel.rei.api.common.display.Display;
 import me.shedaniel.rei.api.common.display.DisplaySerializer;
 import me.shedaniel.rei.api.common.entry.EntryIngredient;
 import me.shedaniel.rei.api.common.util.EntryIngredients;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.resources.Identifier;
-import net.minecraft.world.item.crafting.Recipe;
-import net.minecraft.world.item.crafting.RecipeHolder;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.recipe.Recipe;
+import net.minecraft.recipe.RecipeEntry;
+import net.minecraft.util.Identifier;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-public record DeployingDisplay(EntryIngredient input, EntryIngredient target, List<ProcessingOutput> outputs,
-                               boolean keepHeldItem, Optional<Identifier> location) implements Display {
+public record DeployingDisplay(
+    EntryIngredient input, EntryIngredient target, List<ProcessingOutput> outputs, boolean keepHeldItem,
+    Optional<Identifier> location
+) implements Display {
     public static final DisplaySerializer<DeployingDisplay> SERIALIZER = DisplaySerializer.of(
         RecordCodecBuilder.mapCodec(instance -> instance.group(
             EntryIngredient.codec().fieldOf("input").forGetter(DeployingDisplay::input),
@@ -33,26 +35,26 @@ public record DeployingDisplay(EntryIngredient input, EntryIngredient target, Li
             ProcessingOutput.CODEC.listOf().fieldOf("outputs").forGetter(DeployingDisplay::outputs),
             Codec.BOOL.optionalFieldOf("keep_held_item", false).forGetter(DeployingDisplay::keepHeldItem),
             Identifier.CODEC.optionalFieldOf("location").forGetter(DeployingDisplay::location)
-        ).apply(instance, DeployingDisplay::new)), StreamCodec.composite(
+        ).apply(instance, DeployingDisplay::new)), PacketCodec.tuple(
             EntryIngredient.streamCodec(),
             DeployingDisplay::input,
             EntryIngredient.streamCodec(),
             DeployingDisplay::target,
-            ProcessingOutput.STREAM_CODEC.apply(ByteBufCodecs.list()),
+            ProcessingOutput.STREAM_CODEC.collect(PacketCodecs.toList()),
             DeployingDisplay::outputs,
-            ByteBufCodecs.BOOL,
+            PacketCodecs.BOOLEAN,
             DeployingDisplay::keepHeldItem,
-            ByteBufCodecs.optional(Identifier.STREAM_CODEC),
+            PacketCodecs.optional(Identifier.PACKET_CODEC),
             DeployingDisplay::location,
             DeployingDisplay::new
         )
     );
 
-    public static DeployingDisplay of(RecipeHolder<?> entry) {
+    public static DeployingDisplay of(RecipeEntry<?> entry) {
         if (!AllRecipeTypes.CAN_BE_AUTOMATED.test(entry)) {
             return null;
         }
-        Identifier id = entry.id().identifier();
+        Identifier id = entry.id().getValue();
         Recipe<?> recipe = entry.value();
         if (recipe instanceof ItemApplicationRecipe itemApplicationRecipe) {
             return new DeployingDisplay(id, itemApplicationRecipe);

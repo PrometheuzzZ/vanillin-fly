@@ -1,27 +1,27 @@
 package com.zurrtum.create.foundation.recipe;
 
 import com.zurrtum.create.content.processing.recipe.ProcessingOutput;
-import net.minecraft.util.RandomSource;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.crafting.Ingredient;
-import net.minecraft.world.item.crafting.SingleRecipeInput;
-import net.minecraft.world.level.Level;
+import net.minecraft.item.ItemStack;
+import net.minecraft.recipe.Ingredient;
+import net.minecraft.recipe.input.SingleStackRecipeInput;
+import net.minecraft.util.math.random.Random;
+import net.minecraft.world.World;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public interface CreateSingleStackRollableRecipe extends CreateRollableRecipe<SingleRecipeInput> {
+public interface CreateSingleStackRollableRecipe extends CreateRollableRecipe<SingleStackRecipeInput> {
     Ingredient ingredient();
 
     @Override
-    default boolean matches(SingleRecipeInput input, Level world) {
+    default boolean matches(SingleStackRecipeInput input, World world) {
         return ingredient().test(input.item());
     }
 
     List<ProcessingOutput> results();
 
     @Override
-    default List<ItemStack> assemble(SingleRecipeInput input, RandomSource random) {
+    default List<ItemStack> craft(SingleStackRecipeInput input, Random random) {
         ItemStack junk = CreateRecipe.getJunk(input.item());
         if (junk != null) {
             return List.of(junk);

@@ -3,10 +3,10 @@ package com.zurrtum.create.content.trains.schedule;
 import com.zurrtum.create.AllMenuTypes;
 import com.zurrtum.create.foundation.gui.menu.HeldItemGhostItemMenu;
 import com.zurrtum.create.infrastructure.items.ItemStackHandler;
-import net.minecraft.world.Container;
-import net.minecraft.world.entity.player.Inventory;
-import net.minecraft.world.inventory.Slot;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.entity.player.PlayerInventory;
+import net.minecraft.inventory.Inventory;
+import net.minecraft.item.ItemStack;
+import net.minecraft.screen.slot.Slot;
 
 public class ScheduleMenu extends HeldItemGhostItemMenu {
 
@@ -15,7 +15,7 @@ public class ScheduleMenu extends HeldItemGhostItemMenu {
 
     static final int slots = 2;
 
-    public ScheduleMenu(int id, Inventory inv, ItemStack contentHolder) {
+    public ScheduleMenu(int id, PlayerInventory inv, ItemStack contentHolder) {
         super(AllMenuTypes.SCHEDULE, id, inv, contentHolder);
     }
 
@@ -32,21 +32,17 @@ public class ScheduleMenu extends HeldItemGhostItemMenu {
     @Override
     protected void addSlots() {
         addPlayerSlots(46, 140);
-        for (int i = 0; i < slots; i++) {
+        for (int i = 0; i < slots; i++)
             addSlot(new InactiveItemHandlerSlot(ghostInventory, i, i, 54 + 20 * i, 88));
-        }
     }
 
     @Override
     protected void addPlayerSlots(int x, int y) {
-        for (int hotbarSlot = 0; hotbarSlot < 9; ++hotbarSlot) {
+        for (int hotbarSlot = 0; hotbarSlot < 9; ++hotbarSlot)
             this.addSlot(new InactiveSlot(playerInventory, hotbarSlot, x + hotbarSlot * 18, y + 58));
-        }
-        for (int row = 0; row < 3; ++row) {
-            for (int col = 0; col < 9; ++col) {
+        for (int row = 0; row < 3; ++row)
+            for (int col = 0; col < 9; ++col)
                 this.addSlot(new InactiveSlot(playerInventory, col + row * 9 + 9, x + col * 18, y + row * 18));
-            }
-        }
     }
 
     @Override
@@ -55,12 +51,12 @@ public class ScheduleMenu extends HeldItemGhostItemMenu {
 
     class InactiveSlot extends Slot {
 
-        public InactiveSlot(Container pContainer, int pIndex, int pX, int pY) {
+        public InactiveSlot(Inventory pContainer, int pIndex, int pX, int pY) {
             super(pContainer, pIndex, pX, pY);
         }
 
         @Override
-        public boolean isActive() {
+        public boolean isEnabled() {
             return slotsActive;
         }
 
@@ -69,19 +65,13 @@ public class ScheduleMenu extends HeldItemGhostItemMenu {
     class InactiveItemHandlerSlot extends Slot {
         private final int targetIndex;
 
-        public InactiveItemHandlerSlot(
-            Container itemHandler,
-            int targetIndex,
-            int index,
-            int xPosition,
-            int yPosition
-        ) {
+        public InactiveItemHandlerSlot(Inventory itemHandler, int targetIndex, int index, int xPosition, int yPosition) {
             super(itemHandler, index, xPosition, yPosition);
             this.targetIndex = targetIndex;
         }
 
         @Override
-        public boolean isActive() {
+        public boolean isEnabled() {
             return slotsActive && targetIndex < targetSlotsActive;
         }
     }

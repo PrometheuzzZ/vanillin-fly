@@ -30,27 +30,27 @@ import de.crafty.eiv.common.recipe.inventory.SlotContent;
 import de.crafty.eiv.common.recipe.item.FluidItem;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
-import net.minecraft.ChatFormatting;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.core.component.DataComponentPatch;
-import net.minecraft.core.component.DataComponents;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.network.chat.CommonComponents;
-import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
-import net.minecraft.resources.RegistryOps;
+import net.minecraft.block.Block;
+import net.minecraft.block.Blocks;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.font.TextRenderer;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.component.ComponentChanges;
+import net.minecraft.component.DataComponentTypes;
+import net.minecraft.component.type.PotionContentsComponent;
+import net.minecraft.fluid.Fluid;
+import net.minecraft.fluid.Fluids;
+import net.minecraft.item.ItemConvertible;
+import net.minecraft.item.ItemStack;
+import net.minecraft.recipe.Recipe;
+import net.minecraft.recipe.RecipeType;
+import net.minecraft.registry.Registries;
+import net.minecraft.registry.RegistryOps;
+import net.minecraft.screen.ScreenTexts;
+import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
+import net.minecraft.util.Identifier;
 import net.minecraft.util.Util;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.alchemy.PotionContents;
-import net.minecraft.world.item.crafting.Recipe;
-import net.minecraft.world.item.crafting.RecipeType;
-import net.minecraft.world.level.ItemLike;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.material.Fluid;
-import net.minecraft.world.level.material.Fluids;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix3x2f;
 import org.joml.Matrix3x2fStack;
@@ -165,22 +165,15 @@ public class SequencedAssemblyView extends CreateView {
     }
 
     @Override
-    public void renderRecipe(
-        RecipeViewScreen screen,
-        RecipePosition position,
-        GuiGraphics context,
-        int mouseX,
-        int mouseY,
-        float partialTicks
-    ) {
-        boolean checkHover = screen.hoveredSlot == null;
+    public void renderRecipe(RecipeViewScreen screen, RecipePosition position, DrawContext context, int mouseX, int mouseY, float partialTicks) {
+        boolean checkHover = screen.focusedSlot == null;
         boolean checkStep = mouseY >= 7 && mouseY <= 86;
-        Font textRenderer = screen.getFont();
+        TextRenderer textRenderer = screen.getTextRenderer();
         Iterator<SlotContent> iterator = ingredients.iterator();
         for (int i = 0, size = sequence.size(), left = 91 - 14 * size; i < size; i++) {
             int x = left + i * 28;
             String n = ROMANS[Math.min(i, ROMANS.length)];
-            context.drawString(textRenderer, n, x + 8 - textRenderer.width(n) / 2, 4, 0xff888888, false);
+            context.drawText(textRenderer, n, x + 8 - textRenderer.getWidth(n) / 2, 4, 0xff888888, false);
             Recipe<?> recipe = sequence.get(i);
             ItemStack stack;
             if (empty.contains(i)) {
@@ -194,91 +187,73 @@ public class SequencedAssemblyView extends CreateView {
                 draw.render(context, i, x, 17, stack);
             } else {
                 AllGuiTextures.JEI_CHANCE_SLOT.render(context, x - 1, 16);
-                Component text = Component.literal("?").withStyle(ChatFormatting.BOLD);
-                context.drawString(textRenderer, text, x + textRenderer.width(text) / -2 + 7, 21, 0xffefefef, true);
+                Text text = Text.literal("?").formatted(Formatting.BOLD);
+                context.drawText(textRenderer, text, x + textRenderer.getWidth(text) / -2 + 7, 21, 0xffefefef, true);
             }
             if (checkHover && checkStep && mouseX > x - 7 && mouseX < x + 22) {
                 checkHover = false;
-                Component text = draw != null ? SequencedRenderer.getSequenceName(
-                    draw,
-                    recipe,
-                    stack
-                ) : SequencedRenderer.getSequenceName(recipe);
-                List<Component> tooltip = List.of(
-                    CreateLang.translateDirect("recipe.assembly.step", i + 1),
-                    text.copy().withStyle(ChatFormatting.DARK_GREEN)
-                );
-                context.setComponentTooltipForNextFrame(
-                    textRenderer,
-                    tooltip,
-                    mouseX + position.left(),
-                    mouseY + position.top()
-                );
+                Text text = draw != null ? SequencedRenderer.getSequenceName(draw, recipe, stack) : SequencedRenderer.getSequenceName(recipe);
+                List<Text> tooltip = List.of(CreateLang.translateDirect("recipe.assembly.step", i + 1), text.copy().formatted(Formatting.DARK_GREEN));
+                context.drawTooltip(textRenderer, tooltip, mouseX + position.left(), mouseY + position.top());
             }
         }
         int xOffset = 0;
         if (chance != 1) {
             xOffset = -7;
             AllGuiTextures.JEI_CHANCE_SLOT.render(context, 138, 92);
-            Component text = Component.literal("?").withStyle(ChatFormatting.BOLD);
-            context.drawString(textRenderer, text, 146 + textRenderer.width(text) / -2, 97, 0xffefefef, true);
+            Text text = Text.literal("?").formatted(Formatting.BOLD);
+            context.drawText(textRenderer, text, 146 + textRenderer.getWidth(text) / -2, 97, 0xffefefef, true);
             if (checkHover && mouseX >= 138 && mouseX <= 155 && mouseY >= 92 && mouseY <= 109) {
                 checkHover = false;
                 context.fill(139, 93, 155, 109, 0x80FFFFFF);
                 float junk = 1 - chance;
                 String number = junk < 0.01 ? "<1" : junk > 0.99 ? ">99" : String.valueOf(Math.round(junk * 100));
-                List<Component> tooltip = List.of(
+                List<Text> tooltip = List.of(
                     CreateLang.translateDirect("recipe.assembly.junk"),
-                    CreateLang.translateDirect("recipe.processing.chance", number).withStyle(ChatFormatting.GOLD)
+                    CreateLang.translateDirect("recipe.processing.chance", number).formatted(Formatting.GOLD)
                 );
-                context.setComponentTooltipForNextFrame(
-                    textRenderer,
-                    tooltip,
-                    mouseX + position.left(),
-                    mouseY + position.top()
-                );
+                context.drawTooltip(textRenderer, tooltip, mouseX + position.left(), mouseY + position.top());
             }
         }
         AllGuiTextures.JEI_LONG_ARROW.render(context, xOffset + 47, 96);
         if (loops > 1) {
             AllIcons.I_SEQ_REPEAT.render(context, xOffset + 60, 101);
-            context.drawString(textRenderer, Component.literal("x" + loops), xOffset + 76, 106, 0xff888888, false);
+            context.drawText(textRenderer, Text.literal("x" + loops), xOffset + 76, 106, 0xff888888, false);
             if (checkHover && mouseX >= 43 && mouseX < 108 && mouseY >= 94 && mouseY < 118) {
-                Component text = CreateLang.translateDirect("recipe.assembly.repeat", loops);
-                context.setTooltipForNextFrame(textRenderer, text, mouseX + position.left(), mouseY + position.top());
+                Text text = CreateLang.translateDirect("recipe.assembly.repeat", loops);
+                context.drawTooltip(textRenderer, text, mouseX + position.left(), mouseY + position.top());
             }
         }
     }
 
     public interface SequencedRenderer<T extends Recipe<?>> {
-        Map<Recipe<?>, Component> NAMES = new WeakHashMap<>();
+        Map<Recipe<?>, Text> NAMES = new WeakHashMap<>();
 
-        void render(GuiGraphics graphics, int i, int x, int y, @Nullable ItemStack stack);
+        void render(DrawContext graphics, int i, int x, int y, @Nullable ItemStack stack);
 
-        static Component getSequenceName(Recipe<?> recipe) {
-            Component name = NAMES.get(recipe);
+        static Text getSequenceName(Recipe<?> recipe) {
+            Text name = NAMES.get(recipe);
             if (name != null) {
                 return name;
             }
-            Identifier id = BuiltInRegistries.RECIPE_TYPE.getKey(recipe.getType());
+            Identifier id = Registries.RECIPE_TYPE.getId(recipe.getType());
             if (id == null) {
-                name = CommonComponents.EMPTY;
+                name = ScreenTexts.EMPTY;
             } else {
-                RegistryOps<JsonElement> ops = Minecraft.getInstance().level.registryAccess()
-                    .createSerializationContext(JsonOps.INSTANCE);
+                RegistryOps<JsonElement> ops = MinecraftClient.getInstance().world.getRegistryManager().getOps(JsonOps.INSTANCE);
                 name = Recipe.CODEC.encodeStart(ops, recipe).result().map(json -> AllAssemblyRecipeNames.get(ops, json))
-                    .orElse(CommonComponents.EMPTY);
+                    .orElse(ScreenTexts.EMPTY);
             }
             NAMES.put(recipe, name);
             return name;
         }
 
         @SuppressWarnings("unchecked")
-        static <T extends Recipe<?>> Component getSequenceName(SequencedRenderer<?> render, T recipe, ItemStack stack) {
+        static <T extends Recipe<?>> Text getSequenceName(SequencedRenderer<?> render, T recipe, ItemStack stack) {
             return ((SequencedRenderer<T>) render).getSequenceName(recipe, stack);
         }
 
-        default Component getSequenceName(T recipe, ItemStack stack) {
+        default Text getSequenceName(T recipe, ItemStack stack) {
             return getSequenceName(recipe);
         }
 
@@ -290,46 +265,34 @@ public class SequencedAssemblyView extends CreateView {
 
     public static class PressingRenderer implements SequencedRenderer<PressingRecipe> {
         @Override
-        public void render(GuiGraphics graphics, int i, int x, int y, @Nullable ItemStack stack) {
+        public void render(DrawContext graphics, int i, int x, int y, @Nullable ItemStack stack) {
             float scale = 19 / 30f;
-            Matrix3x2fStack matrices = graphics.pose();
+            Matrix3x2fStack matrices = graphics.getMatrices();
             matrices.pushMatrix();
             matrices.translate(x, y);
             matrices.scale(scale, scale);
             matrices.translate(-x, -y);
-            graphics.guiRenderState.submitPicturesInPictureState(new PressRenderState(
-                i,
-                new Matrix3x2f(matrices),
-                x - 3,
-                y + 18,
-                i
-            ));
+            graphics.state.addSpecialElement(new PressRenderState(i, new Matrix3x2f(matrices), x - 3, y + 18, i));
             matrices.popMatrix();
         }
     }
 
     public static class DeployingRenderer implements SequencedRenderer<DeployerApplicationRecipe> {
         @Override
-        public void render(GuiGraphics graphics, int i, int x, int y, @Nullable ItemStack stack) {
+        public void render(DrawContext graphics, int i, int x, int y, @Nullable ItemStack stack) {
             float scale = 59 / 78f;
-            Matrix3x2fStack matrices = graphics.pose();
+            Matrix3x2fStack matrices = graphics.getMatrices();
             matrices.pushMatrix();
             matrices.translate(x, y);
             matrices.scale(scale, scale);
             matrices.translate(-x, -y);
-            graphics.guiRenderState.submitPicturesInPictureState(new DeployerRenderState(
-                i,
-                new Matrix3x2f(matrices),
-                x - 3,
-                y + 18,
-                i
-            ));
+            graphics.state.addSpecialElement(new DeployerRenderState(i, new Matrix3x2f(matrices), x - 3, y + 18, i));
             matrices.popMatrix();
         }
 
         @Override
-        public Component getSequenceName(DeployerApplicationRecipe recipe, ItemStack stack) {
-            return Component.translatable("create.recipe.assembly.deploying_item", stack.getHoverName());
+        public Text getSequenceName(DeployerApplicationRecipe recipe, ItemStack stack) {
+            return Text.translatable("create.recipe.assembly.deploying_item", stack.getName());
         }
 
         @Override
@@ -340,55 +303,41 @@ public class SequencedAssemblyView extends CreateView {
 
     public static class FillingRenderer implements SequencedRenderer<FillingRecipe> {
         @Override
-        public void render(GuiGraphics graphics, int i, int x, int y, @Nullable ItemStack stack) {
+        public void render(DrawContext graphics, int i, int x, int y, @Nullable ItemStack stack) {
             if (stack != null && stack.getItem() instanceof FluidItem item) {
                 float scale = 35 / 46f;
-                Matrix3x2fStack matrices = graphics.pose();
+                Matrix3x2fStack matrices = graphics.getMatrices();
                 matrices.pushMatrix();
                 matrices.translate(x, y);
                 matrices.scale(scale, scale);
                 matrices.translate(-x, -y);
                 Fluid fluid = item.getFluid();
-                DataComponentPatch components = stack.getComponentsPatch();
-                graphics.guiRenderState.submitPicturesInPictureState(new SpoutRenderState(
-                    i,
-                    new Matrix3x2f(matrices),
-                    fluid,
-                    components,
-                    x - 2,
-                    y + 24,
-                    i
-                ));
+                ComponentChanges components = stack.getComponentChanges();
+                graphics.state.addSpecialElement(new SpoutRenderState(i, new Matrix3x2f(matrices), fluid, components, x - 2, y + 24, i));
                 matrices.popMatrix();
             }
         }
 
         @Override
-        public Component getSequenceName(FillingRecipe recipe, ItemStack stack) {
-            Component name;
+        public Text getSequenceName(FillingRecipe recipe, ItemStack stack) {
+            Text name;
             if (stack.getItem() instanceof FluidItem item) {
                 Fluid fluid = item.getFluid();
                 if (fluid == AllFluids.POTION) {
-                    PotionContents contents = stack.getOrDefault(DataComponents.POTION_CONTENTS, PotionContents.EMPTY);
-                    BottleType bottleType = stack.getOrDefault(
-                        AllDataComponents.POTION_FLUID_BOTTLE_TYPE,
-                        BottleType.REGULAR
-                    );
-                    ItemLike itemFromBottleType = PotionFluidHandler.itemFromBottleType(bottleType);
-                    return contents.getName(itemFromBottleType.asItem().getDescriptionId() + ".effect.");
+                    PotionContentsComponent contents = stack.getOrDefault(DataComponentTypes.POTION_CONTENTS, PotionContentsComponent.DEFAULT);
+                    BottleType bottleType = stack.getOrDefault(AllDataComponents.POTION_FLUID_BOTTLE_TYPE, BottleType.REGULAR);
+                    ItemConvertible itemFromBottleType = PotionFluidHandler.itemFromBottleType(bottleType);
+                    return contents.getName(itemFromBottleType.asItem().getTranslationKey() + ".effect.");
                 }
-                Block block = fluid.defaultFluidState().createLegacyBlock().getBlock();
+                Block block = fluid.getDefaultState().getBlockState().getBlock();
                 if (fluid != Fluids.EMPTY && block == Blocks.AIR) {
-                    return Component.translatable(Util.makeDescriptionId(
-                        "block",
-                        BuiltInRegistries.FLUID.getKey(fluid)
-                    ));
+                    return Text.translatable(Util.createTranslationKey("block", Registries.FLUID.getId(fluid)));
                 }
                 name = block.getName();
             } else {
-                name = CommonComponents.EMPTY;
+                name = ScreenTexts.EMPTY;
             }
-            return Component.translatable("create.recipe.assembly.spout_filling_fluid", name);
+            return Text.translatable("create.recipe.assembly.spout_filling_fluid", name);
         }
 
         @Override
@@ -399,15 +348,15 @@ public class SequencedAssemblyView extends CreateView {
 
     public record SequenceTooltip<T extends Recipe<?>>(T recipe, int i) implements AdditionalStackModifier {
         @Override
-        public void addTooltip(ItemStack stack, List<Component> list) {
+        public void addTooltip(ItemStack stack, List<Text> list) {
             SequencedRenderer<T> renderer = getRenderer(recipe);
-            Component text;
+            Text text;
             if (renderer == null) {
                 text = SequencedRenderer.getSequenceName(recipe);
             } else {
                 text = renderer.getSequenceName(recipe, stack);
             }
-            text = text.copy().withStyle(ChatFormatting.DARK_GREEN);
+            text = text.copy().formatted(Formatting.DARK_GREEN);
             if (list.isEmpty()) {
                 list.add(text);
             } else {

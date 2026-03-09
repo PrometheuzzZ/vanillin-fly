@@ -6,15 +6,15 @@ import com.zurrtum.create.catnip.codecs.CatnipCodecUtils;
 import com.zurrtum.create.catnip.nbt.NBTProcessors;
 import com.zurrtum.create.infrastructure.component.ClipboardContent;
 import com.zurrtum.create.infrastructure.component.ClipboardEntry;
-import net.minecraft.core.component.DataComponentMap;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
-import net.minecraft.server.network.Filterable;
-import net.minecraft.world.item.Items;
-import net.minecraft.world.item.component.WrittenBookContent;
-import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraft.block.entity.BlockEntityType;
+import net.minecraft.component.ComponentMap;
+import net.minecraft.component.type.WrittenBookContentComponent;
+import net.minecraft.item.Items;
+import net.minecraft.nbt.NbtCompound;
+import net.minecraft.registry.Registries;
+import net.minecraft.text.RawFilteredPair;
+import net.minecraft.text.Text;
+import net.minecraft.util.Identifier;
 
 import java.util.List;
 
@@ -22,27 +22,22 @@ public class CreateNBTProcessors {
     public static void register() {
         NBTProcessors.addProcessor(
             BlockEntityType.LECTERN, data -> {
-                if (!data.contains("Book")) {
+                if (!data.contains("Book"))
                     return data;
-                }
-                CompoundTag book = data.getCompoundOrEmpty("Book");
+                NbtCompound book = data.getCompoundOrEmpty("Book");
 
                 // Writable books can't have click events, so they're safe to keep
-                Identifier writableBookResource = BuiltInRegistries.ITEM.getKey(Items.WRITABLE_BOOK);
-                if (writableBookResource != BuiltInRegistries.ITEM.getDefaultKey() && book.getStringOr("id", "")
-                    .equals(writableBookResource.toString())) {
+                Identifier writableBookResource = Registries.ITEM.getId(Items.WRITABLE_BOOK);
+                if (writableBookResource != Registries.ITEM.getDefaultId() && book.getString("id", "").equals(writableBookResource.toString()))
                     return data;
-                }
 
-                WrittenBookContent bookContent = CatnipCodecUtils.decodeOrNull(WrittenBookContent.CODEC, book);
-                if (bookContent == null) {
+                WrittenBookContentComponent bookContent = CatnipCodecUtils.decodeOrNull(WrittenBookContentComponent.CODEC, book);
+                if (bookContent == null)
                     return data;
-                }
 
-                for (Filterable<Component> page : bookContent.pages()) {
-                    if (NBTProcessors.textComponentHasClickEvent(page.get(false))) {
+                for (RawFilteredPair<Text> page : bookContent.pages()) {
+                    if (NBTProcessors.textComponentHasClickEvent(page.get(false)))
                         return null;
-                    }
                 }
 
                 return data;
@@ -54,23 +49,19 @@ public class CreateNBTProcessors {
         NBTProcessors.addProcessor(AllBlockEntityTypes.CREATIVE_CRATE, NBTProcessors.itemProcessor("Filter"));
     }
 
-    public static CompoundTag clipboardProcessor(CompoundTag data) {
-        DataComponentMap components = data.getCompound("components")
-            .flatMap(c -> CatnipCodecUtils.decode(DataComponentMap.CODEC, c)).orElse(null);
-        if (components == null) {
+    public static NbtCompound clipboardProcessor(NbtCompound data) {
+        ComponentMap components = data.getCompound("components").flatMap(c -> CatnipCodecUtils.decode(ComponentMap.CODEC, c)).orElse(null);
+        if (components == null)
             return data;
-        }
 
         ClipboardContent content = components.get(AllDataComponents.CLIPBOARD_CONTENT);
-        if (content == null) {
+        if (content == null)
             return data;
-        }
 
         for (List<ClipboardEntry> entries : content.pages()) {
             for (ClipboardEntry entry : entries) {
-                if (NBTProcessors.textComponentHasClickEvent(entry.text)) {
+                if (NBTProcessors.textComponentHasClickEvent(entry.text))
                     return null;
-                }
             }
         }
 

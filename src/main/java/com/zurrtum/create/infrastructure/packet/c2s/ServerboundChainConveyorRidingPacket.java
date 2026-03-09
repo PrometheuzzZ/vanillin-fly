@@ -3,31 +3,30 @@ package com.zurrtum.create.infrastructure.packet.c2s;
 import com.zurrtum.create.AllHandle;
 import com.zurrtum.create.AllPackets;
 import io.netty.buffer.ByteBuf;
-import net.minecraft.core.BlockPos;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.PacketType;
-import net.minecraft.network.protocol.game.ServerGamePacketListener;
-import net.minecraft.server.network.ServerGamePacketListenerImpl;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.network.listener.ServerPlayPacketListener;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.PacketType;
+import net.minecraft.server.network.ServerPlayNetworkHandler;
+import net.minecraft.util.math.BlockPos;
 
-public record ServerboundChainConveyorRidingPacket(BlockPos pos,
-                                                   boolean stop) implements Packet<ServerGamePacketListener> {
-    public static final StreamCodec<ByteBuf, ServerboundChainConveyorRidingPacket> CODEC = StreamCodec.composite(
-        BlockPos.STREAM_CODEC,
+public record ServerboundChainConveyorRidingPacket(BlockPos pos, boolean stop) implements Packet<ServerPlayPacketListener> {
+    public static final PacketCodec<ByteBuf, ServerboundChainConveyorRidingPacket> CODEC = PacketCodec.tuple(
+        BlockPos.PACKET_CODEC,
         ServerboundChainConveyorRidingPacket::pos,
-        ByteBufCodecs.BOOL,
+        PacketCodecs.BOOLEAN,
         ServerboundChainConveyorRidingPacket::stop,
         ServerboundChainConveyorRidingPacket::new
     );
 
     @Override
-    public void handle(ServerGamePacketListener listener) {
-        AllHandle.onServerboundChainConveyorRiding((ServerGamePacketListenerImpl) listener, this);
+    public void apply(ServerPlayPacketListener listener) {
+        AllHandle.onServerboundChainConveyorRiding((ServerPlayNetworkHandler) listener, this);
     }
 
     @Override
-    public PacketType<ServerboundChainConveyorRidingPacket> type() {
+    public PacketType<ServerboundChainConveyorRidingPacket> getPacketType() {
         return AllPackets.CHAIN_CONVEYOR_RIDING;
     }
 }

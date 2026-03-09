@@ -1,7 +1,5 @@
 package com.zurrtum.create.client.vanillin.elements;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.math.Axis;
 import com.zurrtum.create.client.flywheel.api.material.Material;
 import com.zurrtum.create.client.flywheel.api.model.Model;
 import com.zurrtum.create.client.flywheel.api.vertex.MutableVertexList;
@@ -17,12 +15,15 @@ import com.zurrtum.create.client.flywheel.lib.util.RendererReloadCache;
 import com.zurrtum.create.client.flywheel.lib.visual.AbstractVisual;
 import com.zurrtum.create.client.flywheel.lib.visual.SimpleDynamicVisual;
 import com.zurrtum.create.client.flywheel.lib.visual.util.SmartRecycler;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.LightTexture;
-import net.minecraft.client.renderer.texture.TextureAtlasSprite;
-import net.minecraft.client.resources.model.ModelBakery;
-import net.minecraft.util.Mth;
-import net.minecraft.world.entity.Entity;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.render.LightmapTextureManager;
+import net.minecraft.client.render.model.ModelBaker;
+import net.minecraft.client.texture.Sprite;
+import net.minecraft.client.util.SpriteIdentifier;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.entity.Entity;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.RotationAxis;
 import org.joml.Vector4f;
 import org.joml.Vector4fc;
 
@@ -37,21 +38,17 @@ public final class FireElement extends AbstractVisual implements SimpleDynamicVi
     // Parameterize by the material instead of the sprite
     // because Material#sprite is a surprisingly heavy operation
     // and because sprites are invalidated after a resource reload.
-    private static final RendererReloadCache<net.minecraft.client.resources.model.Material, Model> FIRE_MODELS = new RendererReloadCache<>(
-        texture -> {
-            return new SingleMeshModel(
-                new FireMesh(Minecraft.getInstance().getAtlasManager().get(texture)),
-                FIRE_MATERIAL
-            );
-        });
+    private static final RendererReloadCache<SpriteIdentifier, Model> FIRE_MODELS = new RendererReloadCache<>(texture -> {
+        return new SingleMeshModel(new FireMesh(MinecraftClient.getInstance().getAtlasManager().getSprite(texture)), FIRE_MATERIAL);
+    });
 
     private final Entity entity;
-    private final PoseStack stack = new PoseStack();
+    private final MatrixStack stack = new MatrixStack();
 
     private final SmartRecycler<Model, TransformedInstance> recycler;
 
     public FireElement(VisualizationContext ctx, Entity entity, float partialTick) {
-        super(ctx, entity.level(), partialTick);
+        super(ctx, entity.getEntityWorld(), partialTick);
 
         this.entity = entity;
 
@@ -59,16 +56,15 @@ public final class FireElement extends AbstractVisual implements SimpleDynamicVi
     }
 
     private TransformedInstance createInstance(Model model) {
-        TransformedInstance instance = visualizationContext.instancerProvider()
-            .instancer(InstanceTypes.TRANSFORMED, model).createInstance();
-        instance.light(LightTexture.FULL_BLOCK);
+        TransformedInstance instance = visualizationContext.instancerProvider().instancer(InstanceTypes.TRANSFORMED, model).createInstance();
+        instance.light(LightmapTextureManager.MAX_BLOCK_LIGHT_COORDINATE);
         instance.setChanged();
         return instance;
     }
 
     /**
      * Update the fire instances. You'd typically call this in your visual's
-     * {@link SimpleDynamicVisual#beginFrame(DynamicVisual.Context) beginFrame} method.
+     * {@link com.zurrtum.create.client.flywheel.lib.visual.SimpleDynamicVisual#beginFrame(DynamicVisual.Context) beginFrame} method.
      *
      * @param context The frame context.
      */
@@ -76,7 +72,7 @@ public final class FireElement extends AbstractVisual implements SimpleDynamicVi
     public void beginFrame(DynamicVisual.Context context) {
         recycler.resetCount();
 
-        if (entity.displayFireAnimation()) {
+        if (entity.doesRenderOnFire()) {
             setupInstances(context);
         }
 
@@ -84,26 +80,26 @@ public final class FireElement extends AbstractVisual implements SimpleDynamicVi
     }
 
     private void setupInstances(DynamicVisual.Context context) {
-        double entityX = Mth.lerp(context.partialTick(), entity.xOld, entity.getX());
-        double entityY = Mth.lerp(context.partialTick(), entity.yOld, entity.getY());
-        double entityZ = Mth.lerp(context.partialTick(), entity.zOld, entity.getZ());
+        double entityX = MathHelper.lerp(context.partialTick(), entity.lastRenderX, entity.getX());
+        double entityY = MathHelper.lerp(context.partialTick(), entity.lastRenderY, entity.getY());
+        double entityZ = MathHelper.lerp(context.partialTick(), entity.lastRenderZ, entity.getZ());
         var renderOrigin = visualizationContext.renderOrigin();
 
-        final float scale = entity.getBbWidth() * 1.4F;
-        final float maxHeight = entity.getBbHeight() / scale;
+        final float scale = entity.getWidth() * 1.4F;
+        final float maxHeight = entity.getHeight() / scale;
         float width = 1;
         float y = 0;
         float z = 0;
 
-        stack.setIdentity();
+        stack.loadIdentity();
         stack.translate(entityX - renderOrigin.getX(), entityY - renderOrigin.getY(), entityZ - renderOrigin.getZ());
         stack.scale(scale, scale, scale);
-        stack.mulPose(Axis.YP.rotationDegrees(-context.camera().yRot()));
+        stack.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(-context.camera().getYaw()));
         stack.translate(0.0F, 0.0F, -0.3F + (float) ((int) maxHeight) * 0.02F);
 
         for (int i = 0; y < maxHeight; ++i) {
-            var instance = recycler.get(FIRE_MODELS.get(i % 2 == 0 ? ModelBakery.FIRE_0 : ModelBakery.FIRE_1))
-                .setTransform(stack).scaleX(width).translate(0, y, z);
+            var instance = recycler.get(FIRE_MODELS.get(i % 2 == 0 ? ModelBaker.FIRE_0 : ModelBaker.FIRE_1)).setTransform(stack).scaleX(width)
+                .translate(0, y, z);
 
             if (i / 2 % 2 == 0) {
                 // Vanilla flips the uv directly, but it's easier for us to flip the whole model.
@@ -125,8 +121,8 @@ public final class FireElement extends AbstractVisual implements SimpleDynamicVi
         recycler.delete();
     }
 
-    private record FireMesh(TextureAtlasSprite sprite) implements QuadMesh {
-        private static final Vector4fc BOUNDING_SPHERE = new Vector4f(0, 0.5f, 0, Mth.SQRT_OF_TWO * 0.5f);
+    private record FireMesh(Sprite sprite) implements QuadMesh {
+        private static final Vector4fc BOUNDING_SPHERE = new Vector4f(0, 0.5f, 0, MathHelper.SQUARE_ROOT_OF_TWO * 0.5f);
 
         @Override
         public int vertexCount() {
@@ -135,10 +131,10 @@ public final class FireElement extends AbstractVisual implements SimpleDynamicVi
 
         @Override
         public void write(MutableVertexList vertexList) {
-            float u0 = sprite.getU0();
-            float v0 = sprite.getV0();
-            float u1 = sprite.getU1();
-            float v1 = sprite.getV1();
+            float u0 = sprite.getMinU();
+            float v0 = sprite.getMinV();
+            float u1 = sprite.getMaxU();
+            float v1 = sprite.getMaxV();
             writeVertex(vertexList, 0, 0.5f, 0, u1, v1);
             writeVertex(vertexList, 1, -0.5f, 0, u0, v1);
             writeVertex(vertexList, 2, -0.5f, 1.4f, u0, v0);
@@ -156,7 +152,7 @@ public final class FireElement extends AbstractVisual implements SimpleDynamicVi
             vertexList.b(i, 1);
             vertexList.u(i, u);
             vertexList.v(i, v);
-            vertexList.light(i, LightTexture.FULL_BLOCK);
+            vertexList.light(i, LightmapTextureManager.MAX_BLOCK_LIGHT_COORDINATE);
             vertexList.normalX(i, 0);
             vertexList.normalY(i, 1);
             vertexList.normalZ(i, 0);

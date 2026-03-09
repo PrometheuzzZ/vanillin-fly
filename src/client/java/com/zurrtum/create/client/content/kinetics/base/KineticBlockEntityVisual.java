@@ -6,9 +6,9 @@ import com.zurrtum.create.client.flywheel.lib.visual.AbstractBlockEntityVisual;
 import com.zurrtum.create.content.kinetics.base.IRotate;
 import com.zurrtum.create.content.kinetics.base.KineticBlockEntity;
 import com.zurrtum.create.content.kinetics.simpleRelays.ICogWheel;
-import net.minecraft.core.Direction.Axis;
-import net.minecraft.core.Vec3i;
-import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.block.BlockState;
+import net.minecraft.util.math.Direction.Axis;
+import net.minecraft.util.math.Vec3i;
 
 public abstract class KineticBlockEntityVisual<T extends KineticBlockEntity> extends AbstractBlockEntityVisual<T> {
 
@@ -47,17 +47,14 @@ public abstract class KineticBlockEntityVisual<T extends KineticBlockEntity> ext
             Color color = overstressed ? Color.RED : Color.SPRING_GREEN;
             float weight = overstressed ? overStressedEffect : -overStressedEffect;
 
-            for (RotatingInstance instance : instances) {
+            for (RotatingInstance instance : instances)
                 instance.setColor(Color.WHITE.mixWith(color, weight));
-            }
         } else {
-            for (RotatingInstance instance : instances) {
+            for (RotatingInstance instance : instances)
                 instance.setColor(Color.WHITE);
-            }
         }
 
-        for (RotatingInstance instance : instances) {
+        for (RotatingInstance instance : instances)
             instance.setChanged();
-        }
     }
 }

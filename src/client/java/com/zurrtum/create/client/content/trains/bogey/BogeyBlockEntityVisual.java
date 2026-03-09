@@ -1,7 +1,5 @@
 package com.zurrtum.create.client.content.trains.bogey;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.math.Axis;
 import com.zurrtum.create.client.AllBogeyStyleRenders;
 import com.zurrtum.create.client.flywheel.api.instance.Instance;
 import com.zurrtum.create.client.flywheel.api.visualization.VisualizationContext;
@@ -11,15 +9,17 @@ import com.zurrtum.create.content.trains.bogey.AbstractBogeyBlock;
 import com.zurrtum.create.content.trains.bogey.AbstractBogeyBlockEntity;
 import com.zurrtum.create.content.trains.bogey.BogeySize;
 import com.zurrtum.create.content.trains.bogey.BogeyStyle;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.nbt.CompoundTag;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.nbt.NbtCompound;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.RotationAxis;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.function.Consumer;
 
 public class BogeyBlockEntityVisual extends AbstractBlockEntityVisual<AbstractBogeyBlockEntity> implements SimpleDynamicVisual {
-    private final PoseStack poseStack = new PoseStack();
+    private final MatrixStack poseStack = new MatrixStack();
 
     @Nullable
     private final BogeySize bogeySize;
@@ -42,9 +42,8 @@ public class BogeyBlockEntityVisual extends AbstractBlockEntityVisual<AbstractBo
         BlockPos visualPos = getVisualPosition();
         poseStack.translate(visualPos.getX(), visualPos.getY(), visualPos.getZ());
         poseStack.translate(.5f, .5f, .5f);
-        if (blockState.getValue(AbstractBogeyBlock.AXIS) == Direction.Axis.X) {
-            poseStack.mulPose(Axis.YP.rotationDegrees(90));
-        }
+        if (blockState.get(AbstractBogeyBlock.AXIS) == Direction.Axis.X)
+            poseStack.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(90));
         poseStack.translate(0, -1.5 - 1 / 128f, 0);
 
         bogey = AllBogeyStyleRenders.createVisual(lastStyle, bogeySize, visualizationContext, partialTick, false);
@@ -65,13 +64,7 @@ public class BogeyBlockEntityVisual extends AbstractBlockEntityVisual<AbstractBo
                 bogey = null;
             }
             lastStyle = style;
-            bogey = AllBogeyStyleRenders.createVisual(
-                lastStyle,
-                bogeySize,
-                visualizationContext,
-                context.partialTick(),
-                false
-            );
+            bogey = AllBogeyStyleRenders.createVisual(lastStyle, bogeySize, visualizationContext, context.partialTick(), false);
             updateLight(context.partialTick());
         }
 
@@ -83,7 +76,7 @@ public class BogeyBlockEntityVisual extends AbstractBlockEntityVisual<AbstractBo
             return;
         }
 
-        CompoundTag bogeyData = blockEntity.getBogeyData();
+        NbtCompound bogeyData = blockEntity.getBogeyData();
         float angle = blockEntity.getVirtualAngle(partialTick);
         bogey.update(bogeyData, angle, poseStack);
     }

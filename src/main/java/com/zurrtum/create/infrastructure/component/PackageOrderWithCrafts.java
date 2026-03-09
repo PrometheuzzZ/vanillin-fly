@@ -6,9 +6,9 @@ import com.zurrtum.create.catnip.codecs.stream.CatnipStreamCodecBuilders;
 import com.zurrtum.create.content.logistics.BigItemStack;
 import com.zurrtum.create.content.logistics.packager.InventorySummary;
 import com.zurrtum.create.content.logistics.stockTicker.PackageOrder;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
 
 import java.util.List;
 
@@ -20,18 +20,17 @@ public record PackageOrderWithCrafts(PackageOrder orderedStacks, List<CraftingEn
     public static final Codec<PackageOrderWithCrafts> CODEC = Codec.withAlternative(
 
         RecordCodecBuilder.create(i -> i.group(
-            PackageOrder.CODEC.fieldOf("ordered_stacks")
-                .forGetter(PackageOrderWithCrafts::orderedStacks),
+            PackageOrder.CODEC.fieldOf("ordered_stacks").forGetter(PackageOrderWithCrafts::orderedStacks),
             CraftingEntry.CODEC.listOf().fieldOf("ordered_crafts").forGetter(PackageOrderWithCrafts::orderedCrafts)
         ).apply(i, PackageOrderWithCrafts::new)),
 
         // Legacy format (6.0.0 - 6.0.2)
-        RecordCodecBuilder.create(instance -> instance.group(BigItemStack.CODEC.listOf().fieldOf("entries")
-            .forGetter(PackageOrderWithCrafts::stacks)).apply(instance, PackageOrderWithCrafts::simple))
+        RecordCodecBuilder.create(instance -> instance.group(BigItemStack.CODEC.listOf().fieldOf("entries").forGetter(PackageOrderWithCrafts::stacks))
+            .apply(instance, PackageOrderWithCrafts::simple))
 
     );
 
-    public static final StreamCodec<RegistryFriendlyByteBuf, PackageOrderWithCrafts> STREAM_CODEC = StreamCodec.composite(
+    public static final PacketCodec<RegistryByteBuf, PackageOrderWithCrafts> STREAM_CODEC = PacketCodec.tuple(
         PackageOrder.STREAM_CODEC,
         s -> s.orderedStacks,
         CatnipStreamCodecBuilders.list(CraftingEntry.STREAM_CODEC),
@@ -48,24 +47,20 @@ public record PackageOrderWithCrafts(PackageOrder orderedStacks, List<CraftingEn
     }
 
     public static PackageOrderWithCrafts singleRecipe(List<BigItemStack> pattern) {
-        return new PackageOrderWithCrafts(
-            PackageOrder.empty(),
-            List.of(new CraftingEntry(new PackageOrder(pattern), 1))
-        );
+        return new PackageOrderWithCrafts(PackageOrder.empty(), List.of(new CraftingEntry(new PackageOrder(pattern), 1)));
     }
 
     public record CraftingEntry(PackageOrder pattern, int count) {
 
         public static final Codec<CraftingEntry> CODEC = RecordCodecBuilder.create(i -> i.group(
-            PackageOrder.CODEC.fieldOf(
-                "pattern").forGetter(CraftingEntry::pattern),
-            Codec.INT.fieldOf("count").forGetter(CraftingEntry::count)
+            PackageOrder.CODEC.fieldOf("pattern")
+                .forGetter(CraftingEntry::pattern), Codec.INT.fieldOf("count").forGetter(CraftingEntry::count)
         ).apply(i, CraftingEntry::new));
 
-        public static final StreamCodec<RegistryFriendlyByteBuf, CraftingEntry> STREAM_CODEC = StreamCodec.composite(
+        public static final PacketCodec<RegistryByteBuf, CraftingEntry> STREAM_CODEC = PacketCodec.tuple(
             PackageOrder.STREAM_CODEC,
             CraftingEntry::pattern,
-            ByteBufCodecs.VAR_INT,
+            PacketCodecs.VAR_INT,
             CraftingEntry::count,
             CraftingEntry::new
         );
@@ -74,9 +69,8 @@ public record PackageOrderWithCrafts(PackageOrder orderedStacks, List<CraftingEn
     }
 
     public static boolean hasCraftingInformation(PackageOrderWithCrafts context) {
-        if (context == null) {
+        if (context == null)
             return false;
-        }
         // Only a valid crafting packet if it contains exactly one recipe
         return context.orderedCrafts.size() == 1;
     }
@@ -94,26 +88,21 @@ public record PackageOrderWithCrafts(PackageOrder orderedStacks, List<CraftingEn
     }
 
     public boolean orderedStacksMatchOrderedRecipes() {
-        if (orderedCrafts.isEmpty()) {
+        if (orderedCrafts.isEmpty())
             return false;
-        }
 
         InventorySummary stacks = new InventorySummary();
         InventorySummary crafts = new InventorySummary();
 
         stacks().forEach(stacks::add);
-        orderedCrafts.forEach(ce -> ce.pattern.stacks()
-            .forEach(bis -> crafts.add(new BigItemStack(bis.stack, bis.count * ce.count))));
+        orderedCrafts.forEach(ce -> ce.pattern.stacks().forEach(bis -> crafts.add(new BigItemStack(bis.stack, bis.count * ce.count))));
 
         List<BigItemStack> stackEntries = stacks.getStacks();
-        if (stackEntries.size() != crafts.getStacks().size()) {
+        if (stackEntries.size() != crafts.getStacks().size())
             return false;
-        }
-        for (BigItemStack bis : stackEntries) {
-            if (crafts.getCountOf(bis.stack) != bis.count) {
+        for (BigItemStack bis : stackEntries)
+            if (crafts.getCountOf(bis.stack) != bis.count)
                 return false;
-            }
-        }
         return true;
     }
 

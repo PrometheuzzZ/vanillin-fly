@@ -1,11 +1,11 @@
 package com.zurrtum.create.catnip.levelWrappers;
 
-import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.Identifier;
-import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.registry.RegistryKeys;
+import net.minecraft.util.Identifier;
+import net.minecraft.world.WorldAccess;
 
 public class WorldHelper {
-    public static Identifier getDimensionID(LevelAccessor world) {
-        return world.registryAccess().lookupOrThrow(Registries.DIMENSION_TYPE).getKey(world.dimensionType());
+    public static Identifier getDimensionID(WorldAccess world) {
+        return world.getRegistryManager().getOrThrow(RegistryKeys.DIMENSION_TYPE).getId(world.getDimension());
     }
 }

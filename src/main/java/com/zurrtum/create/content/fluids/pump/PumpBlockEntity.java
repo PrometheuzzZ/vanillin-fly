@@ -2,7 +2,6 @@ package com.zurrtum.create.content.fluids.pump;
 
 import com.zurrtum.create.AllAdvancements;
 import com.zurrtum.create.AllBlockEntityTypes;
-import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.catnip.data.Couple;
 import com.zurrtum.create.catnip.data.Iterate;
 import com.zurrtum.create.catnip.data.Pair;
@@ -13,14 +12,15 @@ import com.zurrtum.create.content.fluids.PipeConnection;
 import com.zurrtum.create.content.kinetics.base.KineticBlockEntity;
 import com.zurrtum.create.foundation.advancement.CreateTrigger;
 import com.zurrtum.create.foundation.blockEntity.SmartBlockEntity;
+import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.foundation.fluid.FluidHelper;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.world.level.BlockAndTintGetter;
-import net.minecraft.world.level.LevelAccessor;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.storage.ValueInput;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.storage.ReadView;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.world.BlockRenderView;
+import net.minecraft.world.WorldAccess;
 import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.jetbrains.annotations.Nullable;
 
@@ -56,22 +56,17 @@ public class PumpBlockEntity extends KineticBlockEntity {
     public void tick() {
         super.tick();
 
-        if (level.isClientSide() && !isVirtual()) {
+        if (world.isClient() && !isVirtual())
             return;
-        }
 
         if (scheduleFlip) {
-            level.setBlockAndUpdate(
-                worldPosition,
-                getBlockState().setValue(PumpBlock.FACING, getBlockState().getValue(PumpBlock.FACING).getOpposite())
-            );
+            world.setBlockState(pos, getCachedState().with(PumpBlock.FACING, getCachedState().get(PumpBlock.FACING).getOpposite()));
             scheduleFlip = false;
         }
 
         sidesToUpdate.forEachWithContext((update, isFront) -> {
-            if (update.isFalse()) {
+            if (update.isFalse())
                 return;
-            }
             update.setFalse();
             distributePressureTo(isFront ? getFront() : getFront().getOpposite());
         });
@@ -81,61 +76,52 @@ public class PumpBlockEntity extends KineticBlockEntity {
     public void onSpeedChanged(float previousSpeed) {
         super.onSpeedChanged(previousSpeed);
 
-        if (Math.abs(previousSpeed) == Math.abs(getSpeed())) {
+        if (Math.abs(previousSpeed) == Math.abs(getSpeed()))
             return;
-        }
-        if (speed != 0) {
+        if (speed != 0)
             award(AllAdvancements.PUMP);
-        }
-        if (level.isClientSide() && !isVirtual()) {
+        if (world.isClient() && !isVirtual())
             return;
-        }
 
         updatePressureChange();
     }
 
     public void updatePressureChange() {
         pressureUpdate = false;
-        BlockPos frontPos = worldPosition.relative(getFront());
-        BlockPos backPos = worldPosition.relative(getFront().getOpposite());
-        FluidPropagator.propagateChangedPipe(level, frontPos, level.getBlockState(frontPos));
-        FluidPropagator.propagateChangedPipe(level, backPos, level.getBlockState(backPos));
+        BlockPos frontPos = pos.offset(getFront());
+        BlockPos backPos = pos.offset(getFront().getOpposite());
+        FluidPropagator.propagateChangedPipe(world, frontPos, world.getBlockState(frontPos));
+        FluidPropagator.propagateChangedPipe(world, backPos, world.getBlockState(backPos));
 
         FluidTransportBehaviour behaviour = getBehaviour(FluidTransportBehaviour.TYPE);
-        if (behaviour != null) {
+        if (behaviour != null)
             behaviour.wipePressure();
-        }
         sidesToUpdate.forEach(MutableBoolean::setTrue);
     }
 
     @Override
-    protected void read(ValueInput view, boolean clientPacket) {
+    protected void read(ReadView view, boolean clientPacket) {
         super.read(view, clientPacket);
-        if (view.getBooleanOr("Reversed", false)) {
+        if (view.getBoolean("Reversed", false))
             scheduleFlip = true;
-        }
     }
 
     protected void distributePressureTo(Direction side) {
-        if (getSpeed() == 0) {
+        if (getSpeed() == 0)
             return;
-        }
 
-        BlockFace start = new BlockFace(worldPosition, side);
+        BlockFace start = new BlockFace(pos, side);
         boolean pull = isPullingOnSide(isFront(side));
         Set<BlockFace> targets = new HashSet<>();
         Map<BlockPos, Pair<Integer, Map<Direction, Boolean>>> pipeGraph = new HashMap<>();
 
-        if (!pull) {
-            FluidPropagator.resetAffectedFluidNetworks(level, worldPosition, side.getOpposite());
-        }
+        if (!pull)
+            FluidPropagator.resetAffectedFluidNetworks(world, pos, side.getOpposite());
 
-        if (!hasReachedValidEndpoint(level, start, pull)) {
+        if (!hasReachedValidEndpoint(world, start, pull)) {
 
-            pipeGraph.computeIfAbsent(worldPosition, $ -> Pair.of(0, new IdentityHashMap<>())).getSecond()
-                .put(side, pull);
-            pipeGraph.computeIfAbsent(start.getConnectedPos(), $ -> Pair.of(1, new IdentityHashMap<>())).getSecond()
-                .put(side.getOpposite(), !pull);
+            pipeGraph.computeIfAbsent(pos, $ -> Pair.of(0, new IdentityHashMap<>())).getSecond().put(side, pull);
+            pipeGraph.computeIfAbsent(start.getConnectedPos(), $ -> Pair.of(1, new IdentityHashMap<>())).getSecond().put(side.getOpposite(), !pull);
 
             List<Pair<Integer, BlockPos>> frontier = new ArrayList<>();
             Set<BlockPos> visited = new HashSet<>();
@@ -147,57 +133,46 @@ public class PumpBlockEntity extends KineticBlockEntity {
                 int distance = entry.getFirst();
                 BlockPos currentPos = entry.getSecond();
 
-                if (!level.isLoaded(currentPos)) {
+                if (!world.isPosLoaded(currentPos))
                     continue;
-                }
-                if (visited.contains(currentPos)) {
+                if (visited.contains(currentPos))
                     continue;
-                }
                 visited.add(currentPos);
-                BlockState currentState = level.getBlockState(currentPos);
-                FluidTransportBehaviour pipe = FluidPropagator.getPipe(level, currentPos);
-                if (pipe == null) {
+                BlockState currentState = world.getBlockState(currentPos);
+                FluidTransportBehaviour pipe = FluidPropagator.getPipe(world, currentPos);
+                if (pipe == null)
                     continue;
-                }
 
                 for (Direction face : FluidPropagator.getPipeConnections(currentState, pipe)) {
                     BlockFace blockFace = new BlockFace(currentPos, face);
                     BlockPos connectedPos = blockFace.getConnectedPos();
 
-                    if (!level.isLoaded(connectedPos)) {
+                    if (!world.isPosLoaded(connectedPos))
                         continue;
-                    }
-                    if (blockFace.isEquivalent(start)) {
+                    if (blockFace.isEquivalent(start))
                         continue;
-                    }
-                    if (hasReachedValidEndpoint(level, blockFace, pull)) {
-                        pipeGraph.computeIfAbsent(currentPos, $ -> Pair.of(distance, new IdentityHashMap<>()))
-                            .getSecond().put(face, pull);
+                    if (hasReachedValidEndpoint(world, blockFace, pull)) {
+                        pipeGraph.computeIfAbsent(currentPos, $ -> Pair.of(distance, new IdentityHashMap<>())).getSecond().put(face, pull);
                         targets.add(blockFace);
                         continue;
                     }
 
-                    FluidTransportBehaviour pipeBehaviour = FluidPropagator.getPipe(level, connectedPos);
-                    if (pipeBehaviour == null) {
+                    FluidTransportBehaviour pipeBehaviour = FluidPropagator.getPipe(world, connectedPos);
+                    if (pipeBehaviour == null)
                         continue;
-                    }
-                    if (pipeBehaviour instanceof PumpFluidTransferBehaviour) {
+                    if (pipeBehaviour instanceof PumpFluidTransferBehaviour)
                         continue;
-                    }
-                    if (visited.contains(connectedPos)) {
+                    if (visited.contains(connectedPos))
                         continue;
-                    }
                     if (distance + 1 >= maxDistance) {
-                        pipeGraph.computeIfAbsent(currentPos, $ -> Pair.of(distance, new IdentityHashMap<>()))
-                            .getSecond().put(face, pull);
+                        pipeGraph.computeIfAbsent(currentPos, $ -> Pair.of(distance, new IdentityHashMap<>())).getSecond().put(face, pull);
                         targets.add(blockFace);
                         continue;
                     }
 
-                    pipeGraph.computeIfAbsent(currentPos, $ -> Pair.of(distance, new IdentityHashMap<>())).getSecond()
-                        .put(face, pull);
-                    pipeGraph.computeIfAbsent(connectedPos, $ -> Pair.of(distance + 1, new IdentityHashMap<>()))
-                        .getSecond().put(face.getOpposite(), !pull);
+                    pipeGraph.computeIfAbsent(currentPos, $ -> Pair.of(distance, new IdentityHashMap<>())).getSecond().put(face, pull);
+                    pipeGraph.computeIfAbsent(connectedPos, $ -> Pair.of(distance + 1, new IdentityHashMap<>())).getSecond()
+                        .put(face.getOpposite(), !pull);
                     frontier.add(Pair.of(distance + 1, connectedPos));
                 }
             }
@@ -205,13 +180,7 @@ public class PumpBlockEntity extends KineticBlockEntity {
 
         // DFS
         Map<Integer, Set<BlockFace>> validFaces = new HashMap<>();
-        searchForEndpointRecursively(
-            pipeGraph,
-            targets,
-            validFaces,
-            new BlockFace(start.getPos(), start.getOppositeFace()),
-            pull
-        );
+        searchForEndpointRecursively(pipeGraph, targets, validFaces, new BlockFace(start.getPos(), start.getOppositeFace()), pull);
 
         float pressure = Math.abs(getSpeed());
         for (Set<BlockFace> set : validFaces.values()) {
@@ -220,15 +189,13 @@ public class PumpBlockEntity extends KineticBlockEntity {
                 BlockPos pipePos = face.getPos();
                 Direction pipeSide = face.getFace();
 
-                if (pipePos.equals(worldPosition)) {
+                if (pipePos.equals(pos))
                     continue;
-                }
 
                 boolean inbound = pipeGraph.get(pipePos).getSecond().get(pipeSide);
-                FluidTransportBehaviour pipeBehaviour = FluidPropagator.getPipe(level, pipePos);
-                if (pipeBehaviour == null) {
+                FluidTransportBehaviour pipeBehaviour = FluidPropagator.getPipe(world, pipePos);
+                if (pipeBehaviour == null)
                     continue;
-                }
 
                 pipeBehaviour.addPressure(pipeSide, inbound, pressure / parallelBranches);
             }
@@ -244,21 +211,18 @@ public class PumpBlockEntity extends KineticBlockEntity {
         boolean pull
     ) {
         BlockPos currentPos = currentFace.getPos();
-        if (!pipeGraph.containsKey(currentPos)) {
+        if (!pipeGraph.containsKey(currentPos))
             return false;
-        }
         Pair<Integer, Map<Direction, Boolean>> pair = pipeGraph.get(currentPos);
         int distance = pair.getFirst();
 
         boolean atLeastOneBranchSuccessful = false;
         for (Direction nextFacing : Iterate.directions) {
-            if (nextFacing == currentFace.getFace()) {
+            if (nextFacing == currentFace.getFace())
                 continue;
-            }
             Map<Direction, Boolean> map = pair.getSecond();
-            if (!map.containsKey(nextFacing)) {
+            if (!map.containsKey(nextFacing))
                 continue;
-            }
 
             BlockFace localTarget = new BlockFace(currentPos, nextFacing);
             if (targets.contains(localTarget)) {
@@ -267,60 +231,55 @@ public class PumpBlockEntity extends KineticBlockEntity {
                 continue;
             }
 
-            if (map.get(nextFacing) != pull) {
+            if (map.get(nextFacing) != pull)
                 continue;
-            }
             if (!searchForEndpointRecursively(
                 pipeGraph,
                 targets,
                 validFaces,
-                new BlockFace(currentPos.relative(nextFacing), nextFacing.getOpposite()),
+                new BlockFace(currentPos.offset(nextFacing), nextFacing.getOpposite()),
                 pull
-            )) {
+            ))
                 continue;
-            }
 
             validFaces.computeIfAbsent(distance, $ -> new HashSet<>()).add(localTarget);
             atLeastOneBranchSuccessful = true;
         }
 
-        if (atLeastOneBranchSuccessful) {
+        if (atLeastOneBranchSuccessful)
             validFaces.computeIfAbsent(distance, $ -> new HashSet<>()).add(currentFace);
-        }
 
         return atLeastOneBranchSuccessful;
     }
 
-    private boolean hasReachedValidEndpoint(LevelAccessor world, BlockFace blockFace, boolean pull) {
+    private boolean hasReachedValidEndpoint(WorldAccess world, BlockFace blockFace, boolean pull) {
         BlockPos connectedPos = blockFace.getConnectedPos();
         BlockState connectedState = world.getBlockState(connectedPos);
         BlockEntity blockEntity = world.getBlockEntity(connectedPos);
         Direction face = blockFace.getFace();
 
         // facing a pump
-        if (PumpBlock.isPump(connectedState) && connectedState.getValue(PumpBlock.FACING)
+        if (PumpBlock.isPump(connectedState) && connectedState.get(PumpBlock.FACING)
             .getAxis() == face.getAxis() && blockEntity instanceof PumpBlockEntity pumpBE) {
             return pumpBE.isPullingOnSide(pumpBE.isFront(blockFace.getOppositeFace())) != pull;
         }
 
         // other pipe, no endpoint
         FluidTransportBehaviour pipe = FluidPropagator.getPipe(world, connectedPos);
-        if (pipe != null && pipe.canHaveFlowToward(connectedState, blockFace.getOppositeFace())) {
+        if (pipe != null && pipe.canHaveFlowToward(connectedState, blockFace.getOppositeFace()))
             return false;
-        }
 
         // fluid handler endpoint
         if (blockEntity != null) {
             boolean hasCapability = FluidHelper.hasFluidInventory(
-                blockEntity.getLevel(),
+                blockEntity.getWorld(),
                 connectedPos,
                 connectedState,
                 blockEntity,
                 face.getOpposite()
             );
-            if (hasCapability) {
+            if (hasCapability)
                 return true;
-            }
         }
 
         // open endpoint
@@ -328,30 +287,27 @@ public class PumpBlockEntity extends KineticBlockEntity {
     }
 
     public void updatePipesOnSide(Direction side) {
-        if (!isSideAccessible(side)) {
+        if (!isSideAccessible(side))
             return;
-        }
         updatePipeNetwork(isFront(side));
         getBehaviour(FluidTransportBehaviour.TYPE).wipePressure();
     }
 
     protected boolean isFront(Direction side) {
-        BlockState blockState = getBlockState();
-        if (!(blockState.getBlock() instanceof PumpBlock)) {
+        BlockState blockState = getCachedState();
+        if (!(blockState.getBlock() instanceof PumpBlock))
             return false;
-        }
-        Direction front = blockState.getValue(PumpBlock.FACING);
+        Direction front = blockState.get(PumpBlock.FACING);
         boolean isFront = side == front;
         return isFront;
     }
 
     @Nullable
     protected Direction getFront() {
-        BlockState blockState = getBlockState();
-        if (!(blockState.getBlock() instanceof PumpBlock)) {
+        BlockState blockState = getCachedState();
+        if (!(blockState.getBlock() instanceof PumpBlock))
             return null;
-        }
-        return blockState.getValue(PumpBlock.FACING);
+        return blockState.get(PumpBlock.FACING);
     }
 
     protected void updatePipeNetwork(boolean front) {
@@ -359,11 +315,10 @@ public class PumpBlockEntity extends KineticBlockEntity {
     }
 
     public boolean isSideAccessible(Direction side) {
-        BlockState blockState = getBlockState();
-        if (!(blockState.getBlock() instanceof PumpBlock)) {
+        BlockState blockState = getCachedState();
+        if (!(blockState.getBlock() instanceof PumpBlock))
             return false;
-        }
-        return blockState.getValue(PumpBlock.FACING).getAxis() == side.getAxis();
+        return blockState.get(PumpBlock.FACING).getAxis() == side.getAxis();
     }
 
     public boolean isPullingOnSide(boolean front) {
@@ -393,16 +348,10 @@ public class PumpBlockEntity extends KineticBlockEntity {
         }
 
         @Override
-        public AttachmentTypes getRenderedRimAttachment(
-            BlockAndTintGetter world,
-            BlockPos pos,
-            BlockState state,
-            Direction direction
-        ) {
+        public AttachmentTypes getRenderedRimAttachment(BlockRenderView world, BlockPos pos, BlockState state, Direction direction) {
             AttachmentTypes attachment = super.getRenderedRimAttachment(world, pos, state, direction);
-            if (attachment == AttachmentTypes.RIM) {
+            if (attachment == AttachmentTypes.RIM)
                 return AttachmentTypes.NONE;
-            }
             return attachment;
         }
 

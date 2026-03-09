@@ -1,7 +1,7 @@
 package com.zurrtum.create.foundation.collision;
 
-import net.minecraft.util.Mth;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.Vec3d;
 
 public class Matrix3d {
 
@@ -17,12 +17,11 @@ public class Matrix3d {
 
     public Matrix3d asXRotation(float radians) {
         asIdentity();
-        if (radians == 0) {
+        if (radians == 0)
             return this;
-        }
 
-        double s = Mth.sin(radians);
-        double c = Mth.cos(radians);
+        double s = MathHelper.sin(radians);
+        double c = MathHelper.cos(radians);
         m22 = m11 = c;
         m21 = s;
         m12 = -s;
@@ -31,12 +30,11 @@ public class Matrix3d {
 
     public Matrix3d asYRotation(float radians) {
         asIdentity();
-        if (radians == 0) {
+        if (radians == 0)
             return this;
-        }
 
-        double s = Mth.sin(radians);
-        double c = Mth.cos(radians);
+        double s = MathHelper.sin(radians);
+        double c = MathHelper.cos(radians);
         m00 = m22 = c;
         m02 = s;
         m20 = -s;
@@ -45,12 +43,11 @@ public class Matrix3d {
 
     public Matrix3d asZRotation(float radians) {
         asIdentity();
-        if (radians == 0) {
+        if (radians == 0)
             return this;
-        }
 
-        double s = Mth.sin(radians);
-        double c = Mth.cos(radians);
+        double s = MathHelper.sin(radians);
+        double c = MathHelper.cos(radians);
         m00 = m11 = c;
         m01 = -s;
         m10 = s;
@@ -86,26 +83,26 @@ public class Matrix3d {
         return this;
     }
 
-    public Vec3 transform(Vec3 vec) {
+    public Vec3d transform(Vec3d vec) {
         return transform(vec.x, vec.y, vec.z);
     }
 
 
-    public Vec3 transformTransposed(Vec3 vec) {
+    public Vec3d transformTransposed(Vec3d vec) {
         return transformTransposed(vec.x, vec.y, vec.z);
     }
 
-    public Vec3 transform(double vecX, double vecY, double vecZ) {
+    public Vec3d transform(double vecX, double vecY, double vecZ) {
         double x = vecX * m00 + vecY * m01 + vecZ * m02;
         double y = vecX * m10 + vecY * m11 + vecZ * m12;
         double z = vecX * m20 + vecY * m21 + vecZ * m22;
-        return new Vec3(x, y, z);
+        return new Vec3d(x, y, z);
     }
 
-    public Vec3 transformTransposed(double vecX, double vecY, double vecZ) {
+    public Vec3d transformTransposed(double vecX, double vecY, double vecZ) {
         double x = vecX * m00 + vecY * m10 + vecZ * m20;
         double y = vecX * m01 + vecY * m11 + vecZ * m21;
         double z = vecX * m02 + vecY * m12 + vecZ * m22;
-        return new Vec3(x, y, z);
+        return new Vec3d(x, y, z);
     }
 }

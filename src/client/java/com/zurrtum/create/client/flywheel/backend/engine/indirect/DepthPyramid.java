@@ -1,12 +1,12 @@
 package com.zurrtum.create.client.flywheel.backend.engine.indirect;
 
 import com.mojang.blaze3d.opengl.GlStateManager;
-import com.mojang.blaze3d.opengl.GlTexture;
 import com.mojang.blaze3d.textures.GpuTexture;
 import com.zurrtum.create.client.flywheel.backend.compile.IndirectPrograms;
 import com.zurrtum.create.client.flywheel.backend.gl.GlTextureUnit;
 import com.zurrtum.create.client.flywheel.lib.math.MoreMath;
-import net.minecraft.client.Minecraft;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.texture.GlTexture;
 import org.lwjgl.opengl.GL32;
 import org.lwjgl.opengl.GL46;
 
@@ -23,16 +23,16 @@ public class DepthPyramid {
     }
 
     public void generate() {
-        var mainRenderTarget = Minecraft.getInstance().getMainRenderTarget();
+        var mainRenderTarget = MinecraftClient.getInstance().getFramebuffer();
 
-        int width = mip0Size(mainRenderTarget.width);
-        int height = mip0Size(mainRenderTarget.height);
+        int width = mip0Size(mainRenderTarget.textureWidth);
+        int height = mip0Size(mainRenderTarget.textureHeight);
         int mipLevels = getImageMipLevels(width, height);
 
         createPyramidMips(mipLevels, width, height);
 
-        GpuTexture depthTexture = mainRenderTarget.getDepthTexture();
-        int depthBufferId = depthTexture != null ? ((GlTexture) depthTexture).glId() : 0;
+        GpuTexture depthTexture = mainRenderTarget.getDepthAttachment();
+        int depthBufferId = depthTexture != null ? ((GlTexture) depthTexture).getGlId() : 0;
 
         GL46.glMemoryBarrier(GL46.GL_FRAMEBUFFER_BARRIER_BIT);
 
@@ -55,22 +55,10 @@ public class DepthPyramid {
             downsampleSecondProgram.setUInt("base_mip_level", baseMipLevel);
 
             for (int i = 0; i < Math.min(7, mipLevels - baseMipLevel); i++) {
-                GL46.glBindImageTexture(
-                    i,
-                    pyramidTextureId,
-                    baseMipLevel + i,
-                    false,
-                    0,
-                    GL32.GL_WRITE_ONLY,
-                    GL32.GL_R32F
-                );
+                GL46.glBindImageTexture(i, pyramidTextureId, baseMipLevel + i, false, 0, GL32.GL_WRITE_ONLY, GL32.GL_R32F);
             }
 
-            GL46.glDispatchCompute(
-                MoreMath.ceilingDiv(width >> baseMipLevel, 64),
-                MoreMath.ceilingDiv(height >> baseMipLevel, 64),
-                1
-            );
+            GL46.glDispatchCompute(MoreMath.ceilingDiv(width >> baseMipLevel, 64), MoreMath.ceilingDiv(height >> baseMipLevel, 64), 1);
         }
 
         GL46.glMemoryBarrier(GL46.GL_TEXTURE_FETCH_BARRIER_BIT);

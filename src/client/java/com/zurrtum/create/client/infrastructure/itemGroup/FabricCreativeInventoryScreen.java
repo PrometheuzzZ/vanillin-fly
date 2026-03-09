@@ -16,11 +16,11 @@
 
 package com.zurrtum.create.client.infrastructure.itemGroup;
 
-import net.minecraft.client.gui.screens.inventory.CreativeModeInventoryScreen;
-import net.minecraft.world.item.CreativeModeTab;
+import net.minecraft.client.gui.screen.ingame.CreativeInventoryScreen;
+import net.minecraft.item.ItemGroup;
 
 /**
- * Fabric provided extensions to {@link CreativeModeInventoryScreen}.
+ * Fabric provided extensions to {@link CreativeInventoryScreen}.
  * This interface is automatically implemented on all creative inventory screens via Mixin and interface injection.
  */
 public interface FabricCreativeInventoryScreen {
@@ -74,7 +74,7 @@ public interface FabricCreativeInventoryScreen {
      * @param itemGroup the item group to get the page index for
      * @return the page index of the item group
      */
-    default int fabric_getPage(CreativeModeTab itemGroup) {
+    default int fabric_getPage(ItemGroup itemGroup) {
         throw new AssertionError("Implemented by mixin");
     }
 

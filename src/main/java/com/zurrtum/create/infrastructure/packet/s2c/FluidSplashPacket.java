@@ -2,32 +2,32 @@ package com.zurrtum.create.infrastructure.packet.s2c;
 
 import com.zurrtum.create.AllClientHandle;
 import com.zurrtum.create.AllPackets;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.registries.Registries;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.PacketType;
-import net.minecraft.network.protocol.game.ClientGamePacketListener;
-import net.minecraft.world.level.material.Fluid;
+import net.minecraft.fluid.Fluid;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.network.listener.ClientPlayPacketListener;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.PacketType;
+import net.minecraft.registry.RegistryKeys;
+import net.minecraft.util.math.BlockPos;
 
-public record FluidSplashPacket(BlockPos pos, Fluid fluid) implements Packet<ClientGamePacketListener> {
-    public static final StreamCodec<RegistryFriendlyByteBuf, FluidSplashPacket> CODEC = StreamCodec.composite(
-        BlockPos.STREAM_CODEC,
+public record FluidSplashPacket(BlockPos pos, Fluid fluid) implements Packet<ClientPlayPacketListener> {
+    public static final PacketCodec<RegistryByteBuf, FluidSplashPacket> CODEC = PacketCodec.tuple(
+        BlockPos.PACKET_CODEC,
         FluidSplashPacket::pos,
-        ByteBufCodecs.registry(Registries.FLUID),
+        PacketCodecs.registryValue(RegistryKeys.FLUID),
         FluidSplashPacket::fluid,
         FluidSplashPacket::new
     );
 
     @Override
-    public void handle(ClientGamePacketListener listener) {
+    public void apply(ClientPlayPacketListener listener) {
         AllClientHandle.INSTANCE.onFluidSplash(this);
     }
 
     @Override
-    public PacketType<FluidSplashPacket> type() {
+    public PacketType<FluidSplashPacket> getPacketType() {
         return AllPackets.FLUID_SPLASH;
     }
 }

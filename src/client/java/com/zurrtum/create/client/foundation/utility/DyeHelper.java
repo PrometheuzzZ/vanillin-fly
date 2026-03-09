@@ -1,9 +1,9 @@
 package com.zurrtum.create.client.foundation.utility;
 
 import com.zurrtum.create.catnip.data.Couple;
-import net.minecraft.world.item.DyeColor;
-import net.minecraft.world.level.ItemLike;
-import net.minecraft.world.level.block.Blocks;
+import net.minecraft.block.Blocks;
+import net.minecraft.item.ItemConvertible;
+import net.minecraft.util.DyeColor;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -11,7 +11,7 @@ import java.util.function.Supplier;
 
 public class DyeHelper {
 
-    public static ItemLike getWoolOfDye(DyeColor color) {
+    public static ItemConvertible getWoolOfDye(DyeColor color) {
         return WOOL_TABLE.getOrDefault(color, () -> Blocks.WHITE_WOOL).get();
     }
 
@@ -27,16 +27,16 @@ public class DyeHelper {
      * @param darkColor   Back (dark) RGB color
      * @param wool        Supplier of wool item/block corresponding to the color
      */
-    public static void addDye(DyeColor color, Integer brightColor, Integer darkColor, Supplier<ItemLike> wool) {
+    public static void addDye(DyeColor color, Integer brightColor, Integer darkColor, Supplier<ItemConvertible> wool) {
         DYE_TABLE.put(color, Couple.create(brightColor, darkColor));
         WOOL_TABLE.put(color, wool);
     }
 
-    private static void addDye(DyeColor color, Integer brightColor, Integer darkColor, ItemLike wool) {
+    private static void addDye(DyeColor color, Integer brightColor, Integer darkColor, ItemConvertible wool) {
         addDye(color, brightColor, darkColor, () -> wool);
     }
 
-    private static final Map<DyeColor, Supplier<ItemLike>> WOOL_TABLE = new HashMap<>();
+    private static final Map<DyeColor, Supplier<ItemConvertible>> WOOL_TABLE = new HashMap<>();
 
     private static final Map<DyeColor, Couple<Integer>> DYE_TABLE = new HashMap<>();
 

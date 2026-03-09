@@ -1,11 +1,11 @@
 package com.zurrtum.create.client.flywheel.lib.model.baked;
 
-import net.minecraft.core.BlockPos;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.material.FluidState;
-import net.minecraft.world.level.material.Fluids;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.Blocks;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.fluid.FluidState;
+import net.minecraft.fluid.Fluids;
+import net.minecraft.util.math.BlockPos;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.function.ToIntFunction;
@@ -26,12 +26,12 @@ public class EmptyVirtualBlockGetter extends VirtualBlockGetter {
 
     @Override
     public final BlockState getBlockState(BlockPos pos) {
-        return Blocks.AIR.defaultBlockState();
+        return Blocks.AIR.getDefaultState();
     }
 
     @Override
     public final FluidState getFluidState(BlockPos pos) {
-        return Fluids.EMPTY.defaultFluidState();
+        return Fluids.EMPTY.getDefaultState();
     }
 
     @Override
@@ -40,7 +40,7 @@ public class EmptyVirtualBlockGetter extends VirtualBlockGetter {
     }
 
     @Override
-    public final int getMinY() {
+    public final int getBottomY() {
         return 0;
     }
 }

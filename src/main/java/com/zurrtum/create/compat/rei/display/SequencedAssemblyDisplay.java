@@ -14,26 +14,27 @@ import me.shedaniel.rei.api.common.display.Display;
 import me.shedaniel.rei.api.common.display.DisplaySerializer;
 import me.shedaniel.rei.api.common.entry.EntryIngredient;
 import me.shedaniel.rei.api.common.util.EntryIngredients;
-import net.minecraft.ChatFormatting;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.core.registries.Registries;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.chat.CommonComponents;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.ComponentSerialization;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.resources.Identifier;
-import net.minecraft.world.item.crafting.Recipe;
-import net.minecraft.world.item.crafting.RecipeHolder;
-import net.minecraft.world.item.crafting.RecipeType;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.recipe.Recipe;
+import net.minecraft.recipe.RecipeEntry;
+import net.minecraft.recipe.RecipeType;
+import net.minecraft.registry.Registries;
+import net.minecraft.registry.RegistryKeys;
+import net.minecraft.screen.ScreenTexts;
+import net.minecraft.text.Text;
+import net.minecraft.text.TextCodecs;
+import net.minecraft.util.Formatting;
+import net.minecraft.util.Identifier;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-public record SequencedAssemblyDisplay(EntryIngredient input, SequenceData sequences, ProcessingOutput output, int loop,
-                                       Optional<Identifier> location) implements Display {
+public record SequencedAssemblyDisplay(
+    EntryIngredient input, SequenceData sequences, ProcessingOutput output, int loop, Optional<Identifier> location
+) implements Display {
     public static final DisplaySerializer<SequencedAssemblyDisplay> SERIALIZER = DisplaySerializer.of(
         RecordCodecBuilder.mapCodec(instance -> instance.group(
             EntryIngredient.codec().fieldOf("input").forGetter(SequencedAssemblyDisplay::input),
@@ -41,33 +42,27 @@ public record SequencedAssemblyDisplay(EntryIngredient input, SequenceData seque
             ProcessingOutput.CODEC.fieldOf("output").forGetter(SequencedAssemblyDisplay::output),
             Codec.INT.fieldOf("loop").forGetter(SequencedAssemblyDisplay::loop),
             Identifier.CODEC.optionalFieldOf("location").forGetter(SequencedAssemblyDisplay::location)
-        ).apply(instance, SequencedAssemblyDisplay::new)), StreamCodec.composite(
+        ).apply(instance, SequencedAssemblyDisplay::new)), PacketCodec.tuple(
             EntryIngredient.streamCodec(),
             SequencedAssemblyDisplay::input,
             SequenceData.PACKET_CODEC,
             SequencedAssemblyDisplay::sequences,
             ProcessingOutput.STREAM_CODEC,
             SequencedAssemblyDisplay::output,
-            ByteBufCodecs.INT,
+            PacketCodecs.INTEGER,
             SequencedAssemblyDisplay::loop,
-            ByteBufCodecs.optional(Identifier.STREAM_CODEC),
+            PacketCodecs.optional(Identifier.PACKET_CODEC),
             SequencedAssemblyDisplay::location,
             SequencedAssemblyDisplay::new
         )
     );
 
-    public SequencedAssemblyDisplay(RecipeHolder<SequencedAssemblyRecipe> entry) {
-        this(entry.id().identifier(), entry.value());
+    public SequencedAssemblyDisplay(RecipeEntry<SequencedAssemblyRecipe> entry) {
+        this(entry.id().getValue(), entry.value());
     }
 
     public SequencedAssemblyDisplay(Identifier id, SequencedAssemblyRecipe recipe) {
-        this(
-            EntryIngredients.ofIngredient(recipe.ingredient()),
-            SequenceData.create(recipe),
-            recipe.result(),
-            recipe.loops(),
-            Optional.of(id)
-        );
+        this(EntryIngredients.ofIngredient(recipe.ingredient()), SequenceData.create(recipe), recipe.result(), recipe.loops(), Optional.of(id));
     }
 
     @Override
@@ -103,45 +98,41 @@ public record SequencedAssemblyDisplay(EntryIngredient input, SequenceData seque
         return SERIALIZER;
     }
 
-    public record SequenceData(List<RecipeType<?>> types, List<List<Component>> tooltip,
-                               List<EntryIngredient> ingredients) {
+    public record SequenceData(List<RecipeType<?>> types, List<List<Text>> tooltip, List<EntryIngredient> ingredients) {
         public static final Codec<SequenceData> CODEC = RecordCodecBuilder.create(instance -> instance.group(
-            BuiltInRegistries.RECIPE_TYPE.byNameCodec().listOf().fieldOf("types").forGetter(SequenceData::types),
-            ComponentSerialization.CODEC.listOf().listOf().fieldOf("tooltip").forGetter(SequenceData::tooltip),
+            Registries.RECIPE_TYPE.getCodec().listOf().fieldOf("types").forGetter(SequenceData::types),
+            TextCodecs.CODEC.listOf().listOf().fieldOf("tooltip").forGetter(SequenceData::tooltip),
             EntryIngredient.codec().listOf().fieldOf("ingredients").forGetter(SequenceData::ingredients)
         ).apply(instance, SequenceData::new));
-        public static final StreamCodec<RegistryFriendlyByteBuf, SequenceData> PACKET_CODEC = StreamCodec.composite(
-            ByteBufCodecs.registry(Registries.RECIPE_TYPE).apply(ByteBufCodecs.list()),
+        public static final PacketCodec<RegistryByteBuf, SequenceData> PACKET_CODEC = PacketCodec.tuple(
+            PacketCodecs.registryValue(RegistryKeys.RECIPE_TYPE).collect(PacketCodecs.toList()),
             SequenceData::types,
-            ComponentSerialization.TRUSTED_CONTEXT_FREE_STREAM_CODEC.apply(ByteBufCodecs.list())
-                .apply(ByteBufCodecs.list()),
+            TextCodecs.PACKET_CODEC.collect(PacketCodecs.toList()).collect(PacketCodecs.toList()),
             SequenceData::tooltip,
-            EntryIngredient.streamCodec().apply(ByteBufCodecs.list()),
+            EntryIngredient.streamCodec().collect(PacketCodecs.toList()),
             SequenceData::ingredients,
             SequenceData::new
         );
 
         public static SequenceData create(SequencedAssemblyRecipe recipe) {
             ImmutableList.Builder<EntryIngredient> ingredientBuilder = ImmutableList.builder();
-            ImmutableList.Builder<List<Component>> textBuilder = ImmutableList.builder();
+            ImmutableList.Builder<List<Text>> textBuilder = ImmutableList.builder();
             ImmutableList.Builder<RecipeType<?>> typeBuilder = ImmutableList.builder();
             List<Recipe<?>> recipes = recipe.sequence();
             for (int i = 0, size = recipes.size() / recipe.loops(); i < size; i++) {
                 Recipe<?> sequence = recipes.get(i);
                 typeBuilder.add(sequence.getType());
-                ImmutableList.Builder<Component> tooltipBuilder = ImmutableList.builder();
-                tooltipBuilder.add(Component.translatable("create.recipe.assembly.step", i + 1));
+                ImmutableList.Builder<Text> tooltipBuilder = ImmutableList.builder();
+                tooltipBuilder.add(Text.translatable("create.recipe.assembly.step", i + 1));
                 if (sequence instanceof DeployerApplicationRecipe deployerApplicationRecipe) {
-                    tooltipBuilder.add(Component.translatable("create.recipe.assembly.deploying_item", "")
-                        .withStyle(ChatFormatting.DARK_GREEN));
+                    tooltipBuilder.add(Text.translatable("create.recipe.assembly.deploying_item", "").formatted(Formatting.DARK_GREEN));
                     ingredientBuilder.add(EntryIngredients.ofIngredient(deployerApplicationRecipe.ingredient()));
                 } else if (sequence instanceof FillingRecipe fillingRecipe) {
-                    tooltipBuilder.add(Component.translatable("create.recipe.assembly.spout_filling_fluid", "")
-                        .withStyle(ChatFormatting.DARK_GREEN));
+                    tooltipBuilder.add(Text.translatable("create.recipe.assembly.spout_filling_fluid", "").formatted(Formatting.DARK_GREEN));
                     ingredientBuilder.add(IngredientHelper.createEntryIngredient(fillingRecipe.fluidIngredient()));
                 } else {
                     ingredientBuilder.add(EntryIngredient.empty());
-                    Identifier id = BuiltInRegistries.RECIPE_TYPE.getKey(sequence.getType());
+                    Identifier id = Registries.RECIPE_TYPE.getId(sequence.getType());
                     if (id != null) {
                         String namespace = id.getNamespace();
                         String recipeName;
@@ -150,10 +141,9 @@ public record SequencedAssemblyDisplay(EntryIngredient input, SequenceData seque
                         } else {
                             recipeName = id.getNamespace() + "." + id.getPath();
                         }
-                        tooltipBuilder.add(Component.translatable("create.recipe.assembly." + recipeName)
-                            .withStyle(ChatFormatting.DARK_GREEN));
+                        tooltipBuilder.add(Text.translatable("create.recipe.assembly." + recipeName).formatted(Formatting.DARK_GREEN));
                     } else {
-                        tooltipBuilder.add(CommonComponents.EMPTY);
+                        tooltipBuilder.add(ScreenTexts.EMPTY);
                     }
                 }
                 textBuilder.add(tooltipBuilder.build());

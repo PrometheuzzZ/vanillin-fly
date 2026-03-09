@@ -9,7 +9,7 @@ import de.crafty.eiv.common.api.recipe.IEivRecipeViewType;
 import de.crafty.eiv.common.recipe.inventory.RecipeViewMenu;
 import de.crafty.eiv.common.recipe.inventory.RecipeViewScreen;
 import de.crafty.eiv.common.recipe.inventory.SlotContent;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.DrawContext;
 import org.joml.Matrix3x2f;
 
 import java.util.List;
@@ -66,19 +66,8 @@ public class CrushingView extends CreateView {
     }
 
     @Override
-    public void renderRecipe(
-        RecipeViewScreen screen,
-        RecipePosition position,
-        GuiGraphics context,
-        int mouseX,
-        int mouseY,
-        float partialTicks
-    ) {
+    public void renderRecipe(RecipeViewScreen screen, RecipePosition position, DrawContext context, int mouseX, int mouseY, float partialTicks) {
         AllGuiTextures.JEI_DOWN_ARROW.render(context, 72, 5);
-        context.guiRenderState.submitPicturesInPictureState(new CrushWheelRenderState(
-            new Matrix3x2f(context.pose()),
-            42,
-            22
-        ));
+        context.state.addSpecialElement(new CrushWheelRenderState(new Matrix3x2f(context.getMatrices()), 42, 22));
     }
 }

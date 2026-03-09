@@ -1,14 +1,15 @@
 package com.zurrtum.create.content.logistics.packager;
 
 import com.zurrtum.create.infrastructure.component.PackageOrderWithCrafts;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.item.ItemStack;
 import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.apache.commons.lang3.mutable.MutableInt;
 import org.jetbrains.annotations.Nullable;
 
-public record PackagingRequest(ItemStack item, MutableInt count, String address, int linkIndex,
-                               MutableBoolean finalLink, MutableInt packageCounter, int orderId,
-                               @Nullable PackageOrderWithCrafts context) {
+public record PackagingRequest(
+    ItemStack item, MutableInt count, String address, int linkIndex, MutableBoolean finalLink, MutableInt packageCounter, int orderId,
+    @Nullable PackageOrderWithCrafts context
+) {
 
     public static PackagingRequest create(
         ItemStack item,
@@ -20,16 +21,7 @@ public record PackagingRequest(ItemStack item, MutableInt count, String address,
         int orderId,
         @Nullable PackageOrderWithCrafts context
     ) {
-        return new PackagingRequest(
-            item,
-            new MutableInt(count),
-            address,
-            linkIndex,
-            finalLink,
-            new MutableInt(packageCount),
-            orderId,
-            context
-        );
+        return new PackagingRequest(item, new MutableInt(count), address, linkIndex, finalLink, new MutableInt(packageCount), orderId, context);
     }
 
     public int getCount() {

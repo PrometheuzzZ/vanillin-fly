@@ -11,11 +11,11 @@ import com.zurrtum.create.client.flywheel.impl.layout.LayoutBuilderImpl;
 import com.zurrtum.create.client.flywheel.impl.registry.IdRegistryImpl;
 import com.zurrtum.create.client.flywheel.impl.visualization.VisualizationManagerImpl;
 import com.zurrtum.create.client.flywheel.impl.visualization.VisualizerRegistryImpl;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.level.LevelAccessor;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.block.entity.BlockEntityType;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.EntityType;
+import net.minecraft.world.WorldAccess;
 import org.jetbrains.annotations.Nullable;
 
 public class FlwApiLinkImpl implements FlwApiLink {
@@ -50,18 +50,18 @@ public class FlwApiLinkImpl implements FlwApiLink {
     }
 
     @Override
-    public boolean supportsVisualization(@Nullable LevelAccessor level) {
+    public boolean supportsVisualization(@Nullable WorldAccess level) {
         return VisualizationManagerImpl.supportsVisualization(level);
     }
 
     @Override
     @Nullable
-    public VisualizationManager getVisualizationManager(@Nullable LevelAccessor level) {
+    public VisualizationManager getVisualizationManager(@Nullable WorldAccess level) {
         return VisualizationManagerImpl.get(level);
     }
 
     @Override
-    public VisualizationManager getVisualizationManagerOrThrow(@Nullable LevelAccessor level) {
+    public VisualizationManager getVisualizationManagerOrThrow(@Nullable WorldAccess level) {
         return VisualizationManagerImpl.getOrThrow(level);
     }
 
@@ -78,10 +78,7 @@ public class FlwApiLinkImpl implements FlwApiLink {
     }
 
     @Override
-    public <T extends BlockEntity> void setVisualizer(
-        BlockEntityType<T> type,
-        @Nullable BlockEntityVisualizer<? super T> visualizer
-    ) {
+    public <T extends BlockEntity> void setVisualizer(BlockEntityType<T> type, @Nullable BlockEntityVisualizer<? super T> visualizer) {
         VisualizerRegistryImpl.setVisualizer(type, visualizer);
     }
 

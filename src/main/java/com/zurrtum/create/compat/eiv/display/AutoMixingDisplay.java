@@ -7,14 +7,14 @@ import com.zurrtum.create.content.kinetics.press.MechanicalPressBlockEntity;
 import de.crafty.eiv.common.api.recipe.EivRecipeType;
 import it.unimi.dsi.fastutil.objects.Object2IntArrayMap;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.Tag;
-import net.minecraft.resources.RegistryOps;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.crafting.CraftingRecipe;
-import net.minecraft.world.item.crafting.Ingredient;
-import net.minecraft.world.item.crafting.RecipeHolder;
-import net.minecraft.world.item.crafting.ShapelessRecipe;
+import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NbtCompound;
+import net.minecraft.nbt.NbtElement;
+import net.minecraft.recipe.CraftingRecipe;
+import net.minecraft.recipe.Ingredient;
+import net.minecraft.recipe.RecipeEntry;
+import net.minecraft.recipe.ShapelessRecipe;
+import net.minecraft.registry.RegistryOps;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -34,10 +34,10 @@ public class AutoMixingDisplay extends CreateDisplay {
     }
 
     @Nullable
-    public static AutoMixingDisplay of(RecipeHolder<CraftingRecipe> entry) {
+    public static AutoMixingDisplay of(RecipeEntry<CraftingRecipe> entry) {
         CraftingRecipe recipe = entry.value();
-        if (!(recipe instanceof ShapelessRecipe shapelessRecipe) || MechanicalPressBlockEntity.canCompress(
-            shapelessRecipe) || AllRecipeTypes.shouldIgnoreInAutomation(entry) || shapelessRecipe.ingredients.size() == 1) {
+        if (!(recipe instanceof ShapelessRecipe shapelessRecipe) || MechanicalPressBlockEntity.canCompress(shapelessRecipe) || AllRecipeTypes.shouldIgnoreInAutomation(
+            entry) || shapelessRecipe.ingredients.size() == 1) {
             return null;
         }
         Object2IntMap<Ingredient> map = new Object2IntArrayMap<>();
@@ -60,17 +60,17 @@ public class AutoMixingDisplay extends CreateDisplay {
     }
 
     @Override
-    public void writeToTag(CompoundTag tag) {
-        RegistryOps<Tag> ops = getServerOps();
-        tag.store("result", ItemStack.CODEC, ops, result);
-        tag.store("ingredient", STACKS_LIST_CODEC, ops, ingredients);
+    public void writeToTag(NbtCompound tag) {
+        RegistryOps<NbtElement> ops = getServerOps();
+        tag.put("result", ItemStack.CODEC, ops, result);
+        tag.put("ingredient", STACKS_LIST_CODEC, ops, ingredients);
     }
 
     @Override
-    public void loadFromTag(CompoundTag tag) {
-        RegistryOps<Tag> ops = getClientOps();
-        result = tag.read("result", ItemStack.CODEC, ops).orElseThrow();
-        ingredients = tag.read("ingredient", STACKS_LIST_CODEC, ops).orElseThrow();
+    public void loadFromTag(NbtCompound tag) {
+        RegistryOps<NbtElement> ops = getClientOps();
+        result = tag.get("result", ItemStack.CODEC, ops).orElseThrow();
+        ingredients = tag.get("ingredient", STACKS_LIST_CODEC, ops).orElseThrow();
     }
 
     @Override

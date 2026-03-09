@@ -2,15 +2,15 @@ package com.zurrtum.create.content.trains.schedule.condition;
 
 import com.zurrtum.create.content.trains.entity.Train;
 import com.zurrtum.create.content.trains.station.GlobalStation;
-import net.minecraft.core.BlockPos;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.resources.Identifier;
-import net.minecraft.resources.ResourceKey;
+import net.minecraft.nbt.NbtCompound;
+import net.minecraft.registry.RegistryKey;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.level.Level;
+import net.minecraft.server.world.ServerWorld;
+import net.minecraft.text.MutableText;
+import net.minecraft.text.Text;
+import net.minecraft.util.Identifier;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.World;
 
 public class StationPoweredCondition extends ScheduleWaitCondition {
     public StationPoweredCondition(Identifier id) {
@@ -18,26 +18,23 @@ public class StationPoweredCondition extends ScheduleWaitCondition {
     }
 
     @Override
-    public boolean tickCompletion(Level level, Train train, CompoundTag context) {
+    public boolean tickCompletion(World level, Train train, NbtCompound context) {
         GlobalStation currentStation = train.getCurrentStation();
-        if (currentStation == null) {
+        if (currentStation == null)
             return false;
-        }
         BlockPos stationPos = currentStation.getBlockEntityPos();
-        ResourceKey<Level> stationDim = currentStation.getBlockEntityDimension();
+        RegistryKey<World> stationDim = currentStation.getBlockEntityDimension();
         MinecraftServer server = level.getServer();
-        if (server == null) {
+        if (server == null)
             return false;
-        }
-        ServerLevel stationLevel = server.getLevel(stationDim);
-        if (stationLevel == null || !stationLevel.isLoaded(stationPos)) {
+        ServerWorld stationLevel = server.getWorld(stationDim);
+        if (stationLevel == null || !stationLevel.isPosLoaded(stationPos))
             return false;
-        }
-        return stationLevel.hasNeighborSignal(stationPos);
+        return stationLevel.isReceivingRedstonePower(stationPos);
     }
 
     @Override
-    public MutableComponent getWaitingStatus(Level level, Train train, CompoundTag tag) {
-        return Component.translatable("create.schedule.condition.powered.status");
+    public MutableText getWaitingStatus(World level, Train train, NbtCompound tag) {
+        return Text.translatable("create.schedule.condition.powered.status");
     }
 }

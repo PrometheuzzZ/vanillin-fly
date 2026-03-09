@@ -1,28 +1,28 @@
 package com.zurrtum.create.client.flywheel.lib.model.baked;
 
-import com.mojang.blaze3d.vertex.PoseStack;
 import com.zurrtum.create.client.flywheel.api.material.Material;
 import com.zurrtum.create.client.flywheel.lib.internal.FlwLibXplat;
 import com.zurrtum.create.client.flywheel.lib.model.ModelUtil;
 import com.zurrtum.create.client.flywheel.lib.model.SimpleModel;
-import net.minecraft.client.renderer.block.model.BlockStateModel;
-import net.minecraft.client.renderer.block.model.SimpleModelWrapper;
-import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
-import net.minecraft.core.BlockPos;
-import net.minecraft.world.level.BlockAndTintGetter;
+import net.minecraft.client.render.BlockRenderLayer;
+import net.minecraft.client.render.model.BlockStateModel;
+import net.minecraft.client.render.model.GeometryBakedModel;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.BlockRenderView;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.function.BiFunction;
 
 public final class BakedModelBuilder {
     final BlockStateModel model;
-    final SimpleModelWrapper bakedModel;
-    @Nullable BlockAndTintGetter level;
+    final GeometryBakedModel bakedModel;
+    @Nullable BlockRenderView level;
     @Nullable BlockPos pos;
-    @Nullable PoseStack poseStack;
+    @Nullable MatrixStack poseStack;
     @Nullable BlockMaterialFunction materialFunc;
 
-    public BakedModelBuilder(SimpleModelWrapper bakedModel) {
+    public BakedModelBuilder(GeometryBakedModel bakedModel) {
         this.bakedModel = bakedModel;
         this.model = null;
     }
@@ -32,7 +32,7 @@ public final class BakedModelBuilder {
         this.bakedModel = null;
     }
 
-    public BakedModelBuilder level(@Nullable BlockAndTintGetter level) {
+    public BakedModelBuilder level(@Nullable BlockRenderView level) {
         this.level = level;
         return this;
     }
@@ -42,18 +42,15 @@ public final class BakedModelBuilder {
         return this;
     }
 
-    public BakedModelBuilder poseStack(@Nullable PoseStack poseStack) {
+    public BakedModelBuilder poseStack(@Nullable MatrixStack poseStack) {
         this.poseStack = poseStack;
         return this;
     }
 
     @Deprecated(forRemoval = true)
-    public BakedModelBuilder materialFunc(@Nullable BiFunction<ChunkSectionLayer, Boolean, @Nullable Material> materialFunc) {
+    public BakedModelBuilder materialFunc(@Nullable BiFunction<BlockRenderLayer, Boolean, Material> materialFunc) {
         if (materialFunc != null) {
-            this.materialFunc = (chunkRenderType, shaded, ambientOcclusion) -> materialFunc.apply(
-                chunkRenderType,
-                shaded
-            );
+            this.materialFunc = (chunkRenderType, shaded, ambientOcclusion) -> materialFunc.apply(chunkRenderType, shaded);
         } else {
             this.materialFunc = null;
         }
@@ -70,7 +67,7 @@ public final class BakedModelBuilder {
             level = EmptyVirtualBlockGetter.FULL_DARK;
         }
         if (pos == null) {
-            pos = BlockPos.ZERO;
+            pos = BlockPos.ORIGIN;
         }
         if (materialFunc == null) {
             materialFunc = ModelUtil::getMaterial;

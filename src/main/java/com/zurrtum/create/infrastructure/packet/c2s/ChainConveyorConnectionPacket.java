@@ -2,37 +2,38 @@ package com.zurrtum.create.infrastructure.packet.c2s;
 
 import com.zurrtum.create.AllHandle;
 import com.zurrtum.create.AllPackets;
-import net.minecraft.core.BlockPos;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.PacketType;
-import net.minecraft.network.protocol.game.ServerGamePacketListener;
-import net.minecraft.server.network.ServerGamePacketListenerImpl;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.item.ItemStack;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.network.listener.ServerPlayPacketListener;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.PacketType;
+import net.minecraft.server.network.ServerPlayNetworkHandler;
+import net.minecraft.util.math.BlockPos;
 
-public record ChainConveyorConnectionPacket(BlockPos pos, BlockPos targetPos, ItemStack chain,
-                                            boolean connect) implements Packet<ServerGamePacketListener> {
-    public static final StreamCodec<RegistryFriendlyByteBuf, ChainConveyorConnectionPacket> CODEC = StreamCodec.composite(
-        BlockPos.STREAM_CODEC,
+public record ChainConveyorConnectionPacket(
+    BlockPos pos, BlockPos targetPos, ItemStack chain, boolean connect
+) implements Packet<ServerPlayPacketListener> {
+    public static final PacketCodec<RegistryByteBuf, ChainConveyorConnectionPacket> CODEC = PacketCodec.tuple(
+        BlockPos.PACKET_CODEC,
         ChainConveyorConnectionPacket::pos,
-        BlockPos.STREAM_CODEC,
+        BlockPos.PACKET_CODEC,
         ChainConveyorConnectionPacket::targetPos,
-        ItemStack.STREAM_CODEC,
+        ItemStack.PACKET_CODEC,
         ChainConveyorConnectionPacket::chain,
-        ByteBufCodecs.BOOL,
+        PacketCodecs.BOOLEAN,
         ChainConveyorConnectionPacket::connect,
         ChainConveyorConnectionPacket::new
     );
 
     @Override
-    public void handle(ServerGamePacketListener listener) {
-        AllHandle.onChainConveyorConnection((ServerGamePacketListenerImpl) listener, this);
+    public void apply(ServerPlayPacketListener listener) {
+        AllHandle.onChainConveyorConnection((ServerPlayNetworkHandler) listener, this);
     }
 
     @Override
-    public PacketType<ChainConveyorConnectionPacket> type() {
+    public PacketType<ChainConveyorConnectionPacket> getPacketType() {
         return AllPackets.CHAIN_CONVEYOR_CONNECT;
     }
 }

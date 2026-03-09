@@ -9,11 +9,11 @@ import com.zurrtum.create.client.flywheel.lib.model.Models;
 import com.zurrtum.create.client.flywheel.lib.visual.AbstractBlockEntityVisual;
 import com.zurrtum.create.client.flywheel.lib.visual.SimpleDynamicVisual;
 import com.zurrtum.create.content.logistics.packagePort.frogport.FrogportBlockEntity;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.Identifier;
-import net.minecraft.util.Mth;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.block.Blocks;
+import net.minecraft.registry.Registries;
+import net.minecraft.util.Identifier;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.Vec3d;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
 
@@ -36,20 +36,15 @@ public class FrogportVisual extends AbstractBlockEntityVisual<FrogportBlockEntit
     public FrogportVisual(VisualizationContext ctx, FrogportBlockEntity blockEntity, float partialTick) {
         super(ctx, blockEntity, partialTick);
 
-        body = ctx.instancerProvider()
-            .instancer(InstanceTypes.TRANSFORMED, Models.partial(AllPartialModels.FROGPORT_BODY)).createInstance();
+        body = ctx.instancerProvider().instancer(InstanceTypes.TRANSFORMED, Models.partial(AllPartialModels.FROGPORT_BODY)).createInstance();
 
-        head = ctx.instancerProvider()
-            .instancer(InstanceTypes.TRANSFORMED, Models.partial(AllPartialModels.FROGPORT_HEAD)).createInstance();
+        head = ctx.instancerProvider().instancer(InstanceTypes.TRANSFORMED, Models.partial(AllPartialModels.FROGPORT_HEAD)).createInstance();
 
-        tongue = ctx.instancerProvider()
-            .instancer(InstanceTypes.TRANSFORMED, Models.partial(AllPartialModels.FROGPORT_TONGUE)).createInstance();
+        tongue = ctx.instancerProvider().instancer(InstanceTypes.TRANSFORMED, Models.partial(AllPartialModels.FROGPORT_TONGUE)).createInstance();
 
-        rig = ctx.instancerProvider().instancer(InstanceTypes.TRANSFORMED, Models.block(Blocks.AIR.defaultBlockState()))
-            .createInstance();
+        rig = ctx.instancerProvider().instancer(InstanceTypes.TRANSFORMED, Models.block(Blocks.AIR.getDefaultState())).createInstance();
 
-        box = ctx.instancerProvider().instancer(InstanceTypes.TRANSFORMED, Models.block(Blocks.AIR.defaultBlockState()))
-            .createInstance();
+        box = ctx.instancerProvider().instancer(InstanceTypes.TRANSFORMED, Models.block(Blocks.AIR.getDefaultState())).createInstance();
 
         rig.handle().setVisible(false);
         box.handle().setVisible(false);
@@ -76,17 +71,14 @@ public class FrogportVisual extends AbstractBlockEntityVisual<FrogportBlockEntit
         boolean animating = blockEntity.isAnimationInProgress();
         boolean depositing = blockEntity.currentlyDepositing;
 
-        Vec3 diff = Vec3.ZERO;
+        Vec3d diff = Vec3d.ZERO;
 
         if (hasTarget) {
-            diff = blockEntity.target.getExactTargetLocation(
-                blockEntity,
-                blockEntity.getLevel(),
-                blockEntity.getBlockPos()
-            ).subtract(0, animating && depositing ? 0 : 0.75, 0).subtract(Vec3.atCenterOf(blockEntity.getBlockPos()));
-            tonguePitch = (float) Mth.atan2(diff.y, diff.multiply(1, 0, 1).length() + (3 / 16f)) * Mth.RAD_TO_DEG;
+            diff = blockEntity.target.getExactTargetLocation(blockEntity, blockEntity.getWorld(), blockEntity.getPos())
+                .subtract(0, animating && depositing ? 0 : 0.75, 0).subtract(Vec3d.ofCenter(blockEntity.getPos()));
+            tonguePitch = (float) MathHelper.atan2(diff.y, diff.multiply(1, 0, 1).length() + (3 / 16f)) * MathHelper.DEGREES_PER_RADIAN;
             tongueLength = Math.max((float) diff.length(), 1);
-            headPitch = Mth.clamp(tonguePitch * 2, 60, 100);
+            headPitch = MathHelper.clamp(tonguePitch * 2, 60, 100);
         }
 
         if (animating) {
@@ -96,10 +88,7 @@ public class FrogportVisual extends AbstractBlockEntityVisual<FrogportBlockEntit
 
             if (depositing) {
                 double modifier = Math.max(0, 1 - Math.pow((progress - 0.25) * 4 - 1, 4));
-                itemDistance = (float) Math.max(
-                    tongueLength * Math.min(1, (progress - 0.25) * 3),
-                    tongueLength * modifier
-                );
+                itemDistance = (float) Math.max(tongueLength * Math.min(1, (progress - 0.25) * 3), tongueLength * modifier);
                 tongueLength *= Math.max(0, 1 - Math.pow((progress * 1.25 - 0.25) * 4 - 1, 4));
                 headPitchModifier = (float) Math.max(0, 1 - Math.pow((progress * 1.25) * 2 - 1, 4));
                 scale = 0.25f + progress * 3 / 4;
@@ -116,10 +105,7 @@ public class FrogportVisual extends AbstractBlockEntityVisual<FrogportBlockEntit
         } else {
             tongueLength = 0;
             float anticipation = blockEntity.anticipationProgress.getValue(partialTicks);
-            headPitchModifier = anticipation > 0 ? (float) Math.max(
-                0,
-                1 - Math.pow((anticipation * 1.25) * 2 - 1, 4)
-            ) : 0;
+            headPitchModifier = anticipation > 0 ? (float) Math.max(0, 1 - Math.pow((anticipation * 1.25) * 2 - 1, 4)) : 0;
             rig.handle().setVisible(false);
             box.handle().setVisible(false);
         }
@@ -129,8 +115,7 @@ public class FrogportVisual extends AbstractBlockEntityVisual<FrogportBlockEntit
         headPitch = Math.max(headPitch, blockEntity.manualOpenAnimationProgress.getValue(partialTicks) * 60);
         tongueLength = Math.max(tongueLength, blockEntity.manualOpenAnimationProgress.getValue(partialTicks) * 0.25f);
         if (yaw != lastYaw) {
-            body.setIdentityTransform().translate(getVisualPosition()).center().rotateYDegrees(yaw).uncenter()
-                .setChanged();
+            body.setIdentityTransform().translate(getVisualPosition()).center().rotateYDegrees(yaw).uncenter().setChanged();
 
             // Save the base pose to avoid recalculating it twice every frame
             basePose.set(body.pose).translate(8 / 16f, 10 / 16f, 11 / 16f);
@@ -144,8 +129,7 @@ public class FrogportVisual extends AbstractBlockEntityVisual<FrogportBlockEntit
         }
 
         if (headPitch != lastHeadPitch) {
-            head.setTransform(basePose).rotateXDegrees(headPitch).translateBack(8 / 16f, 10 / 16f, 11 / 16f)
-                .setChanged();
+            head.setTransform(basePose).rotateXDegrees(headPitch).translateBack(8 / 16f, 10 / 16f, 11 / 16f).setChanged();
 
             lastHeadPitch = headPitch;
         }
@@ -162,10 +146,7 @@ public class FrogportVisual extends AbstractBlockEntityVisual<FrogportBlockEntit
     public void updateGoggles() {
         if (blockEntity.goggles && !lastGoggles) {
             head.delete();
-            head = instancerProvider().instancer(
-                InstanceTypes.TRANSFORMED,
-                Models.partial(AllPartialModels.FROGPORT_HEAD_GOGGLES)
-            ).createInstance();
+            head = instancerProvider().instancer(InstanceTypes.TRANSFORMED, Models.partial(AllPartialModels.FROGPORT_HEAD_GOGGLES)).createInstance();
             lastHeadPitch = -1;
             updateLight(0);
             lastGoggles = true;
@@ -173,24 +154,21 @@ public class FrogportVisual extends AbstractBlockEntityVisual<FrogportBlockEntit
 
         if (!blockEntity.goggles && lastGoggles) {
             head.delete();
-            head = instancerProvider().instancer(
-                InstanceTypes.TRANSFORMED,
-                Models.partial(AllPartialModels.FROGPORT_HEAD)
-            ).createInstance();
+            head = instancerProvider().instancer(InstanceTypes.TRANSFORMED, Models.partial(AllPartialModels.FROGPORT_HEAD)).createInstance();
             lastHeadPitch = -1;
             updateLight(0);
             lastGoggles = false;
         }
     }
 
-    private void renderPackage(Vec3 diff, float scale, float itemDistance) {
+    private void renderPackage(Vec3d diff, float scale, float itemDistance) {
         if (blockEntity.animatedPackage == null || scale < 0.45) {
             rig.handle().setVisible(false);
             box.handle().setVisible(false);
             return;
         }
-        Identifier key = BuiltInRegistries.ITEM.getKey(blockEntity.animatedPackage.getItem());
-        if (key == BuiltInRegistries.ITEM.getDefaultKey()) {
+        Identifier key = Registries.ITEM.getId(blockEntity.animatedPackage.getItem());
+        if (key == Registries.ITEM.getDefaultId()) {
             rig.handle().setVisible(false);
             box.handle().setVisible(false);
             return;
@@ -199,23 +177,19 @@ public class FrogportVisual extends AbstractBlockEntityVisual<FrogportBlockEntit
         boolean animating = blockEntity.isAnimationInProgress();
         boolean depositing = blockEntity.currentlyDepositing;
 
-        instancerProvider().instancer(InstanceTypes.TRANSFORMED, Models.partial(AllPartialModels.PACKAGES.get(key)))
-            .stealInstance(box);
+        instancerProvider().instancer(InstanceTypes.TRANSFORMED, Models.partial(AllPartialModels.PACKAGES.get(key))).stealInstance(box);
         box.handle().setVisible(true);
 
         box.setIdentityTransform().translate(getVisualPosition()).translate(0, 3 / 16f, 0)
-            .translate(diff.normalize().scale(itemDistance).subtract(0, animating && depositing ? 0.75 : 0, 0)).center()
-            .scale(scale).uncenter().setChanged();
+            .translate(diff.normalize().multiply(itemDistance).subtract(0, animating && depositing ? 0.75 : 0, 0)).center().scale(scale).uncenter()
+            .setChanged();
 
         if (!depositing) {
             rig.handle().setVisible(false);
             return;
         }
 
-        instancerProvider().instancer(
-            InstanceTypes.TRANSFORMED,
-            Models.partial(AllPartialModels.PACKAGE_RIGGING.get(key))
-        ).stealInstance(rig);
+        instancerProvider().instancer(InstanceTypes.TRANSFORMED, Models.partial(AllPartialModels.PACKAGE_RIGGING.get(key))).stealInstance(rig);
         rig.handle().setVisible(true);
 
         rig.pose.set(box.pose);

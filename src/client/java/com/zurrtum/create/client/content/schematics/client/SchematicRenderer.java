@@ -1,6 +1,5 @@
 package com.zurrtum.create.client.content.schematics.client;
 
-import com.mojang.blaze3d.vertex.PoseStack;
 import com.zurrtum.create.catnip.levelWrappers.SchematicLevel;
 import com.zurrtum.create.client.catnip.animation.AnimationTickHolder;
 import com.zurrtum.create.client.catnip.render.ShadedBlockSbbBuilder;
@@ -11,31 +10,31 @@ import com.zurrtum.create.client.foundation.render.BlockEntityRenderHelper;
 import com.zurrtum.create.client.foundation.render.BlockEntityRenderHelper.BlockEntityListRenderState;
 import com.zurrtum.create.client.infrastructure.model.WrapperBlockStateModel;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.ItemBlockRenderTypes;
-import net.minecraft.client.renderer.block.BlockRenderDispatcher;
-import net.minecraft.client.renderer.block.ModelBlockRenderer;
-import net.minecraft.client.renderer.block.model.BlockModelPart;
-import net.minecraft.client.renderer.block.model.BlockStateModel;
-import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
-import net.minecraft.client.renderer.feature.FeatureRenderDispatcher;
-import net.minecraft.client.renderer.texture.OverlayTexture;
-import net.minecraft.core.BlockPos;
-import net.minecraft.util.RandomSource;
-import net.minecraft.world.level.block.RenderShape;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.levelgen.structure.BoundingBox;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.block.BlockRenderType;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.render.BlockRenderLayer;
+import net.minecraft.client.render.OverlayTexture;
+import net.minecraft.client.render.RenderLayers;
+import net.minecraft.client.render.block.BlockModelRenderer;
+import net.minecraft.client.render.block.BlockRenderManager;
+import net.minecraft.client.render.command.RenderDispatcher;
+import net.minecraft.client.render.model.BlockModelPart;
+import net.minecraft.client.render.model.BlockStateModel;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.util.math.BlockBox;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.util.math.random.Random;
 
 import java.util.*;
 
 public class SchematicRenderer {
 
-    private static final ThreadLocal<ThreadLocalObjects> THREAD_LOCAL_OBJECTS = ThreadLocal.withInitial(
-        ThreadLocalObjects::new);
+    private static final ThreadLocal<ThreadLocalObjects> THREAD_LOCAL_OBJECTS = ThreadLocal.withInitial(ThreadLocalObjects::new);
 
-    private final Map<ChunkSectionLayer, SuperByteBuffer> bufferCache = new LinkedHashMap<>(ChunkSectionLayer.values().length);
+    private final Map<BlockRenderLayer, SuperByteBuffer> bufferCache = new LinkedHashMap<>(BlockRenderLayer.values().length);
     private boolean changed;
     protected final SchematicLevel schematic;
     private final BlockPos anchor;
@@ -58,23 +57,15 @@ public class SchematicRenderer {
         changed = true;
     }
 
-    public void render(
-        Minecraft mc,
-        PoseStack ms,
-        SuperRenderTypeBuffer buffers,
-        SchematicTransformation transformation,
-        Vec3 camera
-    ) {
-        if (mc.level == null || mc.player == null) {
+    public void render(MinecraftClient mc, MatrixStack ms, SuperRenderTypeBuffer buffers, SchematicTransformation transformation, Vec3d camera) {
+        if (mc.world == null || mc.player == null)
             return;
-        }
-        if (changed) {
+        if (changed)
             redraw(mc);
-        }
         changed = false;
 
         bufferCache.forEach((layer, buffer) -> {
-            buffer.renderInto(ms.last(), buffers.getBuffer(layer));
+            buffer.renderInto(ms.peek(), buffers.getBuffer(layer));
         });
         scratchErroredBlockEntities.clear();
         BlockEntityListRenderState renderState = BlockEntityRenderHelper.getBlockEntitiesRenderState(
@@ -89,92 +80,78 @@ public class SchematicRenderer {
             AnimationTickHolder.getPartialTicks()
         );
         if (renderState != null) {
-            FeatureRenderDispatcher renderDispatcher = Minecraft.getInstance().gameRenderer.getFeatureRenderDispatcher();
-            renderState.render(
-                ms,
-                renderDispatcher.getSubmitNodeStorage(),
-                mc.gameRenderer.getLevelRenderState().cameraRenderState
-            );
+            RenderDispatcher renderDispatcher = MinecraftClient.getInstance().gameRenderer.getEntityRenderDispatcher();
+            renderState.render(ms, renderDispatcher.getQueue(), mc.gameRenderer.getEntityRenderStates().cameraRenderState);
         }
 
         // Don't bother looping over errored BEs again.
         shouldRenderBlockEntities.andNot(scratchErroredBlockEntities);
     }
 
-    protected void redraw(Minecraft mc) {
+    protected void redraw(MinecraftClient mc) {
         bufferCache.clear();
 
-        for (ChunkSectionLayer layer : ChunkSectionLayer.values()) {
+        for (BlockRenderLayer layer : BlockRenderLayer.values()) {
             SuperByteBuffer buffer = drawLayer(mc, layer);
-            if (!buffer.isEmpty()) {
+            if (!buffer.isEmpty())
                 bufferCache.put(layer, buffer);
-            }
         }
     }
 
     @SuppressWarnings("removal")
-    protected SuperByteBuffer drawLayer(Minecraft mc, ChunkSectionLayer layer) {
-        BlockRenderDispatcher dispatcher = mc.getBlockRenderer();
-        ModelBlockRenderer renderer = dispatcher.getModelRenderer();
+    protected SuperByteBuffer drawLayer(MinecraftClient mc, BlockRenderLayer layer) {
+        BlockRenderManager dispatcher = mc.getBlockRenderManager();
+        BlockModelRenderer renderer = dispatcher.getModelRenderer();
         ThreadLocalObjects objects = THREAD_LOCAL_OBJECTS.get();
 
-        PoseStack poseStack = objects.poseStack;
-        RandomSource random = objects.random;
-        BlockPos.MutableBlockPos mutableBlockPos = objects.mutableBlockPos;
+        MatrixStack poseStack = objects.poseStack;
+        Random random = objects.random;
+        BlockPos.Mutable mutableBlockPos = objects.mutableBlockPos;
         SchematicLevel renderWorld = schematic;
-        BoundingBox bounds = renderWorld.getBounds();
+        BlockBox bounds = renderWorld.getBounds();
 
         ShadedBlockSbbBuilder sbbBuilder = objects.sbbBuilder;
         sbbBuilder.begin();
 
         renderWorld.renderMode = true;
-        ModelBlockRenderer.enableCaching();
-        for (BlockPos localPos : BlockPos.betweenClosed(
-            bounds.minX(),
-            bounds.minY(),
-            bounds.minZ(),
-            bounds.maxX(),
-            bounds.maxY(),
-            bounds.maxZ()
+        BlockModelRenderer.enableBrightnessCache();
+        for (BlockPos localPos : BlockPos.iterate(
+            bounds.getMinX(),
+            bounds.getMinY(),
+            bounds.getMinZ(),
+            bounds.getMaxX(),
+            bounds.getMaxY(),
+            bounds.getMaxZ()
         )) {
-            BlockPos pos = mutableBlockPos.setWithOffset(localPos, anchor);
+            BlockPos pos = mutableBlockPos.set(localPos, anchor);
             BlockState state = renderWorld.getBlockState(pos);
 
-            if (state.getRenderShape() == RenderShape.MODEL && ItemBlockRenderTypes.getChunkRenderType(state) == layer) {
-                long seed = state.getSeed(pos);
-                BlockStateModel model = dispatcher.getBlockModel(state);
+            if (state.getRenderType() == BlockRenderType.MODEL && RenderLayers.getBlockLayer(state) == layer) {
+                long seed = state.getRenderingSeed(pos);
+                BlockStateModel model = dispatcher.getModel(state);
                 random.setSeed(seed);
-                poseStack.pushPose();
+                poseStack.push();
                 poseStack.translate(localPos.getX(), localPos.getY(), localPos.getZ());
                 List<BlockModelPart> parts = new ObjectArrayList<>();
                 if (WrapperBlockStateModel.unwrapCompat(model) instanceof WrapperBlockStateModel wrapper) {
                     wrapper.addPartsWithInfo(renderWorld, pos, state, random, parts);
                 } else {
-                    model.collectParts(random, parts);
+                    model.addParts(random, parts);
                 }
-                renderer.tesselateBlock(
-                    renderWorld,
-                    parts,
-                    state,
-                    pos,
-                    poseStack,
-                    sbbBuilder,
-                    true,
-                    OverlayTexture.NO_OVERLAY
-                );
-                poseStack.popPose();
+                renderer.render(renderWorld, parts, state, pos, poseStack, sbbBuilder, true, OverlayTexture.DEFAULT_UV);
+                poseStack.pop();
             }
         }
-        ModelBlockRenderer.clearCache();
+        BlockModelRenderer.disableBrightnessCache();
         renderWorld.renderMode = false;
 
         return sbbBuilder.end();
     }
 
     private static class ThreadLocalObjects {
-        public final PoseStack poseStack = new PoseStack();
-        public final RandomSource random = RandomSource.createNewThreadLocalInstance();
-        public final BlockPos.MutableBlockPos mutableBlockPos = new BlockPos.MutableBlockPos();
+        public final MatrixStack poseStack = new MatrixStack();
+        public final Random random = Random.createLocal();
+        public final BlockPos.Mutable mutableBlockPos = new BlockPos.Mutable();
         @SuppressWarnings("removal")
         public final ShadedBlockSbbBuilder sbbBuilder = ShadedBlockSbbBuilder.create();
     }

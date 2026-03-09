@@ -2,111 +2,110 @@ package com.zurrtum.create.client.infrastructure.model;
 
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.math.Axis;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import com.zurrtum.create.AllDataComponents;
 import com.zurrtum.create.client.catnip.animation.AnimationTickHolder;
 import com.zurrtum.create.infrastructure.component.SandPaperItemComponent;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.multiplayer.ClientLevel;
-import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.client.renderer.Sheets;
-import net.minecraft.client.renderer.SubmitNodeCollector;
-import net.minecraft.client.renderer.block.model.BakedQuad;
-import net.minecraft.client.renderer.block.model.TextureSlots;
-import net.minecraft.client.renderer.item.*;
-import net.minecraft.client.renderer.item.ItemStackRenderState.LayerRenderState;
-import net.minecraft.client.renderer.rendertype.RenderType;
-import net.minecraft.client.renderer.special.SpecialModelRenderer;
-import net.minecraft.client.resources.model.BlockModelRotation;
-import net.minecraft.client.resources.model.ModelBaker;
-import net.minecraft.client.resources.model.ResolvedModel;
-import net.minecraft.resources.Identifier;
-import net.minecraft.util.Mth;
-import net.minecraft.world.entity.ItemOwner;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemDisplayContext;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.item.ItemModelManager;
+import net.minecraft.client.network.ClientPlayerEntity;
+import net.minecraft.client.render.RenderLayer;
+import net.minecraft.client.render.TexturedRenderLayers;
+import net.minecraft.client.render.command.OrderedRenderCommandQueue;
+import net.minecraft.client.render.item.ItemRenderState;
+import net.minecraft.client.render.item.ItemRenderState.LayerRenderState;
+import net.minecraft.client.render.item.model.BasicItemModel;
+import net.minecraft.client.render.item.model.ItemModel;
+import net.minecraft.client.render.item.model.special.SpecialModelRenderer;
+import net.minecraft.client.render.model.*;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.client.world.ClientWorld;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.item.ItemDisplayContext;
+import net.minecraft.item.ItemStack;
+import net.minecraft.util.HeldItemContext;
+import net.minecraft.util.Identifier;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.RotationAxis;
 import org.jetbrains.annotations.Nullable;
-import org.joml.Vector3fc;
+import org.joml.Vector3f;
 
 import java.util.List;
-import java.util.function.Consumer;
+import java.util.Set;
 
 import static com.zurrtum.create.Create.MOD_ID;
 
 public class SandPaperModel implements ItemModel, SpecialModelRenderer<SandPaperModel.RenderData> {
-    public static final Identifier ID = Identifier.fromNamespaceAndPath(MOD_ID, "model/sand_paper");
+    public static final Identifier ID = Identifier.of(MOD_ID, "model/sand_paper");
 
-    private final RenderType layer = Sheets.translucentItemSheet();
+    private final RenderLayer layer = TexturedRenderLayers.getItemEntityTranslucentCull();
     private final List<BakedQuad> quads;
-    private final ModelRenderProperties settings;
-    private final Supplier<Vector3fc[]> vector;
+    private final ModelSettings settings;
+    private final Supplier<Vector3f[]> vector;
 
-    public SandPaperModel(List<BakedQuad> quads, ModelRenderProperties settings) {
+    public SandPaperModel(List<BakedQuad> quads, ModelSettings settings) {
         this.quads = quads;
         this.settings = settings;
-        this.vector = Suppliers.memoize(() -> BlockModelWrapper.computeExtents(this.quads));
+        this.vector = Suppliers.memoize(() -> BasicItemModel.bakeQuads(this.quads));
     }
 
     @Override
     public void update(
-        ItemStackRenderState state,
+        ItemRenderState state,
         ItemStack stack,
-        ItemModelResolver resolver,
+        ItemModelManager resolver,
         ItemDisplayContext displayContext,
-        @Nullable ClientLevel world,
-        @Nullable ItemOwner ctx,
+        @Nullable ClientWorld world,
+        @Nullable HeldItemContext ctx,
         int seed
     ) {
-        state.appendModelIdentityElement(this);
-        state.setAnimated();
-        ItemStackRenderState.LayerRenderState layerRenderState = state.newLayer();
-        layerRenderState.setRenderType(layer);
-        layerRenderState.setExtents(vector);
-        settings.applyToLayer(layerRenderState, displayContext);
-        layerRenderState.prepareQuadList().addAll(quads);
+        state.addModelKey(this);
+        state.markAnimated();
+        ItemRenderState.LayerRenderState layerRenderState = state.newLayer();
+        layerRenderState.setRenderLayer(layer);
+        layerRenderState.setVertices(vector);
+        settings.addSettings(layerRenderState, displayContext);
+        layerRenderState.getQuads().addAll(quads);
 
         RenderData data = new RenderData();
         data.state = layerRenderState;
-        Player entity;
-        if (ctx instanceof Player player) {
-            data.itemInUseCount = player.getUseItemRemainingTicks();
+        PlayerEntity entity;
+        if (ctx instanceof PlayerEntity player) {
+            data.itemInUseCount = player.getItemUseTimeLeft();
             entity = player;
         } else {
-            LocalPlayer player = Minecraft.getInstance().player;
-            data.itemInUseCount = player.getUseItemRemainingTicks();
+            ClientPlayerEntity player = MinecraftClient.getInstance().player;
+            data.itemInUseCount = player.getItemUseTimeLeft();
             entity = player;
         }
 
         SandPaperItemComponent component = stack.get(AllDataComponents.SAND_PAPER_POLISHING);
         if (component != null) {
-            int maxUseTime = stack.getUseDuration(entity);
-            boolean jeiMode = stack.has(AllDataComponents.SAND_PAPER_JEI);
+            int maxUseTime = stack.getMaxUseTime(entity);
+            boolean jeiMode = stack.contains(AllDataComponents.SAND_PAPER_JEI);
             float partialTicks = AnimationTickHolder.getPartialTicks();
             float time = (float) (!jeiMode ? data.itemInUseCount : (-AnimationTickHolder.getTicks()) % maxUseTime) - partialTicks + 1.0F;
             data.reverseBobbing = time / (float) maxUseTime < 0.8F;
             if (data.reverseBobbing) {
-                data.bobbing = -Mth.abs(Mth.cos(time / 4.0F * (float) Math.PI) * 0.1F);
+                data.bobbing = -MathHelper.abs(MathHelper.cos(time / 4.0F * (float) Math.PI) * 0.1F);
             }
 
             ItemStack toPolish = component.item();
-            data.item = new ItemStackRenderState();
+            data.item = new ItemRenderState();
             data.item.displayContext = displayContext;
-            resolver.appendItemLayers(data.item, toPolish, ItemDisplayContext.GUI, world, ctx, seed);
+            resolver.update(data.item, toPolish, ItemDisplayContext.GUI, world, ctx, seed);
         }
 
-        layerRenderState.setupSpecialModel(this, data);
+        layerRenderState.setSpecialModel(this, data);
     }
 
     @Override
-    public void submit(
+    public void render(
         RenderData data,
         ItemDisplayContext displayContext,
-        PoseStack matrices,
-        SubmitNodeCollector queue,
+        MatrixStack matrices,
+        OrderedRenderCommandQueue queue,
         int light,
         int overlay,
         boolean glint,
@@ -117,41 +116,31 @@ public class SandPaperModel implements ItemModel, SpecialModelRenderer<SandPaper
         boolean leftHand = displayContext == ItemDisplayContext.FIRST_PERSON_LEFT_HAND;
         boolean firstPerson = leftHand || displayContext == ItemDisplayContext.FIRST_PERSON_RIGHT_HAND;
 
-        matrices.pushPose();
+        matrices.push();
         if (firstPerson && data.itemInUseCount > 0) {
             int modifier = leftHand ? -1 : 1;
             matrices.translate(0.5F, 0.5F, 0.5F);
             matrices.translate(modifier * .5f, 0, -.25f);
-            matrices.mulPose(Axis.ZP.rotationDegrees(modifier * 40));
-            matrices.mulPose(Axis.XP.rotationDegrees(modifier * 10));
-            matrices.mulPose(Axis.YP.rotationDegrees(modifier * 90));
+            matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(modifier * 40));
+            matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(modifier * 10));
+            matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(modifier * 90));
             matrices.translate(-0.5F, -0.5F, -0.5F);
         }
-        queue.submitItem(
-            matrices,
-            displayContext,
-            light,
-            overlay,
-            0,
-            state.tintLayers,
-            state.prepareQuadList(),
-            state.renderType,
-            state.foilType
-        );
-        matrices.popPose();
+        queue.submitItem(matrices, displayContext, light, overlay, 0, state.tints, state.getQuads(), state.renderLayer, state.glint);
+        matrices.pop();
 
         if (data.item == null) {
             return;
         }
 
-        matrices.pushPose();
+        matrices.push();
         matrices.translate(0.5F, 0.5F, 0.5F);
         if (displayContext == ItemDisplayContext.GUI) {
             matrices.translate(0.0F, .2f, 1.0F);
             matrices.scale(.75f, .75f, .75f);
         } else {
             int modifier = leftHand ? -1 : 1;
-            matrices.mulPose(Axis.YP.rotationDegrees(modifier * 40));
+            matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(modifier * 40));
         }
         if (data.reverseBobbing) {
             if (displayContext == ItemDisplayContext.GUI) {
@@ -160,49 +149,49 @@ public class SandPaperModel implements ItemModel, SpecialModelRenderer<SandPaper
                 matrices.translate(0.0F, data.bobbing, 0.0F);
             }
         }
-        data.item.submit(matrices, queue, light, overlay, 0);
-        matrices.popPose();
+        data.item.render(matrices, queue, light, overlay, 0);
+        matrices.pop();
     }
 
     @Override
-    public void getExtents(Consumer<Vector3fc> output) {
+    public void collectVertices(Set<Vector3f> vertices) {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public RenderData extractArgument(ItemStack stack) {
+    public RenderData getData(ItemStack stack) {
         throw new UnsupportedOperationException();
     }
 
     public static class RenderData {
         LayerRenderState state;
-        ItemStackRenderState item;
+        ItemRenderState item;
         int itemInUseCount;
         boolean reverseBobbing;
         float bobbing;
     }
 
     public record Unbaked(Identifier model) implements ItemModel.Unbaked {
-        public static final MapCodec<Unbaked> CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(Identifier.CODEC.fieldOf(
-            "model").forGetter(Unbaked::model)).apply(instance, Unbaked::new));
+        public static final MapCodec<Unbaked> CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(Identifier.CODEC.fieldOf("model")
+            .forGetter(Unbaked::model)).apply(instance, Unbaked::new));
 
         @Override
-        public MapCodec<Unbaked> type() {
+        public MapCodec<Unbaked> getCodec() {
             return CODEC;
         }
 
         @Override
-        public void resolveDependencies(Resolver resolver) {
+        public void resolve(Resolver resolver) {
             resolver.markDependency(model);
         }
 
         @Override
-        public ItemModel bake(ItemModel.BakingContext context) {
-            ModelBaker baker = context.blockModelBaker();
-            ResolvedModel model = baker.getModel(this.model);
-            TextureSlots textures = model.getTopTextureSlots();
-            List<BakedQuad> quads = model.bakeTopGeometry(textures, baker, BlockModelRotation.IDENTITY).getAll();
-            ModelRenderProperties settings = ModelRenderProperties.fromResolvedModel(baker, model, textures);
+        public ItemModel bake(ItemModel.BakeContext context) {
+            Baker baker = context.blockModelBaker();
+            BakedSimpleModel model = baker.getModel(this.model);
+            ModelTextures textures = model.getTextures();
+            List<BakedQuad> quads = model.bakeGeometry(textures, baker, ModelRotation.X0_Y0).getAllQuads();
+            ModelSettings settings = ModelSettings.resolveSettings(baker, model, textures);
             return new SandPaperModel(quads, settings);
         }
     }

@@ -4,10 +4,10 @@ import com.zurrtum.create.AllBlockEntityTypes;
 import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.foundation.blockEntity.SmartBlockEntity;
 import com.zurrtum.create.foundation.blockEntity.behaviour.filtering.ServerFilteringBehaviour;
-import net.minecraft.core.BlockPos;
-import net.minecraft.world.Clearable;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.block.BlockState;
+import net.minecraft.item.ItemStack;
+import net.minecraft.util.Clearable;
+import net.minecraft.util.math.BlockPos;
 
 import java.util.List;
 
@@ -25,7 +25,7 @@ public class ItemHatchBlockEntity extends SmartBlockEntity implements Clearable 
     }
 
     @Override
-    public void clearContent() {
+    public void clear() {
         filtering.setFilter(ItemStack.EMPTY);
     }
 }

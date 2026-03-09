@@ -5,14 +5,9 @@
 
 package com.zurrtum.create.client.model;
 
-import net.minecraft.client.renderer.block.model.ItemTransforms;
-import net.minecraft.client.renderer.block.model.SimpleUnbakedGeometry;
-import net.minecraft.client.renderer.block.model.TextureSlots;
-import net.minecraft.client.resources.model.ModelBaker;
-import net.minecraft.client.resources.model.ModelDebugName;
-import net.minecraft.client.resources.model.ModelState;
-import net.minecraft.client.resources.model.UnbakedModel;
-import net.minecraft.resources.Identifier;
+import net.minecraft.client.render.model.*;
+import net.minecraft.client.render.model.json.ModelTransformation;
+import net.minecraft.util.Identifier;
 import org.jetbrains.annotations.Nullable;
 
 /**
@@ -23,7 +18,7 @@ import org.jetbrains.annotations.Nullable;
 public abstract class AbstractUnbakedModel implements UnbakedModel {
     /**
      * Holds the standard top-level model parameters except elements.
-     * {@link SimpleUnbakedGeometry#bake(TextureSlots, ModelBaker, ModelState, ModelDebugName)}
+     * {@link UnbakedGeometry#bake(ModelTextures, Baker, ModelBakeSettings, SimpleModel)}
      * must always use the values given as parameters instead of accessing this parameter directly in order to
      * take values collected along the model's parent chain into account.
      */
@@ -47,12 +42,12 @@ public abstract class AbstractUnbakedModel implements UnbakedModel {
 
     @Nullable
     @Override
-    public ItemTransforms transforms() {
+    public ModelTransformation transformations() {
         return this.parameters.itemTransforms();
     }
 
     @Override
-    public TextureSlots.Data textureSlots() {
+    public ModelTextures.Textures textures() {
         return this.parameters.textures();
     }
 

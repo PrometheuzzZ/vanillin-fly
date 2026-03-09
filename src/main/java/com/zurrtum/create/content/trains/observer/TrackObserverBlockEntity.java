@@ -10,14 +10,14 @@ import com.zurrtum.create.content.trains.graph.EdgePointType;
 import com.zurrtum.create.content.trains.track.TrackTargetingBehaviour;
 import com.zurrtum.create.foundation.blockEntity.SmartBlockEntity;
 import com.zurrtum.create.foundation.blockEntity.behaviour.filtering.ServerFilteringBehaviour;
-import net.minecraft.core.BlockPos;
-import net.minecraft.world.Clearable;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.item.ItemStack;
+import net.minecraft.util.Clearable;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Box;
+import net.minecraft.util.math.Vec3d;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
@@ -42,31 +42,26 @@ public class TrackObserverBlockEntity extends SmartBlockEntity implements Transf
     }
 
     private void onFilterChanged(ItemStack newFilter) {
-        if (level.isClientSide()) {
+        if (world.isClient())
             return;
-        }
         TrackObserver observer = getObserver();
-        if (observer != null) {
-            observer.setFilterAndNotify(level, newFilter);
-        }
+        if (observer != null)
+            observer.setFilterAndNotify(world, newFilter);
     }
 
     @Override
     public void tick() {
         super.tick();
 
-        if (level.isClientSide()) {
+        if (world.isClient())
             return;
-        }
 
         boolean shouldBePowered = false;
         TrackObserver observer = getObserver();
-        if (observer != null) {
+        if (observer != null)
             shouldBePowered = observer.isActivated();
-        }
-        if (isBlockPowered() == shouldBePowered) {
+        if (isBlockPowered() == shouldBePowered)
             return;
-        }
 
         if (observer != null) {
             AbstractComputerBehaviour computer = AbstractComputerBehaviour.get(this);
@@ -75,15 +70,10 @@ public class TrackObserverBlockEntity extends SmartBlockEntity implements Transf
             }
         }
 
-        BlockState blockState = getBlockState();
-        if (blockState.hasProperty(TrackObserverBlock.POWERED)) {
-            level.setBlock(
-                worldPosition,
-                blockState.setValue(TrackObserverBlock.POWERED, shouldBePowered),
-                Block.UPDATE_ALL
-            );
-        }
-        DisplayLinkBlock.notifyGatherers(level, worldPosition);
+        BlockState blockState = getCachedState();
+        if (blockState.contains(TrackObserverBlock.POWERED))
+            world.setBlockState(pos, blockState.with(TrackObserverBlock.POWERED, shouldBePowered), Block.NOTIFY_ALL);
+        DisplayLinkBlock.notifyGatherers(world, pos);
     }
 
     @Nullable
@@ -96,15 +86,12 @@ public class TrackObserverBlockEntity extends SmartBlockEntity implements Transf
     }
 
     public boolean isBlockPowered() {
-        return getBlockState().getValueOrElse(TrackObserverBlock.POWERED, false);
+        return getCachedState().get(TrackObserverBlock.POWERED, false);
     }
 
     @Override
-    protected AABB createRenderBoundingBox() {
-        return new AABB(
-            Vec3.atLowerCornerOf(worldPosition),
-            Vec3.atLowerCornerOf(edgePoint.getGlobalPosition())
-        ).inflate(2);
+    protected Box createRenderBoundingBox() {
+        return new Box(Vec3d.of(pos), Vec3d.of(edgePoint.getGlobalPosition())).expand(2);
     }
 
     @Override
@@ -113,7 +100,7 @@ public class TrackObserverBlockEntity extends SmartBlockEntity implements Transf
     }
 
     @Override
-    public void clearContent() {
+    public void clear() {
         filtering.setFilter(ItemStack.EMPTY);
     }
 }

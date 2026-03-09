@@ -15,19 +15,19 @@ import com.zurrtum.create.content.trains.schedule.destination.DestinationInstruc
 import com.zurrtum.create.content.trains.schedule.destination.ScheduleInstruction;
 import com.zurrtum.create.content.trains.station.GlobalStation;
 import com.zurrtum.create.foundation.codec.CreateCodecs;
-import net.minecraft.core.HolderLookup;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.network.chat.CommonComponents;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.util.Mth;
-import net.minecraft.util.ProblemReporter;
-import net.minecraft.util.StringRepresentable;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.storage.TagValueOutput;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NbtCompound;
+import net.minecraft.registry.RegistryWrapper;
+import net.minecraft.screen.ScreenTexts;
+import net.minecraft.storage.NbtWriteView;
+import net.minecraft.storage.ReadView;
+import net.minecraft.storage.WriteView;
+import net.minecraft.text.MutableText;
+import net.minecraft.text.Text;
+import net.minecraft.util.ErrorReporter;
+import net.minecraft.util.StringIdentifiable;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.world.World;
 
 import java.util.*;
 
@@ -36,13 +36,15 @@ public class ScheduleRuntime {
     private static final int TBD = -1;
     private static final int INVALID = -2;
 
-    public enum State implements StringRepresentable {
-        PRE_TRANSIT, IN_TRANSIT, POST_TRANSIT;
+    public enum State implements StringIdentifiable {
+        PRE_TRANSIT,
+        IN_TRANSIT,
+        POST_TRANSIT;
 
-        public static final Codec<State> CODEC = StringRepresentable.fromEnum(State::values);
+        public static final Codec<State> CODEC = StringIdentifiable.createCodec(State::values);
 
         @Override
-        public String getSerializedName() {
+        public String asString() {
             return name().toLowerCase(Locale.ROOT);
         }
     }
@@ -57,7 +59,7 @@ public class ScheduleRuntime {
     public State state;
 
     public List<Integer> conditionProgress;
-    public List<CompoundTag> conditionContext;
+    public List<NbtCompound> conditionContext;
     public String currentTitle;
 
     public int ticksInTransit;
@@ -78,76 +80,64 @@ public class ScheduleRuntime {
     }
 
     public void destinationReached() {
-        if (state != State.IN_TRANSIT) {
+        if (state != State.IN_TRANSIT)
             return;
-        }
         state = State.POST_TRANSIT;
         conditionProgress.clear();
         conditionContext.clear();
         displayLinkUpdateRequested = true;
-        for (Carriage carriage : train.carriages) {
+        for (Carriage carriage : train.carriages)
             carriage.storage.resetIdleCargoTracker();
-        }
 
         if (ticksInTransit > 0) {
             int current = predictionTicks.get(currentEntry);
-            if (current > 0) {
+            if (current > 0)
                 ticksInTransit = (current + ticksInTransit) / 2;
-            }
             predictionTicks.set(currentEntry, ticksInTransit);
         }
 
-        if (currentEntry >= schedule.entries.size()) {
+        if (currentEntry >= schedule.entries.size())
             return;
-        }
         List<List<ScheduleWaitCondition>> conditions = schedule.entries.get(currentEntry).conditions;
         for (int i = 0; i < conditions.size(); i++) {
             conditionProgress.add(0);
-            conditionContext.add(new CompoundTag());
+            conditionContext.add(new NbtCompound());
         }
     }
 
     public void transitInterrupted() {
-        if (schedule == null || state != State.IN_TRANSIT) {
+        if (schedule == null || state != State.IN_TRANSIT)
             return;
-        }
         state = State.PRE_TRANSIT;
         cooldown = 0;
     }
 
-    public void tick(Level level) {
-        if (schedule == null) {
+    public void tick(World level) {
+        if (schedule == null)
             return;
-        }
-        if (paused) {
+        if (paused)
             return;
-        }
-        if (train.derailed) {
+        if (train.derailed)
             return;
-        }
         if (train.navigation.destination != null) {
             ticksInTransit++;
             return;
         }
 
-        if (checkEndOfScheduleReached()) {
+        if (checkEndOfScheduleReached())
             return;
-        }
-        if (cooldown-- > 0) {
+        if (cooldown-- > 0)
             return;
-        }
-        if (state == State.IN_TRANSIT) {
+        if (state == State.IN_TRANSIT)
             return;
-        }
         if (state == State.POST_TRANSIT) {
             tickConditions(level);
             return;
         }
 
         DiscoveredPath nextPath = startCurrentInstruction(level);
-        if (nextPath == null) {
+        if (nextPath == null)
             return;
-        }
 
         train.status.successfulNavigation();
         if (nextPath.destination == train.getCurrentStation()) {
@@ -162,9 +152,8 @@ public class ScheduleRuntime {
     }
 
     private boolean checkEndOfScheduleReached() {
-        if (currentEntry < schedule.entries.size()) {
+        if (currentEntry < schedule.entries.size())
             return false;
-        }
 
         currentEntry = 0;
         if (!schedule.cyclic) {
@@ -174,7 +163,7 @@ public class ScheduleRuntime {
         return true;
     }
 
-    public void tickConditions(Level level) {
+    public void tickConditions(World level) {
         ScheduleEntry entry = schedule.entries.get(currentEntry);
         List<List<ScheduleWaitCondition>> conditions = entry.conditions;
 
@@ -194,28 +183,26 @@ public class ScheduleRuntime {
                 return;
             }
 
-            CompoundTag tag = conditionContext.get(i);
+            NbtCompound tag = conditionContext.get(i);
             ScheduleWaitCondition condition = list.get(progress);
-            int prevVersion = tag.getIntOr("StatusVersion", 0);
+            int prevVersion = tag.getInt("StatusVersion", 0);
 
             if (condition.tickCompletion(level, train, tag)) {
-                conditionContext.set(i, new CompoundTag());
+                conditionContext.set(i, new NbtCompound());
                 conditionProgress.set(i, progress + 1);
                 displayLinkUpdateRequested |= i == 0;
             }
 
-            displayLinkUpdateRequested |= i == 0 && prevVersion != tag.getIntOr("StatusVersion", 0);
+            displayLinkUpdateRequested |= i == 0 && prevVersion != tag.getInt("StatusVersion", 0);
         }
 
-        for (Carriage carriage : train.carriages) {
+        for (Carriage carriage : train.carriages)
             carriage.storage.tickIdleCargoTracker();
-        }
     }
 
-    public DiscoveredPath startCurrentInstruction(Level level) {
-        if (checkEndOfScheduleReached()) {
+    public DiscoveredPath startCurrentInstruction(World level) {
+        if (checkEndOfScheduleReached())
             return null;
-        }
 
         ScheduleEntry entry = schedule.entries.get(currentEntry);
         ScheduleInstruction instruction = entry.instruction;
@@ -225,7 +212,7 @@ public class ScheduleRuntime {
     public void setSchedule(Schedule schedule, boolean auto) {
         reset();
         this.schedule = schedule;
-        currentEntry = Mth.clamp(schedule.savedProgress, 0, schedule.entries.size() - 1);
+        currentEntry = MathHelper.clamp(schedule.savedProgress, 0, schedule.entries.size() - 1);
         paused = false;
         isAutoSchedule = auto;
         train.status.newSchedule();
@@ -265,33 +252,24 @@ public class ScheduleRuntime {
         // Current
         if (state == State.POST_TRANSIT || current >= entryCount) {
             GlobalStation currentStation = train.getCurrentStation();
-            if (currentStation != null) {
+            if (currentStation != null)
                 predictions.add(createPrediction(current, currentStation.name, currentTitle, 0));
-            }
             int departureTime = estimateStayDuration(current);
-            if (departureTime == INVALID) {
+            if (departureTime == INVALID)
                 accumulatedTime = INVALID;
-            } else {
+            else
                 accumulatedTime += departureTime;
-            }
 
         } else {
             GlobalStation destination = train.navigation.destination;
             if (destination != null) {
-                double speed = Math.min(
-                    train.throttle * train.maxSpeed(),
-                    (train.maxSpeed() + train.maxTurnSpeed()) / 2
-                );
+                double speed = Math.min(train.throttle * train.maxSpeed(), (train.maxSpeed() + train.maxTurnSpeed()) / 2);
                 int timeRemaining = (int) (train.navigation.distanceToDestination / speed) * 2;
 
                 if (predictionTicks.size() > current && train.navigation.distanceStartedAt != 0) {
                     float predictedTime = predictionTicks.get(current);
                     if (predictedTime > 0) {
-                        predictedTime *= Mth.clamp(
-                            train.navigation.distanceToDestination / train.navigation.distanceStartedAt,
-                            0,
-                            1
-                        );
+                        predictedTime *= MathHelper.clamp(train.navigation.distanceToDestination / train.navigation.distanceStartedAt, 0, 1);
                         timeRemaining = (timeRemaining + (int) predictedTime) / 2;
                     }
                 }
@@ -300,24 +278,21 @@ public class ScheduleRuntime {
                 predictions.add(createPrediction(current, destination.name, currentTitle, accumulatedTime));
 
                 int departureTime = estimateStayDuration(current);
-                if (departureTime != INVALID) {
+                if (departureTime != INVALID)
                     accumulatedTime += departureTime;
-                } else {
+                else
                     accumulatedTime = INVALID;
-                }
 
-            } else {
+            } else
                 predictForEntry(current, currentTitle, accumulatedTime, predictions);
-            }
         }
 
         // Upcoming
         String currentTitle = this.currentTitle;
         for (int i = 1; i < entryCount; i++) {
             int index = (i + current) % entryCount;
-            if (index == 0 && !schedule.cyclic) {
+            if (index == 0 && !schedule.cyclic)
                 break;
-            }
 
             if (schedule.entries.get(index).instruction instanceof ChangeTitleInstruction title) {
                 currentTitle = title.getScheduleTitle();
@@ -331,19 +306,12 @@ public class ScheduleRuntime {
         return predictions;
     }
 
-    private int predictForEntry(
-        int index,
-        String currentTitle,
-        int accumulatedTime,
-        Collection<TrainDeparturePrediction> predictions
-    ) {
+    private int predictForEntry(int index, String currentTitle, int accumulatedTime, Collection<TrainDeparturePrediction> predictions) {
         ScheduleEntry entry = schedule.entries.get(index);
-        if (!(entry.instruction instanceof DestinationInstruction filter)) {
+        if (!(entry.instruction instanceof DestinationInstruction filter))
             return accumulatedTime;
-        }
-        if (predictionTicks.size() <= currentEntry) {
+        if (predictionTicks.size() <= currentEntry)
             return accumulatedTime;
-        }
 
         int departureTime = estimateStayDuration(index);
 
@@ -355,28 +323,24 @@ public class ScheduleRuntime {
         int predictedTime = predictionTicks.get(index);
         accumulatedTime += predictedTime;
 
-        if (predictedTime == TBD) {
+        if (predictedTime == TBD)
             accumulatedTime = TBD;
-        }
 
         predictions.add(createPrediction(index, filter.getFilter(), currentTitle, accumulatedTime));
 
-        if (accumulatedTime != TBD) {
+        if (accumulatedTime != TBD)
             accumulatedTime += departureTime;
-        }
 
-        if (departureTime == INVALID) {
+        if (departureTime == INVALID)
             accumulatedTime = INVALID;
-        }
 
         return accumulatedTime;
     }
 
     private int estimateStayDuration(int index) {
         if (index >= schedule.entries.size()) {
-            if (!schedule.cyclic) {
+            if (!schedule.cyclic)
                 return INVALID;
-            }
             index = 0;
         }
 
@@ -385,9 +349,8 @@ public class ScheduleRuntime {
         for (List<ScheduleWaitCondition> list : scheduleEntry.conditions) {
             int total = 0;
             for (ScheduleWaitCondition condition : list) {
-                if (!(condition instanceof ScheduledDelay wait)) {
+                if (!(condition instanceof ScheduledDelay wait))
                     continue Columns;
-                }
                 total += wait.totalWaitTicks();
             }
             return total;
@@ -397,14 +360,13 @@ public class ScheduleRuntime {
     }
 
     private TrainDeparturePrediction createPrediction(int index, String destination, String currentTitle, int time) {
-        if (time == INVALID) {
+        if (time == INVALID)
             return null;
-        }
 
         int size = schedule.entries.size();
         if (index >= size) {
             if (!schedule.cyclic) {
-                return new TrainDeparturePrediction(train, time, CommonComponents.space(), destination);
+                return new TrainDeparturePrediction(train, time, ScreenTexts.space(), destination);
             }
             index %= size;
         }
@@ -414,28 +376,26 @@ public class ScheduleRuntime {
             for (int i = 1; i < size; i++) {
                 int j = (index + i) % size;
                 ScheduleEntry scheduleEntry = schedule.entries.get(j);
-                if (!(scheduleEntry.instruction instanceof DestinationInstruction instruction)) {
+                if (!(scheduleEntry.instruction instanceof DestinationInstruction instruction))
                     continue;
-                }
                 text = instruction.getFilter().replaceAll("\\*", "").trim();
                 break;
             }
         }
 
-        return new TrainDeparturePrediction(train, time, Component.literal(text), destination);
+        return new TrainDeparturePrediction(train, time, Text.literal(text), destination);
     }
 
-    public void write(ValueOutput view) {
+    public void write(WriteView view) {
         view.putInt("CurrentEntry", currentEntry);
         view.putBoolean("AutoSchedule", isAutoSchedule);
         view.putBoolean("Paused", paused);
         view.putBoolean("Completed", completed);
-        if (schedule != null) {
-            schedule.write(view.child("Schedule"));
-        }
-        view.store("State", State.CODEC, state);
+        if (schedule != null)
+            schedule.write(view.get("Schedule"));
+        view.put("State", State.CODEC, state);
         view.putIntArray("ConditionProgress", conditionProgress.stream().mapToInt(Integer::intValue).toArray());
-        view.store("ConditionContext", CreateCodecs.NBT_COMPOUND_LIST_CODEC, conditionContext);
+        view.put("ConditionContext", CreateCodecs.NBT_COMPOUND_LIST_CODEC, conditionContext);
         view.putIntArray("TransitTimes", predictionTicks.stream().mapToInt(Integer::intValue).toArray());
     }
 
@@ -445,9 +405,8 @@ public class ScheduleRuntime {
         map.add("AutoSchedule", ops.createBoolean(input.isAutoSchedule));
         map.add("Paused", ops.createBoolean(input.paused));
         map.add("Completed", ops.createBoolean(input.completed));
-        if (input.schedule != null) {
+        if (input.schedule != null)
             map.add("Schedule", Schedule.encode(input.schedule, ops, empty));
-        }
         map.add("State", input.state, State.CODEC);
         map.add("ConditionProgress", ops.createIntList(input.conditionProgress.stream().mapToInt(Integer::intValue)));
         map.add("ConditionContext", input.conditionContext, CreateCodecs.NBT_COMPOUND_LIST_CODEC);
@@ -455,15 +414,15 @@ public class ScheduleRuntime {
         return map.build(empty);
     }
 
-    public void read(ValueInput view) {
+    public void read(ReadView view) {
         reset();
-        paused = view.getBooleanOr("Paused", false);
-        completed = view.getBooleanOr("Completed", false);
-        isAutoSchedule = view.getBooleanOr("AutoSchedule", false);
-        currentEntry = Math.max(0, view.getIntOr("CurrentEntry", 0));
-        view.child("Schedule").ifPresent(scheduleView -> schedule = Schedule.read(scheduleView));
+        paused = view.getBoolean("Paused", false);
+        completed = view.getBoolean("Completed", false);
+        isAutoSchedule = view.getBoolean("AutoSchedule", false);
+        currentEntry = Math.max(0, view.getInt("CurrentEntry", 0));
+        view.getOptionalReadView("Schedule").ifPresent(scheduleView -> schedule = Schedule.read(scheduleView));
         state = view.read("State", State.CODEC).orElse(State.PRE_TRANSIT);
-        view.getIntArray("ConditionProgress").ifPresent(array -> {
+        view.getOptionalIntArray("ConditionProgress").ifPresent(array -> {
             for (int i : array) {
                 conditionProgress.add(i);
             }
@@ -472,7 +431,7 @@ public class ScheduleRuntime {
 
         if (schedule != null) {
             schedule.entries.forEach($ -> predictionTicks.add(TBD));
-            view.getIntArray("TransitTimes").ifPresent(readTransits -> {
+            view.getOptionalIntArray("TransitTimes").ifPresent(readTransits -> {
                 if (readTransits.length == schedule.entries.size()) {
                     for (int i = 0; i < readTransits.length; i++) {
                         predictionTicks.set(i, readTransits[i]);
@@ -489,13 +448,10 @@ public class ScheduleRuntime {
         completed = ops.getBooleanValue(map.get("Completed")).result().orElse(false);
         isAutoSchedule = ops.getBooleanValue(map.get("AutoSchedule")).result().orElse(false);
         currentEntry = Math.max(0, ops.getNumberValue(map.get("CurrentEntry"), 0).intValue());
-        Optional.ofNullable(map.get("Schedule"))
-            .ifPresent(scheduleView -> schedule = Schedule.decode(ops, scheduleView));
+        Optional.ofNullable(map.get("Schedule")).ifPresent(scheduleView -> schedule = Schedule.decode(ops, scheduleView));
         state = State.CODEC.parse(ops, map.get("State")).result().orElse(State.PRE_TRANSIT);
-        ops.getIntStream(map.get("ConditionProgress"))
-            .ifSuccess(stream -> stream.forEach(i -> conditionProgress.add(i)));
-        CreateCodecs.NBT_COMPOUND_LIST_CODEC.parse(ops, map.get("ConditionContext"))
-            .ifSuccess(list -> conditionContext.addAll(list));
+        ops.getIntStream(map.get("ConditionProgress")).ifSuccess(stream -> stream.forEach(i -> conditionProgress.add(i)));
+        CreateCodecs.NBT_COMPOUND_LIST_CODEC.parse(ops, map.get("ConditionContext")).ifSuccess(list -> conditionContext.addAll(list));
 
         if (schedule != null) {
             schedule.entries.forEach($ -> predictionTicks.add(TBD));
@@ -510,19 +466,15 @@ public class ScheduleRuntime {
         }
     }
 
-    public ItemStack returnSchedule(HolderLookup.Provider registries) {
-        if (schedule == null) {
+    public ItemStack returnSchedule(RegistryWrapper.WrapperLookup registries) {
+        if (schedule == null)
             return ItemStack.EMPTY;
-        }
-        ItemStack stack = AllItems.SCHEDULE.getDefaultInstance();
+        ItemStack stack = AllItems.SCHEDULE.getDefaultStack();
         schedule.savedProgress = currentEntry;
-        try (ProblemReporter.ScopedCollector logging = new ProblemReporter.ScopedCollector(
-            () -> "Schedule",
-            Create.LOGGER
-        )) {
-            TagValueOutput view = TagValueOutput.createWithContext(logging, registries);
+        try (ErrorReporter.Logging logging = new ErrorReporter.Logging(() -> "Schedule", Create.LOGGER)) {
+            NbtWriteView view = NbtWriteView.create(logging, registries);
             schedule.write(view);
-            stack.set(AllDataComponents.TRAIN_SCHEDULE, view.buildResult());
+            stack.set(AllDataComponents.TRAIN_SCHEDULE, view.getNbt());
         }
         stack = isAutoSchedule ? ItemStack.EMPTY : stack;
         discardSchedule();
@@ -533,19 +485,17 @@ public class ScheduleRuntime {
         schedule = present ? new Schedule() : null;
     }
 
-    public MutableComponent getWaitingStatus(Level level) {
+    public MutableText getWaitingStatus(World level) {
         List<List<ScheduleWaitCondition>> conditions = schedule.entries.get(currentEntry).conditions;
-        if (conditions.isEmpty() || conditionProgress.isEmpty() || conditionContext.isEmpty()) {
-            return Component.empty();
-        }
+        if (conditions.isEmpty() || conditionProgress.isEmpty() || conditionContext.isEmpty())
+            return Text.empty();
 
         List<ScheduleWaitCondition> list = conditions.getFirst();
         int progress = conditionProgress.getFirst();
-        if (progress >= list.size()) {
-            return Component.empty();
-        }
+        if (progress >= list.size())
+            return Text.empty();
 
-        CompoundTag tag = conditionContext.getFirst();
+        NbtCompound tag = conditionContext.getFirst();
         ScheduleWaitCondition condition = list.get(progress);
         return condition.getWaitingStatus(level, train, tag);
     }

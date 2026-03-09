@@ -5,8 +5,8 @@ import com.mojang.datafixers.util.Pair;
 import com.zurrtum.create.client.flywheel.backend.glsl.span.Span;
 import com.zurrtum.create.client.flywheel.backend.glsl.span.StringSpan;
 import com.zurrtum.create.client.flywheel.lib.util.ResourceUtil;
-import net.minecraft.IdentifierException;
-import net.minecraft.resources.Identifier;
+import net.minecraft.util.Identifier;
+import net.minecraft.util.InvalidIdentifierException;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
@@ -33,13 +33,7 @@ public class SourceFile implements SourceComponent {
 
     public final String finalSource;
 
-    private SourceFile(
-        Identifier name,
-        SourceLines source,
-        ImmutableList<Import> imports,
-        List<SourceFile> included,
-        String finalSource
-    ) {
+    private SourceFile(Identifier name, SourceLines source, ImmutableList<Import> imports, List<SourceFile> included, String finalSource) {
         this.name = name;
         this.source = source;
         this.imports = imports;
@@ -48,20 +42,10 @@ public class SourceFile implements SourceComponent {
     }
 
     public static LoadResult empty(Identifier name) {
-        return new LoadResult.Success(new SourceFile(
-            name,
-            new SourceLines(name, ""),
-            ImmutableList.of(),
-            ImmutableList.of(),
-            ""
-        ));
+        return new LoadResult.Success(new SourceFile(name, new SourceLines(name, ""), ImmutableList.of(), ImmutableList.of(), ""));
     }
 
-    public static LoadResult parse(
-        Function<Identifier, LoadResult> sourceFinder,
-        Identifier name,
-        String stringSource
-    ) {
+    public static LoadResult parse(Function<Identifier, LoadResult> sourceFinder, Identifier name, String stringSource) {
         var source = new SourceLines(name, stringSource);
 
         var imports = Import.parseImports(source);
@@ -80,7 +64,7 @@ public class SourceFile implements SourceComponent {
             Identifier location;
             try {
                 location = ResourceUtil.parseFlywheelDefault(string);
-            } catch (IdentifierException e) {
+            } catch (InvalidIdentifierException e) {
                 failures.add(Pair.of(fileSpan, new LoadError.MalformedInclude(e)));
                 continue;
             }

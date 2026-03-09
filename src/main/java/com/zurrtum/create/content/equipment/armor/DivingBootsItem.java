@@ -2,20 +2,20 @@ package com.zurrtum.create.content.equipment.armor;
 
 import com.zurrtum.create.AllItems;
 import com.zurrtum.create.AllSynchedDatas;
-import net.minecraft.tags.FluidTags;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EquipmentSlot;
-import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.Pose;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.EntityPose;
+import net.minecraft.entity.EquipmentSlot;
+import net.minecraft.entity.LivingEntity;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
+import net.minecraft.registry.tag.FluidTags;
+import net.minecraft.util.math.Vec3d;
 
 public class DivingBootsItem extends Item {
     public static final EquipmentSlot SLOT = EquipmentSlot.FEET;
 
-    public DivingBootsItem(Properties settings) {
+    public DivingBootsItem(Settings settings) {
         super(settings);
     }
 
@@ -27,7 +27,7 @@ public class DivingBootsItem extends Item {
         if (!(entity instanceof LivingEntity livingEntity)) {
             return ItemStack.EMPTY;
         }
-        ItemStack stack = livingEntity.getItemBySlot(SLOT);
+        ItemStack stack = livingEntity.getEquippedStack(SLOT);
         if (!(stack.getItem() instanceof DivingBootsItem)) {
             return ItemStack.EMPTY;
         }
@@ -35,18 +35,16 @@ public class DivingBootsItem extends Item {
     }
 
     public static void accelerateDescentUnderwater(Entity entity) {
-        if (!(entity instanceof Player player)) {
+        if (!(entity instanceof PlayerEntity player))
             return;
-        }
 
-        if (!affects(player)) {
+        if (!affects(player))
             return;
-        }
 
-        Vec3 motion = player.getDeltaMovement();
-        player.setOnGround(player.onGround() || player.verticalCollision);
+        Vec3d motion = player.getVelocity();
+        player.setOnGround(player.isOnGround() || player.verticalCollision);
 
-        if (player.isJumping() && player.onGround()) {
+        if (player.isJumping() && player.isOnGround()) {
             motion = motion.add(0, .5f, 0);
             player.setOnGround(false);
         } else {
@@ -54,14 +52,12 @@ public class DivingBootsItem extends Item {
         }
 
         float multiplier = 1.3f;
-        if (motion.multiply(1, 0, 1)
-            .length() < 0.145f && (player.zza > 0 || player.xxa != 0) && !player.isShiftKeyDown()) {
+        if (motion.multiply(1, 0, 1).length() < 0.145f && (player.forwardSpeed > 0 || player.sidewaysSpeed != 0) && !player.isSneaking())
             motion = motion.multiply(multiplier, 1, multiplier);
-        }
-        player.setDeltaMovement(motion);
+        player.setVelocity(motion);
     }
 
-    protected static boolean affects(Player player) {
+    protected static boolean affects(PlayerEntity player) {
         boolean old = AllSynchedDatas.HEAVY_BOOTS.get(player);
         if (!isWornBy(player)) {
             if (old) {
@@ -72,36 +68,34 @@ public class DivingBootsItem extends Item {
         if (!old) {
             AllSynchedDatas.HEAVY_BOOTS.set(player, true);
         }
-        if (!player.isInWater()) {
+        if (!player.isTouchingWater())
             return false;
-        }
-        if (player.getPose() == Pose.SWIMMING) {
+        if (player.getPose() == EntityPose.SWIMMING)
             return false;
-        }
         return !player.getAbilities().flying;
     }
 
-    public static void onLavaTravel(Player player, boolean onGround) {
+    public static void onLavaTravel(PlayerEntity player, boolean onGround) {
         ItemStack bootsStack = DivingBootsItem.getWornItem(player);
-        if (!bootsStack.is(AllItems.NETHERITE_DIVING_BOOTS)) {
+        if (!bootsStack.isOf(AllItems.NETHERITE_DIVING_BOOTS)) {
             return;
         }
-        Vec3 playerVelocity = player.getDeltaMovement();
+        Vec3d playerVelocity = player.getVelocity();
         double yMotion = playerVelocity.y;
         double vMultiplier = yMotion < 0 ? Math.max(0, 2.5 - Math.abs(yMotion) * 2) : 1;
-        Vec3 velocity;
+        Vec3d velocity;
         if (onGround) {
             if (player.isJumping()) {
-                boolean eyeInFluid = player.isEyeInFluid(FluidTags.LAVA);
+                boolean eyeInFluid = player.isSubmergedIn(FluidTags.LAVA);
                 vMultiplier = yMotion == 0 ? 0 : (eyeInFluid ? 1 : 0.5) / yMotion;
             }
             double hMultiplier = player.isSprinting() ? 1.85 : 1.75;
-            velocity = new Vec3(hMultiplier, vMultiplier, hMultiplier);
+            velocity = new Vec3d(hMultiplier, vMultiplier, hMultiplier);
         } else {
             if (yMotion > 0) {
                 vMultiplier = 1.3;
             }
-            velocity = new Vec3(1.75, vMultiplier, 1.75);
+            velocity = new Vec3d(1.75, vMultiplier, 1.75);
         }
         //        if (!player.isOnGround()) {
         //            if (player.isJumping() && player.getPersistentData().contains("LavaGrounded")) {
@@ -119,6 +113,6 @@ public class DivingBootsItem extends Item {
         //            velocity = new Vec3d(hMultiplier, vMultiplier, hMultiplier);
         //        }
 
-        player.setDeltaMovement(playerVelocity.multiply(velocity));
+        player.setVelocity(playerVelocity.multiply(velocity));
     }
 }

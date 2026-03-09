@@ -8,10 +8,10 @@ import me.shedaniel.math.Rectangle;
 import me.shedaniel.rei.api.client.REIRuntime;
 import me.shedaniel.rei.api.client.gui.widgets.Tooltip;
 import me.shedaniel.rei.api.client.gui.widgets.Widget;
-import net.minecraft.ChatFormatting;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.events.GuiEventListener;
-import net.minecraft.network.chat.Component;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.Element;
+import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
 
 import java.util.List;
 
@@ -20,10 +20,7 @@ public class JunkWidget extends Widget {
     private final float chance;
 
     private final NumberAnimator<Float> darkHighlightedAlpha = ValueAnimator.ofFloat()
-        .withConvention(
-            () -> REIRuntime.getInstance().isDarkThemeEnabled() ? 1.0F : 0.0F,
-            ValueAnimator.typicalTransitionTime()
-        ).asFloat();
+        .withConvention(() -> REIRuntime.getInstance().isDarkThemeEnabled() ? 1.0F : 0.0F, ValueAnimator.typicalTransitionTime()).asFloat();
 
     public JunkWidget(int x, int y, float chance) {
         this.bounds = new Rectangle(x, y, 16, 16);
@@ -31,16 +28,16 @@ public class JunkWidget extends Widget {
     }
 
     @Override
-    public List<? extends GuiEventListener> children() {
+    public List<? extends Element> children() {
         return List.of();
     }
 
     @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY, float delta) {
+    public void render(DrawContext graphics, int mouseX, int mouseY, float delta) {
         darkHighlightedAlpha.update(delta);
         AllGuiTextures.JEI_CHANCE_SLOT.render(graphics, bounds.x - 1, bounds.y - 1);
-        Component text = Component.literal("?").withStyle(ChatFormatting.BOLD);
-        graphics.drawString(font, text, bounds.x + font.width(text) / -2 + 7, bounds.y + 4, 0xffefefef, true);
+        Text text = Text.literal("?").formatted(Formatting.BOLD);
+        graphics.drawText(font, text, bounds.x + font.getWidth(text) / -2 + 7, bounds.y + 4, 0xffefefef, true);
         if (bounds.contains(mouseX, mouseY)) {
             graphics.fillGradient(bounds.x, bounds.y, bounds.getMaxX(), bounds.getMaxY(), 0x80ffffff, 0x80ffffff);
             int darkColor = 0x111111 | ((int) (90 * darkHighlightedAlpha.value()) << 24);
@@ -48,7 +45,7 @@ public class JunkWidget extends Widget {
             String number = chance < 0.01 ? "<1" : chance > 0.99 ? ">99" : String.valueOf(Math.round(chance * 100));
             Tooltip.create(
                 CreateLang.translateDirect("recipe.assembly.junk"),
-                CreateLang.translateDirect("recipe.processing.chance", number).withStyle(ChatFormatting.GOLD)
+                CreateLang.translateDirect("recipe.processing.chance", number).formatted(Formatting.GOLD)
             ).queue();
         }
     }

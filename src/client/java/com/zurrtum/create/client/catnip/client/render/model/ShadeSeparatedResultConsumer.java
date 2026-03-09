@@ -1,8 +1,8 @@
 package com.zurrtum.create.client.catnip.client.render.model;
 
-import com.mojang.blaze3d.vertex.MeshData;
-import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
+import net.minecraft.client.render.BlockRenderLayer;
+import net.minecraft.client.render.BuiltBuffer;
 
 public interface ShadeSeparatedResultConsumer {
-    void accept(ChunkSectionLayer renderType, boolean shaded, MeshData data);
+    void accept(BlockRenderLayer renderType, boolean shaded, BuiltBuffer data);
 }

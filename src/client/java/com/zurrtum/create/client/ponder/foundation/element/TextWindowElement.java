@@ -9,15 +9,14 @@ import com.zurrtum.create.client.ponder.foundation.PonderIndex;
 import com.zurrtum.create.client.ponder.foundation.PonderScene;
 import com.zurrtum.create.client.ponder.foundation.PonderScene.SceneTransform;
 import com.zurrtum.create.client.ponder.foundation.ui.PonderUI;
-import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.FormattedText;
-import net.minecraft.network.chat.Style;
-import net.minecraft.resources.Identifier;
-import net.minecraft.util.Mth;
-import net.minecraft.world.phys.Vec2;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.client.font.TextRenderer;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.text.StringVisitable;
+import net.minecraft.text.Style;
+import net.minecraft.util.Identifier;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.Vec2f;
+import net.minecraft.util.math.Vec3d;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix3x2fStack;
 
@@ -26,10 +25,8 @@ import java.util.function.Supplier;
 
 public class TextWindowElement extends AnimatedOverlayElementBase {
 
-    public static final Couple<Color> COLOR_WINDOW_BORDER = Couple.create(
-        new Color(0x607a6000, true),
-        new Color(0x207a6000, true)
-    ).map(Color::setImmutable);
+    public static final Couple<Color> COLOR_WINDOW_BORDER = Couple.create(new Color(0x607a6000, true), new Color(0x207a6000, true))
+        .map(Color::setImmutable);
 
     Supplier<String> textGetter = () -> "(?) No text was provided";
     @Nullable String bakedText;
@@ -37,7 +34,7 @@ public class TextWindowElement extends AnimatedOverlayElementBase {
     // from 0 to 200
     int y;
 
-    @Nullable Vec3 vec;
+    @Nullable Vec3d vec;
 
     boolean nearScene = false;
     PonderPalette palette = PonderPalette.WHITE;
@@ -61,7 +58,7 @@ public class TextWindowElement extends AnimatedOverlayElementBase {
         }
 
         @Override
-        public Builder pointAt(Vec3 vec) {
+        public Builder pointAt(Vec3d vec) {
             TextWindowElement.this.vec = vec;
             return this;
         }
@@ -98,12 +95,12 @@ public class TextWindowElement extends AnimatedOverlayElementBase {
 
         @Override
         public Builder sharedText(String key) {
-            return sharedText(Identifier.fromNamespaceAndPath(scene.getNamespace(), key));
+            return sharedText(Identifier.of(scene.getNamespace(), key));
         }
 
         @Override
         public TextElementBuilder sharedText(String key, Object... params) {
-            return sharedText(Identifier.fromNamespaceAndPath(scene.getNamespace(), key), params);
+            return sharedText(Identifier.of(scene.getNamespace(), key), params);
         }
 
         @Override
@@ -120,16 +117,14 @@ public class TextWindowElement extends AnimatedOverlayElementBase {
     }
 
     @Override
-    public void render(PonderScene scene, PonderUI screen, GuiGraphics graphics, float partialTicks, float fade) {
-        if (bakedText == null) {
+    public void render(PonderScene scene, PonderUI screen, DrawContext graphics, float partialTicks, float fade) {
+        if (bakedText == null)
             bakedText = textGetter.get();
-        }
 
-        if (fade < 1 / 16f) {
+        if (fade < 1 / 16f)
             return;
-        }
         SceneTransform transform = scene.getTransform();
-        Vec2 sceneToScreen = vec != null ? transform.sceneToScreen(vec, partialTicks) : new Vec2(
+        Vec2f sceneToScreen = vec != null ? transform.sceneToScreen(vec, partialTicks) : new Vec2f(
             screen.width / 2f,
             (screen.height - 200) / 2f + y - 8
         );
@@ -138,34 +133,31 @@ public class TextWindowElement extends AnimatedOverlayElementBase {
         float pY = settled ? (int) sceneToScreen.y : sceneToScreen.y;
 
         float yDiff = (screen.height / 2f - sceneToScreen.y - 10) / 100f;
-        float targetX = (screen.width * Mth.lerp(yDiff * yDiff, 6f / 8, 5f / 8));
+        float targetX = (screen.width * MathHelper.lerp(yDiff * yDiff, 6f / 8, 5f / 8));
 
-        if (nearScene) {
+        if (nearScene)
             targetX = Math.min(targetX, sceneToScreen.x + 50);
-        }
 
-        if (settled) {
+        if (settled)
             targetX = (int) targetX;
-        }
 
         int textWidth = (int) Math.min(screen.width - targetX, 180);
 
-        Font fontRenderer = screen.getFontRenderer();
-        List<FormattedText> lines = fontRenderer.getSplitter().splitLines(bakedText, textWidth, Style.EMPTY);
+        TextRenderer fontRenderer = screen.getFontRenderer();
+        List<StringVisitable> lines = fontRenderer.getTextHandler().wrapLines(bakedText, textWidth, Style.EMPTY);
 
         int boxWidth = 0;
-        for (FormattedText line : lines) {
-            boxWidth = Math.max(boxWidth, fontRenderer.width(line));
-        }
+        for (StringVisitable line : lines)
+            boxWidth = Math.max(boxWidth, fontRenderer.getWidth(line));
 
-        int boxHeight = fontRenderer.wordWrapHeight(Component.literal(bakedText), boxWidth);
+        int boxHeight = fontRenderer.getWrappedLinesHeight(bakedText, boxWidth);
 
-        Matrix3x2fStack poseStack = graphics.pose();
+        Matrix3x2fStack poseStack = graphics.getMatrices();
         poseStack.pushMatrix();
         poseStack.translate(0, pY);
 
-        new BoxElement().withBackground(PonderUI.BACKGROUND_FLAT).gradientBorder(COLOR_WINDOW_BORDER)
-            .at(targetX - 10, 3, -101).withBounds(boxWidth, boxHeight - 1).render(graphics);
+        new BoxElement().withBackground(PonderUI.BACKGROUND_FLAT).gradientBorder(COLOR_WINDOW_BORDER).at(targetX - 10, 3, -101)
+            .withBounds(boxWidth, boxHeight - 1).render(graphics);
 
         Color brighter = palette.getColorObject().mixWith(new Color(0xff_ffffdd), 0.5f).setImmutable();
         Color c1 = new Color(0xff_494949);
@@ -181,7 +173,7 @@ public class TextWindowElement extends AnimatedOverlayElementBase {
         }
 
         for (int i = 0; i < lines.size(); i++) {
-            graphics.drawString(
+            graphics.drawText(
                 fontRenderer,
                 lines.get(i).getString(),
                 (int) (targetX - 10),

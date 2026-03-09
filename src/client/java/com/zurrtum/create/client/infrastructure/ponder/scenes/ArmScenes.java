@@ -13,13 +13,13 @@ import com.zurrtum.create.client.ponder.api.scene.Selection;
 import com.zurrtum.create.content.kinetics.crafter.MechanicalCrafterBlockEntity;
 import com.zurrtum.create.content.kinetics.mechanicalArm.ArmBlockEntity.Phase;
 import com.zurrtum.create.content.logistics.funnel.FunnelBlockEntity;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.block.Blocks;
+import net.minecraft.item.ItemStack;
+import net.minecraft.item.Items;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Box;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Vec3d;
 
 public class ArmScenes {
 
@@ -29,12 +29,12 @@ public class ArmScenes {
         scene.configureBasePlate(0, 0, 5);
         scene.showBasePlate();
 
-        ItemStack armItem = AllItems.MECHANICAL_ARM.getDefaultInstance();
+        ItemStack armItem = AllItems.MECHANICAL_ARM.getDefaultStack();
         BlockPos armPos = util.grid().at(2, 1, 2);
         Selection armSel = util.select().position(armPos);
         BlockPos inputDepot = util.grid().at(4, 2, 1);
-        Vec3 depotSurface = util.vector().blockSurface(inputDepot, Direction.NORTH);
-        Vec3 armSurface = util.vector().blockSurface(armPos, Direction.WEST);
+        Vec3d depotSurface = util.vector().blockSurface(inputDepot, Direction.NORTH);
+        Vec3d armSurface = util.vector().blockSurface(armPos, Direction.WEST);
 
         scene.idle(20);
 
@@ -43,8 +43,7 @@ public class ArmScenes {
         scene.idle(10);
         scene.effects().indicateRedstone(armPos);
         scene.overlay().showOutlineWithText(armSel, 70).attachKeyFrame().colored(PonderPalette.RED)
-            .text("Mechanical Arms have to be assigned their in- and outputs before they are placed")
-            .pointAt(armSurface).placeNearTarget();
+            .text("Mechanical Arms have to be assigned their in- and outputs before they are placed").pointAt(armSurface).placeNearTarget();
         scene.idle(80);
         scene.world().showSection(util.select().fromTo(4, 1, 1, 4, 2, 1), Direction.DOWN);
         scene.world().showSection(util.select().fromTo(0, 1, 1, 0, 2, 1), Direction.DOWN);
@@ -52,8 +51,8 @@ public class ArmScenes {
         scene.idle(20);
         scene.overlay().showControls(depotSurface, Pointing.RIGHT, 50).rightClick().withItem(armItem);
         scene.idle(7);
-        AABB depotBounds = AllShapes.CASING_13PX.get(Direction.UP).bounds();
-        scene.overlay().chaseBoundingBoxOutline(PonderPalette.INPUT, new Object(), depotBounds.move(4, 2, 1), 400);
+        Box depotBounds = AllShapes.CASING_13PX.get(Direction.UP).getBoundingBox();
+        scene.overlay().chaseBoundingBoxOutline(PonderPalette.INPUT, new Object(), depotBounds.offset(4, 2, 1), 400);
 
         scene.overlay().showText(70).attachKeyFrame().colored(PonderPalette.INPUT)
             .text("Right-Click inventories while holding the Arm to assign them as Targets")
@@ -61,45 +60,38 @@ public class ArmScenes {
         scene.idle(80);
 
         BlockPos outputDepot = util.grid().at(0, 2, 1);
-        scene.overlay().showControls(util.vector().blockSurface(outputDepot, Direction.NORTH), Pointing.RIGHT, 20)
-            .rightClick().withItem(armItem);
+        scene.overlay().showControls(util.vector().blockSurface(outputDepot, Direction.NORTH), Pointing.RIGHT, 20).rightClick().withItem(armItem);
         scene.idle(7);
         Object second = new Object();
-        scene.overlay().chaseBoundingBoxOutline(PonderPalette.INPUT, second, depotBounds.move(0, 2, 1), 100);
+        scene.overlay().chaseBoundingBoxOutline(PonderPalette.INPUT, second, depotBounds.offset(0, 2, 1), 100);
         scene.idle(25);
-        scene.overlay().showControls(util.vector().blockSurface(outputDepot, Direction.NORTH), Pointing.RIGHT, 30)
-            .rightClick().withItem(armItem);
+        scene.overlay().showControls(util.vector().blockSurface(outputDepot, Direction.NORTH), Pointing.RIGHT, 30).rightClick().withItem(armItem);
         scene.idle(7);
-        scene.overlay().chaseBoundingBoxOutline(PonderPalette.OUTPUT, second, depotBounds.move(0, 2, 1), 280);
-        scene.overlay().showText(70).colored(PonderPalette.OUTPUT)
-            .text("Right-Click again to toggle between Input (Blue) and Output (Yellow)")
+        scene.overlay().chaseBoundingBoxOutline(PonderPalette.OUTPUT, second, depotBounds.offset(0, 2, 1), 280);
+        scene.overlay().showText(70).colored(PonderPalette.OUTPUT).text("Right-Click again to toggle between Input (Blue) and Output (Yellow)")
             .pointAt(util.vector().blockSurface(outputDepot, Direction.WEST)).placeNearTarget();
 
         scene.idle(80);
         scene.world().showSection(util.select().position(1, 1, 0), Direction.DOWN);
         scene.idle(15);
-        scene.overlay().chaseBoundingBoxOutline(PonderPalette.INPUT, new Object(), depotBounds.move(1, 1, 0), 43);
+        scene.overlay().chaseBoundingBoxOutline(PonderPalette.INPUT, new Object(), depotBounds.offset(1, 1, 0), 43);
 
-        scene.overlay().showText(50).colored(PonderPalette.WHITE)
-            .text("Left-Click components to remove their Selection")
+        scene.overlay().showText(50).colored(PonderPalette.WHITE).text("Left-Click components to remove their Selection")
             .pointAt(util.vector().blockSurface(util.grid().at(1, 1, 0), Direction.WEST)).placeNearTarget();
 
         scene.idle(35);
-        scene.overlay().showControls(util.vector().topOf(util.grid().at(1, 1, 0)), Pointing.DOWN, 30).leftClick()
-            .withItem(armItem);
+        scene.overlay().showControls(util.vector().topOf(util.grid().at(1, 1, 0)), Pointing.DOWN, 30).leftClick().withItem(armItem);
         scene.idle(50);
 
         scene.world().showSection(armSel, Direction.DOWN);
         scene.idle(10);
-        Vec3 armTop = armSurface.add(0.5, 1.5, 0);
+        Vec3d armTop = armSurface.add(0.5, 1.5, 0);
         scene.overlay().showText(70).attachKeyFrame().colored(PonderPalette.GREEN)
-            .text("Once placed, the Mechanical Arm will target the blocks selected previously").pointAt(armTop)
-            .placeNearTarget();
+            .text("Once placed, the Mechanical Arm will target the blocks selected previously").pointAt(armTop).placeNearTarget();
         scene.idle(80);
 
         scene.effects().indicateSuccess(armPos);
-        scene.world()
-            .showSection(util.select().fromTo(2, 1, 5, 2, 1, 3).add(util.select().position(2, 0, 5)), Direction.DOWN);
+        scene.world().showSection(util.select().fromTo(2, 1, 5, 2, 1, 3).add(util.select().position(2, 0, 5)), Direction.DOWN);
         ItemStack copper = new ItemStack(Items.COPPER_INGOT);
         scene.world().createItemOnBeltLike(inputDepot, Direction.SOUTH, copper);
         scene.idle(10);
@@ -122,19 +114,18 @@ public class ArmScenes {
         scene.world().showSection(util.select().position(4, 1, 2), Direction.DOWN);
         scene.idle(5);
 
-        scene.overlay().chaseBoundingBoxOutline(PonderPalette.OUTPUT, new Object(), depotBounds.move(0, 2, 1), 60);
+        scene.overlay().chaseBoundingBoxOutline(PonderPalette.OUTPUT, new Object(), depotBounds.offset(0, 2, 1), 60);
         scene.idle(5);
-        scene.overlay().chaseBoundingBoxOutline(PonderPalette.INPUT, new Object(), depotBounds.move(4, 2, 1), 60);
+        scene.overlay().chaseBoundingBoxOutline(PonderPalette.INPUT, new Object(), depotBounds.offset(4, 2, 1), 60);
         scene.idle(5);
-        scene.overlay().chaseBoundingBoxOutline(PonderPalette.OUTPUT, new Object(), depotBounds.move(1, 1, 0), 60);
+        scene.overlay().chaseBoundingBoxOutline(PonderPalette.OUTPUT, new Object(), depotBounds.offset(1, 1, 0), 60);
         scene.idle(5);
-        scene.overlay().chaseBoundingBoxOutline(PonderPalette.INPUT, new Object(), depotBounds.move(1, 3, 4), 60);
+        scene.overlay().chaseBoundingBoxOutline(PonderPalette.INPUT, new Object(), depotBounds.offset(1, 3, 4), 60);
         scene.idle(5);
-        scene.overlay().chaseBoundingBoxOutline(PonderPalette.INPUT, new Object(), depotBounds.move(4, 1, 2), 60);
+        scene.overlay().chaseBoundingBoxOutline(PonderPalette.INPUT, new Object(), depotBounds.offset(4, 1, 2), 60);
         scene.idle(5);
 
-        scene.overlay().showText(80).attachKeyFrame()
-            .text("They can have any amount of in- and outputs within their range")
+        scene.overlay().showText(80).attachKeyFrame().text("They can have any amount of in- and outputs within their range")
             .pointAt(util.vector().blockSurface(util.grid().at(1, 3, 4), Direction.WEST)).placeNearTarget();
 
         inputDepot = util.grid().at(1, 3, 4);
@@ -170,14 +161,13 @@ public class ArmScenes {
 
         Object in = new Object();
         Object out = new Object();
-        AABB chestBounds = new AABB(1 / 16f, 0, 1 / 16f, 15 / 16f, 14 / 16f, 15 / 16f);
-        AABB funnelBounds = new AABB(0, 0, 8 / 16f, 16 / 16f, 16 / 16f, 16 / 16f);
+        Box chestBounds = new Box(1 / 16f, 0, 1 / 16f, 15 / 16f, 14 / 16f, 15 / 16f);
+        Box funnelBounds = new Box(0, 0, 8 / 16f, 16 / 16f, 16 / 16f, 16 / 16f);
 
-        scene.overlay().chaseBoundingBoxOutline(PonderPalette.RED, in, chestBounds.move(4, 2, 3), 120);
-        scene.overlay().chaseBoundingBoxOutline(PonderPalette.RED, out, chestBounds.move(0, 2, 3), 120);
-        scene.overlay().showText(80).attachKeyFrame()
-            .text("However, not every type of Inventory can be interacted with directly").colored(PonderPalette.RED)
-            .placeNearTarget().pointAt(util.vector().blockSurface(util.grid().at(0, 2, 3), Direction.WEST));
+        scene.overlay().chaseBoundingBoxOutline(PonderPalette.RED, in, chestBounds.offset(4, 2, 3), 120);
+        scene.overlay().chaseBoundingBoxOutline(PonderPalette.RED, out, chestBounds.offset(0, 2, 3), 120);
+        scene.overlay().showText(80).attachKeyFrame().text("However, not every type of Inventory can be interacted with directly")
+            .colored(PonderPalette.RED).placeNearTarget().pointAt(util.vector().blockSurface(util.grid().at(0, 2, 3), Direction.WEST));
         scene.idle(90);
 
         scene.world().showSection(util.select().fromTo(4, 1, 2, 4, 2, 2), Direction.SOUTH);
@@ -185,13 +175,12 @@ public class ArmScenes {
         scene.world().showSection(util.select().position(0, 2, 2), Direction.SOUTH);
         scene.idle(10);
 
-        scene.overlay().chaseBoundingBoxOutline(PonderPalette.INPUT, in, depotBounds.move(4, 1, 2), 80);
+        scene.overlay().chaseBoundingBoxOutline(PonderPalette.INPUT, in, depotBounds.offset(4, 1, 2), 80);
         scene.idle(5);
-        scene.overlay().chaseBoundingBoxOutline(PonderPalette.OUTPUT, out, funnelBounds.move(0, 2, 2), 80);
+        scene.overlay().chaseBoundingBoxOutline(PonderPalette.OUTPUT, out, funnelBounds.offset(0, 2, 2), 80);
         scene.idle(5);
 
-        scene.overlay().showText(60).text("Funnels and Depots can help to Bridge that gap")
-            .colored(PonderPalette.OUTPUT).placeNearTarget()
+        scene.overlay().showText(60).text("Funnels and Depots can help to Bridge that gap").colored(PonderPalette.OUTPUT).placeNearTarget()
             .pointAt(util.vector().topOf(util.grid().at(0, 2, 2)).add(0, 0, 0.25));
         scene.idle(70);
         ItemStack sword = new ItemStack(Items.GOLDEN_SWORD);
@@ -210,9 +199,7 @@ public class ArmScenes {
         scene.world().flapFunnel(util.grid().at(0, 2, 2), false);
         scene.world().instructArm(armPos, Phase.SEARCH_INPUTS, ItemStack.EMPTY, -1);
         scene.idle(5);
-        scene.overlay()
-            .showControls(util.vector().blockSurface(util.grid().at(0, 2, 3), Direction.WEST), Pointing.LEFT, 30)
-            .withItem(sword);
+        scene.overlay().showControls(util.vector().blockSurface(util.grid().at(0, 2, 3), Direction.WEST), Pointing.LEFT, 30).withItem(sword);
 
     }
 
@@ -247,16 +234,14 @@ public class ArmScenes {
         scene.world().createItemOnBeltLike(util.grid().at(2, 1, 4), Direction.SOUTH, sand);
         scene.world().createItemOnBeltLike(util.grid().at(1, 1, 4), Direction.SOUTH, sulphur);
 
-        scene.overlay().showOutlineWithText(util.select().fromTo(2, 1, 4, 1, 1, 4), 60).text("Inputs").placeNearTarget()
-            .colored(PonderPalette.INPUT);
+        scene.overlay().showOutlineWithText(util.select().fromTo(2, 1, 4, 1, 1, 4), 60).text("Inputs").placeNearTarget().colored(PonderPalette.INPUT);
         scene.idle(50);
-        scene.overlay().showOutlineWithText(util.select().fromTo(5, 3, 1, 3, 1, 1), 40).text("Outputs")
-            .placeNearTarget().colored(PonderPalette.OUTPUT);
+        scene.overlay().showOutlineWithText(util.select().fromTo(5, 3, 1, 3, 1, 1), 40).text("Outputs").placeNearTarget()
+            .colored(PonderPalette.OUTPUT);
         scene.idle(50);
 
-        scene.overlay().showText(80).attachKeyFrame()
-            .text("Sometimes it is desirable to restrict targets of the Arm by matching a filter").placeNearTarget()
-            .pointAt(util.vector().blockSurface(util.grid().at(3, 3, 1), Direction.WEST));
+        scene.overlay().showText(80).attachKeyFrame().text("Sometimes it is desirable to restrict targets of the Arm by matching a filter")
+            .placeNearTarget().pointAt(util.vector().blockSurface(util.grid().at(3, 3, 1), Direction.WEST));
 
         scene.idle(90);
         scene.rotateCameraY(-90 - 30);
@@ -271,7 +256,7 @@ public class ArmScenes {
             scene.idle(2);
         }
 
-        Vec3 filterSlot = util.vector().of(3.5, 3.75, 2.6);
+        Vec3d filterSlot = util.vector().of(3.5, 3.75, 2.6);
         scene.overlay().showFilterSlotInput(filterSlot, Direction.NORTH, 80);
         scene.idle(10);
         scene.overlay().showText(80).attachKeyFrame().colored(PonderPalette.GREEN).pointAt(filterSlot)
@@ -281,8 +266,7 @@ public class ArmScenes {
         for (int y = 0; y < 3; y++) {
             for (int x = 0; x < 3; x++) {
                 ItemStack item = (x + y) % 2 == 0 ? sulphur : sand;
-                scene.overlay().showControls(filterSlot.add(2 - x, -y, 0), Pointing.LEFT, 5).rightClick()
-                    .withItem(item);
+                scene.overlay().showControls(filterSlot.add(2 - x, -y, 0), Pointing.LEFT, 5).rightClick().withItem(item);
                 scene.idle(7);
                 scene.world().setFilterData(util.select().position(5 - x, 3 - y, 2), FunnelBlockEntity.class, item);
                 scene.idle(4);
@@ -311,11 +295,7 @@ public class ArmScenes {
             BlockPos funnelPos = util.grid().at(5 - index % 3, 1 + index / 3, 2);
             scene.world().flapFunnel(funnelPos, false);
             scene.world().instructArm(armPos, Phase.SEARCH_INPUTS, i == 3 ? ItemStack.EMPTY : sand, -1);
-            scene.world().modifyBlockEntity(
-                funnelPos.north(),
-                MechanicalCrafterBlockEntity.class,
-                mct -> mct.getInventory().insert(sand.copy())
-            );
+            scene.world().modifyBlockEntity(funnelPos.north(), MechanicalCrafterBlockEntity.class, mct -> mct.getInventory().insert(sand.copy()));
             scene.idle(10);
         }
 
@@ -334,11 +314,7 @@ public class ArmScenes {
             BlockPos funnelPos = util.grid().at(3 + index % 3, 1 + index / 3, 2);
             scene.world().flapFunnel(funnelPos, false);
             scene.world().instructArm(armPos, Phase.SEARCH_INPUTS, i == 4 ? ItemStack.EMPTY : sulphur, -1);
-            scene.world().modifyBlockEntity(
-                funnelPos.north(),
-                MechanicalCrafterBlockEntity.class,
-                mct -> mct.getInventory().insert(sulphur.copy())
-            );
+            scene.world().modifyBlockEntity(funnelPos.north(), MechanicalCrafterBlockEntity.class, mct -> mct.getInventory().insert(sulphur.copy()));
             scene.idle(10);
         }
 
@@ -349,7 +325,7 @@ public class ArmScenes {
         CreateSceneBuilder scene = new CreateSceneBuilder(builder);
         scene.title("mechanical_arm_modes", "Distribution modes of the Mechanical Arm");
         scene.configureBasePlate(0, 1, 5);
-        scene.world().setBlock(util.grid().at(3, 1, 0), Blocks.BARRIER.defaultBlockState(), false);
+        scene.world().setBlock(util.grid().at(3, 1, 0), Blocks.BARRIER.getDefaultState(), false);
 
         scene.world().showSection(util.select().layer(0), Direction.UP);
         scene.idle(5);
@@ -360,92 +336,75 @@ public class ArmScenes {
         scene.world().showSection(util.select().fromTo(1, 1, 1, 5, 1, 2), Direction.SOUTH);
         scene.idle(10);
 
-        AABB depotBox = AllShapes.CASING_13PX.get(Direction.UP).bounds();
-        AABB beltBox = depotBox.contract(0, -3 / 16f, 0).inflate(1, 0, 0);
+        Box depotBox = AllShapes.CASING_13PX.get(Direction.UP).getBoundingBox();
+        Box beltBox = depotBox.shrink(0, -3 / 16f, 0).expand(1, 0, 0);
         BlockPos depotPos = util.grid().at(1, 1, 4);
         BlockPos armPos = util.grid().at(3, 1, 4);
 
-        scene.overlay().chaseBoundingBoxOutline(PonderPalette.INPUT, depotBox, depotBox.move(1, 1, 4), 60);
-        scene.overlay().showText(30).text("Input").pointAt(util.vector().blockSurface(depotPos, Direction.WEST))
-            .placeNearTarget().colored(PonderPalette.INPUT);
+        scene.overlay().chaseBoundingBoxOutline(PonderPalette.INPUT, depotBox, depotBox.offset(1, 1, 4), 60);
+        scene.overlay().showText(30).text("Input").pointAt(util.vector().blockSurface(depotPos, Direction.WEST)).placeNearTarget()
+            .colored(PonderPalette.INPUT);
         scene.idle(40);
-        scene.overlay().chaseBoundingBoxOutline(PonderPalette.OUTPUT, depotBox, beltBox.move(2, 1, 2), 40);
-        scene.overlay().showText(40).text("Outputs")
-            .pointAt(util.vector().blockSurface(util.grid().at(1, 1, 2), Direction.WEST)).placeNearTarget()
+        scene.overlay().chaseBoundingBoxOutline(PonderPalette.OUTPUT, depotBox, beltBox.offset(2, 1, 2), 40);
+        scene.overlay().showText(40).text("Outputs").pointAt(util.vector().blockSurface(util.grid().at(1, 1, 2), Direction.WEST)).placeNearTarget()
             .colored(PonderPalette.OUTPUT);
         scene.idle(50);
 
         ItemStack item = new ItemStack(Items.SNOWBALL);
 
         scene.world().createItemOnBeltLike(depotPos, Direction.SOUTH, item);
-        scene.overlay().showText(60).attachKeyFrame()
-            .text("Whenever an Arm has to choose between multiple valid outputs...")
-            .pointAt(util.vector().blockSurface(util.grid().at(2, 1, 2), Direction.UP)).placeNearTarget()
-            .colored(PonderPalette.OUTPUT);
+        scene.overlay().showText(60).attachKeyFrame().text("Whenever an Arm has to choose between multiple valid outputs...")
+            .pointAt(util.vector().blockSurface(util.grid().at(2, 1, 2), Direction.UP)).placeNearTarget().colored(PonderPalette.OUTPUT);
         scene.idle(70);
 
-        Vec3 scrollSlot = util.vector().of(3.5, 1 + 3 / 16f, 4);
+        Vec3d scrollSlot = util.vector().of(3.5, 1 + 3 / 16f, 4);
         scene.overlay().showFilterSlotInput(scrollSlot, Direction.NORTH, 120);
-        scene.overlay().showText(50).text("...it will act according to its setting").pointAt(scrollSlot)
-            .placeNearTarget();
+        scene.overlay().showText(50).text("...it will act according to its setting").pointAt(scrollSlot).placeNearTarget();
         scene.idle(60);
 
         scene.overlay().showControls(scrollSlot, Pointing.RIGHT, 40).rightClick();
         scene.idle(10);
-        scene.overlay().showText(50).text("The value panel will allow you to configure it").pointAt(scrollSlot)
-            .placeNearTarget();
+        scene.overlay().showText(50).text("The value panel will allow you to configure it").pointAt(scrollSlot).placeNearTarget();
         scene.idle(60);
 
-        ElementLink<WorldSectionElement> blockage = scene.world()
-            .showIndependentSection(util.select().position(4, 1, 0), Direction.UP);
+        ElementLink<WorldSectionElement> blockage = scene.world().showIndependentSection(util.select().position(4, 1, 0), Direction.UP);
         scene.world().moveSection(blockage, util.vector().of(-1, 0, 0), 0);
 
         for (int i = 0; i < 20; i++) {
 
             if (i == 2) {
-                scene.overlay().showText(60).attachKeyFrame()
-                    .text("Round Robin mode simply cycles through all outputs that are available")
-                    .pointAt(util.vector().blockSurface(util.grid().at(2, 1, 2), Direction.UP)).placeNearTarget()
-                    .colored(PonderPalette.OUTPUT);
+                scene.overlay().showText(60).attachKeyFrame().text("Round Robin mode simply cycles through all outputs that are available")
+                    .pointAt(util.vector().blockSurface(util.grid().at(2, 1, 2), Direction.UP)).placeNearTarget().colored(PonderPalette.OUTPUT);
             }
-            if (i == 6) {
+            if (i == 6)
                 continue;
-            }
             if (i == 7) {
-                scene.overlay().showText(60).attachKeyFrame()
-                    .text("If an output is unable to take more items, it will be skipped")
-                    .pointAt(util.vector().blockSurface(util.grid().at(3, 1, 2), Direction.UP)).placeNearTarget()
-                    .colored(PonderPalette.GREEN);
+                scene.overlay().showText(60).attachKeyFrame().text("If an output is unable to take more items, it will be skipped")
+                    .pointAt(util.vector().blockSurface(util.grid().at(3, 1, 2), Direction.UP)).placeNearTarget().colored(PonderPalette.GREEN);
             }
 
             if (i == 12) {
                 scene.world().moveSection(blockage, util.vector().of(-1, 0, 0), 10);
-                scene.world().setBlock(util.grid().at(3, 1, 0), Blocks.BARRIER.defaultBlockState(), false);
+                scene.world().setBlock(util.grid().at(3, 1, 0), Blocks.BARRIER.getDefaultState(), false);
             }
 
             int index = i % 3;
 
             if (i == 13) {
-                scene.world().setBlock(util.grid().at(2, 1, 0), Blocks.BARRIER.defaultBlockState(), false);
-                ElementLink<WorldSectionElement> blockage2 = scene.world()
-                    .showIndependentSection(util.select().position(4, 1, 0), Direction.UP);
+                scene.world().setBlock(util.grid().at(2, 1, 0), Blocks.BARRIER.getDefaultState(), false);
+                ElementLink<WorldSectionElement> blockage2 = scene.world().showIndependentSection(util.select().position(4, 1, 0), Direction.UP);
                 scene.world().moveSection(blockage2, util.vector().of(-2, 0, 0), 0);
-                scene.overlay().showText(60).attachKeyFrame()
-                    .text("Prefer First prioritizes the outputs selected earliest when configuring this Arm")
-                    .pointAt(util.vector().blockSurface(util.grid().at(3, 1, 2), Direction.UP)).placeNearTarget()
-                    .colored(PonderPalette.GREEN);
+                scene.overlay().showText(60).attachKeyFrame().text("Prefer First prioritizes the outputs selected earliest when configuring this Arm")
+                    .pointAt(util.vector().blockSurface(util.grid().at(3, 1, 2), Direction.UP)).placeNearTarget().colored(PonderPalette.GREEN);
                 index = 0;
             }
 
-            if (i == 14) {
+            if (i == 14)
                 index = 1;
-            }
-            if (i == 15) {
+            if (i == 15)
                 index = 1;
-            }
-            if (i >= 16) {
+            if (i >= 16)
                 index = 2;
-            }
 
             scene.idle(5);
             scene.world().instructArm(armPos, Phase.MOVE_TO_INPUT, ItemStack.EMPTY, 0);
@@ -457,11 +416,10 @@ public class ArmScenes {
             if (i == 9) {
                 scene.overlay().showText(80).attachKeyFrame()
                     .text("Forced Round Robin mode will never skip outputs, and instead wait until they are free")
-                    .pointAt(util.vector().blockSurface(util.grid().at(3, 1, 2), Direction.UP)).placeNearTarget()
-                    .colored(PonderPalette.RED);
+                    .pointAt(util.vector().blockSurface(util.grid().at(3, 1, 2), Direction.UP)).placeNearTarget().colored(PonderPalette.RED);
                 scene.idle(40);
                 scene.world().moveSection(blockage, util.vector().of(1, 0, 0), 10);
-                scene.world().setBlock(util.grid().at(3, 1, 0), Blocks.AIR.defaultBlockState(), false);
+                scene.world().setBlock(util.grid().at(3, 1, 0), Blocks.AIR.getDefaultState(), false);
                 scene.idle(50);
                 scene.world().multiplyKineticSpeed(util.select().fromTo(1, 1, 1, 5, 0, 3), 2);
             }
@@ -506,8 +464,7 @@ public class ArmScenes {
                 scene.effects().indicateRedstone(leverPos);
                 scene.idle(10);
 
-                scene.overlay().showText(60).colored(PonderPalette.RED).attachKeyFrame()
-                    .pointAt(util.vector().topOf(armPos)).placeNearTarget()
+                scene.overlay().showText(60).colored(PonderPalette.RED).attachKeyFrame().pointAt(util.vector().topOf(armPos)).placeNearTarget()
                     .text("When powered by Redstone, Mechanical Arms will not activate");
                 scene.idle(70);
                 scene.world().toggleRedstonePower(redstone);
@@ -537,8 +494,7 @@ public class ArmScenes {
             scene.idle(10);
 
             if (i == 2) {
-                scene.overlay().showText(100).colored(PonderPalette.GREEN).attachKeyFrame()
-                    .pointAt(util.vector().topOf(armPos)).placeNearTarget()
+                scene.overlay().showText(100).colored(PonderPalette.GREEN).attachKeyFrame().pointAt(util.vector().topOf(armPos)).placeNearTarget()
                     .text("Thus, a negative pulse can be used to trigger exactly one activation cycle");
             }
 

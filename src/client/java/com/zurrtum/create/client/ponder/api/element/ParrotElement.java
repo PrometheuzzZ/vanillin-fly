@@ -1,15 +1,15 @@
 package com.zurrtum.create.client.ponder.api.element;
 
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.util.math.Vec3d;
 
 public interface ParrotElement extends AnimatedSceneElement {
-    void setPositionOffset(Vec3 position, boolean immediate);
+    void setPositionOffset(Vec3d position, boolean immediate);
 
-    void setRotation(Vec3 eulers, boolean immediate);
+    void setRotation(Vec3d eulers, boolean immediate);
 
-    Vec3 getPositionOffset();
+    Vec3d getPositionOffset();
 
-    Vec3 getRotation();
+    Vec3d getRotation();
 
     void setPose(ParrotPose pose);
 }

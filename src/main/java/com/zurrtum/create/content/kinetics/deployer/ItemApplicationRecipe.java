@@ -6,14 +6,14 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 import com.zurrtum.create.content.processing.recipe.ProcessingOutput;
 import com.zurrtum.create.foundation.recipe.CreateRecipe;
 import com.zurrtum.create.foundation.recipe.CreateRollableRecipe;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.util.RandomSource;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.crafting.Ingredient;
-import net.minecraft.world.item.crafting.RecipeSerializer;
-import net.minecraft.world.level.Level;
+import net.minecraft.item.ItemStack;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.recipe.Ingredient;
+import net.minecraft.recipe.RecipeSerializer;
+import net.minecraft.util.math.random.Random;
+import net.minecraft.world.World;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -28,12 +28,12 @@ public interface ItemApplicationRecipe extends CreateRollableRecipe<ItemApplicat
     Ingredient ingredient();
 
     @Override
-    default boolean matches(ItemApplicationInput input, Level world) {
+    default boolean matches(ItemApplicationInput input, World world) {
         return target().test(input.target()) && ingredient().test(input.ingredient());
     }
 
     @Override
-    default List<ItemStack> assemble(ItemApplicationInput input, RandomSource random) {
+    default List<ItemStack> craft(ItemApplicationInput input, Random random) {
         ItemStack junk = CreateRecipe.getJunk(input.target());
         if (junk != null) {
             return List.of(junk);
@@ -44,8 +44,9 @@ public interface ItemApplicationRecipe extends CreateRollableRecipe<ItemApplicat
         return outputs;
     }
 
-    record Serializer<T extends ItemApplicationRecipe>(MapCodec<T> codec,
-                                                       StreamCodec<RegistryFriendlyByteBuf, T> streamCodec) implements RecipeSerializer<T> {
+    record Serializer<T extends ItemApplicationRecipe>(
+        MapCodec<T> codec, PacketCodec<RegistryByteBuf, T> packetCodec
+    ) implements RecipeSerializer<T> {
         public Serializer(Factory<T> factory) {
             this(
                 RecordCodecBuilder.mapCodec(instance -> instance.group(
@@ -53,14 +54,14 @@ public interface ItemApplicationRecipe extends CreateRollableRecipe<ItemApplicat
                     Codec.BOOL.optionalFieldOf("keep_held_item", false).forGetter(ItemApplicationRecipe::keepHeldItem),
                     Ingredient.CODEC.fieldOf("target").forGetter(ItemApplicationRecipe::target),
                     Ingredient.CODEC.fieldOf("ingredient").forGetter(ItemApplicationRecipe::ingredient)
-                ).apply(instance, factory::create)), StreamCodec.composite(
-                    ProcessingOutput.STREAM_CODEC.apply(ByteBufCodecs.list()),
+                ).apply(instance, factory::create)), PacketCodec.tuple(
+                    ProcessingOutput.STREAM_CODEC.collect(PacketCodecs.toList()),
                     ItemApplicationRecipe::results,
-                    ByteBufCodecs.BOOL,
+                    PacketCodecs.BOOLEAN,
                     ItemApplicationRecipe::keepHeldItem,
-                    Ingredient.CONTENTS_STREAM_CODEC,
+                    Ingredient.PACKET_CODEC,
                     ItemApplicationRecipe::target,
-                    Ingredient.CONTENTS_STREAM_CODEC,
+                    Ingredient.PACKET_CODEC,
                     ItemApplicationRecipe::ingredient,
                     factory::create
                 )

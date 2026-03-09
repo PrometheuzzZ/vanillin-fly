@@ -3,15 +3,15 @@ package com.zurrtum.create.client.catnip.gui;
 import com.zurrtum.create.catnip.theme.Color;
 import com.zurrtum.create.client.catnip.animation.AnimationTickHolder;
 import com.zurrtum.create.client.catnip.gui.widget.AbstractSimiWidget;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.AbstractWidget;
-import net.minecraft.client.gui.components.Renderable;
-import net.minecraft.client.gui.components.events.GuiEventListener;
-import net.minecraft.client.gui.narration.NarratableEntry;
-import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.input.KeyEvent;
-import net.minecraft.network.chat.CommonComponents;
-import net.minecraft.network.chat.Component;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.Drawable;
+import net.minecraft.client.gui.Element;
+import net.minecraft.client.gui.Selectable;
+import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.gui.widget.ClickableWidget;
+import net.minecraft.client.input.KeyInput;
+import net.minecraft.screen.ScreenTexts;
+import net.minecraft.text.Text;
 import org.joml.Matrix3x2fStack;
 
 import java.util.Collection;
@@ -25,12 +25,12 @@ public abstract class AbstractSimiScreen extends Screen {
     protected int windowXOffset, windowYOffset;
     protected int guiLeft, guiTop;
 
-    protected AbstractSimiScreen(Component title) {
+    protected AbstractSimiScreen(Text title) {
         super(title);
     }
 
     protected AbstractSimiScreen() {
-        this(CommonComponents.EMPTY);
+        this(ScreenTexts.EMPTY);
     }
 
     /**
@@ -59,7 +59,7 @@ public abstract class AbstractSimiScreen extends Screen {
 
     @Override
     public void tick() {
-        for (GuiEventListener listener : children()) {
+        for (Element listener : children()) {
             if (listener instanceof TickableGuiEventListener tickable) {
                 tickable.tick();
             }
@@ -67,40 +67,39 @@ public abstract class AbstractSimiScreen extends Screen {
     }
 
     @Override
-    public boolean isPauseScreen() {
+    public boolean shouldPause() {
         return false;
     }
 
     @SuppressWarnings("unchecked")
-    protected <W extends GuiEventListener & Renderable & NarratableEntry> void addRenderableWidgets(W... widgets) {
+    protected <W extends Element & Drawable & Selectable> void addRenderableWidgets(W... widgets) {
         for (W widget : widgets) {
-            addRenderableWidget(widget);
+            addDrawableChild(widget);
         }
     }
 
-    protected <W extends GuiEventListener & Renderable & NarratableEntry> void addRenderableWidgets(Collection<W> widgets) {
+    protected <W extends Element & Drawable & Selectable> void addRenderableWidgets(Collection<W> widgets) {
         for (W widget : widgets) {
-            addRenderableWidget(widget);
+            addDrawableChild(widget);
         }
     }
 
-    protected void removeWidgets(GuiEventListener... widgets) {
-        for (GuiEventListener widget : widgets) {
-            removeWidget(widget);
+    protected void removeWidgets(Element... widgets) {
+        for (Element widget : widgets) {
+            remove(widget);
         }
     }
 
-    protected void removeWidgets(Collection<? extends GuiEventListener> widgets) {
-        for (GuiEventListener widget : widgets) {
-            removeWidget(widget);
+    protected void removeWidgets(Collection<? extends Element> widgets) {
+        for (Element widget : widgets) {
+            remove(widget);
         }
     }
 
     @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
-        partialTicks = NavigatableSimiScreen.currentlyRenderingPreviousScreen ? 0 : AnimationTickHolder.getPartialTicksUI(
-            minecraft.getDeltaTracker());
-        Matrix3x2fStack poseStack = graphics.pose();
+    public void render(DrawContext graphics, int mouseX, int mouseY, float partialTicks) {
+        partialTicks = NavigatableSimiScreen.currentlyRenderingPreviousScreen ? 0 : AnimationTickHolder.getPartialTicksUI(client.getRenderTickCounter());
+        Matrix3x2fStack poseStack = graphics.getMatrices();
 
         poseStack.pushMatrix();
 
@@ -109,9 +108,8 @@ public abstract class AbstractSimiScreen extends Screen {
         renderWindowBackground(graphics, mouseX, mouseY, partialTicks);
         renderWindow(graphics, mouseX, mouseY, partialTicks);
 
-        for (Renderable renderable : getRenderables()) {
+        for (Drawable renderable : getRenderables())
             renderable.render(graphics, mouseX, mouseY, partialTicks);
-        }
 
         renderWindowForeground(graphics, mouseX, mouseY, partialTicks);
 
@@ -121,24 +119,22 @@ public abstract class AbstractSimiScreen extends Screen {
     }
 
     @Override
-    public boolean keyPressed(KeyEvent input) {
+    public boolean keyPressed(KeyInput input) {
         boolean keyPressed = super.keyPressed(input);
-        if (keyPressed || getFocused() != null) {
+        if (keyPressed || getFocused() != null)
             return keyPressed;
-        }
 
-        if (this.minecraft.options.keyInventory.matches(input)) {
-            this.onClose();
+        if (this.client.options.inventoryKey.matchesKey(input)) {
+            this.close();
             return true;
         }
 
         boolean consumed = false;
 
-        for (GuiEventListener widget : children()) {
+        for (Element widget : children()) {
             if (widget instanceof AbstractSimiWidget simiWidget) {
-                if (simiWidget.keyPressed(input)) {
+                if (simiWidget.keyPressed(input))
                     consumed = true;
-                }
             }
         }
 
@@ -148,33 +144,32 @@ public abstract class AbstractSimiScreen extends Screen {
     protected void prepareFrame() {
     }
 
-    protected void renderWindowBackground(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
-        renderMenuBackground(graphics);
+    protected void renderWindowBackground(DrawContext graphics, int mouseX, int mouseY, float partialTicks) {
+        renderDarkening(graphics);
     }
 
-    protected abstract void renderWindow(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks);
+    protected abstract void renderWindow(DrawContext graphics, int mouseX, int mouseY, float partialTicks);
 
-    protected void renderWindowForeground(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
+    protected void renderWindowForeground(DrawContext graphics, int mouseX, int mouseY, float partialTicks) {
     }
 
     protected void endFrame() {
     }
 
     @Deprecated
-    protected void debugWindowArea(GuiGraphics graphics) {
+    protected void debugWindowArea(DrawContext graphics) {
         graphics.fill(guiLeft + windowWidth, guiTop + windowHeight, guiLeft, guiTop, 0xD3D3D3D3);
     }
 
-    protected List<Renderable> getRenderables() {
-        return this.renderables;
+    protected List<Drawable> getRenderables() {
+        return this.drawables;
     }
 
     @Override
-    public GuiEventListener getFocused() {
-        GuiEventListener focused = super.getFocused();
-        if (focused instanceof AbstractWidget && !focused.isFocused()) {
+    public Element getFocused() {
+        Element focused = super.getFocused();
+        if (focused instanceof ClickableWidget && !focused.isFocused())
             focused = null;
-        }
         setFocused(focused);
         return focused;
     }

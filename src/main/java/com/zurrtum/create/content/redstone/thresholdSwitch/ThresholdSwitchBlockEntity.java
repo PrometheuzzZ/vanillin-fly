@@ -16,17 +16,17 @@ import com.zurrtum.create.foundation.blockEntity.behaviour.inventory.VersionedIn
 import com.zurrtum.create.foundation.item.ItemHelper;
 import com.zurrtum.create.infrastructure.fluids.FluidInventory;
 import com.zurrtum.create.infrastructure.fluids.FluidStack;
-import net.minecraft.core.BlockPos;
-import net.minecraft.util.Mth;
-import net.minecraft.world.Clearable;
-import net.minecraft.world.Container;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
-import net.minecraft.world.ticks.TickPriority;
+import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.inventory.Inventory;
+import net.minecraft.item.ItemStack;
+import net.minecraft.storage.ReadView;
+import net.minecraft.storage.WriteView;
+import net.minecraft.util.Clearable;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.world.tick.TickPriority;
 
 import java.util.List;
 
@@ -64,27 +64,27 @@ public class ThresholdSwitchBlockEntity extends SmartBlockEntity implements Clea
     }
 
     @Override
-    protected void read(ValueInput view, boolean clientPacket) {
-        onWhenAbove = view.getIntOr("OnAboveAmount", 0);
-        offWhenBelow = view.getIntOr("OffBelowAmount", 0);
-        currentLevel = view.getIntOr("CurrentAmount", 0);
-        currentMinLevel = view.getIntOr("CurrentMinAmount", 0);
-        currentMaxLevel = view.getIntOr("CurrentMaxAmount", 0);
-        inStacks = view.getBooleanOr("InStacks", false);
-        redstoneState = view.getBooleanOr("Powered", false);
-        inverted = view.getBooleanOr("Inverted", false);
-        poweredAfterDelay = view.getBooleanOr("PoweredAfterDelay", false);
+    protected void read(ReadView view, boolean clientPacket) {
+        onWhenAbove = view.getInt("OnAboveAmount", 0);
+        offWhenBelow = view.getInt("OffBelowAmount", 0);
+        currentLevel = view.getInt("CurrentAmount", 0);
+        currentMinLevel = view.getInt("CurrentMinAmount", 0);
+        currentMaxLevel = view.getInt("CurrentMaxAmount", 0);
+        inStacks = view.getBoolean("InStacks", false);
+        redstoneState = view.getBoolean("Powered", false);
+        inverted = view.getBoolean("Inverted", false);
+        poweredAfterDelay = view.getBoolean("PoweredAfterDelay", false);
         super.read(view, clientPacket);
     }
 
-    protected void writeCommon(ValueOutput view) {
+    protected void writeCommon(WriteView view) {
         view.putFloat("OnAboveAmount", onWhenAbove);
         view.putFloat("OffBelowAmount", offWhenBelow);
         view.putBoolean("Inverted", inverted);
     }
 
     @Override
-    public void write(ValueOutput view, boolean clientPacket) {
+    public void write(WriteView view, boolean clientPacket) {
         writeCommon(view);
         view.putInt("CurrentAmount", currentLevel);
         view.putInt("CurrentMinAmount", currentMinLevel);
@@ -96,7 +96,7 @@ public class ThresholdSwitchBlockEntity extends SmartBlockEntity implements Clea
     }
 
     @Override
-    public void writeSafe(ValueOutput view) {
+    public void writeSafe(WriteView view) {
         writeCommon(view);
         super.writeSafe(view);
     }
@@ -119,7 +119,7 @@ public class ThresholdSwitchBlockEntity extends SmartBlockEntity implements Clea
         int prevMaxLevel = currentMaxLevel;
 
         BlockPos target = getTargetPos();
-        BlockEntity targetBlockEntity = level.getBlockEntity(target);
+        BlockEntity targetBlockEntity = world.getBlockEntity(target);
 
         observedInventory.findNewCapability();
         observedTank.findNewCapability();
@@ -143,24 +143,22 @@ public class ThresholdSwitchBlockEntity extends SmartBlockEntity implements Clea
             if (observedInventory.hasInventory()) {
 
                 // Item inventory
-                Container inv = observedInventory.getInventory();
+                Inventory inv = observedInventory.getInventory();
                 if (invVersionTracker.stillWaiting(inv)) {
                     currentLevel = prevLevel;
                     currentMaxLevel = prevMaxLevel;
 
                 } else {
                     invVersionTracker.awaitNewVersion(inv);
-                    for (int slot = 0, size = inv.getContainerSize(); slot < size; slot++) {
-                        ItemStack stackInSlot = inv.getItem(slot);
-                        int space = stackInSlot.isEmpty() ? 64 : inv.getMaxStackSize(stackInSlot);
-                        if (space == 0) {
+                    for (int slot = 0, size = inv.size(); slot < size; slot++) {
+                        ItemStack stackInSlot = inv.getStack(slot);
+                        int space = stackInSlot.isEmpty() ? 64 : inv.getMaxCount(stackInSlot);
+                        if (space == 0)
                             continue;
-                        }
 
                         currentMaxLevel += space;
-                        if (filtering.test(stackInSlot)) {
+                        if (filtering.test(stackInSlot))
                             currentLevel += stackInSlot.getCount();
-                        }
                     }
                 }
             }
@@ -171,14 +169,12 @@ public class ThresholdSwitchBlockEntity extends SmartBlockEntity implements Clea
                 for (int slot = 0, size = tank.size(); slot < size; slot++) {
                     FluidStack stackInSlot = tank.getStack(slot);
                     int space = tank.getMaxAmount(stackInSlot);
-                    if (space == 0) {
+                    if (space == 0)
                         continue;
-                    }
 
                     currentMaxLevel += space;
-                    if (filtering.test(stackInSlot)) {
+                    if (filtering.test(stackInSlot))
                         currentLevel += stackInSlot.getAmount();
-                    }
                 }
             }
 
@@ -186,11 +182,10 @@ public class ThresholdSwitchBlockEntity extends SmartBlockEntity implements Clea
             // No compatible inventories found
             currentMinLevel = -1;
             currentMaxLevel = -1;
-            if (currentLevel == -1) {
+            if (currentLevel == -1)
                 return;
-            }
 
-            level.setBlock(worldPosition, getBlockState().setValue(ThresholdSwitchBlock.LEVEL, 0), Block.UPDATE_ALL);
+            world.setBlockState(pos, getCachedState().with(ThresholdSwitchBlock.LEVEL, 0), Block.NOTIFY_ALL);
             currentLevel = -1;
             redstoneState = false;
             sendData();
@@ -198,42 +193,35 @@ public class ThresholdSwitchBlockEntity extends SmartBlockEntity implements Clea
             return;
         }
 
-        currentLevel = Mth.clamp(currentLevel, currentMinLevel, currentMaxLevel);
+        currentLevel = MathHelper.clamp(currentLevel, currentMinLevel, currentMaxLevel);
         changed = currentLevel != prevLevel;
 
         boolean previouslyPowered = redstoneState;
-        if (redstoneState && currentLevel <= offWhenBelow) {
+        if (redstoneState && currentLevel <= offWhenBelow)
             redstoneState = false;
-        } else if (!redstoneState && currentLevel >= onWhenAbove) {
+        else if (!redstoneState && currentLevel >= onWhenAbove)
             redstoneState = true;
-        }
         boolean update = previouslyPowered != redstoneState;
 
         int displayLevel = 0;
         float normedLevel = (float) (currentLevel - currentMinLevel) / (currentMaxLevel - currentMinLevel);
-        if (currentLevel > 0) {
+        if (currentLevel > 0)
             displayLevel = (int) (1 + normedLevel * 4);
-        }
-        level.setBlock(
-            worldPosition,
-            getBlockState().setValue(ThresholdSwitchBlock.LEVEL, displayLevel),
-            update ? 3 : 2
-        );
+        world.setBlockState(pos, getCachedState().with(ThresholdSwitchBlock.LEVEL, displayLevel), update ? 3 : 2);
 
-        if (update) {
+        if (update)
             scheduleBlockTick();
-        }
 
         if (changed || update) {
-            DisplayLinkBlock.notifyGatherers(level, worldPosition);
+            DisplayLinkBlock.notifyGatherers(world, pos);
             notifyUpdate();
         }
     }
 
     private boolean isSuitableInventory(BlockEntity be) {
         return be != null && !(be instanceof StockTickerBlockEntity || ItemHelper.getInventory(
-            level,
-            be.getBlockPos(),
+            world,
+            be.getPos(),
             null,
             be,
             null
@@ -241,49 +229,47 @@ public class ThresholdSwitchBlockEntity extends SmartBlockEntity implements Clea
     }
 
     public BlockPos getTargetPos() {
-        return worldPosition.relative(ThresholdSwitchBlock.getTargetDirection(getBlockState()));
+        return pos.offset(ThresholdSwitchBlock.getTargetDirection(getCachedState()));
     }
 
     public ItemStack getDisplayItemForScreen() {
         BlockPos target = getTargetPos();
-        return new ItemStack(level.getBlockState(target).getBlock());
+        return new ItemStack(world.getBlockState(target).getBlock());
     }
 
     public static enum ThresholdType {
-        UNSUPPORTED, ITEM, FLUID, CUSTOM;
+        UNSUPPORTED,
+        ITEM,
+        FLUID,
+        CUSTOM;
     }
 
     public ThresholdType getTypeOfCurrentTarget() {
-        if (observedInventory.hasInventory()) {
+        if (observedInventory.hasInventory())
             return ThresholdType.ITEM;
-        }
-        if (observedTank.hasInventory()) {
+        if (observedTank.hasInventory())
             return ThresholdType.FLUID;
-        }
-        if (level.getBlockEntity(getTargetPos()) instanceof ThresholdSwitchObservable) {
+        if (world.getBlockEntity(getTargetPos()) instanceof ThresholdSwitchObservable)
             return ThresholdType.CUSTOM;
-        }
         return ThresholdType.UNSUPPORTED;
     }
 
     protected void scheduleBlockTick() {
-        Block block = getBlockState().getBlock();
-        if (!level.getBlockTicks().willTickThisTick(worldPosition, block)) {
-            level.scheduleTick(worldPosition, block, 2, TickPriority.NORMAL);
-        }
+        Block block = getCachedState().getBlock();
+        if (!world.getBlockTickScheduler().isTicking(pos, block))
+            world.scheduleBlockTick(pos, block, 2, TickPriority.NORMAL);
     }
 
     @Override
     public void lazyTick() {
         super.lazyTick();
-        if (level.isClientSide()) {
+        if (world.isClient())
             return;
-        }
         updateCurrentLevel();
     }
 
     @Override
-    public void clearContent() {
+    public void clear() {
         filtering.setFilter(ItemStack.EMPTY);
     }
 
@@ -296,10 +282,7 @@ public class ThresholdSwitchBlockEntity extends SmartBlockEntity implements Clea
 
         behaviours.add(invVersionTracker = new VersionedInventoryTrackerBehaviour(this));
 
-        InterfaceProvider towardBlockFacing = (w, p, s) -> new BlockFace(
-            p,
-            DirectedDirectionalBlock.getTargetDirection(s)
-        );
+        InterfaceProvider towardBlockFacing = (w, p, s) -> new BlockFace(p, DirectedDirectionalBlock.getTargetDirection(s));
 
         behaviours.add(observedInventory = new InvManipulationBehaviour(this, towardBlockFacing).bypassSidedness()
             .withFilter(this::isSuitableInventory));
@@ -320,7 +303,7 @@ public class ThresholdSwitchBlockEntity extends SmartBlockEntity implements Clea
 
     public void updatePowerAfterDelay() {
         poweredAfterDelay = shouldBePowered();
-        level.updateNeighborsAt(worldPosition, getBlockState().getBlock());
+        world.updateNeighbors(pos, getCachedState().getBlock());
         sendData();
     }
 
@@ -333,9 +316,8 @@ public class ThresholdSwitchBlockEntity extends SmartBlockEntity implements Clea
     }
 
     public void setInverted(boolean inverted) {
-        if (inverted == this.inverted) {
+        if (inverted == this.inverted)
             return;
-        }
         this.inverted = inverted;
         updatePowerAfterDelay();
     }

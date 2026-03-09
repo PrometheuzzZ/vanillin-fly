@@ -1,8 +1,8 @@
 package com.zurrtum.create.client.catnip.render;
 
-import net.minecraft.client.renderer.texture.TextureAtlas;
-import net.minecraft.client.renderer.texture.TextureAtlasSprite;
-import net.minecraft.resources.Identifier;
+import net.minecraft.client.texture.Sprite;
+import net.minecraft.client.texture.SpriteAtlasTexture;
+import net.minecraft.util.Identifier;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -14,7 +14,7 @@ public class StitchedSprite {
 
     protected final Identifier atlasLocation;
     protected final Identifier location;
-    protected TextureAtlasSprite sprite;
+    protected Sprite sprite;
 
     public StitchedSprite(Identifier atlas, Identifier location) {
         atlasLocation = atlas;
@@ -24,11 +24,11 @@ public class StitchedSprite {
 
     @SuppressWarnings("deprecation")
     public StitchedSprite(Identifier location) {
-        this(TextureAtlas.LOCATION_BLOCKS, location);
+        this(SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE, location);
     }
 
-    public static void onTextureStitchPost(TextureAtlas atlas) {
-        Identifier atlasLocation = atlas.location();
+    public static void onTextureStitchPost(SpriteAtlasTexture atlas) {
+        Identifier atlasLocation = atlas.getId();
         List<StitchedSprite> sprites = ALL.get(atlasLocation);
         if (sprites != null) {
             for (StitchedSprite sprite : sprites) {
@@ -37,7 +37,7 @@ public class StitchedSprite {
         }
     }
 
-    protected void loadSprite(TextureAtlas atlas) {
+    protected void loadSprite(SpriteAtlasTexture atlas) {
         sprite = atlas.getSprite(location);
     }
 
@@ -49,7 +49,7 @@ public class StitchedSprite {
         return location;
     }
 
-    public TextureAtlasSprite get() {
+    public Sprite get() {
         return sprite;
     }
 }

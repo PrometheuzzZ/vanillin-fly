@@ -1,31 +1,23 @@
 package com.zurrtum.create.client.flywheel.lib.model.baked;
 
 import com.mojang.blaze3d.pipeline.BlendFunction;
-import com.mojang.blaze3d.pipeline.RenderPipeline;
-import com.mojang.blaze3d.vertex.MeshData;
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.zurrtum.create.client.flywheel.api.material.Material;
 import com.zurrtum.create.client.flywheel.api.material.Transparency;
 import com.zurrtum.create.client.flywheel.api.model.Mesh;
 import com.zurrtum.create.client.flywheel.lib.material.CutoutShaders;
 import com.zurrtum.create.client.flywheel.lib.material.Materials;
 import com.zurrtum.create.client.flywheel.lib.material.SimpleMaterial;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.multiplayer.ClientLevel;
-import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.OutlineBufferSource;
-import net.minecraft.client.renderer.Sheets;
-import net.minecraft.client.renderer.SubmitNodeStorage;
-import net.minecraft.client.renderer.feature.FeatureRenderDispatcher;
-import net.minecraft.client.renderer.item.ItemStackRenderState;
-import net.minecraft.client.renderer.rendertype.RenderSetup;
-import net.minecraft.client.renderer.rendertype.RenderType;
-import net.minecraft.client.renderer.rendertype.RenderTypes;
-import net.minecraft.client.renderer.texture.OverlayTexture;
-import net.minecraft.world.item.ItemDisplayContext;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.BlockAndTintGetter;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.render.*;
+import net.minecraft.client.render.command.OrderedRenderCommandQueueImpl;
+import net.minecraft.client.render.command.RenderDispatcher;
+import net.minecraft.client.render.item.ItemRenderState;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.client.world.ClientWorld;
+import net.minecraft.item.ItemDisplayContext;
+import net.minecraft.item.ItemStack;
+import net.minecraft.util.Identifier;
+import net.minecraft.world.BlockRenderView;
 
 import java.util.*;
 
@@ -40,41 +32,40 @@ public class BakedItemModelBufferer {
         BlendFunction.TRANSLUCENT,
         Transparency.TRANSLUCENT
     );
-    static final List<RenderType> CHUNK_LAYERS = List.of(
-        Sheets.solidBlockSheet(),
-        Sheets.cutoutBlockSheet(),
-        Sheets.translucentItemSheet(),
-        RenderTypes.glint(),
-        RenderTypes.glintTranslucent(),
-        RenderTypes.entityGlint()
+    static final List<RenderLayer> CHUNK_LAYERS = List.of(
+        TexturedRenderLayers.getEntitySolid(),
+        TexturedRenderLayers.getEntityCutout(),
+        TexturedRenderLayers.getItemEntityTranslucentCull(),
+        RenderLayer.getGlint(),
+        RenderLayer.getGlintTranslucent(),
+        RenderLayer.getEntityGlint()
     );
 
     public static void bufferItemStack(
         ItemStack stack,
-        BlockAndTintGetter level,
+        BlockRenderView level,
         ItemDisplayContext displayContext,
         ResultConsumer resultConsumer,
         MeshResultConsumer meshResultConsumer
     ) {
         ThreadLocalObjects objects = THREAD_LOCAL_OBJECTS.get();
-        PoseStack poseStack = objects.identityPoseStack;
-        ClientLevel world = level instanceof ClientLevel clientWorld ? clientWorld : null;
+        MatrixStack poseStack = objects.identityPoseStack;
+        ClientWorld world = level instanceof ClientWorld clientWorld ? clientWorld : null;
         ItemMeshEmitterProvider provider = objects.provider;
         provider.setResultConsumer(resultConsumer, meshResultConsumer);
-        ItemStackRenderState state = objects.state;
-        FeatureRenderDispatcher dispatcher = objects.featureRenderDispatcher;
-        Minecraft.getInstance().getItemModelResolver().updateForTopItem(state, stack, displayContext, world, null, 0);
-        state.submit(poseStack, dispatcher.getSubmitNodeStorage(), 0, OverlayTexture.NO_OVERLAY, 0);
-        dispatcher.renderAllFeatures();
-        provider.endBatch();
+        ItemRenderState state = objects.state;
+        RenderDispatcher dispatcher = objects.featureRenderDispatcher;
+        MinecraftClient.getInstance().getItemModelManager().clearAndUpdate(state, stack, displayContext, world, null, 0);
+        state.render(poseStack, dispatcher.getQueue(), 0, OverlayTexture.DEFAULT_UV, 0);
+        dispatcher.render();
+        provider.draw();
     }
 
-    public static class ItemMeshEmitterProvider extends MultiBufferSource.BufferSource {
+    public static class ItemMeshEmitterProvider extends VertexConsumerProvider.Immediate {
         private final ThreadLocalObjects objects;
         private ResultConsumer resultConsumer;
         private MeshResultConsumer meshResultConsumer;
 
-        @SuppressWarnings("DataFlowIssue")
         private ItemMeshEmitterProvider(ThreadLocalObjects objects) {
             super(null, null);
             this.objects = objects;
@@ -85,32 +76,24 @@ public class BakedItemModelBufferer {
             this.meshResultConsumer = meshResultConsumer;
         }
 
-        private void emitMesh(RenderType renderType, Mesh mesh, boolean translucent) {
+        private void emitMesh(RenderLayer renderType, Mesh mesh, boolean translucent) {
             Material material = objects.materials.computeIfAbsent(renderType, ItemMeshEmitterProvider::createMaterial);
             meshResultConsumer.accept(renderType, material, mesh, translucent);
         }
 
-        private static Material createMaterial(RenderType renderLayer) {
-            RenderSetup state = renderLayer.state;
-            Map<String, RenderSetup.TextureBinding> textures = state.textures;
-            RenderSetup.TextureBinding texture = textures.get("Sampler0");
-            if (texture != null) {
-                SimpleMaterial.Builder builder = SimpleMaterial.builder().texture(texture.location()).mipmap(false);
-                if (!state.useLightmap) {
-                    builder.useLight(false);
-                }
-                if (!state.useOverlay) {
-                    builder.useOverlay(false);
-                }
-                RenderPipeline pipeline = renderLayer.pipeline();
-                Optional<BlendFunction> blendFunction = pipeline.getBlendFunction();
+        private static Material createMaterial(RenderLayer renderLayer) {
+            RenderLayer.MultiPhase layer = (RenderLayer.MultiPhase) renderLayer;
+            Optional<Identifier> id = layer.phases.texture.getId();
+            if (id.isPresent()) {
+                SimpleMaterial.Builder builder = SimpleMaterial.builder().texture(id.get()).mipmap(false);
+                Optional<BlendFunction> blendFunction = layer.pipeline.getBlendFunction();
                 if (blendFunction.isPresent()) {
                     Transparency transparency = TRANSPARENCY.get(blendFunction.get());
                     if (transparency != null) {
                         builder.transparency(transparency);
                     }
                 }
-                String cutout = pipeline.getShaderDefines().values().get("ALPHA_CUTOUT");
+                String cutout = layer.pipeline.getShaderDefines().values().get("ALPHA_CUTOUT");
                 if (cutout != null) {
                     if (cutout.equals("0.1")) {
                         builder.cutout(CutoutShaders.ONE_TENTH);
@@ -120,11 +103,11 @@ public class BakedItemModelBufferer {
                 }
                 return builder.build();
             }
-            return Materials.TRANSLUCENT_ITEM_ENTITY_ITEM;
+            return Materials.TRANSLUCENT_ENTITY;
         }
 
         @Override
-        public VertexConsumer getBuffer(RenderType layer) {
+        public VertexConsumer getBuffer(RenderLayer layer) {
             Integer index = objects.chunkLayers.get(layer);
             ItemMeshEmitter emitter;
             if (index == null) {
@@ -142,69 +125,68 @@ public class BakedItemModelBufferer {
         }
 
         @Override
-        public void endBatch() {
+        public void draw() {
             for (ItemMeshEmitter emitter : objects.emitters) {
                 emitter.end();
             }
         }
 
         @Override
-        public void endLastBatch() {
+        public void drawCurrentLayer() {
         }
 
         @Override
-        public void endBatch(RenderType type) {
+        public void draw(RenderLayer layer) {
         }
     }
 
     public interface ResultConsumer {
-        void accept(RenderType renderType, boolean shaded, MeshData data);
+        void accept(RenderLayer renderType, boolean shaded, BuiltBuffer data);
     }
 
     public interface MeshResultConsumer {
-        void accept(RenderType renderType, Material material, Mesh mesh, boolean translucent);
+        void accept(RenderLayer renderType, Material material, Mesh mesh, boolean translucent);
     }
 
-    private static final ThreadLocal<ThreadLocalObjects> THREAD_LOCAL_OBJECTS = ThreadLocal.withInitial(
-        ThreadLocalObjects::new);
+    private static final ThreadLocal<ThreadLocalObjects> THREAD_LOCAL_OBJECTS = ThreadLocal.withInitial(ThreadLocalObjects::new);
 
-    public static Map<RenderType, Integer> getChunkLayers() {
+    public static Map<RenderLayer, Integer> getChunkLayers() {
         return THREAD_LOCAL_OBJECTS.get().chunkLayers;
     }
 
     private static class ThreadLocalObjects {
-        public final PoseStack identityPoseStack = new PoseStack();
-        public final ItemStackRenderState state = new ItemStackRenderState();
+        public final MatrixStack identityPoseStack = new MatrixStack();
+        public final ItemRenderState state = new ItemRenderState();
         public final ItemMeshEmitterProvider provider = new ItemMeshEmitterProvider(this);
-        public final Map<RenderType, Material> materials = new HashMap<>();
-        public final Map<RenderType, Integer> chunkLayers = new HashMap<>();
+        public final Map<RenderLayer, Material> materials = new HashMap<>();
+        public final Map<RenderLayer, Integer> chunkLayers = new HashMap<>();
         public final List<ItemMeshEmitter> emitters = new ArrayList<>();
-        public final FeatureRenderDispatcher featureRenderDispatcher;
+        public final RenderDispatcher featureRenderDispatcher;
 
         {
-            Minecraft mc = Minecraft.getInstance();
-            featureRenderDispatcher = new FeatureRenderDispatcher(
-                new SubmitNodeStorage(),
-                mc.getBlockRenderer(),
+            MinecraftClient mc = MinecraftClient.getInstance();
+            featureRenderDispatcher = new RenderDispatcher(
+                new OrderedRenderCommandQueueImpl(),
+                mc.getBlockRenderManager(),
                 provider,
                 mc.getAtlasManager(),
                 EmptyOutlineBufferSource.INSTANCE,
                 EmptyBufferSource.INSTANCE,
-                mc.font
+                mc.textRenderer
             );
             for (int i = 0, size = CHUNK_LAYERS.size(); i < size; i++) {
-                RenderType renderType = CHUNK_LAYERS.get(i);
+                RenderLayer renderType = CHUNK_LAYERS.get(i);
                 chunkLayers.put(renderType, i);
                 emitters.add(new ItemMeshEmitter(renderType));
             }
         }
     }
 
-    private static class EmptyOutlineBufferSource extends OutlineBufferSource {
+    private static class EmptyOutlineBufferSource extends OutlineVertexConsumerProvider {
         public static final EmptyOutlineBufferSource INSTANCE = new EmptyOutlineBufferSource();
 
         @Override
-        public VertexConsumer getBuffer(RenderType renderType) {
+        public VertexConsumer getBuffer(RenderLayer renderType) {
             return EmptyVertexConsumer.INSTANCE;
         }
 
@@ -213,33 +195,32 @@ public class BakedItemModelBufferer {
         }
 
         @Override
-        public void endOutlineBatch() {
+        public void draw() {
         }
     }
 
-    private static class EmptyBufferSource extends MultiBufferSource.BufferSource {
+    private static class EmptyBufferSource extends VertexConsumerProvider.Immediate {
         public static final EmptyBufferSource INSTANCE = new EmptyBufferSource();
 
-        @SuppressWarnings("DataFlowIssue")
         public EmptyBufferSource() {
             super(null, null);
         }
 
         @Override
-        public VertexConsumer getBuffer(RenderType renderType) {
+        public VertexConsumer getBuffer(RenderLayer renderType) {
             return EmptyVertexConsumer.INSTANCE;
         }
 
         @Override
-        public void endLastBatch() {
+        public void drawCurrentLayer() {
         }
 
         @Override
-        public void endBatch() {
+        public void draw() {
         }
 
         @Override
-        public void endBatch(RenderType type) {
+        public void draw(RenderLayer type) {
         }
     }
 }

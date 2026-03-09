@@ -8,11 +8,10 @@ import dan200.computercraft.api.detail.VanillaDetailRegistries;
 import dan200.computercraft.api.lua.IArguments;
 import dan200.computercraft.api.lua.LuaException;
 import dan200.computercraft.api.lua.LuaFunction;
-import net.minecraft.core.RegistryAccess;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.Identifier;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.ItemLike;
+import net.minecraft.item.ItemConvertible;
+import net.minecraft.item.ItemStack;
+import net.minecraft.registry.Registries;
+import net.minecraft.util.Identifier;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -47,8 +46,8 @@ public class RedstoneRequesterPeripheral extends SyncedPeripheral<RedstoneReques
 
         PackageOrder order = new PackageOrder(orderStacks);
         PackageOrderWithCrafts.CraftingEntry orderContext = new PackageOrderWithCrafts.CraftingEntry(
-            new PackageOrder(
-            orderStacks.stream().map(stack -> new BigItemStack(stack.stack.copyWithCount(1))).toList()), count
+            new PackageOrder(orderStacks.stream()
+                .map(stack -> new BigItemStack(stack.stack.copyWithCount(1))).toList()), count
         );
 
         this.blockEntity.encodedRequest = new PackageOrderWithCrafts(order, List.of(orderContext));
@@ -60,13 +59,9 @@ public class RedstoneRequesterPeripheral extends SyncedPeripheral<RedstoneReques
         List<BigItemStack> stacks = blockEntity.encodedRequest.stacks();
         Map<Integer, Map<String, ?>> result = new HashMap<>();
         // Loop through the packageOrder get each bigItem stack
-        RegistryAccess registryAccess = blockEntity.getLevel().registryAccess();
         for (int i = 0; i < stacks.size(); i++) {
             ItemStack stack = stacks.get(i).stack;
-            Map<String, Object> details = new HashMap<>(VanillaDetailRegistries.ITEM_STACK.getDetails(
-                registryAccess,
-                stack
-            ));
+            Map<String, Object> details = new HashMap<>(VanillaDetailRegistries.ITEM_STACK.getDetails(stack));
             if (!details.get("name").equals("minecraft:air")) {
                 details.put("count", stacks.get(i).count);
                 result.put(i + 1, details); // +1 because lua
@@ -77,11 +72,10 @@ public class RedstoneRequesterPeripheral extends SyncedPeripheral<RedstoneReques
 
     @LuaFunction(mainThread = true)
     public final String getConfiguration() throws LuaException {
-        if (blockEntity.allowPartialRequests) {
+        if (blockEntity.allowPartialRequests)
             return "allow_partial";
-        } else {
+        else
             return "strict";
-        }
     }
 
     @LuaFunction(mainThread = true)
@@ -126,7 +120,7 @@ public class RedstoneRequesterPeripheral extends SyncedPeripheral<RedstoneReques
                 Object arg = arguments.get(i);
                 if (arg instanceof String itemName) {
                     Identifier resourceLocation = Identifier.tryParse(itemName);
-                    ItemLike item = BuiltInRegistries.ITEM.getValue(resourceLocation);
+                    ItemConvertible item = Registries.ITEM.get(resourceLocation);
                     list.add(new BigItemStack(new ItemStack(item), 1));
                 } else if (arg instanceof Map<?, ?> itemData) {
                     String itemName = "minecraft:air";
@@ -137,12 +131,11 @@ public class RedstoneRequesterPeripheral extends SyncedPeripheral<RedstoneReques
                     if (itemData.get("count") instanceof Number) {
                         Object countObj = itemData.get("count");
                         count = (countObj instanceof Number) ? ((Number) countObj).intValue() : 1;
-                        if (count > 256) {
+                        if (count > 256)
                             throw new LuaException("Count for item " + itemName + " exceeds 256");
-                        }
                     }
                     Identifier resourceLocation = Identifier.tryParse(itemName);
-                    ItemLike item = BuiltInRegistries.ITEM.getValue(resourceLocation);
+                    ItemConvertible item = Registries.ITEM.get(resourceLocation);
                     list.add(new BigItemStack(new ItemStack(item), count));
                 }
             }

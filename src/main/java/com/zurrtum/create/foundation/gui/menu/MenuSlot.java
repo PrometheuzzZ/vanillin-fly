@@ -1,24 +1,24 @@
 package com.zurrtum.create.foundation.gui.menu;
 
-import net.minecraft.world.Container;
-import net.minecraft.world.inventory.Slot;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.inventory.Inventory;
+import net.minecraft.item.ItemStack;
+import net.minecraft.screen.slot.Slot;
 
 public class MenuSlot extends Slot {
-    public MenuSlot(Container container, int slot, int x, int y) {
-        super(container, slot, x, y);
+    public MenuSlot(Inventory inventory, int index, int x, int y) {
+        super(inventory, index, x, y);
     }
 
     @Override
-    public ItemStack remove(int amount) {
-        return super.remove(Math.min(container.getMaxStackSize(getItem()), amount));
+    public ItemStack takeStack(int amount) {
+        return super.takeStack(Math.min(inventory.getMaxCount(getStack()), amount));
     }
 
     @Override
-    public boolean mayPlace(ItemStack itemStack) {
-        if (itemStack.isEmpty()) {
+    public boolean canInsert(ItemStack stack) {
+        if (stack.isEmpty()) {
             return false;
         }
-        return container.canPlaceItem(getContainerSlot(), itemStack);
+        return inventory.isValid(getIndex(), stack);
     }
 }

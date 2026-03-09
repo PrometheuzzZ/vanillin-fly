@@ -3,26 +3,24 @@ package com.zurrtum.create.client.content.contraptions.mounted;
 import com.zurrtum.create.catnip.math.VecHelper;
 import com.zurrtum.create.client.foundation.blockEntity.behaviour.CenteredSideValueBoxTransform;
 import com.zurrtum.create.content.contraptions.mounted.CartAssemblerBlock;
-import net.minecraft.core.Direction;
-import net.minecraft.world.level.block.state.properties.RailShape;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.block.enums.RailShape;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Vec3d;
 
 public class CartAssemblerValueBoxTransform extends CenteredSideValueBoxTransform {
     public CartAssemblerValueBoxTransform() {
         super((state, d) -> {
-            if (d.getAxis().isVertical()) {
+            if (d.getAxis().isVertical())
                 return false;
-            }
-            if (!state.hasProperty(CartAssemblerBlock.RAIL_SHAPE)) {
+            if (!state.contains(CartAssemblerBlock.RAIL_SHAPE))
                 return false;
-            }
-            RailShape railShape = state.getValue(CartAssemblerBlock.RAIL_SHAPE);
+            RailShape railShape = state.get(CartAssemblerBlock.RAIL_SHAPE);
             return (d.getAxis() == Direction.Axis.X) == (railShape == RailShape.NORTH_SOUTH);
         });
     }
 
     @Override
-    protected Vec3 getSouthLocation() {
+    protected Vec3d getSouthLocation() {
         return VecHelper.voxelSpace(8, 7, 17.5);
     }
 }

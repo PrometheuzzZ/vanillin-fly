@@ -6,12 +6,12 @@ import com.zurrtum.create.compat.eiv.EivCommonPlugin;
 import com.zurrtum.create.content.processing.recipe.ProcessingOutput;
 import com.zurrtum.create.content.processing.sequenced.SequencedAssemblyRecipe;
 import de.crafty.eiv.common.api.recipe.EivRecipeType;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.Tag;
-import net.minecraft.resources.RegistryOps;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.crafting.Recipe;
-import net.minecraft.world.item.crafting.RecipeHolder;
+import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NbtCompound;
+import net.minecraft.nbt.NbtElement;
+import net.minecraft.recipe.Recipe;
+import net.minecraft.recipe.RecipeEntry;
+import net.minecraft.registry.RegistryOps;
 
 import java.util.List;
 
@@ -25,7 +25,7 @@ public class SequencedAssemblyDisplay extends CreateDisplay {
     public SequencedAssemblyDisplay() {
     }
 
-    public SequencedAssemblyDisplay(RecipeHolder<SequencedAssemblyRecipe> entry) {
+    public SequencedAssemblyDisplay(RecipeEntry<SequencedAssemblyRecipe> entry) {
         SequencedAssemblyRecipe recipe = entry.value();
         ingredient = getItemStacks(recipe.ingredient());
         result = recipe.result();
@@ -35,21 +35,21 @@ public class SequencedAssemblyDisplay extends CreateDisplay {
     }
 
     @Override
-    public void writeToTag(CompoundTag tag) {
-        RegistryOps<Tag> ops = getServerOps();
-        tag.store("ingredient", STACKS_CODEC, ops, ingredient);
-        tag.store("result", ProcessingOutput.CODEC, ops, result);
+    public void writeToTag(NbtCompound tag) {
+        RegistryOps<NbtElement> ops = getServerOps();
+        tag.put("ingredient", STACKS_CODEC, ops, ingredient);
+        tag.put("result", ProcessingOutput.CODEC, ops, result);
         tag.putInt("loops", loops);
-        tag.store("sequence", SEQUENCE_CODEC, ops, sequence);
+        tag.put("sequence", SEQUENCE_CODEC, ops, sequence);
     }
 
     @Override
-    public void loadFromTag(CompoundTag tag) {
-        RegistryOps<Tag> ops = getClientOps();
-        ingredient = tag.read("ingredient", STACKS_CODEC, ops).orElseThrow();
-        result = tag.read("result", ProcessingOutput.CODEC, ops).orElseThrow();
-        loops = tag.getIntOr("loops", 1);
-        sequence = tag.read("sequence", SEQUENCE_CODEC, ops).orElseThrow();
+    public void loadFromTag(NbtCompound tag) {
+        RegistryOps<NbtElement> ops = getClientOps();
+        ingredient = tag.get("ingredient", STACKS_CODEC, ops).orElseThrow();
+        result = tag.get("result", ProcessingOutput.CODEC, ops).orElseThrow();
+        loops = tag.getInt("loops", 1);
+        sequence = tag.get("sequence", SEQUENCE_CODEC, ops).orElseThrow();
     }
 
     @Override

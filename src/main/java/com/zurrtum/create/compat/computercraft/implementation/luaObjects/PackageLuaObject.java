@@ -6,8 +6,7 @@ import com.zurrtum.create.content.logistics.packager.PackagerBlockEntity;
 import com.zurrtum.create.infrastructure.items.ItemStackHandler;
 import dan200.computercraft.api.lua.LuaException;
 import dan200.computercraft.api.lua.LuaFunction;
-import net.minecraft.core.RegistryAccess;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.item.ItemStack;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -35,29 +34,27 @@ public class PackageLuaObject implements LuaComparable {
 
     @LuaFunction(mainThread = true)
     public final String getAddress() throws LuaException {
-        if (isEditable()) {
+        if (isEditable())
             this.address = PackageItem.getAddress(box);
-        }
         return this.address;
     }
 
     @LuaFunction(mainThread = true)
     public final void setAddress(String argument) throws LuaException {
-        if (!isEditable()) {
+        if (!isEditable())
             throw new LuaException("Package is not editable");
-        }
         PackageItem.addAddress(box, argument);
         this.address = argument;
     }
 
     @LuaFunction(mainThread = true)
     public Map<Integer, Map<String, ?>> list() {
-        return ComputerUtil.list(blockEntity.getLevel().registryAccess(), PackageItem.getContents(box));
+        return ComputerUtil.list(PackageItem.getContents(box));
     }
 
     @LuaFunction(mainThread = true)
     public Map<String, ?> getItemDetail(int slot) throws LuaException {
-        return ComputerUtil.getItemDetail(blockEntity.getLevel().registryAccess(), PackageItem.getContents(box), slot);
+        return ComputerUtil.getItemDetail(PackageItem.getContents(box), slot);
     }
 
     public boolean hasOrderData() {
@@ -67,9 +64,8 @@ public class PackageLuaObject implements LuaComparable {
     @LuaFunction(mainThread = true)
     public final PackageOrderLuaObject getOrderData() throws LuaException {
 
-        if (!hasOrderData()) {
+        if (!hasOrderData())
             return null;
-        }
 
         return new PackageOrderLuaObject(this);
     }
@@ -78,11 +74,10 @@ public class PackageLuaObject implements LuaComparable {
         ItemStackHandler results = PackageItem.getContents(box);
         List<LuaItemStack> result = new ArrayList<>();
 
-        RegistryAccess registryAccess = blockEntity.getLevel().registryAccess();
-        for (int i = 0; i < results.getContainerSize(); i++) {
-            ItemStack stack = results.getItem(i);
+        for (int i = 0; i < results.size(); i++) {
+            ItemStack stack = results.getStack(i);
             if (!stack.isEmpty()) {
-                result.add(new LuaItemStack(registryAccess, stack));
+                result.add(new LuaItemStack(stack));
             }
         }
 
@@ -97,9 +92,8 @@ public class PackageLuaObject implements LuaComparable {
             // Lazy getter so we don't need to get the contents if we don't need to
             map.put("contents", getLuaItemStacks());
 
-            if (hasOrderData()) {
+            if (hasOrderData())
                 map.put("orderData", getOrderData());
-            }
             return map;
 
         } catch (LuaException e) {

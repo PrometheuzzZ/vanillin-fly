@@ -1,8 +1,8 @@
 package com.zurrtum.create.content.kinetics.belt.transport;
 
 import com.zurrtum.create.infrastructure.items.ItemInventory;
-import net.minecraft.core.component.DataComponents;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.component.DataComponentTypes;
+import net.minecraft.item.ItemStack;
 
 public class ItemHandlerBeltSegment implements ItemInventory {
     private final BeltInventory beltInventory;
@@ -14,12 +14,12 @@ public class ItemHandlerBeltSegment implements ItemInventory {
     }
 
     @Override
-    public int getContainerSize() {
+    public int size() {
         return 1;
     }
 
     @Override
-    public boolean canPlaceItem(int slot, ItemStack stack) {
+    public boolean isValid(int slot, ItemStack stack) {
         return beltInventory.canInsertAt(offset);
     }
 
@@ -30,46 +30,39 @@ public class ItemHandlerBeltSegment implements ItemInventory {
     }
 
     @Override
-    public ItemStack getItem(int slot) {
-        if (slot != 0) {
+    public ItemStack getStack(int slot) {
+        if (slot != 0)
             return ItemStack.EMPTY;
-        }
         TransportedItemStack stackAtOffset = beltInventory.getStackAtOffset(offset);
-        if (stackAtOffset == null) {
+        if (stackAtOffset == null)
             return ItemStack.EMPTY;
-        }
         return stackAtOffset.stack;
     }
 
     @Override
-    public ItemStack removeItem(int slot, int amount) {
-        if (slot != 0) {
+    public ItemStack removeStack(int slot, int amount) {
+        if (slot != 0)
             return ItemStack.EMPTY;
-        }
         TransportedItemStack transported = this.beltInventory.getStackAtOffset(offset);
-        if (transported == null) {
+        if (transported == null)
             return ItemStack.EMPTY;
-        }
 
         amount = Math.min(amount, transported.stack.getCount());
         ItemStack extracted = transported.stack.split(amount);
-        if (transported.stack.isEmpty()) {
+        if (transported.stack.isEmpty())
             beltInventory.toRemove.add(transported);
-        } else {
-            setChanged();
-        }
+        else
+            markDirty();
         return extracted;
     }
 
     @Override
-    public ItemStack removeItemNoUpdate(int slot) {
-        if (slot != 0) {
+    public ItemStack removeStack(int slot) {
+        if (slot != 0)
             return ItemStack.EMPTY;
-        }
         TransportedItemStack transported = this.beltInventory.getStackAtOffset(offset);
-        if (transported == null) {
+        if (transported == null)
             return ItemStack.EMPTY;
-        }
         beltInventory.toRemove.add(transported);
         ItemStack stack = transported.stack;
         transported.stack = ItemStack.EMPTY;
@@ -77,15 +70,14 @@ public class ItemHandlerBeltSegment implements ItemInventory {
     }
 
     @Override
-    public void setItem(int slot, ItemStack stack) {
+    public void setStack(int slot, ItemStack stack) {
         if (slot != 0) {
             return;
         }
         if (stack.isEmpty()) {
             TransportedItemStack transported = this.beltInventory.getStackAtOffset(offset);
-            if (transported == null || transported.stack.isEmpty()) {
+            if (transported == null || transported.stack.isEmpty())
                 return;
-            }
             beltInventory.toRemove.add(transported);
             transported.stack = stack;
         } else {
@@ -98,12 +90,12 @@ public class ItemHandlerBeltSegment implements ItemInventory {
     }
 
     @Override
-    public void setChanged() {
+    public void markDirty() {
         beltInventory.belt.notifyUpdate();
     }
 
     @Override
-    public int getMaxStackSize(ItemStack stack) {
-        return stack.getOrDefault(DataComponents.MAX_STACK_SIZE, 64);
+    public int getMaxCount(ItemStack stack) {
+        return stack.getOrDefault(DataComponentTypes.MAX_STACK_SIZE, 64);
     }
 }

@@ -6,31 +6,31 @@ import com.zurrtum.create.AllShapes;
 import com.zurrtum.create.catnip.placement.IPlacementHelper;
 import com.zurrtum.create.catnip.placement.PlacementHelpers;
 import com.zurrtum.create.catnip.placement.PlacementOffset;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.core.Direction.Axis;
-import net.minecraft.world.InteractionHand;
-import net.minecraft.world.InteractionResult;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.BlockItem;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.context.BlockPlaceContext;
-import net.minecraft.world.level.BlockAndTintGetter;
-import net.minecraft.world.level.BlockGetter;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.Mirror;
-import net.minecraft.world.level.block.Rotation;
-import net.minecraft.world.level.block.TrapDoorBlock;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.StateDefinition;
-import net.minecraft.world.level.block.state.properties.BlockStateProperties;
-import net.minecraft.world.level.block.state.properties.EnumProperty;
-import net.minecraft.world.level.block.state.properties.Half;
-import net.minecraft.world.level.pathfinder.PathComputationType;
-import net.minecraft.world.phys.BlockHitResult;
-import net.minecraft.world.phys.shapes.CollisionContext;
-import net.minecraft.world.phys.shapes.VoxelShape;
+import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.ShapeContext;
+import net.minecraft.block.TrapdoorBlock;
+import net.minecraft.block.enums.BlockHalf;
+import net.minecraft.entity.ai.pathing.NavigationType;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.item.BlockItem;
+import net.minecraft.item.ItemPlacementContext;
+import net.minecraft.item.ItemStack;
+import net.minecraft.state.StateManager;
+import net.minecraft.state.property.EnumProperty;
+import net.minecraft.state.property.Properties;
+import net.minecraft.util.ActionResult;
+import net.minecraft.util.BlockMirror;
+import net.minecraft.util.BlockRotation;
+import net.minecraft.util.Hand;
+import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Direction.Axis;
+import net.minecraft.util.shape.VoxelShape;
+import net.minecraft.world.BlockRenderView;
+import net.minecraft.world.BlockView;
+import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
@@ -38,13 +38,13 @@ import java.util.function.Predicate;
 
 public class CopycatPanelBlock extends WaterloggedCopycatBlock {
 
-    public static final EnumProperty<Direction> FACING = BlockStateProperties.FACING;
+    public static final EnumProperty<Direction> FACING = Properties.FACING;
 
     private static final int placementHelperId = PlacementHelpers.register(new PlacementHelper());
 
-    public CopycatPanelBlock(Properties pProperties) {
+    public CopycatPanelBlock(Settings pProperties) {
         super(pProperties);
-        registerDefaultState(defaultBlockState().setValue(FACING, Direction.UP));
+        setDefaultState(getDefaultState().with(FACING, Direction.UP));
     }
 
     @Override
@@ -54,109 +54,93 @@ public class CopycatPanelBlock extends WaterloggedCopycatBlock {
 
     @Override
     public BlockState prepareMaterial(
-        Level pLevel,
+        World pLevel,
         BlockPos pPos,
         BlockState pState,
-        Player pPlayer,
-        InteractionHand pHand,
+        PlayerEntity pPlayer,
+        Hand pHand,
         BlockHitResult pHit,
         BlockState material
     ) {
-        if (!CopycatSpecialCases.isTrapdoorMaterial(material)) {
+        if (!CopycatSpecialCases.isTrapdoorMaterial(material))
             return super.prepareMaterial(pLevel, pPos, pState, pPlayer, pHand, pHit, material);
-        }
 
-        Direction panelFacing = pState.getValue(FACING);
-        if (panelFacing == Direction.DOWN) {
-            material = material.setValue(TrapDoorBlock.HALF, Half.TOP);
-        }
-        if (panelFacing.getAxis() == Axis.Y) {
-            return material.setValue(TrapDoorBlock.FACING, pPlayer.getDirection()).setValue(TrapDoorBlock.OPEN, false);
-        }
+        Direction panelFacing = pState.get(FACING);
+        if (panelFacing == Direction.DOWN)
+            material = material.with(TrapdoorBlock.HALF, BlockHalf.TOP);
+        if (panelFacing.getAxis() == Axis.Y)
+            return material.with(TrapdoorBlock.FACING, pPlayer.getHorizontalFacing()).with(TrapdoorBlock.OPEN, false);
 
-        boolean clickedNearTop = pHit.getLocation().y - .5 > pPos.getY();
-        return material.setValue(TrapDoorBlock.OPEN, true)
-            .setValue(TrapDoorBlock.HALF, clickedNearTop ? Half.TOP : Half.BOTTOM)
-            .setValue(TrapDoorBlock.FACING, panelFacing);
+        boolean clickedNearTop = pHit.getPos().y - .5 > pPos.getY();
+        return material.with(TrapdoorBlock.OPEN, true).with(TrapdoorBlock.HALF, clickedNearTop ? BlockHalf.TOP : BlockHalf.BOTTOM)
+            .with(TrapdoorBlock.FACING, panelFacing);
     }
 
     @Override
-    protected InteractionResult useItemOn(
+    protected ActionResult onUseWithItem(
         ItemStack stack,
         BlockState state,
-        Level level,
+        World level,
         BlockPos pos,
-        Player player,
-        InteractionHand hand,
+        PlayerEntity player,
+        Hand hand,
         BlockHitResult hitResult
     ) {
-        if (!player.isShiftKeyDown() && player.mayBuild()) {
+        if (!player.isSneaking() && player.canModifyBlocks()) {
             IPlacementHelper placementHelper = PlacementHelpers.get(placementHelperId);
             if (placementHelper.matchesItem(stack)) {
-                placementHelper.getOffset(player, level, state, pos, hitResult)
-                    .placeInWorld(level, (BlockItem) stack.getItem(), player, hand);
-                return InteractionResult.SUCCESS;
+                placementHelper.getOffset(player, level, state, pos, hitResult).placeInWorld(level, (BlockItem) stack.getItem(), player, hand);
+                return ActionResult.SUCCESS;
             }
         }
 
-        return super.useItemOn(stack, state, level, pos, player, hand, hitResult);
+        return super.onUseWithItem(stack, state, level, pos, player, hand, hitResult);
     }
 
     @Override
     public boolean isIgnoredConnectivitySide(
-        BlockAndTintGetter reader,
+        BlockRenderView reader,
         BlockState state,
         Direction face,
         @Nullable BlockPos fromPos,
         @Nullable BlockPos toPos
     ) {
-        if (fromPos == null || toPos == null) {
+        if (fromPos == null || toPos == null)
             return true;
-        }
 
-        Direction facing = state.getValue(FACING);
+        Direction facing = state.get(FACING);
         BlockState toState = reader.getBlockState(toPos);
 
-        if (!toState.is(this)) {
+        if (!toState.isOf(this))
             return facing != face.getOpposite();
-        }
 
         BlockPos diff = fromPos.subtract(toPos);
         int coord = facing.getAxis().choose(diff.getX(), diff.getY(), diff.getZ());
-        return facing == toState.getValue(FACING).getOpposite() && !(coord != 0 && coord == facing.getAxisDirection()
-            .getStep());
+        return facing == toState.get(FACING).getOpposite() && !(coord != 0 && coord == facing.getDirection().offset());
     }
 
     @Override
-    public boolean canConnectTexturesToward(
-        BlockAndTintGetter reader,
-        BlockPos fromPos,
-        BlockPos toPos,
-        BlockState state
-    ) {
-        Direction facing = state.getValue(FACING);
+    public boolean canConnectTexturesToward(BlockRenderView reader, BlockPos fromPos, BlockPos toPos, BlockState state) {
+        Direction facing = state.get(FACING);
         BlockState toState = reader.getBlockState(toPos);
 
-        if (toPos.equals(fromPos.relative(facing))) {
+        if (toPos.equals(fromPos.offset(facing)))
             return false;
-        }
 
         BlockPos diff = fromPos.subtract(toPos);
         int coord = facing.getAxis().choose(diff.getX(), diff.getY(), diff.getZ());
 
-        if (!toState.is(this)) {
-            return coord != -facing.getAxisDirection().getStep();
-        }
+        if (!toState.isOf(this))
+            return coord != -facing.getDirection().offset();
 
-        if (isOccluded(state, toState, facing)) {
+        if (isOccluded(state, toState, facing))
             return true;
-        }
-        return toState.setValue(WATERLOGGED, false) == state.setValue(WATERLOGGED, false) && coord == 0;
+        return toState.with(WATERLOGGED, false) == state.with(WATERLOGGED, false) && coord == 0;
     }
 
     @Override
     public boolean canFaceBeOccluded(BlockState state, Direction face) {
-        return state.getValue(FACING).getOpposite() == face;
+        return state.get(FACING).getOpposite() == face;
     }
 
     @Override
@@ -165,23 +149,23 @@ public class CopycatPanelBlock extends WaterloggedCopycatBlock {
     }
 
     @Override
-    public BlockState getStateForPlacement(BlockPlaceContext pContext) {
-        BlockState stateForPlacement = super.getStateForPlacement(pContext);
-        return stateForPlacement.setValue(FACING, pContext.getNearestLookingDirection().getOpposite());
+    public BlockState getPlacementState(ItemPlacementContext pContext) {
+        BlockState stateForPlacement = super.getPlacementState(pContext);
+        return stateForPlacement.with(FACING, pContext.getPlayerLookDirection().getOpposite());
     }
 
     @Override
-    protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> pBuilder) {
-        super.createBlockStateDefinition(pBuilder.add(FACING));
+    protected void appendProperties(StateManager.Builder<Block, BlockState> pBuilder) {
+        super.appendProperties(pBuilder.add(FACING));
     }
 
     @Override
-    public VoxelShape getShape(BlockState pState, BlockGetter pLevel, BlockPos pPos, CollisionContext pContext) {
-        return AllShapes.CASING_3PX.get(pState.getValue(FACING));
+    public VoxelShape getOutlineShape(BlockState pState, BlockView pLevel, BlockPos pPos, ShapeContext pContext) {
+        return AllShapes.CASING_3PX.get(pState.get(FACING));
     }
 
     @Override
-    protected boolean isPathfindable(BlockState state, PathComputationType pathComputationType) {
+    protected boolean canPathfindThrough(BlockState state, NavigationType pathComputationType) {
         return false;
     }
 
@@ -208,61 +192,50 @@ public class CopycatPanelBlock extends WaterloggedCopycatBlock {
     //    }
 
     public static boolean isOccluded(BlockState state, BlockState other, Direction pDirection) {
-        state = state.setValue(WATERLOGGED, false);
-        other = other.setValue(WATERLOGGED, false);
-        Direction facing = state.getValue(FACING);
-        if (facing.getOpposite() == other.getValue(FACING) && pDirection == facing) {
+        state = state.with(WATERLOGGED, false);
+        other = other.with(WATERLOGGED, false);
+        Direction facing = state.get(FACING);
+        if (facing.getOpposite() == other.get(FACING) && pDirection == facing)
             return true;
-        }
-        if (other.getValue(FACING) != facing) {
+        if (other.get(FACING) != facing)
             return false;
-        }
         return pDirection.getAxis() != facing.getAxis();
     }
 
     @Override
-    public BlockState rotate(BlockState state, Rotation rot) {
-        return state.setValue(FACING, rot.rotate(state.getValue(FACING)));
+    public BlockState rotate(BlockState state, BlockRotation rot) {
+        return state.with(FACING, rot.rotate(state.get(FACING)));
     }
 
     @Override
-    public BlockState mirror(BlockState state, Mirror mirrorIn) {
-        return state.rotate(mirrorIn.getRotation(state.getValue(FACING)));
+    public BlockState mirror(BlockState state, BlockMirror mirrorIn) {
+        return state.rotate(mirrorIn.getRotation(state.get(FACING)));
     }
 
     private static class PlacementHelper implements IPlacementHelper {
         @Override
         public Predicate<ItemStack> getItemPredicate() {
-            return stack -> stack.is(AllItems.COPYCAT_PANEL);
+            return stack -> stack.isOf(AllItems.COPYCAT_PANEL);
         }
 
         @Override
         public Predicate<BlockState> getStatePredicate() {
-            return state -> state.is(AllBlocks.COPYCAT_PANEL);
+            return state -> state.isOf(AllBlocks.COPYCAT_PANEL);
         }
 
         @Override
-        public PlacementOffset getOffset(
-            Player player,
-            Level world,
-            BlockState state,
-            BlockPos pos,
-            BlockHitResult ray
-        ) {
+        public PlacementOffset getOffset(PlayerEntity player, World world, BlockState state, BlockPos pos, BlockHitResult ray) {
             List<Direction> directions = IPlacementHelper.orderedByDistanceExceptAxis(
                 pos,
-                ray.getLocation(),
-                state.getValue(FACING).getAxis(),
-                dir -> world.getBlockState(pos.relative(dir)).canBeReplaced()
+                ray.getPos(),
+                state.get(FACING).getAxis(),
+                dir -> world.getBlockState(pos.offset(dir)).isReplaceable()
             );
 
-            if (directions.isEmpty()) {
+            if (directions.isEmpty())
                 return PlacementOffset.fail();
-            } else {
-                return PlacementOffset.success(
-                    pos.relative(directions.getFirst()),
-                    s -> s.setValue(FACING, state.getValue(FACING))
-                );
+            else {
+                return PlacementOffset.success(pos.offset(directions.getFirst()), s -> s.with(FACING, state.get(FACING)));
             }
         }
     }

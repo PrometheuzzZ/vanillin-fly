@@ -1,35 +1,35 @@
 package com.zurrtum.create.client.catnip.gui.render;
 
-import com.mojang.blaze3d.vertex.PoseStack;
 import com.zurrtum.create.client.flywheel.lib.model.baked.PartialModel;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.navigation.ScreenRectangle;
-import net.minecraft.client.gui.render.state.pip.PictureInPictureRenderState;
-import net.minecraft.client.renderer.block.model.SimpleModelWrapper;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.ScreenRect;
+import net.minecraft.client.gui.render.state.special.SpecialGuiElementRenderState;
+import net.minecraft.client.render.model.GeometryBakedModel;
+import net.minecraft.client.util.math.MatrixStack;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix3x2f;
 
 import java.util.function.BiConsumer;
 
-public class PartialRenderState implements PictureInPictureRenderState {
-    public SimpleModelWrapper model;
+public class PartialRenderState implements SpecialGuiElementRenderState {
+    public GeometryBakedModel model;
     public boolean dirty;
-    public Matrix3x2f pose = IDENTITY_POSE;
-    public ScreenRectangle bounds;
+    public Matrix3x2f pose;
+    public ScreenRect bounds;
     public int x1, y1, x2, y2, padding;
     public float size;
-    private BiConsumer<PoseStack, Float> transform;
+    private BiConsumer<MatrixStack, Float> transform;
     private float partialTicks;
-    public @Nullable ScreenRectangle scissor;
+    public @Nullable ScreenRect scissor;
 
-    public void transform(PoseStack matrices) {
+    public void transform(MatrixStack matrices) {
         if (transform != null) {
             transform.accept(matrices, partialTicks);
         }
     }
 
     public void update(
-        GuiGraphics graphics,
+        DrawContext graphics,
         PartialModel partial,
         float x,
         float y,
@@ -38,7 +38,7 @@ public class PartialRenderState implements PictureInPictureRenderState {
         float scale,
         int padding,
         float partialTicks,
-        BiConsumer<PoseStack, Float> transform
+        BiConsumer<MatrixStack, Float> transform
     ) {
         float size = scale * 16 + padding;
         if (model != partial.get()) {
@@ -47,14 +47,14 @@ public class PartialRenderState implements PictureInPictureRenderState {
         } else if (size != this.size || partialTicks != this.partialTicks) {
             dirty = true;
         }
-        pose = new Matrix3x2f(graphics.pose());
+        pose = new Matrix3x2f(graphics.getMatrices());
         pose.translate(xLocal, yLocal);
         x1 = (int) x;
         y1 = (int) y;
         x2 = (int) (x + size);
         y2 = (int) (y + size);
-        bounds = new ScreenRectangle(x1, y1, (int) size, (int) size).transformMaxBounds(pose);
-        scissor = graphics.scissorStack.peek();
+        bounds = new ScreenRect(x1, y1, (int) size, (int) size).transformEachVertex(pose);
+        scissor = graphics.scissorStack.peekLast();
         if (scissor != null) {
             bounds = bounds.intersection(scissor);
         }
@@ -69,22 +69,22 @@ public class PartialRenderState implements PictureInPictureRenderState {
     }
 
     @Override
-    public int x0() {
+    public int x1() {
         return x1;
     }
 
     @Override
-    public int x1() {
+    public int x2() {
         return x2;
     }
 
     @Override
-    public int y0() {
+    public int y1() {
         return y1;
     }
 
     @Override
-    public int y1() {
+    public int y2() {
         return y2;
     }
 
@@ -94,7 +94,7 @@ public class PartialRenderState implements PictureInPictureRenderState {
     }
 
     @Override
-    public @Nullable ScreenRectangle bounds() {
+    public @Nullable ScreenRect bounds() {
         return bounds;
     }
 
@@ -104,7 +104,7 @@ public class PartialRenderState implements PictureInPictureRenderState {
     }
 
     @Override
-    public @Nullable ScreenRectangle scissorArea() {
+    public @Nullable ScreenRect scissorArea() {
         return scissor;
     }
 }

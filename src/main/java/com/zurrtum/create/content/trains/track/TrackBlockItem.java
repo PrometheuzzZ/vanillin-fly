@@ -7,36 +7,36 @@ import com.zurrtum.create.AllSoundEvents;
 import com.zurrtum.create.catnip.data.Pair;
 import com.zurrtum.create.content.trains.track.TrackPlacement.PlacementInfo;
 import com.zurrtum.create.infrastructure.component.ConnectingFrom;
-import net.minecraft.ChatFormatting;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction.AxisDirection;
-import net.minecraft.network.chat.Component;
-import net.minecraft.sounds.SoundEvents;
-import net.minecraft.sounds.SoundSource;
-import net.minecraft.world.InteractionHand;
-import net.minecraft.world.InteractionResult;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.BlockItem;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.context.BlockPlaceContext;
-import net.minecraft.world.item.context.UseOnContext;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.LevelAccessor;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.SoundType;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.item.BlockItem;
+import net.minecraft.item.ItemPlacementContext;
+import net.minecraft.item.ItemStack;
+import net.minecraft.item.ItemUsageContext;
+import net.minecraft.sound.BlockSoundGroup;
+import net.minecraft.sound.SoundCategory;
+import net.minecraft.sound.SoundEvents;
+import net.minecraft.text.Text;
+import net.minecraft.util.ActionResult;
+import net.minecraft.util.Formatting;
+import net.minecraft.util.Hand;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction.AxisDirection;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.World;
+import net.minecraft.world.WorldAccess;
 
 public class TrackBlockItem extends BlockItem {
 
-    public TrackBlockItem(Block pBlock, Properties pProperties) {
+    public TrackBlockItem(Block pBlock, Settings pProperties) {
         super(pBlock, pProperties);
     }
 
     @Override
-    public InteractionResult use(Level world, Player player, InteractionHand usedHand) {
-        ItemStack stack = player.getItemInHand(usedHand);
-        if (player.isShiftKeyDown() && isFoil(stack)) {
+    public ActionResult use(World world, PlayerEntity player, Hand usedHand) {
+        ItemStack stack = player.getStackInHand(usedHand);
+        if (player.isSneaking() && hasGlint(stack)) {
             return clearSelection(stack, world, player);
         } else {
             return super.use(world, player, usedHand);
@@ -44,50 +44,40 @@ public class TrackBlockItem extends BlockItem {
     }
 
     @Override
-    public InteractionResult useOn(UseOnContext pContext) {
-        ItemStack stack = pContext.getItemInHand();
-        BlockPos pos = pContext.getClickedPos();
-        Level level = pContext.getLevel();
+    public ActionResult useOnBlock(ItemUsageContext pContext) {
+        ItemStack stack = pContext.getStack();
+        BlockPos pos = pContext.getBlockPos();
+        World level = pContext.getWorld();
         BlockState state = level.getBlockState(pos);
-        Player player = pContext.getPlayer();
+        PlayerEntity player = pContext.getPlayer();
 
-        if (player == null) {
-            return super.useOn(pContext);
-        }
-        if (pContext.getHand() == InteractionHand.OFF_HAND) {
-            return super.useOn(pContext);
-        }
+        if (player == null)
+            return super.useOnBlock(pContext);
+        if (pContext.getHand() == Hand.OFF_HAND)
+            return super.useOnBlock(pContext);
 
-        Vec3 lookAngle = player.getLookAngle();
+        Vec3d lookAngle = player.getRotationVector();
 
-        if (!isFoil(stack)) {
+        if (!hasGlint(stack)) {
             if (state.getBlock() instanceof TrackBlock track && track.getTrackAxes(level, pos, state).size() > 1) {
-                if (!level.isClientSide()) {
-                    player.displayClientMessage(
-                        Component.translatable("create.track.junction_start")
-                            .withStyle(ChatFormatting.RED), true
-                    );
-                }
-                return InteractionResult.SUCCESS;
+                if (!level.isClient())
+                    player.sendMessage(Text.translatable("create.track.junction_start").formatted(Formatting.RED), true);
+                return ActionResult.SUCCESS;
             }
 
             if (level.getBlockEntity(pos) instanceof TrackBlockEntity tbe && tbe.isTilted()) {
-                if (!level.isClientSide()) {
-                    player.displayClientMessage(
-                        Component.translatable("create.track.turn_start")
-                            .withStyle(ChatFormatting.RED), true
-                    );
-                }
-                return InteractionResult.SUCCESS;
+                if (!level.isClient())
+                    player.sendMessage(Text.translatable("create.track.turn_start").formatted(Formatting.RED), true);
+                return ActionResult.SUCCESS;
             }
 
             if (select(level, pos, lookAngle, stack)) {
-                level.playSound(null, pos, SoundEvents.ITEM_FRAME_ADD_ITEM, SoundSource.BLOCKS, 0.75f, 1);
-                return InteractionResult.SUCCESS;
+                level.playSound(null, pos, SoundEvents.ENTITY_ITEM_FRAME_ADD_ITEM, SoundCategory.BLOCKS, 0.75f, 1);
+                return ActionResult.SUCCESS;
             }
-            return super.useOn(pContext);
+            return super.useOnBlock(pContext);
 
-        } else if (player.isShiftKeyDown()) {
+        } else if (player.isSneaking()) {
             return clearSelection(stack, level, player);
         }
 
@@ -96,93 +86,80 @@ public class TrackBlockItem extends BlockItem {
         stack.remove(AllDataComponents.TRACK_EXTENDED_CURVE);
 
         if (placing) {
-            if (!state.canBeReplaced()) {
-                pos = pos.relative(pContext.getClickedFace());
-            }
+            if (!state.isReplaceable())
+                pos = pos.offset(pContext.getSide());
             state = getPlacementState(pContext);
-            if (state == null) {
-                return InteractionResult.FAIL;
-            }
+            if (state == null)
+                return ActionResult.FAIL;
         }
 
-        ItemStack offhandItem = player.getOffhandItem();
-        boolean hasGirder = offhandItem.is(AllItems.METAL_GIRDER);
+        ItemStack offhandItem = player.getOffHandStack();
+        boolean hasGirder = offhandItem.isOf(AllItems.METAL_GIRDER);
         PlacementInfo info = TrackPlacement.tryConnect(level, player, pos, state, stack, hasGirder, extend);
 
-        if (info.message != null && !level.isClientSide()) {
-            player.displayClientMessage(Component.translatable("create." + info.message), true);
-        }
+        if (info.message != null && !level.isClient())
+            player.sendMessage(Text.translatable("create." + info.message), true);
         if (!info.valid) {
             AllSoundEvents.DENY.playFrom(player, 1, 1);
-            return InteractionResult.FAIL;
+            return ActionResult.FAIL;
         }
 
-        if (level.isClientSide()) {
-            return InteractionResult.SUCCESS;
-        }
+        if (level.isClient())
+            return ActionResult.SUCCESS;
 
-        stack = player.getMainHandItem();
-        if (stack.is(AllItemTags.TRACKS)) {
+        stack = player.getMainHandStack();
+        if (stack.isIn(AllItemTags.TRACKS)) {
             stack.remove(AllDataComponents.TRACK_CONNECTING_FROM);
             stack.remove(AllDataComponents.TRACK_EXTENDED_CURVE);
-            player.setItemInHand(pContext.getHand(), stack);
+            player.setStackInHand(pContext.getHand(), stack);
         }
 
-        SoundType soundtype = state.getSoundType();
-        if (soundtype != null) {
+        BlockSoundGroup soundtype = state.getSoundGroup();
+        if (soundtype != null)
             level.playSound(
                 null,
                 pos,
                 soundtype.getPlaceSound(),
-                SoundSource.BLOCKS,
+                SoundCategory.BLOCKS,
                 (soundtype.getVolume() + 1.0F) / 2.0F,
                 soundtype.getPitch() * 0.8F
             );
-        }
 
-        return InteractionResult.SUCCESS;
+        return ActionResult.SUCCESS;
     }
 
-    public static InteractionResult clearSelection(ItemStack stack, Level level, Player player) {
-        if (level.isClientSide()) {
-            level.playSound(
-                player,
-                player.blockPosition(),
-                SoundEvents.ITEM_FRAME_REMOVE_ITEM,
-                SoundSource.BLOCKS,
-                0.75f,
-                1.0f
-            );
+    public static ActionResult clearSelection(ItemStack stack, World level, PlayerEntity player) {
+        if (level.isClient()) {
+            level.playSound(player, player.getBlockPos(), SoundEvents.ENTITY_ITEM_FRAME_REMOVE_ITEM, SoundCategory.BLOCKS, 0.75f, 1.0f);
         } else {
-            player.displayClientMessage(Component.translatable("create.track.selection_cleared"), true);
+            player.sendMessage(Text.translatable("create.track.selection_cleared"), true);
             stack.remove(AllDataComponents.TRACK_CONNECTING_FROM);
         }
-        return InteractionResult.SUCCESS.heldItemTransformedTo(stack);
+        return ActionResult.SUCCESS.withNewHandStack(stack);
     }
 
-    public BlockState getPlacementState(UseOnContext pContext) {
-        return getPlacementState(updatePlacementContext(new BlockPlaceContext(pContext)));
+    public BlockState getPlacementState(ItemUsageContext pContext) {
+        return getPlacementState(getPlacementContext(new ItemPlacementContext(pContext)));
     }
 
-    public static boolean select(LevelAccessor world, BlockPos pos, Vec3 lookVec, ItemStack heldItem) {
+    public static boolean select(WorldAccess world, BlockPos pos, Vec3d lookVec, ItemStack heldItem) {
         BlockState blockState = world.getBlockState(pos);
         Block block = blockState.getBlock();
-        if (!(block instanceof ITrackBlock track)) {
+        if (!(block instanceof ITrackBlock track))
             return false;
-        }
 
-        Pair<Vec3, AxisDirection> nearestTrackAxis = track.getNearestTrackAxis(world, pos, blockState, lookVec);
-        Vec3 axis = nearestTrackAxis.getFirst().scale(nearestTrackAxis.getSecond() == AxisDirection.POSITIVE ? -1 : 1);
-        Vec3 end = track.getCurveStart(world, pos, blockState, axis);
-        Vec3 normal = track.getUpNormal(world, pos, blockState).normalize();
+        Pair<Vec3d, AxisDirection> nearestTrackAxis = track.getNearestTrackAxis(world, pos, blockState, lookVec);
+        Vec3d axis = nearestTrackAxis.getFirst().multiply(nearestTrackAxis.getSecond() == AxisDirection.POSITIVE ? -1 : 1);
+        Vec3d end = track.getCurveStart(world, pos, blockState, axis);
+        Vec3d normal = track.getUpNormal(world, pos, blockState).normalize();
 
         heldItem.set(AllDataComponents.TRACK_CONNECTING_FROM, new ConnectingFrom(pos, axis, normal, end));
         return true;
     }
 
     @Override
-    public boolean isFoil(ItemStack stack) {
-        return stack.has(AllDataComponents.TRACK_CONNECTING_FROM);
+    public boolean hasGlint(ItemStack stack) {
+        return stack.contains(AllDataComponents.TRACK_CONNECTING_FROM);
     }
 
 }

@@ -13,7 +13,7 @@ import com.zurrtum.create.content.logistics.packager.PackagingRequest;
 import com.zurrtum.create.content.logistics.packagerLink.LogisticallyLinkedBehaviour.RequestType;
 import com.zurrtum.create.foundation.utility.TickBasedCache;
 import com.zurrtum.create.infrastructure.component.PackageOrderWithCrafts;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.item.ItemStack;
 import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.jetbrains.annotations.Nullable;
 
@@ -44,9 +44,8 @@ public class LogisticsManager {
 
             // Skip inventories already presented by other links
             InventoryIdentifier currentInventoryId = getInventoryIdentifierFromLink(link);
-            if (currentInventoryId != null && !processedInventories.add(currentInventoryId)) {
+            if (currentInventoryId != null && !processedInventories.add(currentInventoryId))
                 continue;
-            }
 
             InventorySummary summary = link.getSummary(null);
             if (summary != InventorySummary.EMPTY) {
@@ -60,9 +59,8 @@ public class LogisticsManager {
 
     public static int getStockOf(UUID freqId, ItemStack stack, @Nullable IdentifiedInventory ignoredHandler) {
         int sum = 0;
-        for (LogisticallyLinkedBehaviour link : LogisticallyLinkedBehaviour.getAllPresent(freqId, false)) {
+        for (LogisticallyLinkedBehaviour link : LogisticallyLinkedBehaviour.getAllPresent(freqId, false))
             sum += link.getSummary(ignoredHandler).getCountOf(stack);
-        }
         return sum;
     }
 
@@ -73,23 +71,15 @@ public class LogisticsManager {
         @Nullable IdentifiedInventory ignoredHandler,
         String address
     ) {
-        if (order.isEmpty()) {
+        if (order.isEmpty())
             return false;
-        }
 
-        Multimap<PackagerBlockEntity, PackagingRequest> requests = findPackagersForRequest(
-            freqId,
-            order,
-            ignoredHandler,
-            address
-        );
+        Multimap<PackagerBlockEntity, PackagingRequest> requests = findPackagersForRequest(freqId, order, ignoredHandler, address);
 
         // Check if packagers have accumulated too many packages already
-        for (PackagerBlockEntity packager : requests.keySet()) {
-            if (packager.isTooBusyFor(type)) {
+        for (PackagerBlockEntity packager : requests.keySet())
+            if (packager.isTooBusyFor(type))
                 return false;
-            }
-        }
 
         // Actually perform package creation
         performPackageRequests(requests);
@@ -104,19 +94,14 @@ public class LogisticsManager {
     ) {
         List<BigItemStack> stacks = new ArrayList<>();
 
-        for (BigItemStack stack : order.stacks()) {
-            if (!stack.stack.isEmpty() && stack.count > 0) {
+        for (BigItemStack stack : order.stacks())
+            if (!stack.stack.isEmpty() && stack.count > 0)
                 stacks.add(stack);
-            }
-        }
 
         Multimap<PackagerBlockEntity, PackagingRequest> requests = HashMultimap.create();
 
         // Packages need to track their index and successors for successful defrag
-        Iterable<LogisticallyLinkedBehaviour> allAvailableLinks = LogisticallyLinkedBehaviour.getAllPresent(
-            freqId,
-            true
-        );
+        Iterable<LogisticallyLinkedBehaviour> allAvailableLinks = LogisticallyLinkedBehaviour.getAllPresent(freqId, true);
 
         // Group links by InventoryIdentifier and randomly select one from each group
         Map<InventoryIdentifier, List<LogisticallyLinkedBehaviour>> linksByInventory = new HashMap<>();
@@ -160,9 +145,8 @@ public class LogisticsManager {
                 int usedIndex = usedLinks.indexOf(link);
                 int linkIndex = usedIndex == -1 ? usedLinks.size() : usedIndex;
                 MutableBoolean isFinalLink = new MutableBoolean(false);
-                if (linkIndex == usedLinks.size() - 1) {
+                if (linkIndex == usedLinks.size() - 1)
                     isFinalLink = finalLinkTracker;
-                }
 
                 // Only send context and craftingContext with first package
                 Pair<PackagerBlockEntity, PackagingRequest> request = link.processRequest(
@@ -175,9 +159,8 @@ public class LogisticsManager {
                     context,
                     ignoredHandler
                 );
-                if (request == null) {
+                if (request == null)
                     continue;
-                }
 
                 requests.put(request.getFirst(), request.getSecond());
 
@@ -189,12 +172,10 @@ public class LogisticsManager {
                 }
 
                 remainingCount -= processedCount;
-                if (remainingCount > 0) {
+                if (remainingCount > 0)
                     continue;
-                }
-                if (finalEntry) {
+                if (finalEntry)
                     finalLinkTracker.setTrue();
-                }
                 break;
             }
         }

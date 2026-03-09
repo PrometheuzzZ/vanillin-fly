@@ -15,33 +15,33 @@ import mezz.jei.api.gui.drawable.IDrawable;
 import mezz.jei.api.gui.ingredient.IRecipeSlotsView;
 import mezz.jei.api.recipe.IFocusGroup;
 import mezz.jei.api.recipe.types.IRecipeType;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.network.chat.Component;
-import net.minecraft.world.item.crafting.RecipeHolder;
-import net.minecraft.world.item.crafting.RecipeMap;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.recipe.PreparedRecipes;
+import net.minecraft.recipe.RecipeEntry;
+import net.minecraft.text.Text;
 import org.jetbrains.annotations.NotNull;
 import org.joml.Matrix3x2f;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public class CrushingCategory extends CreateCategory<RecipeHolder<? extends CreateSingleStackRollableRecipe>> {
-    public static List<RecipeHolder<? extends CreateSingleStackRollableRecipe>> getRecipes(RecipeMap preparedRecipes) {
-        List<RecipeHolder<? extends CreateSingleStackRollableRecipe>> recipes = new ArrayList<>();
-        recipes.addAll(preparedRecipes.byType(AllRecipeTypes.CRUSHING));
-        recipes.addAll(preparedRecipes.byType(AllRecipeTypes.MILLING));
+public class CrushingCategory extends CreateCategory<RecipeEntry<? extends CreateSingleStackRollableRecipe>> {
+    public static List<RecipeEntry<? extends CreateSingleStackRollableRecipe>> getRecipes(PreparedRecipes preparedRecipes) {
+        List<RecipeEntry<? extends CreateSingleStackRollableRecipe>> recipes = new ArrayList<>();
+        recipes.addAll(preparedRecipes.getAll(AllRecipeTypes.CRUSHING));
+        recipes.addAll(preparedRecipes.getAll(AllRecipeTypes.MILLING));
         return recipes;
     }
 
     @Override
     @NotNull
-    public IRecipeType<RecipeHolder<? extends CreateSingleStackRollableRecipe>> getRecipeType() {
+    public IRecipeType<RecipeEntry<? extends CreateSingleStackRollableRecipe>> getRecipeType() {
         return JeiClientPlugin.CRUSHING;
     }
 
     @Override
     @NotNull
-    public Component getTitle() {
+    public Text getTitle() {
         return CreateLang.translateDirect("recipe.crushing");
     }
 
@@ -56,11 +56,7 @@ public class CrushingCategory extends CreateCategory<RecipeHolder<? extends Crea
     }
 
     @Override
-    public void setRecipe(
-        IRecipeLayoutBuilder builder,
-        RecipeHolder<? extends CreateSingleStackRollableRecipe> entry,
-        IFocusGroup focuses
-    ) {
+    public void setRecipe(IRecipeLayoutBuilder builder, RecipeEntry<? extends CreateSingleStackRollableRecipe> entry, IFocusGroup focuses) {
         CreateSingleStackRollableRecipe recipe = entry.value();
         builder.addInputSlot(51, 3).setBackground(SLOT, -1, -1).add(recipe.ingredient());
         List<ProcessingOutput> results = recipe.results();
@@ -71,17 +67,13 @@ public class CrushingCategory extends CreateCategory<RecipeHolder<? extends Crea
 
     @Override
     public void draw(
-        RecipeHolder<? extends CreateSingleStackRollableRecipe> entry,
+        RecipeEntry<? extends CreateSingleStackRollableRecipe> entry,
         IRecipeSlotsView recipeSlotsView,
-        GuiGraphics graphics,
+        DrawContext graphics,
         double mouseX,
         double mouseY
     ) {
         AllGuiTextures.JEI_DOWN_ARROW.render(graphics, 72, 7);
-        graphics.guiRenderState.submitPicturesInPictureState(new CrushWheelRenderState(
-            new Matrix3x2f(graphics.pose()),
-            42,
-            24
-        ));
+        graphics.state.addSpecialElement(new CrushWheelRenderState(new Matrix3x2f(graphics.getMatrices()), 42, 24));
     }
 }

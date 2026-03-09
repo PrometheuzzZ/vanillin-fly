@@ -8,7 +8,7 @@ import com.zurrtum.create.content.logistics.packager.PackagerBlockEntity;
 import dan200.computercraft.api.lua.LuaException;
 import dan200.computercraft.api.lua.LuaFunction;
 import dan200.computercraft.api.peripheral.IComputerAccess;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.item.ItemStack;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Map;
@@ -38,28 +38,22 @@ public class PackagerPeripheral extends SyncedPeripheral<PackagerBlockEntity> {
 
     @LuaFunction(mainThread = true)
     public final boolean makePackage() {
-        if (!blockEntity.heldBox.isEmpty()) {
+        if (!blockEntity.heldBox.isEmpty())
             return false;
-        }
         blockEntity.activate();
-        if (blockEntity.heldBox.isEmpty()) {
+        if (blockEntity.heldBox.isEmpty())
             return false;
-        }
         return true;
     }
 
     @LuaFunction(mainThread = true)
     public Map<Integer, Map<String, ?>> list() {
-        return ComputerUtil.list(blockEntity.getLevel().registryAccess(), blockEntity.targetInventory.getInventory());
+        return ComputerUtil.list(blockEntity.targetInventory.getInventory());
     }
 
     @LuaFunction(mainThread = true)
     public Map<String, ?> getItemDetail(int slot) throws LuaException {
-        return ComputerUtil.getItemDetail(
-            blockEntity.getLevel().registryAccess(),
-            blockEntity.targetInventory.getInventory(),
-            slot
-        );
+        return ComputerUtil.getItemDetail(blockEntity.targetInventory.getInventory(), slot);
     }
 
     @LuaFunction(mainThread = true)
@@ -83,9 +77,8 @@ public class PackagerPeripheral extends SyncedPeripheral<PackagerBlockEntity> {
     @LuaFunction(mainThread = true)
     public final PackageLuaObject getPackage() {
         ItemStack box = blockEntity.heldBox;
-        if (box.isEmpty()) {
+        if (box.isEmpty())
             return null;
-        }
         return new PackageLuaObject(blockEntity, box);
     }
 

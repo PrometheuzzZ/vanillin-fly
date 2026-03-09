@@ -1,9 +1,9 @@
 package com.zurrtum.create;
 
-import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.Identifier;
-import net.minecraft.tags.TagKey;
-import net.minecraft.world.entity.EntityType;
+import net.minecraft.entity.EntityType;
+import net.minecraft.registry.RegistryKeys;
+import net.minecraft.registry.tag.TagKey;
+import net.minecraft.util.Identifier;
 
 import static com.zurrtum.create.Create.MOD_ID;
 
@@ -12,7 +12,7 @@ public class AllEntityTags {
     public static final TagKey<EntityType<?>> IGNORE_SEAT = register("ignore_seat");
 
     private static TagKey<EntityType<?>> register(String name) {
-        return TagKey.create(Registries.ENTITY_TYPE, Identifier.fromNamespaceAndPath(MOD_ID, name));
+        return TagKey.of(RegistryKeys.ENTITY_TYPE, Identifier.of(MOD_ID, name));
     }
 
     public static void register() {

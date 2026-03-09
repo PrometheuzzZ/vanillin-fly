@@ -6,18 +6,18 @@ import com.zurrtum.create.infrastructure.items.CombinedInvWrapper;
 import com.zurrtum.create.infrastructure.items.ItemStackHandler;
 import com.zurrtum.create.infrastructure.items.SidedItemInventory;
 import com.zurrtum.create.infrastructure.transfer.SlotRangeCache;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.world.Container;
-import net.minecraft.world.WorldlyContainer;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.block.BlockState;
+import net.minecraft.inventory.Inventory;
+import net.minecraft.inventory.SidedInventory;
+import net.minecraft.item.ItemStack;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 public class PortableItemInterfaceBlockEntity extends PortableStorageInterfaceBlockEntity {
 
-    public final Container capability;
+    public final Inventory capability;
 
     public PortableItemInterfaceBlockEntity(BlockPos pos, BlockState state) {
         super(AllBlockEntityTypes.PORTABLE_STORAGE_INTERFACE, pos, state);
@@ -27,8 +27,8 @@ public class PortableItemInterfaceBlockEntity extends PortableStorageInterfaceBl
     @Override
     public void startTransferringTo(Contraption contraption, float distance) {
         ((InterfaceItemHandler) capability).setInventory(contraption.getStorage().getAllItems());
-        if (level != null && !level.isClientSide()) {
-            level.updateNeighborsAt(worldPosition, getBlockState().getBlock());
+        if (world != null && !world.isClient()) {
+            world.updateNeighborsAlways(pos, getCachedState().getBlock(), null);
         }
         super.startTransferringTo(contraption, distance);
     }
@@ -36,43 +36,43 @@ public class PortableItemInterfaceBlockEntity extends PortableStorageInterfaceBl
     @Override
     protected void stopTransferring() {
         ((InterfaceItemHandler) capability).setEmpty();
-        if (level != null && !level.isClientSide()) {
-            level.updateNeighborsAt(worldPosition, getBlockState().getBlock());
+        if (world != null && !world.isClient()) {
+            world.updateNeighborsAlways(pos, getCachedState().getBlock(), null);
         }
         super.stopTransferring();
     }
 
     class InterfaceItemHandler implements SidedItemInventory {
-        private static final Container EMPTY = new ItemStackHandler(0);
+        private static final Inventory EMPTY = new ItemStackHandler(0);
 
         private int[] slots = SlotRangeCache.EMPTY;
-        private Container wrapped = EMPTY;
+        private Inventory wrapped = EMPTY;
         private boolean mark = false;
 
         @Override
-        public int[] getSlotsForFace(Direction side) {
+        public int[] getAvailableSlots(Direction side) {
             return slots;
         }
 
         @Override
-        public boolean canTakeItemThroughFace(int slot, ItemStack stack, Direction dir) {
+        public boolean canExtract(int slot, ItemStack stack, Direction dir) {
             if (wrapped == EMPTY) {
                 return false;
             }
-            return ((WorldlyContainer) wrapped).canTakeItemThroughFace(slot, stack, dir);
+            return ((SidedInventory) wrapped).canExtract(slot, stack, dir);
         }
 
         @Override
-        public boolean canPlaceItemThroughFace(int slot, ItemStack stack, @Nullable Direction dir) {
+        public boolean canInsert(int slot, ItemStack stack, @Nullable Direction dir) {
             if (wrapped == EMPTY) {
                 return false;
             }
-            return ((WorldlyContainer) wrapped).canPlaceItemThroughFace(slot, stack, dir);
+            return ((SidedInventory) wrapped).canInsert(slot, stack, dir);
         }
 
         public void setInventory(CombinedInvWrapper wrapped) {
             this.wrapped = wrapped;
-            slots = wrapped.getSlotsForFace(null);
+            slots = wrapped.getAvailableSlots(null);
         }
 
         public void setEmpty() {
@@ -81,37 +81,37 @@ public class PortableItemInterfaceBlockEntity extends PortableStorageInterfaceBl
         }
 
         @Override
-        public int getContainerSize() {
+        public int size() {
             return slots.length;
         }
 
         @Override
-        public int getMaxStackSize() {
-            return wrapped.getMaxStackSize();
+        public int getMaxCountPerStack() {
+            return wrapped.getMaxCountPerStack();
         }
 
         @Override
-        public int getMaxStackSize(ItemStack stack) {
-            return wrapped.getMaxStackSize(stack);
+        public int getMaxCount(ItemStack stack) {
+            return wrapped.getMaxCount(stack);
         }
 
         @Override
-        public ItemStack getItem(int slot) {
+        public ItemStack getStack(int slot) {
             mark = true;
-            return wrapped.getItem(slot);
+            return wrapped.getStack(slot);
         }
 
         @Override
-        public void setItem(int slot, ItemStack stack) {
+        public void setStack(int slot, ItemStack stack) {
             mark = true;
-            wrapped.setItem(slot, stack);
+            wrapped.setStack(slot, stack);
         }
 
         @Override
         public int insert(ItemStack stack, int maxAmount, Direction side) {
             int insert = wrapped.insert(stack, maxAmount, side);
             if (insert != 0) {
-                setChanged();
+                markDirty();
             }
             return insert;
         }
@@ -120,17 +120,17 @@ public class PortableItemInterfaceBlockEntity extends PortableStorageInterfaceBl
         public int extract(ItemStack stack, int maxAmount, Direction side) {
             int extract = wrapped.extract(stack, maxAmount, side);
             if (extract != 0) {
-                setChanged();
+                markDirty();
             }
             return extract;
         }
 
         @Override
-        public void setChanged() {
+        public void markDirty() {
             onContentTransferred();
             if (mark) {
                 mark = false;
-                wrapped.setChanged();
+                wrapped.markDirty();
             }
         }
 

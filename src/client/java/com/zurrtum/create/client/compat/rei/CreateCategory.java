@@ -18,8 +18,8 @@ import me.shedaniel.rei.api.common.entry.EntryIngredient;
 import me.shedaniel.rei.api.common.entry.EntryStack;
 import me.shedaniel.rei.api.common.util.EntryIngredients;
 import me.shedaniel.rei.api.common.util.EntryStacks;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.item.ItemStack;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -29,26 +29,26 @@ public abstract class CreateCategory<T extends Display> implements DisplayCatego
 
     public abstract void addWidgets(List<Widget> widgets, T display, Rectangle bounds);
 
-    public static void drawSlotBackground(GuiGraphics graphics, List<Point> points1, Point... points2) {
+    public static void drawSlotBackground(DrawContext graphics, List<Point> points1, Point... points2) {
         for (Point point : points1) {
             AllGuiTextures.JEI_SLOT.render(graphics, point.x - 1, point.y - 1);
         }
         drawSlotBackground(graphics, points2);
     }
 
-    public static void drawSlotBackground(GuiGraphics graphics, Point... points) {
+    public static void drawSlotBackground(DrawContext graphics, Point... points) {
         for (Point point : points) {
             AllGuiTextures.JEI_SLOT.render(graphics, point.x - 1, point.y - 1);
         }
     }
 
-    public static void drawChanceSlotBackground(GuiGraphics graphics, List<Point> points) {
+    public static void drawChanceSlotBackground(DrawContext graphics, List<Point> points) {
         for (Point point : points) {
             AllGuiTextures.JEI_CHANCE_SLOT.render(graphics, point.x - 1, point.y - 1);
         }
     }
 
-    public static void drawChanceSlotBackground(GuiGraphics graphics, Point... points) {
+    public static void drawChanceSlotBackground(DrawContext graphics, Point... points) {
         for (Point point : points) {
             AllGuiTextures.JEI_CHANCE_SLOT.render(graphics, point.x - 1, point.y - 1);
         }
@@ -118,8 +118,8 @@ public abstract class CreateCategory<T extends Display> implements DisplayCatego
                 continue;
             }
             for (ItemStack target : cache) {
-                if (ItemStack.isSameItemSameComponents(stack, target)) {
-                    target.grow(stack.getCount());
+                if (ItemStack.areItemsAndComponentsEqual(stack, target)) {
+                    target.increment(stack.getCount());
                     continue Find;
                 }
             }

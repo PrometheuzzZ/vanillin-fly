@@ -7,9 +7,9 @@ import net.fabricmc.fabric.api.transfer.v1.fluid.FluidVariant;
 import net.fabricmc.fabric.api.transfer.v1.storage.SlottedStorage;
 import net.fabricmc.fabric.api.transfer.v1.storage.base.SingleSlotStorage;
 import net.fabricmc.fabric.impl.transfer.DebugMessages;
-import net.minecraft.core.Direction;
-import net.minecraft.core.component.DataComponentPatch;
-import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.component.ComponentChanges;
+import net.minecraft.util.math.Direction;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.UnmodifiableView;
 
@@ -42,13 +42,13 @@ public interface FluidInventoryStorage extends SlottedStorage<FluidVariant> {
         if (!variant.isOf(stack.getFluid())) {
             return false;
         }
-        DataComponentPatch stackComponents = stack.getComponentChanges();
-        DataComponentPatch variantComponents = variant.getComponents();
+        ComponentChanges stackComponents = stack.getComponentChanges();
+        ComponentChanges variantComponents = variant.getComponents();
         if (stackComponents == variantComponents) {
             return true;
         }
-        return stackComponents.map.reference2ObjectEntrySet()
-            .containsAll(variantComponents.map.reference2ObjectEntrySet());
+        return stackComponents.changedComponents.reference2ObjectEntrySet()
+            .containsAll(variantComponents.changedComponents.reference2ObjectEntrySet());
     }
 
     @Override
@@ -74,8 +74,8 @@ public interface FluidInventoryStorage extends SlottedStorage<FluidVariant> {
 
             if (inventory instanceof BlockEntity blockEntity) {
                 result += " (%s, %s)".formatted(
-                    blockEntity.getBlockState(),
-                    DebugMessages.forGlobalPos(blockEntity.getLevel(), blockEntity.getBlockPos())
+                    blockEntity.getCachedState(),
+                    DebugMessages.forGlobalPos(blockEntity.getWorld(), blockEntity.getPos())
                 );
             }
 

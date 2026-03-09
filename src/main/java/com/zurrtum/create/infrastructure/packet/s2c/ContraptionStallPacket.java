@@ -3,35 +3,34 @@ package com.zurrtum.create.infrastructure.packet.s2c;
 import com.zurrtum.create.AllClientHandle;
 import com.zurrtum.create.AllPackets;
 import io.netty.buffer.ByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.PacketType;
-import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.network.listener.ClientPlayPacketListener;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.PacketType;
 
-public record ContraptionStallPacket(int entityId, double x, double y, double z,
-                                     float angle) implements Packet<ClientGamePacketListener> {
-    public static final StreamCodec<ByteBuf, ContraptionStallPacket> CODEC = StreamCodec.composite(
-        ByteBufCodecs.INT,
+public record ContraptionStallPacket(int entityId, double x, double y, double z, float angle) implements Packet<ClientPlayPacketListener> {
+    public static final PacketCodec<ByteBuf, ContraptionStallPacket> CODEC = PacketCodec.tuple(
+        PacketCodecs.INTEGER,
         ContraptionStallPacket::entityId,
-        ByteBufCodecs.DOUBLE,
+        PacketCodecs.DOUBLE,
         ContraptionStallPacket::x,
-        ByteBufCodecs.DOUBLE,
+        PacketCodecs.DOUBLE,
         ContraptionStallPacket::y,
-        ByteBufCodecs.DOUBLE,
+        PacketCodecs.DOUBLE,
         ContraptionStallPacket::z,
-        ByteBufCodecs.FLOAT,
+        PacketCodecs.FLOAT,
         ContraptionStallPacket::angle,
         ContraptionStallPacket::new
     );
 
     @Override
-    public void handle(ClientGamePacketListener listener) {
+    public void apply(ClientPlayPacketListener listener) {
         AllClientHandle.INSTANCE.onContraptionStall(this);
     }
 
     @Override
-    public PacketType<ContraptionStallPacket> type() {
+    public PacketType<ContraptionStallPacket> getPacketType() {
         return AllPackets.CONTRAPTION_STALL;
     }
 }

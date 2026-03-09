@@ -1,6 +1,6 @@
 package com.zurrtum.create.client.ponder.api.registration;
 
-import net.minecraft.resources.Identifier;
+import net.minecraft.util.Identifier;
 
 import java.util.function.Function;
 

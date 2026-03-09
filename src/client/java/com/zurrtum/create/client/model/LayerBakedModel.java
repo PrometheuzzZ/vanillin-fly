@@ -1,22 +1,22 @@
 package com.zurrtum.create.client.model;
 
 import com.google.common.base.Supplier;
-import net.minecraft.client.renderer.block.model.BlockModelPart;
-import net.minecraft.client.renderer.block.model.SimpleModelWrapper;
-import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
+import net.minecraft.client.render.BlockRenderLayer;
+import net.minecraft.client.render.model.BlockModelPart;
+import net.minecraft.client.render.model.GeometryBakedModel;
 
 public interface LayerBakedModel {
-    static ChunkSectionLayer getBlockRenderLayer(SimpleModelWrapper model, Supplier<ChunkSectionLayer> defaultLayer) {
-        ChunkSectionLayer layer = ((LayerBakedModel) (Object) model).create$getBlockRenderLayer();
+    static BlockRenderLayer getBlockRenderLayer(GeometryBakedModel model, Supplier<BlockRenderLayer> defaultLayer) {
+        BlockRenderLayer layer = ((LayerBakedModel) (Object) model).create$getBlockRenderLayer();
         if (layer != null) {
             return layer;
         }
         return defaultLayer.get();
     }
 
-    static ChunkSectionLayer getBlockRenderLayer(BlockModelPart part, Supplier<ChunkSectionLayer> defaultLayer) {
+    static BlockRenderLayer getBlockRenderLayer(BlockModelPart part, Supplier<BlockRenderLayer> defaultLayer) {
         if (part instanceof LayerBakedModel model) {
-            ChunkSectionLayer layer = model.create$getBlockRenderLayer();
+            BlockRenderLayer layer = model.create$getBlockRenderLayer();
             if (layer != null) {
                 return layer;
             }
@@ -24,10 +24,10 @@ public interface LayerBakedModel {
         return defaultLayer.get();
     }
 
-    default ChunkSectionLayer create$getBlockRenderLayer() {
+    default BlockRenderLayer create$getBlockRenderLayer() {
         return null;
     }
 
-    default void create$setBlockRenderLayer(ChunkSectionLayer layer) {
+    default void create$setBlockRenderLayer(BlockRenderLayer layer) {
     }
 }

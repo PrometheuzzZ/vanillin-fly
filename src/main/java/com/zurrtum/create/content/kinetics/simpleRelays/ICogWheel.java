@@ -1,11 +1,11 @@
 package com.zurrtum.create.content.kinetics.simpleRelays;
 
 import com.zurrtum.create.content.kinetics.base.IRotate;
-import net.minecraft.world.item.BlockItem;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
+import net.minecraft.item.BlockItem;
+import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
 
 public interface ICogWheel extends IRotate {
 
@@ -31,25 +31,22 @@ public interface ICogWheel extends IRotate {
 
     static boolean isDedicatedCogItem(ItemStack test) {
         Item item = test.getItem();
-        if (!(item instanceof BlockItem)) {
+        if (!(item instanceof BlockItem))
             return false;
-        }
         return isDedicatedCogWheel(((BlockItem) item).getBlock());
     }
 
     static boolean isSmallCogItem(ItemStack test) {
         Item item = test.getItem();
-        if (!(item instanceof BlockItem)) {
+        if (!(item instanceof BlockItem))
             return false;
-        }
         return isSmallCog(((BlockItem) item).getBlock());
     }
 
     static boolean isLargeCogItem(ItemStack test) {
         Item item = test.getItem();
-        if (!(item instanceof BlockItem)) {
+        if (!(item instanceof BlockItem))
             return false;
-        }
         return isLargeCog(((BlockItem) item).getBlock());
     }
 

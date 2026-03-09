@@ -1,7 +1,7 @@
 package com.zurrtum.create.foundation.recipe.trie;
 
-import net.minecraft.world.item.Item;
-import net.minecraft.world.level.material.Fluid;
+import net.minecraft.fluid.Fluid;
+import net.minecraft.item.Item;
 import org.jetbrains.annotations.NotNull;
 
 public sealed interface AbstractVariant {
@@ -16,9 +16,8 @@ public sealed interface AbstractVariant {
 
         @Override
         public boolean equals(Object o) {
-            if (!(o instanceof AbstractItem that)) {
+            if (!(o instanceof AbstractItem that))
                 return false;
-            }
 
             return item == that.item;
         }
@@ -40,9 +39,8 @@ public sealed interface AbstractVariant {
 
         @Override
         public boolean equals(Object o) {
-            if (!(o instanceof AbstractFluid that)) {
+            if (!(o instanceof AbstractFluid that))
                 return false;
-            }
 
             return fluid == that.fluid;
         }

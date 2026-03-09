@@ -3,33 +3,34 @@ package com.zurrtum.create.infrastructure.packet.s2c;
 import com.zurrtum.create.AllClientHandle;
 import com.zurrtum.create.AllPackets;
 import io.netty.buffer.ByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.PacketType;
-import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.network.listener.ClientPlayPacketListener;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.PacketType;
 
-public record GantryContraptionUpdatePacket(int entityID, double coord, double motion,
-                                            double sequenceLimit) implements Packet<ClientGamePacketListener> {
-    public static final StreamCodec<ByteBuf, GantryContraptionUpdatePacket> CODEC = StreamCodec.composite(
-        ByteBufCodecs.INT,
+public record GantryContraptionUpdatePacket(
+    int entityID, double coord, double motion, double sequenceLimit
+) implements Packet<ClientPlayPacketListener> {
+    public static final PacketCodec<ByteBuf, GantryContraptionUpdatePacket> CODEC = PacketCodec.tuple(
+        PacketCodecs.INTEGER,
         GantryContraptionUpdatePacket::entityID,
-        ByteBufCodecs.DOUBLE,
+        PacketCodecs.DOUBLE,
         GantryContraptionUpdatePacket::coord,
-        ByteBufCodecs.DOUBLE,
+        PacketCodecs.DOUBLE,
         GantryContraptionUpdatePacket::motion,
-        ByteBufCodecs.DOUBLE,
+        PacketCodecs.DOUBLE,
         GantryContraptionUpdatePacket::sequenceLimit,
         GantryContraptionUpdatePacket::new
     );
 
     @Override
-    public void handle(ClientGamePacketListener listener) {
+    public void apply(ClientPlayPacketListener listener) {
         AllClientHandle.INSTANCE.onGantryContraptionUpdate(this);
     }
 
     @Override
-    public PacketType<GantryContraptionUpdatePacket> type() {
+    public PacketType<GantryContraptionUpdatePacket> getPacketType() {
         return AllPackets.GANTRY_UPDATE;
     }
 }

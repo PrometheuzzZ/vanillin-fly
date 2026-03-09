@@ -1,10 +1,10 @@
 package com.zurrtum.create.client.foundation.block.connected;
 
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.core.Direction.AxisDirection;
-import net.minecraft.world.level.BlockAndTintGetter;
-import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.block.BlockState;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Direction.AxisDirection;
+import net.minecraft.world.BlockRenderView;
 
 public class GlassPaneCTBehaviour extends SimpleCTBehaviour {
 
@@ -18,22 +18,14 @@ public class GlassPaneCTBehaviour extends SimpleCTBehaviour {
     }
 
     @Override
-    public boolean connectsTo(
-        BlockState state,
-        BlockState other,
-        BlockAndTintGetter reader,
-        BlockPos pos,
-        BlockPos otherPos,
-        Direction face
-    ) {
+    public boolean connectsTo(BlockState state, BlockState other, BlockRenderView reader, BlockPos pos, BlockPos otherPos, Direction face) {
         return state.getBlock() == other.getBlock();
     }
 
     @Override
     protected boolean reverseUVsHorizontally(BlockState state, Direction face) {
-        if (face.getAxisDirection() == AxisDirection.NEGATIVE) {
+        if (face.getDirection() == AxisDirection.NEGATIVE)
             return true;
-        }
         return super.reverseUVsHorizontally(state, face);
     }
 }

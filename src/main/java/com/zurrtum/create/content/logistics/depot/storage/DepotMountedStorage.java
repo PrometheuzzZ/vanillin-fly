@@ -9,13 +9,13 @@ import com.zurrtum.create.content.contraptions.Contraption;
 import com.zurrtum.create.content.kinetics.belt.transport.TransportedItemStack;
 import com.zurrtum.create.content.logistics.depot.DepotBlockEntity;
 import com.zurrtum.create.infrastructure.items.ItemInventory;
-import net.minecraft.core.BlockPos;
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate.StructureBlockInfo;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.item.ItemStack;
+import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.structure.StructureTemplate.StructureBlockInfo;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Optional;
@@ -33,20 +33,20 @@ public class DepotMountedStorage extends WrapperMountedItemStorage<DepotMountedS
     }
 
     @Override
-    public void unmount(Level level, BlockState state, BlockPos pos, @Nullable BlockEntity be) {
+    public void unmount(World level, BlockState state, BlockPos pos, @Nullable BlockEntity be) {
         if (be instanceof DepotBlockEntity depot) {
             wrapped.getHeld().ifPresentOrElse(depot::setHeldItem, depot::removeHeldItem);
         }
     }
 
     @Override
-    public boolean handleInteraction(ServerPlayer player, Contraption contraption, StructureBlockInfo info) {
+    public boolean handleInteraction(ServerPlayerEntity player, Contraption contraption, StructureBlockInfo info) {
         // interaction is handled in the Interaction Behavior, swaps items with the player
         return false;
     }
 
     @Override
-    public void setChanged() {
+    public void markDirty() {
         dirty = true;
     }
 
@@ -94,12 +94,12 @@ public class DepotMountedStorage extends WrapperMountedItemStorage<DepotMountedS
         }
 
         @Override
-        public int getContainerSize() {
+        public int size() {
             return 1;
         }
 
         @Override
-        public ItemStack getItem(int slot) {
+        public ItemStack getStack(int slot) {
             if (slot > 1) {
                 return ItemStack.EMPTY;
             }
@@ -107,7 +107,7 @@ public class DepotMountedStorage extends WrapperMountedItemStorage<DepotMountedS
         }
 
         @Override
-        public void setItem(int slot, ItemStack stack) {
+        public void setStack(int slot, ItemStack stack) {
             if (slot > 1) {
                 return;
             }
@@ -131,7 +131,7 @@ public class DepotMountedStorage extends WrapperMountedItemStorage<DepotMountedS
         }
 
         @Override
-        public void setChanged() {
+        public void markDirty() {
             dirty = true;
         }
     }

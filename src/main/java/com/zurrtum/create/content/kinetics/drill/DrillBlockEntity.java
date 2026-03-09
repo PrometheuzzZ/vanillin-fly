@@ -1,21 +1,21 @@
 package com.zurrtum.create.content.kinetics.drill;
 
 import com.zurrtum.create.AllBlockEntityTypes;
-import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.content.kinetics.base.BlockBreakingKineticBlockEntity;
 import com.zurrtum.create.content.kinetics.belt.behaviour.DirectBeltInputBehaviour;
 import com.zurrtum.create.content.kinetics.drill.CobbleGenOptimisation.CobbleGenBlockConfiguration;
 import com.zurrtum.create.content.logistics.chute.ChuteBlockEntity;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.LevelEvent;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.entity.HopperBlockEntity;
-import net.minecraft.world.level.block.state.BlockState;
+import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
+import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.Blocks;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.block.entity.HopperBlockEntity;
+import net.minecraft.item.ItemStack;
+import net.minecraft.server.world.ServerWorld;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.world.WorldEvents;
 
 public class DrillBlockEntity extends BlockBreakingKineticBlockEntity {
 
@@ -24,45 +24,33 @@ public class DrillBlockEntity extends BlockBreakingKineticBlockEntity {
 
     public DrillBlockEntity(BlockPos pos, BlockState state) {
         super(AllBlockEntityTypes.DRILL, pos, state);
-        currentOutput = Blocks.AIR.defaultBlockState();
+        currentOutput = Blocks.AIR.getDefaultState();
     }
 
     @Override
     protected BlockPos getBreakingPos() {
-        return getBlockPos().relative(getBlockState().getValue(DrillBlock.FACING));
+        return getPos().offset(getCachedState().get(DrillBlock.FACING));
     }
 
     @Override
     public void onBlockBroken(BlockState stateToBreak) {
-        if (!optimiseCobbleGen(stateToBreak)) {
+        if (!optimiseCobbleGen(stateToBreak))
             super.onBlockBroken(stateToBreak);
-        }
     }
 
     public boolean optimiseCobbleGen(BlockState stateToBreak) {
-        DirectBeltInputBehaviour inv = BlockEntityBehaviour.get(
-            level,
-            breakingPos.below(),
-            DirectBeltInputBehaviour.TYPE
-        );
-        BlockEntity blockEntityBelow = level.getBlockEntity(breakingPos.below());
-        BlockEntity blockEntityAbove = level.getBlockEntity(breakingPos.above());
+        DirectBeltInputBehaviour inv = BlockEntityBehaviour.get(world, breakingPos.down(), DirectBeltInputBehaviour.TYPE);
+        BlockEntity blockEntityBelow = world.getBlockEntity(breakingPos.down());
+        BlockEntity blockEntityAbove = world.getBlockEntity(breakingPos.up());
 
-        if (inv == null && !(blockEntityBelow instanceof HopperBlockEntity) && !(blockEntityAbove instanceof ChuteBlockEntity chute && chute.getItemMotion() > 0)) {
+        if (inv == null && !(blockEntityBelow instanceof HopperBlockEntity) && !(blockEntityAbove instanceof ChuteBlockEntity chute && chute.getItemMotion() > 0))
             return false;
-        }
 
-        CobbleGenBlockConfiguration config = CobbleGenOptimisation.getConfig(
-            level,
-            worldPosition,
-            getBlockState().getValue(DrillBlock.FACING)
-        );
-        if (config == null) {
+        CobbleGenBlockConfiguration config = CobbleGenOptimisation.getConfig(world, pos, getCachedState().get(DrillBlock.FACING));
+        if (config == null)
             return false;
-        }
-        if (!(level instanceof ServerLevel sl)) {
+        if (!(world instanceof ServerWorld sl))
             return false;
-        }
 
         BlockPos breakingPos = getBreakingPos();
         if (!config.equals(currentConfig)) {
@@ -70,27 +58,22 @@ public class DrillBlockEntity extends BlockBreakingKineticBlockEntity {
             currentOutput = CobbleGenOptimisation.determineOutput(sl, breakingPos, config);
         }
 
-        if (currentOutput.isAir() || !currentOutput.equals(stateToBreak)) {
+        if (currentOutput.isAir() || !currentOutput.equals(stateToBreak))
             return false;
-        }
 
-        if (inv != null) {
-            for (ItemStack stack : Block.getDrops(stateToBreak, sl, breakingPos, null)) {
+        if (inv != null)
+            for (ItemStack stack : Block.getDroppedStacks(stateToBreak, sl, breakingPos, null))
                 inv.handleInsertion(stack, Direction.UP, false);
-            }
-        } else if (blockEntityBelow instanceof HopperBlockEntity hbe) {
-            for (ItemStack stack : Block.getDrops(stateToBreak, sl, breakingPos, null)) {
+        else if (blockEntityBelow instanceof HopperBlockEntity hbe) {
+            for (ItemStack stack : Block.getDroppedStacks(stateToBreak, sl, breakingPos, null))
                 hbe.insertExist(stack);
-            }
         } else if (blockEntityAbove instanceof ChuteBlockEntity chute && chute.getItemMotion() > 0) {
-            for (ItemStack stack : Block.getDrops(stateToBreak, sl, breakingPos, null)) {
-                if (chute.getItem().isEmpty()) {
+            for (ItemStack stack : Block.getDroppedStacks(stateToBreak, sl, breakingPos, null))
+                if (chute.getItem().isEmpty())
                     chute.setItem(stack, 0);
-                }
-            }
         }
 
-        level.levelEvent(LevelEvent.PARTICLES_DESTROY_BLOCK, breakingPos, Block.getId(stateToBreak));
+        world.syncWorldEvent(WorldEvents.BLOCK_BROKEN, breakingPos, Block.getRawIdFromState(stateToBreak));
         return true;
     }
 

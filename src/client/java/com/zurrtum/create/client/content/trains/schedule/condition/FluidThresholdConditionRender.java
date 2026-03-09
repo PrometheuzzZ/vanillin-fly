@@ -7,17 +7,17 @@ import com.zurrtum.create.client.foundation.utility.CreateLang;
 import com.zurrtum.create.content.logistics.filter.FilterItemStack;
 import com.zurrtum.create.content.trains.schedule.condition.FluidThresholdCondition;
 import com.zurrtum.create.infrastructure.fluids.FluidStack;
-import net.minecraft.ChatFormatting;
-import net.minecraft.client.Minecraft;
-import net.minecraft.network.chat.Component;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.item.ItemStack;
+import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
 
 import java.util.List;
 
 public class FluidThresholdConditionRender extends CargoThresholdConditionRender<FluidThresholdCondition> {
     @Override
-    protected Component getUnit(FluidThresholdCondition input) {
-        return Component.literal("b");
+    protected Text getUnit(FluidThresholdCondition input) {
+        return Text.literal("b");
     }
 
     @Override
@@ -26,11 +26,11 @@ public class FluidThresholdConditionRender extends CargoThresholdConditionRender
     }
 
     private FluidStack loadFluid(FluidThresholdCondition input) {
-        return input.compareStack.fluid(Minecraft.getInstance().level);
+        return input.compareStack.fluid(MinecraftClient.getInstance().world);
     }
 
     @Override
-    public List<Component> getTitleAs(FluidThresholdCondition input, String type) {
+    public List<Text> getTitleAs(FluidThresholdCondition input, String type) {
         return ImmutableList.of(
             CreateLang.translateDirect(
                 "schedule.condition.threshold.train_holds",
@@ -41,7 +41,7 @@ public class FluidThresholdConditionRender extends CargoThresholdConditionRender
                 CreateLang.translateDirect("schedule.condition.threshold.buckets"),
                 input.compareStack.isEmpty() ? CreateLang.translateDirect("schedule.condition.threshold.anything") : input.compareStack.isFilterItem() ? CreateLang.translateDirect(
                     "schedule.condition.threshold.matching_content") : loadFluid(input).getName()
-            ).withStyle(ChatFormatting.DARK_AQUA)
+            ).formatted(Formatting.DARK_AQUA)
         );
     }
 
@@ -60,8 +60,7 @@ public class FluidThresholdConditionRender extends CargoThresholdConditionRender
         super.initConfigurationWidgets(input, builder);
         builder.addSelectionScrollInput(
             71, 50, (i, l) -> {
-                i.forOptions(ImmutableList.of(CreateLang.translateDirect("schedule.condition.threshold.buckets")))
-                    .titled(null);
+                i.forOptions(ImmutableList.of(CreateLang.translateDirect("schedule.condition.threshold.buckets"))).titled(null);
             }, "Measure"
         );
     }

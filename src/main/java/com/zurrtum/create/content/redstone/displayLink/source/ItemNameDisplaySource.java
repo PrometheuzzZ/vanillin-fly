@@ -1,25 +1,25 @@
 package com.zurrtum.create.content.redstone.displayLink.source;
 
-import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.content.kinetics.belt.behaviour.TransportedItemStackHandlerBehaviour;
 import com.zurrtum.create.content.kinetics.belt.behaviour.TransportedItemStackHandlerBehaviour.TransportedResult;
 import com.zurrtum.create.content.redstone.displayLink.DisplayLinkBlockEntity;
 import com.zurrtum.create.content.redstone.displayLink.DisplayLinkContext;
 import com.zurrtum.create.content.redstone.displayLink.target.DisplayTargetStats;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.world.item.ItemStack;
+import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
+import net.minecraft.item.ItemStack;
+import net.minecraft.text.MutableText;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
 import org.apache.commons.lang3.mutable.MutableObject;
 
 public class ItemNameDisplaySource extends SingleLineDisplaySource {
     @Override
-    protected MutableComponent provideLine(DisplayLinkContext context, DisplayTargetStats stats) {
+    protected MutableText provideLine(DisplayLinkContext context, DisplayTargetStats stats) {
         DisplayLinkBlockEntity gatherer = context.blockEntity();
         Direction direction = gatherer.getDirection();
-        BlockPos.MutableBlockPos pos = gatherer.getSourcePosition().mutable();
+        BlockPos.Mutable pos = gatherer.getSourcePosition().mutableCopy();
 
-        MutableComponent combined = EMPTY_LINE.copy();
+        MutableText combined = EMPTY_LINE.copy();
 
         for (int i = 0; i < 32; i++) {
             TransportedItemStackHandlerBehaviour behaviour = BlockEntityBehaviour.get(
@@ -29,9 +29,8 @@ public class ItemNameDisplaySource extends SingleLineDisplaySource {
             );
             pos.move(direction);
 
-            if (behaviour == null) {
+            if (behaviour == null)
                 break;
-            }
 
             MutableObject<ItemStack> stackHolder = new MutableObject<>();
             behaviour.handleCenteredProcessingOnAllItems(
@@ -42,9 +41,8 @@ public class ItemNameDisplaySource extends SingleLineDisplaySource {
             );
 
             ItemStack stack = stackHolder.getValue();
-            if (stack != null && !stack.isEmpty()) {
-                combined = combined.append(stack.getHoverName());
-            }
+            if (stack != null && !stack.isEmpty())
+                combined = combined.append(stack.getName());
         }
 
         return combined;

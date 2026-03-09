@@ -1,7 +1,6 @@
 package com.zurrtum.create.client.content.kinetics.mechanicalArm;
 
 import com.google.common.collect.Lists;
-import com.mojang.blaze3d.vertex.PoseStack;
 import com.zurrtum.create.catnip.data.Iterate;
 import com.zurrtum.create.catnip.theme.Color;
 import com.zurrtum.create.client.AllPartialModels;
@@ -19,12 +18,13 @@ import com.zurrtum.create.client.flywheel.lib.transform.TransformStack;
 import com.zurrtum.create.client.flywheel.lib.visual.SimpleDynamicVisual;
 import com.zurrtum.create.content.kinetics.mechanicalArm.ArmBlock;
 import com.zurrtum.create.content.kinetics.mechanicalArm.ArmBlockEntity;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.item.ItemStackRenderState;
-import net.minecraft.util.Mth;
-import net.minecraft.world.item.BlockItem;
-import net.minecraft.world.item.ItemDisplayContext;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.render.item.ItemRenderState;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.item.BlockItem;
+import net.minecraft.item.ItemDisplayContext;
+import net.minecraft.item.ItemStack;
+import net.minecraft.util.math.MathHelper;
 
 import java.util.ArrayList;
 import java.util.function.Consumer;
@@ -40,8 +40,8 @@ public class ArmVisual extends SingleAxisRotatingVisual<ArmBlockEntity> implemen
     private final ArrayList<TransformedInstance> models;
     private final boolean ceiling;
 
-    private final PoseStack poseStack = new PoseStack();
-    private final ItemStackRenderState itemRenderState = new ItemStackRenderState();
+    private final MatrixStack poseStack = new MatrixStack();
+    private final ItemRenderState itemRenderState = new ItemRenderState();
 
     private boolean wasDancing = false;
     private float baseAngle = Float.NaN;
@@ -52,41 +52,29 @@ public class ArmVisual extends SingleAxisRotatingVisual<ArmBlockEntity> implemen
     public ArmVisual(VisualizationContext context, ArmBlockEntity blockEntity, float partialTick) {
         super(context, blockEntity, partialTick, Models.partial(AllPartialModels.ARM_COG));
 
-        base = instancerProvider().instancer(InstanceTypes.TRANSFORMED, Models.partial(AllPartialModels.ARM_BASE))
-            .createInstance();
-        lowerBody = instancerProvider().instancer(
-            InstanceTypes.TRANSFORMED,
-            Models.partial(AllPartialModels.ARM_LOWER_BODY)
-        ).createInstance();
-        upperBody = instancerProvider().instancer(
-            InstanceTypes.TRANSFORMED,
-            Models.partial(AllPartialModels.ARM_UPPER_BODY)
-        ).createInstance();
+        base = instancerProvider().instancer(InstanceTypes.TRANSFORMED, Models.partial(AllPartialModels.ARM_BASE)).createInstance();
+        lowerBody = instancerProvider().instancer(InstanceTypes.TRANSFORMED, Models.partial(AllPartialModels.ARM_LOWER_BODY)).createInstance();
+        upperBody = instancerProvider().instancer(InstanceTypes.TRANSFORMED, Models.partial(AllPartialModels.ARM_UPPER_BODY)).createInstance();
         claw = instancerProvider().instancer(
             InstanceTypes.TRANSFORMED,
             Models.partial(blockEntity.goggles ? AllPartialModels.ARM_CLAW_BASE_GOGGLES : AllPartialModels.ARM_CLAW_BASE)
         ).createInstance();
 
-        TransformedInstance clawGrip1 = instancerProvider().instancer(
-            InstanceTypes.TRANSFORMED,
-            Models.partial(AllPartialModels.ARM_CLAW_GRIP_UPPER)
-        ).createInstance();
-        TransformedInstance clawGrip2 = instancerProvider().instancer(
-            InstanceTypes.TRANSFORMED,
-            Models.partial(AllPartialModels.ARM_CLAW_GRIP_LOWER)
-        ).createInstance();
+        TransformedInstance clawGrip1 = instancerProvider().instancer(InstanceTypes.TRANSFORMED, Models.partial(AllPartialModels.ARM_CLAW_GRIP_UPPER))
+            .createInstance();
+        TransformedInstance clawGrip2 = instancerProvider().instancer(InstanceTypes.TRANSFORMED, Models.partial(AllPartialModels.ARM_CLAW_GRIP_LOWER))
+            .createInstance();
 
         clawGrips = Lists.newArrayList(clawGrip1, clawGrip2);
         models = Lists.newArrayList(base, lowerBody, upperBody, claw, clawGrip1, clawGrip2);
-        ceiling = blockState.getValue(ArmBlock.CEILING);
+        ceiling = blockState.get(ArmBlock.CEILING);
 
         var msr = TransformStack.of(poseStack);
         msr.translate(getVisualPosition());
         msr.center();
 
-        if (ceiling) {
+        if (ceiling)
             msr.rotateXDegrees(180);
-        }
 
         animate(partialTick);
     }
@@ -108,9 +96,10 @@ public class ArmVisual extends SingleAxisRotatingVisual<ArmBlockEntity> implemen
         float upperArmAngleNow = blockEntity.upperArmAngle.getValue(pt);
         float headAngleNow = blockEntity.headAngle.getValue(pt);
 
-        boolean settled = Mth.equal(baseAngle, baseAngleNow) && Mth.equal(lowerArmAngle, lowerArmAngleNow) && Mth.equal(upperArmAngle,
-            upperArmAngleNow
-        ) && Mth.equal(headAngle, headAngleNow);
+        boolean settled = MathHelper.approximatelyEquals(baseAngle, baseAngleNow) && MathHelper.approximatelyEquals(
+            lowerArmAngle,
+            lowerArmAngleNow
+        ) && MathHelper.approximatelyEquals(upperArmAngle, upperArmAngleNow) && MathHelper.approximatelyEquals(headAngle, headAngleNow);
 
         this.baseAngle = baseAngleNow;
         this.lowerArmAngle = lowerArmAngleNow;
@@ -118,20 +107,19 @@ public class ArmVisual extends SingleAxisRotatingVisual<ArmBlockEntity> implemen
         this.headAngle = headAngleNow;
 
         // Need to reset the animation if the arm is dancing. We'd very likely be settled
-        if (!settled || wasDancing) {
+        if (!settled || wasDancing)
             animateArm();
-        }
 
         wasDancing = false;
     }
 
     private void animateRave(float partialTick) {
-        var ticks = AnimationTickHolder.getTicks(blockEntity.getLevel());
+        var ticks = AnimationTickHolder.getTicks(blockEntity.getWorld());
         float renderTick = ticks + partialTick + (blockEntity.hashCode() % 64);
 
         float baseAngle = (renderTick * 10) % 360;
-        float lowerArmAngle = Mth.lerpInt((Mth.sin(renderTick / 4) + 1) / 2, -45, 15);
-        float upperArmAngle = Mth.lerpInt((Mth.sin(renderTick / 8) + 1) / 4, -45, 95);
+        float lowerArmAngle = MathHelper.lerp((MathHelper.sin(renderTick / 4) + 1) / 2, -45, 15);
+        float upperArmAngle = MathHelper.lerp((MathHelper.sin(renderTick / 8) + 1) / 4, -45, 95);
         float headAngle = -lowerArmAngle;
         int color = Color.rainbowColor(ticks * 100).getRGB();
         updateAngles(baseAngle, lowerArmAngle, upperArmAngle, headAngle, color);
@@ -142,7 +130,7 @@ public class ArmVisual extends SingleAxisRotatingVisual<ArmBlockEntity> implemen
     }
 
     private void updateAngles(float baseAngle, float lowerArmAngle, float upperArmAngle, float headAngle, int color) {
-        poseStack.pushPose();
+        poseStack.push();
 
         var msr = TransformStack.of(poseStack);
 
@@ -157,37 +145,34 @@ public class ArmVisual extends SingleAxisRotatingVisual<ArmBlockEntity> implemen
 
         ArmRenderer.transformHead(msr, headAngle);
 
-        if (ceiling && blockEntity.goggles) {
+        if (ceiling && blockEntity.goggles)
             msr.rotateZDegrees(180);
-        }
 
         claw.setTransform(poseStack).setChanged();
 
-        if (ceiling && blockEntity.goggles) {
+        if (ceiling && blockEntity.goggles)
             msr.rotateZDegrees(180);
-        }
 
         ItemStack item = blockEntity.heldItem;
         boolean hasItem = !item.isEmpty();
         boolean isBlockItem;
         if (hasItem && item.getItem() instanceof BlockItem) {
-            Minecraft mc = Minecraft.getInstance();
-            mc.getItemModelResolver()
-                .updateForTopItem(itemRenderState, item, ItemDisplayContext.FIXED, mc.level, null, 0);
-            isBlockItem = itemRenderState.usesBlockLight();
+            MinecraftClient mc = MinecraftClient.getInstance();
+            mc.getItemModelManager().clearAndUpdate(itemRenderState, item, ItemDisplayContext.FIXED, mc.world, null, 0);
+            isBlockItem = itemRenderState.isSideLit();
         } else {
             isBlockItem = false;
         }
 
         for (int index : Iterate.zeroAndOne) {
-            poseStack.pushPose();
+            poseStack.push();
             int flip = index * 2 - 1;
             ArmRenderer.transformClawHalf(msr, hasItem, isBlockItem, flip);
             clawGrips.get(index).setTransform(poseStack).setChanged();
-            poseStack.popPose();
+            poseStack.pop();
         }
 
-        poseStack.popPose();
+        poseStack.pop();
     }
 
     @Override

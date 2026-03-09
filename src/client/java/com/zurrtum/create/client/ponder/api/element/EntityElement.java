@@ -1,6 +1,6 @@
 package com.zurrtum.create.client.ponder.api.element;
 
-import net.minecraft.world.entity.Entity;
+import net.minecraft.entity.Entity;
 
 public interface EntityElement extends TrackedElement<Entity> {
 }

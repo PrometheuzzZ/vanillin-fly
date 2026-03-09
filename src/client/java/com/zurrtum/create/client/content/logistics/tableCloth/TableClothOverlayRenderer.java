@@ -7,75 +7,62 @@ import com.zurrtum.create.content.logistics.stockTicker.StockTickerInteractionHa
 import com.zurrtum.create.content.logistics.tableCloth.ShoppingListItem;
 import com.zurrtum.create.content.logistics.tableCloth.TableClothBlockEntity;
 import com.zurrtum.create.infrastructure.component.ShoppingList;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.multiplayer.ClientLevel;
-import net.minecraft.core.BlockPos;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.GameType;
-import net.minecraft.world.phys.BlockHitResult;
-import net.minecraft.world.phys.EntityHitResult;
-import net.minecraft.world.phys.HitResult;
-import net.minecraft.world.phys.HitResult.Type;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.world.ClientWorld;
+import net.minecraft.item.ItemStack;
+import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.util.hit.EntityHitResult;
+import net.minecraft.util.hit.HitResult;
+import net.minecraft.util.hit.HitResult.Type;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.GameMode;
 
 public class TableClothOverlayRenderer {
-    public static void tick(Minecraft mc) {
-        if (mc.gameMode.getPlayerMode() == GameType.SPECTATOR) {
+    public static void tick(MinecraftClient mc) {
+        if (mc.interactionManager.getCurrentGameMode() == GameMode.SPECTATOR)
             return;
-        }
-        HitResult mouseOver = mc.hitResult;
-        if (mouseOver == null) {
+        HitResult mouseOver = mc.crosshairTarget;
+        if (mouseOver == null)
             return;
-        }
 
-        ItemStack heldItem = mc.player.getMainHandItem();
+        ItemStack heldItem = mc.player.getMainHandStack();
 
-        ClientLevel world = mc.level;
+        ClientWorld world = mc.world;
         if (mouseOver.getType() != Type.ENTITY) {
-            if (!(mouseOver instanceof BlockHitResult bhr)) {
+            if (!(mouseOver instanceof BlockHitResult bhr))
                 return;
-            }
-            if (!(world.getBlockEntity(bhr.getBlockPos()) instanceof TableClothBlockEntity dcbe)) {
+            if (!(world.getBlockEntity(bhr.getBlockPos()) instanceof TableClothBlockEntity dcbe))
                 return;
-            }
-            if (!dcbe.isShop()) {
+            if (!dcbe.isShop())
                 return;
-            }
-            if (heldItem.is(AllItems.CLIPBOARD)) {
+            if (heldItem.isOf(AllItems.CLIPBOARD))
                 return;
-            }
-            TableClothFilteringBehaviour behaviour = (TableClothFilteringBehaviour) dcbe.getBehaviour(
-                TableClothFilteringBehaviour.TYPE);
-            if (behaviour.targetsPriceTag(mc.player, bhr)) {
+            TableClothFilteringBehaviour behaviour = (TableClothFilteringBehaviour) dcbe.getBehaviour(TableClothFilteringBehaviour.TYPE);
+            if (behaviour.targetsPriceTag(mc.player, bhr))
                 return;
-            }
 
             int alreadyPurchased = 0;
             ShoppingList list = ShoppingListItem.getList(heldItem);
-            if (list != null) {
-                alreadyPurchased = list.getPurchases(dcbe.getBlockPos());
-            }
+            if (list != null)
+                alreadyPurchased = list.getPurchases(dcbe.getPos());
 
             BlueprintOverlayRenderer.displayClothShop(dcbe, alreadyPurchased, list);
             return;
         }
 
         EntityHitResult entityRay = (EntityHitResult) mouseOver;
-        if (!heldItem.is(AllItems.SHOPPING_LIST)) {
+        if (!heldItem.isOf(AllItems.SHOPPING_LIST))
             return;
-        }
 
         ShoppingList list = ShoppingListItem.getList(heldItem);
         BlockPos stockTickerPosition = StockTickerInteractionHandler.getStockTickerPosition(entityRay.getEntity());
 
-        if (list == null || stockTickerPosition == null) {
+        if (list == null || stockTickerPosition == null)
             return;
-        }
-        if (!(world.getBlockEntity(stockTickerPosition) instanceof StockTickerBlockEntity tickerBE)) {
+        if (!(world.getBlockEntity(stockTickerPosition) instanceof StockTickerBlockEntity tickerBE))
             return;
-        }
-        if (!tickerBE.behaviour.freqId.equals(list.shopNetwork())) {
+        if (!tickerBE.behaviour.freqId.equals(list.shopNetwork()))
             return;
-        }
 
         BlueprintOverlayRenderer.displayShoppingList(mc.player, list.bakeEntries(world, null));
     }

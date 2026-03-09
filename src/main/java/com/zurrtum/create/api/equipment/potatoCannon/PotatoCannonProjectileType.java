@@ -7,59 +7,53 @@ import com.zurrtum.create.api.registry.CreateRegistryKeys;
 import com.zurrtum.create.content.equipment.potatoCannon.AllPotatoProjectileRenderModes.Billboard;
 import com.zurrtum.create.content.equipment.potatoCannon.AllPotatoProjectileRenderModes.TowardMotion;
 import com.zurrtum.create.content.equipment.potatoCannon.AllPotatoProjectileRenderModes.Tumble;
-import net.minecraft.core.Holder;
-import net.minecraft.core.Holder.Reference;
-import net.minecraft.core.HolderSet;
-import net.minecraft.core.RegistryAccess;
-import net.minecraft.core.RegistryCodecs;
-import net.minecraft.core.registries.Registries;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.ItemLike;
-import net.minecraft.world.level.LevelAccessor;
-import net.minecraft.world.phys.BlockHitResult;
-import net.minecraft.world.phys.EntityHitResult;
+import net.minecraft.item.Item;
+import net.minecraft.item.ItemConvertible;
+import net.minecraft.item.ItemStack;
+import net.minecraft.registry.DynamicRegistryManager;
+import net.minecraft.registry.RegistryCodecs;
+import net.minecraft.registry.RegistryKeys;
+import net.minecraft.registry.entry.RegistryEntry;
+import net.minecraft.registry.entry.RegistryEntry.Reference;
+import net.minecraft.registry.entry.RegistryEntryList;
+import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.util.hit.EntityHitResult;
+import net.minecraft.world.WorldAccess;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
 // TODO: 1.21.7 - Move into api package
-public record PotatoCannonProjectileType(HolderSet<Item> items, int reloadTicks, int damage, int split, float knockback,
-                                         float drag, float velocityMultiplier, float gravityMultiplier,
-                                         float soundPitch, boolean sticky, ItemStack dropStack,
-                                         PotatoProjectileRenderMode renderMode,
-                                         Optional<PotatoProjectileEntityHitAction> preEntityHit,
-                                         Optional<PotatoProjectileEntityHitAction> onEntityHit,
-                                         Optional<PotatoProjectileBlockHitAction> onBlockHit) {
+public record PotatoCannonProjectileType(
+    RegistryEntryList<Item> items, int reloadTicks, int damage, int split, float knockback, float drag, float velocityMultiplier,
+    float gravityMultiplier, float soundPitch, boolean sticky, ItemStack dropStack, PotatoProjectileRenderMode renderMode,
+    Optional<PotatoProjectileEntityHitAction> preEntityHit, Optional<PotatoProjectileEntityHitAction> onEntityHit,
+    Optional<PotatoProjectileBlockHitAction> onBlockHit
+) {
     public static final Codec<PotatoCannonProjectileType> CODEC = RecordCodecBuilder.create(i -> i.group(
-        RegistryCodecs.homogeneousList(Registries.ITEM).fieldOf("items").forGetter(PotatoCannonProjectileType::items),
+        RegistryCodecs.entryList(RegistryKeys.ITEM).fieldOf("items").forGetter(PotatoCannonProjectileType::items),
         Codec.INT.optionalFieldOf("reload_ticks", 10).forGetter(PotatoCannonProjectileType::reloadTicks),
         Codec.INT.optionalFieldOf("damage", 1).forGetter(PotatoCannonProjectileType::damage),
         Codec.INT.optionalFieldOf("split", 1).forGetter(PotatoCannonProjectileType::split),
         Codec.FLOAT.optionalFieldOf("knockback", 1f).forGetter(PotatoCannonProjectileType::knockback),
         Codec.FLOAT.optionalFieldOf("drag", .99f).forGetter(PotatoCannonProjectileType::drag),
-        Codec.FLOAT.optionalFieldOf("velocity_multiplier", 1f)
-            .forGetter(PotatoCannonProjectileType::velocityMultiplier),
+        Codec.FLOAT.optionalFieldOf("velocity_multiplier", 1f).forGetter(PotatoCannonProjectileType::velocityMultiplier),
         Codec.FLOAT.optionalFieldOf("gravity_multiplier", 1f).forGetter(PotatoCannonProjectileType::gravityMultiplier),
         Codec.FLOAT.optionalFieldOf("sound_pitch", 1f).forGetter(PotatoCannonProjectileType::soundPitch),
         Codec.BOOL.optionalFieldOf("sticky", false).forGetter(PotatoCannonProjectileType::sticky),
         ItemStack.CODEC.optionalFieldOf("drop_stack", ItemStack.EMPTY).forGetter(PotatoCannonProjectileType::dropStack),
-        PotatoProjectileRenderMode.CODEC.optionalFieldOf("render_mode", Billboard.INSTANCE)
-            .forGetter(PotatoCannonProjectileType::renderMode),
+        PotatoProjectileRenderMode.CODEC.optionalFieldOf("render_mode", Billboard.INSTANCE).forGetter(PotatoCannonProjectileType::renderMode),
         PotatoProjectileEntityHitAction.CODEC.optionalFieldOf("pre_entity_hit").forGetter(p -> p.preEntityHit),
         PotatoProjectileEntityHitAction.CODEC.optionalFieldOf("on_entity_hit").forGetter(p -> p.onEntityHit),
         PotatoProjectileBlockHitAction.CODEC.optionalFieldOf("on_block_hit").forGetter(p -> p.onBlockHit)
     ).apply(i, PotatoCannonProjectileType::new));
 
     @SuppressWarnings("deprecation")
-    public static Optional<Reference<PotatoCannonProjectileType>> getTypeForItem(
-        RegistryAccess registryAccess,
-        Item item
-    ) {
+    public static Optional<Reference<PotatoCannonProjectileType>> getTypeForItem(DynamicRegistryManager registryAccess, Item item) {
         // Cache this if it causes performance issues, but it probably won't
-        return registryAccess.lookupOrThrow(CreateRegistryKeys.POTATO_PROJECTILE_TYPE).listElements()
-            .filter(ref -> ref.value().items.contains(item.builtInRegistryHolder())).findFirst();
+        return registryAccess.getOrThrow(CreateRegistryKeys.POTATO_PROJECTILE_TYPE).streamEntries()
+            .filter(ref -> ref.value().items.contains(item.getRegistryEntry())).findFirst();
     }
 
     public boolean preEntityHit(ItemStack stack, EntityHitResult ray) {
@@ -70,7 +64,7 @@ public record PotatoCannonProjectileType(HolderSet<Item> items, int reloadTicks,
         return onEntityHit.map(i -> i.execute(stack, ray, Type.ON_HIT)).orElse(false);
     }
 
-    public boolean onBlockHit(LevelAccessor level, ItemStack stack, BlockHitResult ray) {
+    public boolean onBlockHit(WorldAccess level, ItemStack stack, BlockHitResult ray) {
         return onBlockHit.map(i -> i.execute(level, stack, ray)).orElse(false);
     }
 
@@ -81,7 +75,7 @@ public record PotatoCannonProjectileType(HolderSet<Item> items, int reloadTicks,
     }
 
     public static class Builder {
-        private final List<Holder<Item>> items = new ArrayList<>();
+        private final List<RegistryEntry<Item>> items = new ArrayList<>();
         private int reloadTicks = 10;
         private int damage = 1;
         private int split = 1;
@@ -183,16 +177,15 @@ public record PotatoCannonProjectileType(HolderSet<Item> items, int reloadTicks,
         }
 
         @SuppressWarnings("deprecation")
-        public Builder addItems(ItemLike... items) {
-            for (ItemLike provider : items) {
-                this.items.add(provider.asItem().builtInRegistryHolder());
-            }
+        public Builder addItems(ItemConvertible... items) {
+            for (ItemConvertible provider : items)
+                this.items.add(provider.asItem().getRegistryEntry());
             return this;
         }
 
         public PotatoCannonProjectileType build() {
             return new PotatoCannonProjectileType(
-                HolderSet.direct(items),
+                RegistryEntryList.of(items),
                 reloadTicks,
                 damage,
                 split,

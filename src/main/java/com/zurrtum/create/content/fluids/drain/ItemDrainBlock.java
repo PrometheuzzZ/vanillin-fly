@@ -2,160 +2,123 @@ package com.zurrtum.create.content.fluids.drain;
 
 import com.zurrtum.create.AllBlockEntityTypes;
 import com.zurrtum.create.AllShapes;
-import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.content.equipment.wrench.IWrenchable;
 import com.zurrtum.create.content.fluids.transfer.GenericItemEmptying;
 import com.zurrtum.create.content.kinetics.belt.behaviour.DirectBeltInputBehaviour;
 import com.zurrtum.create.foundation.advancement.AdvancementBehaviour;
 import com.zurrtum.create.foundation.block.IBE;
 import com.zurrtum.create.foundation.blockEntity.ComparatorUtil;
+import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.foundation.fluid.FluidHelper;
 import com.zurrtum.create.infrastructure.fluids.FluidInventory;
 import com.zurrtum.create.infrastructure.fluids.FluidInventoryProvider;
 import com.zurrtum.create.infrastructure.items.ItemInventoryProvider;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.world.Container;
-import net.minecraft.world.InteractionHand;
-import net.minecraft.world.InteractionResult;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.item.ItemEntity;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.BlockItem;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.BlockGetter;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.LevelAccessor;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.entity.BlockEntityType;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.pathfinder.PathComputationType;
-import net.minecraft.world.phys.BlockHitResult;
-import net.minecraft.world.phys.Vec3;
-import net.minecraft.world.phys.shapes.CollisionContext;
-import net.minecraft.world.phys.shapes.VoxelShape;
+import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.ShapeContext;
+import net.minecraft.block.entity.BlockEntityType;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.ItemEntity;
+import net.minecraft.entity.LivingEntity;
+import net.minecraft.entity.ai.pathing.NavigationType;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.inventory.Inventory;
+import net.minecraft.item.BlockItem;
+import net.minecraft.item.ItemStack;
+import net.minecraft.util.ActionResult;
+import net.minecraft.util.Hand;
+import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.util.shape.VoxelShape;
+import net.minecraft.world.BlockView;
+import net.minecraft.world.World;
+import net.minecraft.world.WorldAccess;
 
 public class ItemDrainBlock extends Block implements IWrenchable, IBE<ItemDrainBlockEntity>, ItemInventoryProvider<ItemDrainBlockEntity>, FluidInventoryProvider<ItemDrainBlockEntity> {
 
-    public ItemDrainBlock(Properties p_i48440_1_) {
+    public ItemDrainBlock(Settings p_i48440_1_) {
         super(p_i48440_1_);
     }
 
     @Override
-    public Container getInventory(
-        LevelAccessor world,
-        BlockPos pos,
-        BlockState state,
-        ItemDrainBlockEntity blockEntity,
-        Direction context
-    ) {
-        if (context != null && context.getAxis().isHorizontal()) {
+    public Inventory getInventory(WorldAccess world, BlockPos pos, BlockState state, ItemDrainBlockEntity blockEntity, Direction context) {
+        if (context != null && context.getAxis().isHorizontal())
             return blockEntity.itemHandlers.get(context);
-        }
         return null;
     }
 
     @Override
-    public FluidInventory getFluidInventory(
-        LevelAccessor world,
-        BlockPos pos,
-        BlockState state,
-        ItemDrainBlockEntity blockEntity,
-        Direction context
-    ) {
+    public FluidInventory getFluidInventory(WorldAccess world, BlockPos pos, BlockState state, ItemDrainBlockEntity blockEntity, Direction context) {
         return blockEntity.internalTank.getCapability();
     }
 
     @Override
-    protected InteractionResult useItemOn(
+    protected ActionResult onUseWithItem(
         ItemStack stack,
         BlockState state,
-        Level level,
+        World level,
         BlockPos pos,
-        Player player,
-        InteractionHand hand,
+        PlayerEntity player,
+        Hand hand,
         BlockHitResult hitResult
     ) {
-        if (stack.getItem() instanceof BlockItem && !FluidHelper.hasFluidInventory(stack)) {
-            return InteractionResult.TRY_WITH_EMPTY_HAND;
-        }
+        if (stack.getItem() instanceof BlockItem && !FluidHelper.hasFluidInventory(stack))
+            return ActionResult.PASS_TO_DEFAULT_BLOCK_ACTION;
 
         return onBlockEntityUseItemOn(
             level, pos, be -> {
                 if (!stack.isEmpty()) {
                     be.internalTank.allowInsertion();
-                    InteractionResult tryExchange = tryExchange(level, player, hand, stack, be);
+                    ActionResult tryExchange = tryExchange(level, player, hand, stack, be);
                     be.internalTank.forbidInsertion();
-                    if (tryExchange.consumesAction()) {
+                    if (tryExchange.isAccepted())
                         return tryExchange;
-                    }
                 }
 
                 ItemStack heldItemStack = be.getHeldItemStack();
-                if (!level.isClientSide() && !heldItemStack.isEmpty()) {
-                    player.getInventory().placeItemBackInInventory(heldItemStack);
+                if (!level.isClient() && !heldItemStack.isEmpty()) {
+                    player.getInventory().offerOrDrop(heldItemStack);
                     be.heldItem = null;
                     be.notifyUpdate();
                 }
-                return InteractionResult.SUCCESS;
+                return ActionResult.SUCCESS;
             }
         );
     }
 
     @Override
-    public void updateEntityMovementAfterFallOn(BlockGetter worldIn, Entity entityIn) {
-        super.updateEntityMovementAfterFallOn(worldIn, entityIn);
-        if (!(entityIn instanceof ItemEntity itemEntity)) {
+    public void onEntityLand(BlockView worldIn, Entity entityIn) {
+        super.onEntityLand(worldIn, entityIn);
+        if (!(entityIn instanceof ItemEntity itemEntity))
             return;
-        }
-        if (!entityIn.isAlive()) {
+        if (!entityIn.isAlive())
             return;
-        }
-        if (entityIn.level().isClientSide()) {
+        if (entityIn.getEntityWorld().isClient())
             return;
-        }
 
-        DirectBeltInputBehaviour inputBehaviour = BlockEntityBehaviour.get(
-            worldIn,
-            entityIn.blockPosition(),
-            DirectBeltInputBehaviour.TYPE
-        );
-        if (inputBehaviour == null) {
+        DirectBeltInputBehaviour inputBehaviour = BlockEntityBehaviour.get(worldIn, entityIn.getBlockPos(), DirectBeltInputBehaviour.TYPE);
+        if (inputBehaviour == null)
             return;
-        }
-        Vec3 deltaMovement = entityIn.getDeltaMovement().multiply(1, 0, 1).normalize();
-        Direction nearest = Direction.getApproximateNearest(deltaMovement.x, deltaMovement.y, deltaMovement.z);
-        ItemStack remainder = inputBehaviour.handleInsertion(itemEntity.getItem(), nearest, false);
-        itemEntity.setItem(remainder);
-        if (remainder.isEmpty()) {
+        Vec3d deltaMovement = entityIn.getVelocity().multiply(1, 0, 1).normalize();
+        Direction nearest = Direction.getFacing(deltaMovement.x, deltaMovement.y, deltaMovement.z);
+        ItemStack remainder = inputBehaviour.handleInsertion(itemEntity.getStack(), nearest, false);
+        itemEntity.setStack(remainder);
+        if (remainder.isEmpty())
             itemEntity.discard();
-        }
     }
 
-    protected InteractionResult tryExchange(
-        Level worldIn,
-        Player player,
-        InteractionHand handIn,
-        ItemStack heldItem,
-        ItemDrainBlockEntity be
-    ) {
-        if (FluidHelper.tryEmptyItemIntoBE(worldIn, player, handIn, heldItem, be)) {
-            return InteractionResult.SUCCESS;
-        }
-        if (GenericItemEmptying.canItemBeEmptied(worldIn, heldItem)) {
-            return InteractionResult.SUCCESS;
-        }
-        return InteractionResult.TRY_WITH_EMPTY_HAND;
+    protected ActionResult tryExchange(World worldIn, PlayerEntity player, Hand handIn, ItemStack heldItem, ItemDrainBlockEntity be) {
+        if (FluidHelper.tryEmptyItemIntoBE(worldIn, player, handIn, heldItem, be))
+            return ActionResult.SUCCESS;
+        if (GenericItemEmptying.canItemBeEmptied(worldIn, heldItem))
+            return ActionResult.SUCCESS;
+        return ActionResult.PASS_TO_DEFAULT_BLOCK_ACTION;
     }
 
     @Override
-    public VoxelShape getShape(
-        BlockState p_220053_1_,
-        BlockGetter p_220053_2_,
-        BlockPos p_220053_3_,
-        CollisionContext p_220053_4_
-    ) {
+    public VoxelShape getOutlineShape(BlockState p_220053_1_, BlockView p_220053_2_, BlockPos p_220053_3_, ShapeContext p_220053_4_) {
         return AllShapes.CASING_13PX.get(Direction.UP);
     }
 
@@ -165,8 +128,8 @@ public class ItemDrainBlock extends Block implements IWrenchable, IBE<ItemDrainB
     }
 
     @Override
-    public void setPlacedBy(Level pLevel, BlockPos pPos, BlockState pState, LivingEntity pPlacer, ItemStack pStack) {
-        super.setPlacedBy(pLevel, pPos, pState, pPlacer, pStack);
+    public void onPlaced(World pLevel, BlockPos pPos, BlockState pState, LivingEntity pPlacer, ItemStack pStack) {
+        super.onPlaced(pLevel, pPos, pState, pPlacer, pStack);
         AdvancementBehaviour.setPlacedBy(pLevel, pPos, pPlacer);
     }
 
@@ -176,17 +139,17 @@ public class ItemDrainBlock extends Block implements IWrenchable, IBE<ItemDrainB
     }
 
     @Override
-    public boolean hasAnalogOutputSignal(BlockState state) {
+    public boolean hasComparatorOutput(BlockState state) {
         return true;
     }
 
     @Override
-    public int getAnalogOutputSignal(BlockState blockState, Level worldIn, BlockPos pos, Direction direction) {
+    public int getComparatorOutput(BlockState blockState, World worldIn, BlockPos pos, Direction direction) {
         return ComparatorUtil.levelOfSmartFluidTank(worldIn, pos);
     }
 
     @Override
-    protected boolean isPathfindable(BlockState state, PathComputationType pathComputationType) {
+    protected boolean canPathfindThrough(BlockState state, NavigationType pathComputationType) {
         return false;
     }
 

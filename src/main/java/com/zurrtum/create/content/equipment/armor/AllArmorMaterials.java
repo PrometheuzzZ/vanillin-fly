@@ -2,19 +2,19 @@ package com.zurrtum.create.content.equipment.armor;
 
 import com.google.common.collect.Maps;
 import com.zurrtum.create.AllItemTags;
-import net.minecraft.core.Holder;
-import net.minecraft.core.component.DataComponents;
-import net.minecraft.resources.ResourceKey;
-import net.minecraft.sounds.SoundEvent;
-import net.minecraft.sounds.SoundEvents;
-import net.minecraft.tags.ItemTags;
-import net.minecraft.tags.TagKey;
-import net.minecraft.world.entity.EquipmentSlot;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.item.equipment.ArmorMaterial;
-import net.minecraft.world.item.equipment.ArmorType;
-import net.minecraft.world.item.equipment.EquipmentAsset;
-import net.minecraft.world.item.equipment.Equippable;
+import net.minecraft.component.DataComponentTypes;
+import net.minecraft.component.type.EquippableComponent;
+import net.minecraft.entity.EquipmentSlot;
+import net.minecraft.item.Item;
+import net.minecraft.item.equipment.ArmorMaterial;
+import net.minecraft.item.equipment.EquipmentAsset;
+import net.minecraft.item.equipment.EquipmentType;
+import net.minecraft.registry.RegistryKey;
+import net.minecraft.registry.entry.RegistryEntry;
+import net.minecraft.registry.tag.ItemTags;
+import net.minecraft.registry.tag.TagKey;
+import net.minecraft.sound.SoundEvent;
+import net.minecraft.sound.SoundEvents;
 
 import java.util.Map;
 
@@ -23,7 +23,7 @@ public class AllArmorMaterials {
         7,
         createDefenseMap(1, 3, 4, 2, 4),
         7,
-        SoundEvents.ARMOR_EQUIP_GOLD,
+        SoundEvents.ITEM_ARMOR_EQUIP_GOLD,
         0.0F,
         0.0F,
         AllItemTags.REPAIRS_COPPER_ARMOR,
@@ -33,7 +33,7 @@ public class AllArmorMaterials {
         4,
         createDefenseMap(1, 1, 1, 1, 2),
         4,
-        SoundEvents.ARMOR_EQUIP_LEATHER,
+        SoundEvents.ITEM_ARMOR_EQUIP_LEATHER,
         0.0F,
         0.0F,
         AllItemTags.REPAIRS_CARDBOARD_ARMOR,
@@ -43,7 +43,7 @@ public class AllArmorMaterials {
         37,
         createDefenseMap(3, 6, 8, 3, 11),
         15,
-        SoundEvents.ARMOR_EQUIP_NETHERITE,
+        SoundEvents.ITEM_ARMOR_EQUIP_NETHERITE,
         3.0F,
         0.1F,
         ItemTags.REPAIRS_NETHERITE_ARMOR,
@@ -52,27 +52,18 @@ public class AllArmorMaterials {
 
     private static ArmorMaterial register(
         int durability,
-        Map<ArmorType, Integer> defense,
+        Map<EquipmentType, Integer> defense,
         int enchantmentValue,
-        Holder<SoundEvent> equipSound,
+        RegistryEntry<SoundEvent> equipSound,
         float toughness,
         float knockbackResistance,
         TagKey<Item> repairIngredient,
-        ResourceKey<EquipmentAsset> assetId
+        RegistryKey<EquipmentAsset> assetId
     ) {
-        return new ArmorMaterial(
-            durability,
-            defense,
-            enchantmentValue,
-            equipSound,
-            toughness,
-            knockbackResistance,
-            repairIngredient,
-            assetId
-        );
+        return new ArmorMaterial(durability, defense, enchantmentValue, equipSound, toughness, knockbackResistance, repairIngredient, assetId);
     }
 
-    private static Map<ArmorType, Integer> createDefenseMap(
+    private static Map<EquipmentType, Integer> createDefenseMap(
         int bootsDefense,
         int leggingsDefense,
         int chestplateDefense,
@@ -80,26 +71,24 @@ public class AllArmorMaterials {
         int bodyDefense
     ) {
         return Maps.newEnumMap(Map.of(
-            ArmorType.BOOTS,
+            EquipmentType.BOOTS,
             bootsDefense,
-            ArmorType.LEGGINGS,
+            EquipmentType.LEGGINGS,
             leggingsDefense,
-            ArmorType.CHESTPLATE,
+            EquipmentType.CHESTPLATE,
             chestplateDefense,
-            ArmorType.HELMET,
+            EquipmentType.HELMET,
             helmetDefense,
-            ArmorType.BODY,
+            EquipmentType.BODY,
             bodyDefense
         ));
     }
 
-    public static Item.Properties chest(ArmorMaterial material) {
-        return new Item.Properties().stacksTo(1).attributes(material.createAttributes(ArmorType.CHESTPLATE))
-            .enchantable(material.enchantmentValue()).repairable(material.repairIngredient())
-            .component(
-                DataComponents.EQUIPPABLE,
-                Equippable.builder(EquipmentSlot.CHEST).setEquipSound(material.equipSound())
-                    .setAsset(material.assetId()).build()
+    public static Item.Settings chest(ArmorMaterial material) {
+        return new Item.Settings().maxCount(1).attributeModifiers(material.createAttributeModifiers(EquipmentType.CHESTPLATE))
+            .enchantable(material.enchantmentValue()).repairable(material.repairIngredient()).component(
+                DataComponentTypes.EQUIPPABLE,
+                EquippableComponent.builder(EquipmentSlot.CHEST).equipSound(material.equipSound()).model(material.assetId()).build()
             );
     }
 

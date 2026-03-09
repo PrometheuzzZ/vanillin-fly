@@ -5,13 +5,13 @@ import com.zurrtum.create.Create;
 import com.zurrtum.create.catnip.data.Couple;
 import com.zurrtum.create.content.redstone.link.RedstoneLinkNetworkHandler.Frequency;
 import com.zurrtum.create.content.trains.entity.Train;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.resources.Identifier;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.nbt.NbtCompound;
+import net.minecraft.storage.ReadView;
+import net.minecraft.storage.WriteView;
+import net.minecraft.text.MutableText;
+import net.minecraft.text.Text;
+import net.minecraft.util.Identifier;
+import net.minecraft.world.World;
 
 public class RedstoneLinkCondition extends ScheduleWaitCondition {
     private static final Codec<Couple<Frequency>> FREQUENCY_CODEC = Couple.codec(Frequency.CODEC);
@@ -24,19 +24,18 @@ public class RedstoneLinkCondition extends ScheduleWaitCondition {
     }
 
     @Override
-    public boolean tickCompletion(Level level, Train train, CompoundTag context) {
-        int lastChecked = context.contains("LastChecked") ? context.getIntOr("LastChecked", 0) : -1;
+    public boolean tickCompletion(World level, Train train, NbtCompound context) {
+        int lastChecked = context.contains("LastChecked") ? context.getInt("LastChecked", 0) : -1;
         int status = Create.REDSTONE_LINK_NETWORK_HANDLER.globalPowerVersion.get();
-        if (status == lastChecked) {
+        if (status == lastChecked)
             return false;
-        }
         context.putInt("LastChecked", status);
         return Create.REDSTONE_LINK_NETWORK_HANDLER.hasAnyLoadedPower(freq) != lowActivation();
     }
 
     @Override
-    protected void writeAdditional(ValueOutput view) {
-        view.store("Frequency", FREQUENCY_CODEC, freq);
+    protected void writeAdditional(WriteView view) {
+        view.put("Frequency", FREQUENCY_CODEC, freq);
     }
 
     public boolean lowActivation() {
@@ -44,12 +43,12 @@ public class RedstoneLinkCondition extends ScheduleWaitCondition {
     }
 
     @Override
-    protected void readAdditional(ValueInput view) {
+    protected void readAdditional(ReadView view) {
         view.read("Frequency", FREQUENCY_CODEC).ifPresent(freq -> this.freq = freq);
     }
 
     @Override
-    public MutableComponent getWaitingStatus(Level level, Train train, CompoundTag tag) {
-        return Component.translatable("create.schedule.condition.redstone_link.status");
+    public MutableText getWaitingStatus(World level, Train train, NbtCompound tag) {
+        return Text.translatable("create.schedule.condition.redstone_link.status");
     }
 }

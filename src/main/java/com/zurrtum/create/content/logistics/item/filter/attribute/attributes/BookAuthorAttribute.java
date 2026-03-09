@@ -6,37 +6,36 @@ import com.zurrtum.create.AllItemAttributeTypes;
 import com.zurrtum.create.content.logistics.item.filter.attribute.ItemAttribute;
 import com.zurrtum.create.content.logistics.item.filter.attribute.ItemAttributeType;
 import io.netty.buffer.ByteBuf;
-import net.minecraft.core.component.DataComponents;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.Level;
+import net.minecraft.component.DataComponentTypes;
+import net.minecraft.item.ItemStack;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.world.World;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public record BookAuthorAttribute(String author) implements ItemAttribute {
-    public static final MapCodec<BookAuthorAttribute> CODEC = Codec.STRING.xmap(
-        BookAuthorAttribute::new,
-        BookAuthorAttribute::author
-    ).fieldOf("value");
+    public static final MapCodec<BookAuthorAttribute> CODEC = Codec.STRING.xmap(BookAuthorAttribute::new, BookAuthorAttribute::author)
+        .fieldOf("value");
 
-    public static final StreamCodec<ByteBuf, BookAuthorAttribute> PACKET_CODEC = ByteBufCodecs.STRING_UTF8.map(BookAuthorAttribute::new,
+    public static final PacketCodec<ByteBuf, BookAuthorAttribute> PACKET_CODEC = PacketCodecs.STRING.xmap(
+        BookAuthorAttribute::new,
         BookAuthorAttribute::author
     );
 
     private static String extractAuthor(ItemStack stack) {
-        if (stack.has(DataComponents.WRITTEN_BOOK_CONTENT)) {
-            return stack.get(DataComponents.WRITTEN_BOOK_CONTENT).author();
+        if (stack.contains(DataComponentTypes.WRITTEN_BOOK_CONTENT)) {
+            return stack.get(DataComponentTypes.WRITTEN_BOOK_CONTENT).author();
         }
 
         return "";
     }
 
     @Override
-    public boolean appliesTo(ItemStack itemStack, Level level) {
+    public boolean appliesTo(ItemStack itemStack, World level) {
         return extractAuthor(itemStack).equals(author);
     }
 
@@ -62,7 +61,7 @@ public record BookAuthorAttribute(String author) implements ItemAttribute {
         }
 
         @Override
-        public List<ItemAttribute> getAllAttributes(ItemStack stack, Level level) {
+        public List<ItemAttribute> getAllAttributes(ItemStack stack, World level) {
             List<ItemAttribute> list = new ArrayList<>();
 
             String name = BookAuthorAttribute.extractAuthor(stack);
@@ -79,7 +78,7 @@ public record BookAuthorAttribute(String author) implements ItemAttribute {
         }
 
         @Override
-        public StreamCodec<? super RegistryFriendlyByteBuf, ? extends ItemAttribute> packetCodec() {
+        public PacketCodec<? super RegistryByteBuf, ? extends ItemAttribute> packetCodec() {
             return PACKET_CODEC;
         }
     }

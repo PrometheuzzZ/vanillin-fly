@@ -8,11 +8,11 @@ import com.zurrtum.create.catnip.data.IntAttached;
 import com.zurrtum.create.content.logistics.BigItemStack;
 import com.zurrtum.create.content.logistics.packager.InventorySummary;
 import com.zurrtum.create.content.logistics.tableCloth.TableClothBlockEntity;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.UUIDUtil;
-import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.network.PacketByteBuf;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.util.Uuids;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.WorldAccess;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 
@@ -23,16 +23,16 @@ import java.util.UUID;
 public record ShoppingList(@Unmodifiable List<IntAttached<BlockPos>> purchases, UUID shopOwner, UUID shopNetwork) {
     public static final Codec<ShoppingList> CODEC = RecordCodecBuilder.create(instance -> instance.group(
         IntAttached.codec(BlockPos.CODEC).listOf().fieldOf("purchases").forGetter(ShoppingList::purchases),
-        UUIDUtil.CODEC.fieldOf("shop_owner").forGetter(ShoppingList::shopOwner),
-        UUIDUtil.CODEC.fieldOf("shop_network").forGetter(ShoppingList::shopNetwork)
+        Uuids.INT_STREAM_CODEC.fieldOf("shop_owner").forGetter(ShoppingList::shopOwner),
+        Uuids.INT_STREAM_CODEC.fieldOf("shop_network").forGetter(ShoppingList::shopNetwork)
     ).apply(instance, ShoppingList::new));
 
-    public static final StreamCodec<FriendlyByteBuf, ShoppingList> STREAM_CODEC = StreamCodec.composite(
-        CatnipStreamCodecBuilders.list(IntAttached.streamCodec(BlockPos.STREAM_CODEC)),
+    public static final PacketCodec<PacketByteBuf, ShoppingList> STREAM_CODEC = PacketCodec.tuple(
+        CatnipStreamCodecBuilders.list(IntAttached.streamCodec(BlockPos.PACKET_CODEC)),
         ShoppingList::purchases,
-        UUIDUtil.STREAM_CODEC,
+        Uuids.PACKET_CODEC,
         ShoppingList::shopOwner,
-        UUIDUtil.STREAM_CODEC,
+        Uuids.PACKET_CODEC,
         ShoppingList::shopNetwork,
         ShoppingList::new
     );
@@ -46,29 +46,24 @@ public record ShoppingList(@Unmodifiable List<IntAttached<BlockPos>> purchases, 
     }
 
     public int getPurchases(BlockPos clothPos) {
-        for (IntAttached<BlockPos> entry : purchases) {
-            if (clothPos.equals(entry.getValue())) {
+        for (IntAttached<BlockPos> entry : purchases)
+            if (clothPos.equals(entry.getValue()))
                 return entry.getFirst();
-            }
-        }
         return 0;
     }
 
-    public Couple<InventorySummary> bakeEntries(LevelAccessor level, @Nullable BlockPos clothPosToIgnore) {
+    public Couple<InventorySummary> bakeEntries(WorldAccess level, @Nullable BlockPos clothPosToIgnore) {
         InventorySummary input = new InventorySummary();
         InventorySummary output = new InventorySummary();
 
         for (IntAttached<BlockPos> entry : purchases) {
-            if (clothPosToIgnore != null && clothPosToIgnore.equals(entry.getValue())) {
+            if (clothPosToIgnore != null && clothPosToIgnore.equals(entry.getValue()))
                 continue;
-            }
-            if (!(level.getBlockEntity(entry.getValue()) instanceof TableClothBlockEntity dcbe)) {
+            if (!(level.getBlockEntity(entry.getValue()) instanceof TableClothBlockEntity dcbe))
                 continue;
-            }
             input.add(dcbe.getPaymentItem(), dcbe.getPaymentAmount() * entry.getFirst());
-            for (BigItemStack stackEntry : dcbe.requestData.encodedRequest().stacks()) {
+            for (BigItemStack stackEntry : dcbe.requestData.encodedRequest().stacks())
                 output.add(stackEntry.stack, stackEntry.count * entry.getFirst());
-            }
         }
 
         return Couple.create(output, input);

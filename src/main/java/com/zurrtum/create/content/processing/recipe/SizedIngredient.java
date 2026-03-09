@@ -1,25 +1,24 @@
 package com.zurrtum.create.content.processing.recipe;
 
 import com.mojang.serialization.Codec;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.crafting.Ingredient;
-import net.minecraft.world.item.crafting.ShapedRecipe;
-import net.minecraft.world.item.crafting.ShapelessRecipe;
+import net.minecraft.item.ItemStack;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.recipe.Ingredient;
+import net.minecraft.recipe.ShapedRecipe;
+import net.minecraft.recipe.ShapelessRecipe;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
 public class SizedIngredient {
-    public static Codec<List<SizedIngredient>> LIST_CODEC = Ingredient.CODEC.listOf()
-        .xmap(SizedIngredient::of, SizedIngredient::unpack);
-    public static StreamCodec<RegistryFriendlyByteBuf, SizedIngredient> PACKET_CODEC = StreamCodec.composite(
-        Ingredient.CONTENTS_STREAM_CODEC,
+    public static Codec<List<SizedIngredient>> LIST_CODEC = Ingredient.CODEC.listOf().xmap(SizedIngredient::of, SizedIngredient::unpack);
+    public static PacketCodec<RegistryByteBuf, SizedIngredient> PACKET_CODEC = PacketCodec.tuple(
+        Ingredient.PACKET_CODEC,
         i -> i.ingredient,
-        ByteBufCodecs.INT,
+        PacketCodecs.INTEGER,
         i -> i.count,
         SizedIngredient::new
     );

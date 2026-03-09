@@ -7,15 +7,15 @@ import com.zurrtum.create.catnip.animation.LerpedFloat;
 import com.zurrtum.create.catnip.animation.LerpedFloat.Chaser;
 import com.zurrtum.create.foundation.blockEntity.SmartBlockEntity;
 import com.zurrtum.create.foundation.blockEntity.behaviour.filtering.ServerFilteringBehaviour;
-import net.minecraft.core.BlockPos;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.world.Clearable;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.block.BlockState;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.item.ItemStack;
+import net.minecraft.storage.ReadView;
+import net.minecraft.storage.WriteView;
+import net.minecraft.text.MutableText;
+import net.minecraft.text.Text;
+import net.minecraft.util.Clearable;
+import net.minecraft.util.math.BlockPos;
 
 import java.util.List;
 
@@ -37,7 +37,7 @@ public class ContraptionControlsBlockEntity extends SmartBlockEntity implements 
     @Override
     public void addBehaviours(List<BlockEntityBehaviour<?>> behaviours) {
         behaviours.add(filtering = new ServerFilteringBehaviour(this));
-        filtering.withPredicate(stack -> stack.is(AllItemTags.CONTRAPTION_CONTROLLED));
+        filtering.withPredicate(stack -> stack.isIn(AllItemTags.CONTRAPTION_CONTROLLED));
     }
 
     public void pressButton() {
@@ -45,13 +45,11 @@ public class ContraptionControlsBlockEntity extends SmartBlockEntity implements 
     }
 
     public void updatePoweredState() {
-        if (level.isClientSide()) {
+        if (world.isClient())
             return;
-        }
-        boolean powered = level.hasNeighborSignal(worldPosition);
-        if (this.powered == powered) {
+        boolean powered = world.isReceivingRedstonePower(pos);
+        if (this.powered == powered)
             return;
-        }
         this.powered = powered;
         this.disabled = powered;
         notifyUpdate();
@@ -66,9 +64,8 @@ public class ContraptionControlsBlockEntity extends SmartBlockEntity implements 
     @Override
     public void tick() {
         super.tick();
-        if (!level.isClientSide()) {
+        if (!world.isClient())
             return;
-        }
         tickAnimations();
         int value = disabled ? 4 * 45 : 0;
         indicator.setValue(value);
@@ -76,7 +73,7 @@ public class ContraptionControlsBlockEntity extends SmartBlockEntity implements 
     }
 
     @Override
-    public void clearContent() {
+    public void clear() {
         filtering.setFilter(ItemStack.EMPTY);
     }
 
@@ -86,37 +83,28 @@ public class ContraptionControlsBlockEntity extends SmartBlockEntity implements 
     }
 
     @Override
-    protected void read(ValueInput view, boolean clientPacket) {
+    protected void read(ReadView view, boolean clientPacket) {
         super.read(view, clientPacket);
-        disabled = view.getBooleanOr("Disabled", false);
-        powered = view.getBooleanOr("Powered", false);
+        disabled = view.getBoolean("Disabled", false);
+        powered = view.getBoolean("Powered", false);
     }
 
     @Override
-    protected void write(ValueOutput view, boolean clientPacket) {
+    protected void write(WriteView view, boolean clientPacket) {
         super.write(view, clientPacket);
         view.putBoolean("Disabled", disabled);
         view.putBoolean("Powered", powered);
     }
 
-    public static void sendStatus(Player player, ItemStack filter, boolean enabled) {
-        MutableComponent state = Component.translatable("create.contraption.controls.actor_toggle." + (enabled ? "on" : "off"))
+    public static void sendStatus(PlayerEntity player, ItemStack filter, boolean enabled) {
+        MutableText state = Text.translatable("create.contraption.controls.actor_toggle." + (enabled ? "on" : "off"))
             .withColor(enabled ? 0xA3DF55 : 0xEE9246);
 
         if (filter.isEmpty()) {
-            player.displayClientMessage(
-                Component.translatable("create.contraption.controls.all_actor_toggle", state),
-                true
-            );
+            player.sendMessage(Text.translatable("create.contraption.controls.all_actor_toggle", state), true);
             return;
         }
 
-        player.displayClientMessage(
-            Component.translatable(
-                "create.contraption.controls.specific_actor_toggle",
-                filter.getHoverName().getString(),
-                state
-            ), true
-        );
+        player.sendMessage(Text.translatable("create.contraption.controls.specific_actor_toggle", filter.getName().getString(), state), true);
     }
 }

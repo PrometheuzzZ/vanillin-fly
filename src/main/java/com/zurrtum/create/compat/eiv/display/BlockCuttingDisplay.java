@@ -8,13 +8,13 @@ import de.crafty.eiv.common.api.recipe.IEivServerRecipe;
 import it.unimi.dsi.fastutil.Hash;
 import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenCustomHashMap;
-import net.minecraft.core.HolderSet;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.Tag;
-import net.minecraft.resources.RegistryOps;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.crafting.*;
+import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NbtCompound;
+import net.minecraft.nbt.NbtElement;
+import net.minecraft.recipe.*;
+import net.minecraft.registry.RegistryOps;
+import net.minecraft.registry.entry.RegistryEntryList;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -32,28 +32,28 @@ public class BlockCuttingDisplay extends CreateDisplay {
         this.results = results;
     }
 
-    public static void register(List<IEivServerRecipe> recipes, RecipeMap preparedRecipes) {
+    public static void register(List<IEivServerRecipe> recipes, PreparedRecipes preparedRecipes) {
         Object2ObjectMap<Ingredient, List<ItemStack>> map = new Object2ObjectOpenCustomHashMap<>(new Hash.Strategy<>() {
             public boolean equals(Ingredient ingredient, Ingredient other) {
                 return Objects.equals(ingredient, other);
             }
 
             public int hashCode(Ingredient ingredient) {
-                if (ingredient.values instanceof HolderSet.Direct<Item> direct) {
+                if (ingredient.entries instanceof RegistryEntryList.Direct<Item> direct) {
                     return direct.hashCode();
                 }
-                if (ingredient.values instanceof HolderSet.Named<Item> named) {
-                    return named.key().location().hashCode();
+                if (ingredient.entries instanceof RegistryEntryList.Named<Item> named) {
+                    return named.getTag().id().hashCode();
                 }
                 return ingredient.hashCode();
             }
         });
-        for (RecipeHolder<StonecutterRecipe> entry : preparedRecipes.byType(RecipeType.STONECUTTING)) {
+        for (RecipeEntry<StonecuttingRecipe> entry : preparedRecipes.getAll(RecipeType.STONECUTTING)) {
             if (AllRecipeTypes.shouldIgnoreInAutomation(entry)) {
                 continue;
             }
-            StonecutterRecipe recipe = entry.value();
-            map.computeIfAbsent(recipe.input(), i -> new ArrayList<>()).add(recipe.result());
+            StonecuttingRecipe recipe = entry.value();
+            map.computeIfAbsent(recipe.ingredient(), i -> new ArrayList<>()).add(recipe.result());
         }
         for (Object2ObjectMap.Entry<Ingredient, List<ItemStack>> entry : map.object2ObjectEntrySet()) {
             List<ItemStack> outputs = entry.getValue();
@@ -76,17 +76,17 @@ public class BlockCuttingDisplay extends CreateDisplay {
     }
 
     @Override
-    public void writeToTag(CompoundTag tag) {
-        RegistryOps<Tag> ops = getServerOps();
-        tag.store("ingredient", STACKS_CODEC, ops, ingredient);
-        tag.store("results", STACKS_LIST_CODEC, ops, results);
+    public void writeToTag(NbtCompound tag) {
+        RegistryOps<NbtElement> ops = getServerOps();
+        tag.put("ingredient", STACKS_CODEC, ops, ingredient);
+        tag.put("results", STACKS_LIST_CODEC, ops, results);
     }
 
     @Override
-    public void loadFromTag(CompoundTag tag) {
-        RegistryOps<Tag> ops = getClientOps();
-        ingredient = tag.read("ingredient", STACKS_CODEC, ops).orElseThrow();
-        results = tag.read("results", STACKS_LIST_CODEC, ops).orElseThrow();
+    public void loadFromTag(NbtCompound tag) {
+        RegistryOps<NbtElement> ops = getClientOps();
+        ingredient = tag.get("ingredient", STACKS_CODEC, ops).orElseThrow();
+        results = tag.get("results", STACKS_LIST_CODEC, ops).orElseThrow();
     }
 
     @Override

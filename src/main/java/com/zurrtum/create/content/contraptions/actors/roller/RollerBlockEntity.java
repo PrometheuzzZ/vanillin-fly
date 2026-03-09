@@ -1,20 +1,20 @@
 package com.zurrtum.create.content.contraptions.actors.roller;
 
 import com.zurrtum.create.AllBlockEntityTypes;
-import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.catnip.data.Iterate;
 import com.zurrtum.create.foundation.blockEntity.SmartBlockEntity;
+import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.foundation.blockEntity.behaviour.filtering.ServerFilteringBehaviour;
 import com.zurrtum.create.foundation.blockEntity.behaviour.scrollValue.ServerScrollOptionBehaviour;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.block.EntityBlock;
-import net.minecraft.world.level.block.StairBlock;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.shapes.Shapes;
-import net.minecraft.world.phys.shapes.VoxelShape;
+import net.minecraft.block.BlockEntityProvider;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.StairsBlock;
+import net.minecraft.item.ItemStack;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Box;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.shape.VoxelShape;
+import net.minecraft.util.shape.VoxelShapes;
 
 import java.util.List;
 
@@ -52,30 +52,25 @@ public class RollerBlockEntity extends SmartBlockEntity {
     }
 
     protected boolean isValidMaterial(ItemStack newFilter) {
-        if (newFilter.isEmpty()) {
+        if (newFilter.isEmpty())
             return true;
-        }
         BlockState appliedState = RollerMovementBehaviour.getStateToPaveWith(newFilter);
-        if (appliedState.isAir()) {
+        if (appliedState.isAir())
             return false;
-        }
-        if (appliedState.getBlock() instanceof EntityBlock) {
+        if (appliedState.getBlock() instanceof BlockEntityProvider)
             return false;
-        }
-        if (appliedState.getBlock() instanceof StairBlock) {
+        if (appliedState.getBlock() instanceof StairsBlock)
             return false;
-        }
-        VoxelShape shape = appliedState.getShape(level, worldPosition);
-        if (shape.isEmpty() || !shape.bounds().equals(Shapes.block().bounds())) {
+        VoxelShape shape = appliedState.getOutlineShape(world, pos);
+        if (shape.isEmpty() || !shape.getBoundingBox().equals(VoxelShapes.fullCube().getBoundingBox()))
             return false;
-        }
-        VoxelShape collisionShape = appliedState.getCollisionShape(level, worldPosition);
+        VoxelShape collisionShape = appliedState.getCollisionShape(world, pos);
         return !collisionShape.isEmpty();
     }
 
     @Override
-    protected AABB createRenderBoundingBox() {
-        return new AABB(worldPosition).inflate(1);
+    protected Box createRenderBoundingBox() {
+        return new Box(pos).expand(1);
     }
 
     public float getAnimatedSpeed() {
@@ -87,17 +82,15 @@ public class RollerBlockEntity extends SmartBlockEntity {
     }
 
     public void searchForSharedValues() {
-        BlockState blockState = getBlockState();
-        Direction facing = blockState.getValueOrElse(RollerBlock.FACING, Direction.SOUTH);
+        BlockState blockState = getCachedState();
+        Direction facing = blockState.get(RollerBlock.FACING, Direction.SOUTH);
 
         for (int side : Iterate.positiveAndNegative) {
-            BlockPos pos = this.worldPosition.relative(facing.getClockWise(), side);
-            if (level.getBlockState(pos) != blockState) {
+            BlockPos pos = this.pos.offset(facing.rotateYClockwise(), side);
+            if (world.getBlockState(pos) != blockState)
                 continue;
-            }
-            if (!(level.getBlockEntity(pos) instanceof RollerBlockEntity otherRoller)) {
+            if (!(world.getBlockEntity(pos) instanceof RollerBlockEntity otherRoller))
                 continue;
-            }
             acceptSharedValues(otherRoller.mode.getValue(), otherRoller.filtering.getFilter());
             shareValuesToAdjacent();
             break;
@@ -113,27 +106,26 @@ public class RollerBlockEntity extends SmartBlockEntity {
     }
 
     public void shareValuesToAdjacent() {
-        if (dontPropagate || level.isClientSide()) {
+        if (dontPropagate || world.isClient())
             return;
-        }
-        BlockState blockState = getBlockState();
-        Direction facing = blockState.getValueOrElse(RollerBlock.FACING, Direction.SOUTH);
+        BlockState blockState = getCachedState();
+        Direction facing = blockState.get(RollerBlock.FACING, Direction.SOUTH);
 
         for (int side : Iterate.positiveAndNegative) {
             for (int i = 1; i < 100; i++) {
-                BlockPos pos = this.worldPosition.relative(facing.getClockWise(), side * i);
-                if (level.getBlockState(pos) != blockState) {
+                BlockPos pos = this.pos.offset(facing.rotateYClockwise(), side * i);
+                if (world.getBlockState(pos) != blockState)
                     break;
-                }
-                if (!(level.getBlockEntity(pos) instanceof RollerBlockEntity otherRoller)) {
+                if (!(world.getBlockEntity(pos) instanceof RollerBlockEntity otherRoller))
                     break;
-                }
                 otherRoller.acceptSharedValues(mode.getValue(), filtering.getFilter());
             }
         }
     }
 
     public enum RollingMode {
-        TUNNEL_PAVE, STRAIGHT_FILL, WIDE_FILL;
+        TUNNEL_PAVE,
+        STRAIGHT_FILL,
+        WIDE_FILL;
     }
 }

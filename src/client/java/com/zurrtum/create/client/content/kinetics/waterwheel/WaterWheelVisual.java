@@ -10,8 +10,8 @@ import com.zurrtum.create.client.flywheel.lib.model.baked.BakedModelBuilder;
 import com.zurrtum.create.client.flywheel.lib.util.RendererReloadCache;
 import com.zurrtum.create.client.foundation.render.AllInstanceTypes;
 import com.zurrtum.create.content.kinetics.waterwheel.WaterWheelBlockEntity;
-import net.minecraft.client.renderer.block.model.SimpleModelWrapper;
-import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.block.BlockState;
+import net.minecraft.client.render.model.GeometryBakedModel;
 
 import java.util.function.Consumer;
 
@@ -29,19 +29,11 @@ public class WaterWheelVisual<T extends WaterWheelBlockEntity> extends KineticBl
         setupInstance();
     }
 
-    public static <T extends WaterWheelBlockEntity> WaterWheelVisual<T> standard(
-        VisualizationContext context,
-        T blockEntity,
-        float partialTick
-    ) {
+    public static <T extends WaterWheelBlockEntity> WaterWheelVisual<T> standard(VisualizationContext context, T blockEntity, float partialTick) {
         return new WaterWheelVisual<>(context, blockEntity, false, partialTick);
     }
 
-    public static <T extends WaterWheelBlockEntity> WaterWheelVisual<T> large(
-        VisualizationContext context,
-        T blockEntity,
-        float partialTick
-    ) {
+    public static <T extends WaterWheelBlockEntity> WaterWheelVisual<T> large(VisualizationContext context, T blockEntity, float partialTick) {
         return new WaterWheelVisual<>(context, blockEntity, true, partialTick);
     }
 
@@ -80,7 +72,7 @@ public class WaterWheelVisual<T extends WaterWheelBlockEntity> extends KineticBl
     }
 
     private static Model createModel(ModelKey key) {
-        SimpleModelWrapper model = WaterWheelRenderer.generateModel(key.variant(), key.material());
+        GeometryBakedModel model = WaterWheelRenderer.generateModel(key.variant(), key.material());
         return new BakedModelBuilder(model).build();
     }
 

@@ -1,19 +1,17 @@
 package com.zurrtum.create.catnip.math;
 
-import net.minecraft.core.Direction;
-import net.minecraft.core.Direction.Axis;
-import net.minecraft.util.Mth;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Direction.Axis;
+import net.minecraft.util.math.MathHelper;
 
 public class AngleHelper {
 
     public static float horizontalAngle(Direction facing) {
-        if (facing.getAxis().isVertical()) {
+        if (facing.getAxis().isVertical())
             return 0;
-        }
-        float angle = facing.toYRot();
-        if (facing.getAxis() == Axis.X) {
+        float angle = facing.getPositiveHorizontalDegrees();
+        if (facing.getAxis() == Axis.X)
             angle = -angle;
-        }
         return angle;
     }
 
@@ -22,16 +20,14 @@ public class AngleHelper {
     }
 
     public static float rad(double angle) {
-        if (angle == 0) {
+        if (angle == 0)
             return 0;
-        }
         return (float) (angle / 180 * Math.PI);
     }
 
     public static float deg(double angle) {
-        if (angle == 0) {
+        if (angle == 0)
             return 0;
-        }
         return (float) (angle * 180 / Math.PI);
     }
 
@@ -47,7 +43,7 @@ public class AngleHelper {
 
     public static float getShortestAngleDiff(double current, double target, float hint) {
         float diff = getShortestAngleDiff(current, target);
-        if (Mth.equal(Math.abs(diff), 180) && Math.signum(diff) != Math.signum(hint)) {
+        if (MathHelper.approximatelyEquals(Math.abs(diff), 180) && Math.signum(diff) != Math.signum(hint)) {
             return diff + 360 * Math.signum(hint);
         }
         return diff;

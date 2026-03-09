@@ -3,37 +3,38 @@ package com.zurrtum.create.infrastructure.packet.c2s;
 import com.zurrtum.create.AllHandle;
 import com.zurrtum.create.AllPackets;
 import io.netty.buffer.ByteBuf;
-import net.minecraft.core.BlockPos;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.PacketType;
-import net.minecraft.network.protocol.game.ServerGamePacketListener;
-import net.minecraft.server.network.ServerGamePacketListenerImpl;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.network.listener.ServerPlayPacketListener;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.PacketType;
+import net.minecraft.server.network.ServerPlayNetworkHandler;
+import net.minecraft.util.math.BlockPos;
 
-public record CurvedTrackSelectionPacket(BlockPos pos, BlockPos targetPos, boolean front, int segment,
-                                         int slot) implements Packet<ServerGamePacketListener> {
-    public static final StreamCodec<ByteBuf, CurvedTrackSelectionPacket> CODEC = StreamCodec.composite(
-        BlockPos.STREAM_CODEC,
+public record CurvedTrackSelectionPacket(
+    BlockPos pos, BlockPos targetPos, boolean front, int segment, int slot
+) implements Packet<ServerPlayPacketListener> {
+    public static final PacketCodec<ByteBuf, CurvedTrackSelectionPacket> CODEC = PacketCodec.tuple(
+        BlockPos.PACKET_CODEC,
         CurvedTrackSelectionPacket::pos,
-        BlockPos.STREAM_CODEC,
+        BlockPos.PACKET_CODEC,
         CurvedTrackSelectionPacket::targetPos,
-        ByteBufCodecs.BOOL,
+        PacketCodecs.BOOLEAN,
         CurvedTrackSelectionPacket::front,
-        ByteBufCodecs.VAR_INT,
+        PacketCodecs.VAR_INT,
         CurvedTrackSelectionPacket::segment,
-        ByteBufCodecs.VAR_INT,
+        PacketCodecs.VAR_INT,
         CurvedTrackSelectionPacket::slot,
         CurvedTrackSelectionPacket::new
     );
 
     @Override
-    public void handle(ServerGamePacketListener listener) {
-        AllHandle.onCurvedTrackSelection((ServerGamePacketListenerImpl) listener, this);
+    public void apply(ServerPlayPacketListener listener) {
+        AllHandle.onCurvedTrackSelection((ServerPlayNetworkHandler) listener, this);
     }
 
     @Override
-    public PacketType<CurvedTrackSelectionPacket> type() {
+    public PacketType<CurvedTrackSelectionPacket> getPacketType() {
         return AllPackets.SELECT_CURVED_TRACK;
     }
 }

@@ -12,11 +12,11 @@ import com.zurrtum.create.client.ponder.api.scene.SceneBuildingUtil;
 import com.zurrtum.create.client.ponder.api.scene.Selection;
 import com.zurrtum.create.content.logistics.box.PackageItem;
 import com.zurrtum.create.content.logistics.packager.PackagerBlock;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.item.ItemStack;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Box;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Vec3d;
 
 import java.util.List;
 
@@ -64,33 +64,31 @@ public class StockTickerScenes {
         scene.world().moveSection(linkL, util.vector().of(0, -2, 0), 0);
         scene.idle(15);
 
-        ItemStack linkItem = AllItems.STOCK_TICKER.getDefaultInstance();
-        scene.overlay().showControls(util.vector().topOf(link1.below(2)), Pointing.DOWN, 50).rightClick()
-            .withItem(linkItem);
+        ItemStack linkItem = AllItems.STOCK_TICKER.getDefaultStack();
+        scene.overlay().showControls(util.vector().topOf(link1.down(2)), Pointing.DOWN, 50).rightClick().withItem(linkItem);
         scene.idle(5);
 
-        AABB bb1 = new AABB(link1.below(2));
-        scene.overlay().chaseBoundingBoxOutline(PonderPalette.BLUE, link1, bb1.deflate(0.45), 10);
+        Box bb1 = new Box(link1.down(2));
+        scene.overlay().chaseBoundingBoxOutline(PonderPalette.BLUE, link1, bb1.contract(0.45), 10);
         scene.idle(1);
-        bb1 = bb1.deflate(1 / 16f).contract(0, 8 / 16f, 0);
+        bb1 = bb1.contract(1 / 16f).shrink(0, 8 / 16f, 0);
         scene.overlay().chaseBoundingBoxOutline(PonderPalette.BLUE, link1, bb1, 50);
         scene.idle(26);
 
-        scene.overlay().showText(100).text("Right-click a Stock link before placement to connect to its network")
-            .attachKeyFrame().colored(PonderPalette.BLUE).placeNearTarget()
-            .pointAt(util.vector().centerOf(link1.below(2)));
+        scene.overlay().showText(100).text("Right-click a Stock link before placement to connect to its network").attachKeyFrame()
+            .colored(PonderPalette.BLUE).placeNearTarget().pointAt(util.vector().centerOf(link1.down(2)));
 
         scene.idle(40);
 
         scene.world().showSection(tickerS, Direction.DOWN);
         scene.idle(20);
 
-        scene.overlay().chaseBoundingBoxOutline(PonderPalette.GREEN, ticker, new AABB(ticker), 40);
+        scene.overlay().chaseBoundingBoxOutline(PonderPalette.GREEN, ticker, new Box(ticker), 40);
         scene.overlay().chaseBoundingBoxOutline(PonderPalette.GREEN, link1, bb1, 40);
         scene.overlay().showLine(
             PonderPalette.GREEN,
             util.vector().centerOf(ticker).subtract(0, 1 / 4f, 0),
-            util.vector().centerOf(link1.below(2)).subtract(0, 1 / 4f, 0),
+            util.vector().centerOf(link1.down(2)).subtract(0, 1 / 4f, 0),
             40
         );
         scene.idle(60);
@@ -124,31 +122,29 @@ public class StockTickerScenes {
         scene.overlay().showOutline(PonderPalette.BLUE, link2, util.select().fromTo(4, 2, 6, 5, 3, 6), 120);
         scene.idle(30);
 
-        scene.overlay().showText(100)
-            .text("Stock-linked packagers make their attached inventory available to the network").attachKeyFrame()
+        scene.overlay().showText(100).text("Stock-linked packagers make their attached inventory available to the network").attachKeyFrame()
             .placeNearTarget().pointAt(util.vector().blockSurface(util.grid().at(3, 2, 5), Direction.WEST));
         scene.idle(110);
 
         scene.overlay().showOutline(PonderPalette.BLUE, ticker, tickerS, 40);
 
-        scene.overlay().showText(80).text("Stock tickers can order items from these inventories").attachKeyFrame()
-            .placeNearTarget().pointAt(util.vector().centerOf(ticker));
+        scene.overlay().showText(80).text("Stock tickers can order items from these inventories").attachKeyFrame().placeNearTarget()
+            .pointAt(util.vector().centerOf(ticker));
         scene.idle(90);
 
         scene.world().showSection(seat, Direction.WEST);
         scene.idle(10);
         scene.special().createBirb(util.vector().centerOf(ticker.east()), FacePointOfInterestPose::new);
 
-        Vec3 keeper = util.vector().blockSurface(ticker.east(), Direction.WEST).add(0, 0.5, 0);
-        scene.overlay().showText(80).text("Seated mobs or blaze burners in front of it act as the Stock Keeper")
-            .attachKeyFrame().placeNearTarget().pointAt(keeper);
+        Vec3d keeper = util.vector().blockSurface(ticker.east(), Direction.WEST).add(0, 0.5, 0);
+        scene.overlay().showText(80).text("Seated mobs or blaze burners in front of it act as the Stock Keeper").attachKeyFrame().placeNearTarget()
+            .pointAt(keeper);
         scene.idle(90);
 
         scene.overlay().showControls(util.vector().topOf(ticker.east()), Pointing.DOWN, 50).rightClick();
         scene.idle(10);
 
-        scene.overlay().showText(80).text("Right-click the keeper to start ordering items").attachKeyFrame()
-            .placeNearTarget().pointAt(keeper);
+        scene.overlay().showText(80).text("Right-click the keeper to start ordering items").attachKeyFrame().placeNearTarget().pointAt(keeper);
         scene.idle(60);
 
         scene.effects().indicateSuccess(ticker);
@@ -162,8 +158,8 @@ public class StockTickerScenes {
         PonderHilo.packagerCreate(scene, pack2, box2);
         scene.idle(30);
 
-        scene.overlay().showText(100).text("When an order is submitted, the items will be placed into packages")
-            .attachKeyFrame().placeNearTarget().pointAt(util.vector().centerOf(util.grid().at(3, 2, 5)));
+        scene.overlay().showText(100).text("When an order is submitted, the items will be placed into packages").attachKeyFrame().placeNearTarget()
+            .pointAt(util.vector().centerOf(util.grid().at(3, 2, 5)));
         scene.idle(80);
 
         scene.world().showSection(largeCog1, Direction.UP);
@@ -189,8 +185,8 @@ public class StockTickerScenes {
         PonderHilo.packagerClear(scene, pack2);
         scene.idle(20);
 
-        scene.overlay().showText(80).text("From there, they can be transported to the request point").attachKeyFrame()
-            .placeNearTarget().pointAt(util.vector().centerOf(util.grid().at(1, 1, 3)));
+        scene.overlay().showText(80).text("From there, they can be transported to the request point").attachKeyFrame().placeNearTarget()
+            .pointAt(util.vector().centerOf(util.grid().at(1, 1, 3)));
         scene.idle(110);
 
         scene.world().hideSection(largeCog2, Direction.DOWN);
@@ -205,32 +201,30 @@ public class StockTickerScenes {
         scene.world().hideSection(fun2S, Direction.NORTH);
         scene.idle(30);
 
-        ItemStack filterItem = AllItems.ATTRIBUTE_FILTER.getDefaultInstance();
+        ItemStack filterItem = AllItems.ATTRIBUTE_FILTER.getDefaultStack();
         scene.overlay().showControls(util.vector().topOf(ticker), Pointing.DOWN, 100).rightClick().withItem(filterItem);
         scene.idle(10);
 
-        scene.overlay().showText(100)
-            .text("Using attribute or list filters, categories can be added to the item listings").attachKeyFrame()
+        scene.overlay().showText(100).text("Using attribute or list filters, categories can be added to the item listings").attachKeyFrame()
             .colored(PonderPalette.BLUE).placeNearTarget().pointAt(util.vector().centerOf(ticker));
         scene.idle(110);
 
-        scene.overlay().showText(80).text("Right-click the Stock ticker to open the category editor")
-            .colored(PonderPalette.BLUE).placeNearTarget().pointAt(util.vector().centerOf(ticker));
+        scene.overlay().showText(80).text("Right-click the Stock ticker to open the category editor").colored(PonderPalette.BLUE).placeNearTarget()
+            .pointAt(util.vector().centerOf(ticker));
         scene.idle(100);
 
         scene.world().showSection(cannon, Direction.DOWN);
 
-        scene.overlay().showText(80).text("Stock tickers can also order blocks required for the schematicannon")
-            .colored(PonderPalette.BLUE).attachKeyFrame().placeNearTarget()
-            .pointAt(util.vector().centerOf(util.grid().at(2, 1, 3)));
+        scene.overlay().showText(80).text("Stock tickers can also order blocks required for the schematicannon").colored(PonderPalette.BLUE)
+            .attachKeyFrame().placeNearTarget().pointAt(util.vector().centerOf(util.grid().at(2, 1, 3)));
         scene.idle(100);
 
-        ItemStack clipboardItem = AllItems.CLIPBOARD.getDefaultInstance();
+        ItemStack clipboardItem = AllItems.CLIPBOARD.getDefaultStack();
         scene.overlay().showControls(keeper, Pointing.DOWN, 100).rightClick().withItem(clipboardItem);
         scene.idle(10);
 
-        scene.overlay().showText(80).text("Simply hand the printed clipboard it generated to the Stock keeper")
-            .colored(PonderPalette.BLUE).placeNearTarget().pointAt(keeper);
+        scene.overlay().showText(80).text("Simply hand the printed clipboard it generated to the Stock keeper").colored(PonderPalette.BLUE)
+            .placeNearTarget().pointAt(keeper);
         scene.idle(50);
 
     }
@@ -270,23 +264,22 @@ public class StockTickerScenes {
 
         scene.idle(20);
 
-        scene.overlay().showText(90).text("When ordering items, a target address can be set in the request")
-            .attachKeyFrame().placeNearTarget().pointAt(util.vector().centerOf(ticker));
+        scene.overlay().showText(90).text("When ordering items, a target address can be set in the request").attachKeyFrame().placeNearTarget()
+            .pointAt(util.vector().centerOf(ticker));
         scene.idle(100);
 
         scene.effects().indicateSuccess(ticker);
         PonderHilo.linkEffect(scene, link);
 
-        scene.overlay().showText(40).colored(PonderPalette.GREEN).text("→ Workshop").placeNearTarget()
-            .pointAt(util.vector().centerOf(ticker));
+        scene.overlay().showText(40).colored(PonderPalette.GREEN).text("→ Workshop").placeNearTarget().pointAt(util.vector().centerOf(ticker));
 
         scene.idle(10);
         ItemStack box1 = PackageItem.containing(List.of());
         PackageItem.addAddress(box1, "Workshop");
         PonderHilo.packagerCreate(scene, pack, box1);
         scene.idle(50);
-        scene.overlay().showText(90).text("This address will be on all packages created for the request")
-            .attachKeyFrame().placeNearTarget().pointAt(util.vector().blockSurface(pack, Direction.WEST));
+        scene.overlay().showText(90).text("This address will be on all packages created for the request").attachKeyFrame().placeNearTarget()
+            .pointAt(util.vector().blockSurface(pack, Direction.WEST));
         scene.idle(50);
 
         scene.world().showSection(belt1, Direction.WEST);
@@ -298,14 +291,13 @@ public class StockTickerScenes {
         scene.rotateCameraY(-15);
         scene.idle(15);
 
-        scene.overlay().showControls(util.vector().of(4, 2.825, 4.5), Pointing.DOWN, 60)
-            .withItem(AllItems.PACKAGE_FILTER.getDefaultInstance());
+        scene.overlay().showControls(util.vector().of(4, 2.825, 4.5), Pointing.DOWN, 60).withItem(AllItems.PACKAGE_FILTER.getDefaultStack());
         scene.idle(10);
         scene.overlay().showFilterSlotInput(util.vector().of(4.1, 2.825, 4.5), 50);
         scene.idle(30);
 
-        scene.overlay().showText(70).text("Using package filters, this can control where the packages will go")
-            .attachKeyFrame().placeNearTarget().pointAt(util.vector().of(4, 2.825, 4.5));
+        scene.overlay().showText(70).text("Using package filters, this can control where the packages will go").attachKeyFrame().placeNearTarget()
+            .pointAt(util.vector().of(4, 2.825, 4.5));
         scene.idle(60);
         scene.world().showSection(funnel, Direction.DOWN);
         scene.idle(15);
@@ -319,8 +311,7 @@ public class StockTickerScenes {
 
         scene.overlay().showText(50).text("→ Workshop").colored(PonderPalette.OUTPUT).placeNearTarget()
             .pointAt(util.vector().blockSurface(util.grid().at(6, 2, 4), Direction.WEST));
-        scene.overlay().showText(50).colored(PonderPalette.BLUE).text("Workshop").placeNearTarget()
-            .pointAt(util.vector().of(4, 2.825, 4.5));
+        scene.overlay().showText(50).colored(PonderPalette.BLUE).text("Workshop").placeNearTarget().pointAt(util.vector().of(4, 2.825, 4.5));
         scene.idle(60);
 
         scene.world().multiplyKineticSpeed(util.select().everywhere(), 32f);
@@ -332,8 +323,7 @@ public class StockTickerScenes {
         scene.effects().indicateSuccess(ticker);
         PonderHilo.linkEffect(scene, link);
 
-        scene.overlay().showText(40).colored(PonderPalette.GREEN).text("→ Factory").placeNearTarget()
-            .pointAt(util.vector().centerOf(ticker));
+        scene.overlay().showText(40).colored(PonderPalette.GREEN).text("→ Factory").placeNearTarget().pointAt(util.vector().centerOf(ticker));
 
         scene.idle(10);
         ItemStack box2 = PackageItem.containing(List.of());
@@ -350,8 +340,7 @@ public class StockTickerScenes {
 
         scene.overlay().showText(30).text("→ Factory").colored(PonderPalette.OUTPUT).placeNearTarget()
             .pointAt(util.vector().blockSurface(util.grid().at(6, 2, 4), Direction.WEST));
-        scene.overlay().showText(30).colored(PonderPalette.BLUE).text("Workshop").placeNearTarget()
-            .pointAt(util.vector().of(4, 2.825, 4.5));
+        scene.overlay().showText(30).colored(PonderPalette.BLUE).text("Workshop").placeNearTarget().pointAt(util.vector().of(4, 2.825, 4.5));
         scene.idle(40);
 
         scene.world().multiplyKineticSpeed(util.select().everywhere(), 32f);
@@ -374,9 +363,8 @@ public class StockTickerScenes {
         scene.world().showSectionAndMerge(frog, Direction.DOWN, extrasL);
         scene.idle(20);
 
-        scene.overlay().showText(100).text("Aside from filters, Frogports and Postboxes have package routing abilities")
-            .attachKeyFrame().placeNearTarget()
-            .pointAt(util.vector().blockSurface(util.grid().at(3, 2, 4), Direction.NORTH));
+        scene.overlay().showText(100).text("Aside from filters, Frogports and Postboxes have package routing abilities").attachKeyFrame()
+            .placeNearTarget().pointAt(util.vector().blockSurface(util.grid().at(3, 2, 4), Direction.NORTH));
         scene.idle(110);
 
         scene.overlay().showText(80).text("Inspect them to find out more about their behaviour").placeNearTarget()

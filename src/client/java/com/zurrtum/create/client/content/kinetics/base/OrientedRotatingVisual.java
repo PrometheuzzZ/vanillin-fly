@@ -14,9 +14,9 @@ import com.zurrtum.create.content.kinetics.base.KineticBlockEntity;
 import com.zurrtum.create.content.kinetics.gantry.GantryShaftBlock;
 import com.zurrtum.create.content.kinetics.gantry.GantryShaftBlock.Part;
 import com.zurrtum.create.content.kinetics.gantry.GantryShaftBlockEntity;
-import net.minecraft.core.Direction;
-import net.minecraft.core.Direction.AxisDirection;
-import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.state.property.Properties;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Direction.AxisDirection;
 
 import java.util.function.Consumer;
 
@@ -28,48 +28,26 @@ public class OrientedRotatingVisual<T extends KineticBlockEntity> extends Kineti
      * @param to    The orientation to rotate to.
      * @param model The model to spin.
      */
-    public OrientedRotatingVisual(
-        VisualizationContext context,
-        T blockEntity,
-        float partialTick,
-        Direction from,
-        Direction to,
-        Model model
-    ) {
+    public OrientedRotatingVisual(VisualizationContext context, T blockEntity, float partialTick, Direction from, Direction to, Model model) {
         super(context, blockEntity, partialTick);
 
-        rotatingModel = instancerProvider().instancer(AllInstanceTypes.ROTATING, model).createInstance()
-            .rotateToFace(from, to).setup(blockEntity).setPosition(getVisualPosition());
+        rotatingModel = instancerProvider().instancer(AllInstanceTypes.ROTATING, model).createInstance().rotateToFace(from, to).setup(blockEntity)
+            .setPosition(getVisualPosition());
 
         rotatingModel.setChanged();
     }
 
     public static <T extends KineticBlockEntity> SimpleBlockEntityVisualizer.Factory<T> of(PartialModel partial) {
         return (context, blockEntity, partialTick) -> {
-            Direction facing = blockEntity.getBlockState().getValue(BlockStateProperties.FACING);
-            return new OrientedRotatingVisual<>(
-                context,
-                blockEntity,
-                partialTick,
-                Direction.SOUTH,
-                facing,
-                Models.partial(partial)
-            );
+            Direction facing = blockEntity.getCachedState().get(Properties.FACING);
+            return new OrientedRotatingVisual<>(context, blockEntity, partialTick, Direction.SOUTH, facing, Models.partial(partial));
         };
     }
 
     public static <T extends KineticBlockEntity> SimpleBlockEntityVisualizer.Factory<T> backHorizontal(PartialModel partial) {
         return (context, blockEntity, partialTick) -> {
-            Direction facing = blockEntity.getBlockState().getValue(BlockStateProperties.HORIZONTAL_FACING)
-                .getOpposite();
-            return new OrientedRotatingVisual<>(
-                context,
-                blockEntity,
-                partialTick,
-                Direction.SOUTH,
-                facing,
-                Models.partial(partial)
-            );
+            Direction facing = blockEntity.getCachedState().get(Properties.HORIZONTAL_FACING).getOpposite();
+            return new OrientedRotatingVisual<>(context, blockEntity, partialTick, Direction.SOUTH, facing, Models.partial(partial));
         };
     }
 
@@ -78,12 +56,12 @@ public class OrientedRotatingVisual<T extends KineticBlockEntity> extends Kineti
         GantryShaftBlockEntity gantryShaftBlockEntity,
         float partialTick
     ) {
-        var blockState = gantryShaftBlockEntity.getBlockState();
+        var blockState = gantryShaftBlockEntity.getCachedState();
 
-        Part part = blockState.getValue(GantryShaftBlock.PART);
+        Part part = blockState.get(GantryShaftBlock.PART);
 
-        boolean isPowered = blockState.getValue(GantryShaftBlock.POWERED);
-        boolean isFlipped = blockState.getValue(GantryShaftBlock.FACING).getAxisDirection() == AxisDirection.NEGATIVE;
+        boolean isPowered = blockState.get(GantryShaftBlock.POWERED);
+        boolean isFlipped = blockState.get(GantryShaftBlock.FACING).getDirection() == AxisDirection.NEGATIVE;
 
         var model = Models.partial(AllPartialModels.GANTRY_SHAFTS.get(new GantryShaftKey(part, isPowered, isFlipped)));
 
@@ -92,7 +70,7 @@ public class OrientedRotatingVisual<T extends KineticBlockEntity> extends Kineti
             gantryShaftBlockEntity,
             partialTick,
             Direction.UP,
-            blockState.getValue(GantryShaftBlock.FACING),
+            blockState.get(GantryShaftBlock.FACING),
             model
         );
     }

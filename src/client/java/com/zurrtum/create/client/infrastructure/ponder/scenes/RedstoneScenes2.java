@@ -14,9 +14,9 @@ import com.zurrtum.create.content.redstone.RoseQuartzLampBlock;
 import com.zurrtum.create.content.redstone.diodes.BrassDiodeBlock;
 import com.zurrtum.create.content.redstone.diodes.PulseTimerBlockEntity;
 import com.zurrtum.create.content.redstone.nixieTube.NixieTubeBlockEntity;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Vec3d;
 
 public class RedstoneScenes2 {
 
@@ -35,8 +35,7 @@ public class RedstoneScenes2 {
         scene.showBasePlate();
         scene.idle(15);
 
-        ElementLink<WorldSectionElement> rowElement = scene.world()
-            .showIndependentSection(util.select().position(centerLamp), Direction.DOWN);
+        ElementLink<WorldSectionElement> rowElement = scene.world().showIndependentSection(util.select().position(centerLamp), Direction.DOWN);
         scene.idle(5);
         scene.world().showSection(input, Direction.SOUTH);
         scene.idle(15);
@@ -46,8 +45,8 @@ public class RedstoneScenes2 {
         scene.world().cycleBlockProperty(centerLamp, RoseQuartzLampBlock.POWERING);
         scene.idle(15);
 
-        scene.overlay().showText(70).pointAt(util.vector().blockSurface(centerLamp, Direction.WEST)).placeNearTarget()
-            .attachKeyFrame().text("Rose Quartz Lamps activate on a Redstone signal");
+        scene.overlay().showText(70).pointAt(util.vector().blockSurface(centerLamp, Direction.WEST)).placeNearTarget().attachKeyFrame()
+            .text("Rose Quartz Lamps activate on a Redstone signal");
         scene.idle(5);
         scene.world().toggleRedstonePower(button);
         scene.idle(55);
@@ -71,8 +70,8 @@ public class RedstoneScenes2 {
         scene.world().showSectionAndMerge(util.select().position(centerLamp.east()), Direction.WEST, rowElement);
         scene.idle(25);
 
-        scene.overlay().showText(50).pointAt(util.vector().blockSurface(util.grid().at(2, 1, 3), Direction.WEST))
-            .placeNearTarget().attachKeyFrame().text("When multiple lamps are arranged in a group...");
+        scene.overlay().showText(50).pointAt(util.vector().blockSurface(util.grid().at(2, 1, 3), Direction.WEST)).placeNearTarget().attachKeyFrame()
+            .text("When multiple lamps are arranged in a group...");
         scene.idle(40);
 
         ElementLink<WorldSectionElement> inputElement = scene.world().showIndependentSection(input, Direction.SOUTH);
@@ -85,8 +84,8 @@ public class RedstoneScenes2 {
         scene.world().cycleBlockProperty(centerLamp.east(), RoseQuartzLampBlock.POWERING);
         scene.idle(15);
 
-        scene.overlay().showText(80).pointAt(util.vector().blockSurface(util.grid().at(4, 1, 3), Direction.UP))
-            .placeNearTarget().text("...activating a Lamp will focus the signal to it, deactivating all others");
+        scene.overlay().showText(80).pointAt(util.vector().blockSurface(util.grid().at(4, 1, 3), Direction.UP)).placeNearTarget()
+            .text("...activating a Lamp will focus the signal to it, deactivating all others");
 
         scene.idle(5);
         scene.world().toggleRedstonePower(button);
@@ -98,34 +97,30 @@ public class RedstoneScenes2 {
         scene.world().showSectionAndMerge(comparator, Direction.EAST, rowElement);
         scene.idle(15);
         scene.world().toggleRedstonePower(comparator);
-        scene.world()
-            .modifyBlockEntityNBT(comparator, NixieTubeBlockEntity.class, nbt -> nbt.putInt("RedstoneStrength", 13));
+        scene.world().modifyBlockEntityNBT(comparator, NixieTubeBlockEntity.class, nbt -> nbt.putInt("RedstoneStrength", 13));
         scene.idle(25);
 
-        scene.overlay().showText(80).pointAt(util.vector().blockSurface(util.grid().at(1, 1, 3), Direction.WEST))
-            .placeNearTarget().attachKeyFrame().text("Comparators output based on the distance to a powered lamp");
+        scene.overlay().showText(80).pointAt(util.vector().blockSurface(util.grid().at(1, 1, 3), Direction.WEST)).placeNearTarget().attachKeyFrame()
+            .text("Comparators output based on the distance to a powered lamp");
         scene.idle(90);
 
         scene.overlay().showControls(util.vector().topOf(centerLamp.east(2)), Pointing.DOWN, 20).rightClick()
-            .withItem(AllItems.WRENCH.getDefaultInstance());
+            .withItem(AllItems.WRENCH.getDefaultStack());
         scene.idle(6);
         scene.world().cycleBlockProperty(centerLamp.east(), RoseQuartzLampBlock.POWERING);
         scene.world().toggleRedstonePower(comparator);
-        scene.world()
-            .modifyBlockEntityNBT(comparator, NixieTubeBlockEntity.class, nbt -> nbt.putInt("RedstoneStrength", 0));
+        scene.world().modifyBlockEntityNBT(comparator, NixieTubeBlockEntity.class, nbt -> nbt.putInt("RedstoneStrength", 0));
         scene.idle(20);
 
-        scene.overlay().showControls(util.vector().topOf(centerLamp), Pointing.DOWN, 20).rightClick()
-            .withItem(AllItems.WRENCH.getDefaultInstance());
+        scene.overlay().showControls(util.vector().topOf(centerLamp), Pointing.DOWN, 20).rightClick().withItem(AllItems.WRENCH.getDefaultStack());
         scene.idle(6);
         scene.world().cycleBlockProperty(centerLamp.west(), RoseQuartzLampBlock.POWERING);
         scene.world().toggleRedstonePower(comparator);
-        scene.world()
-            .modifyBlockEntityNBT(comparator, NixieTubeBlockEntity.class, nbt -> nbt.putInt("RedstoneStrength", 15));
+        scene.world().modifyBlockEntityNBT(comparator, NixieTubeBlockEntity.class, nbt -> nbt.putInt("RedstoneStrength", 15));
         scene.idle(20);
 
-        scene.overlay().showText(80).pointAt(util.vector().blockSurface(util.grid().at(3, 1, 3), Direction.UP))
-            .placeNearTarget().attachKeyFrame().text("The Lamps can also be toggled manually using a Wrench");
+        scene.overlay().showText(80).pointAt(util.vector().blockSurface(util.grid().at(3, 1, 3), Direction.UP)).placeNearTarget().attachKeyFrame()
+            .text("The Lamps can also be toggled manually using a Wrench");
         scene.idle(50);
 
     }
@@ -140,13 +135,9 @@ public class RedstoneScenes2 {
 
         BlockPos circuitPos = util.grid().at(2, 1, 2);
         BlockPos leverPos = util.grid().at(4, 1, 2);
-        Vec3 circuitTop = util.vector().blockSurface(circuitPos, Direction.DOWN).add(0, 3 / 16f, 0);
+        Vec3d circuitTop = util.vector().blockSurface(circuitPos, Direction.DOWN).add(0, 3 / 16f, 0);
 
-        world.modifyBlockEntityNBT(
-            select.position(circuitPos),
-            PulseTimerBlockEntity.class,
-            nbt -> nbt.putInt("ScrollValue", 30)
-        );
+        world.modifyBlockEntityNBT(select.position(circuitPos), PulseTimerBlockEntity.class, nbt -> nbt.putInt("ScrollValue", 30));
         world.showSection(select.fromTo(1, 1, 2, 0, 1, 2), Direction.UP);
         scene.idle(10);
         world.showSection(select.position(circuitPos), Direction.DOWN);
@@ -164,8 +155,7 @@ public class RedstoneScenes2 {
             scene.idle(15);
         }
 
-        scene.overlay().showText(60).text("Pulse Timers repeatedly emit short pulses").attachKeyFrame()
-            .placeNearTarget().pointAt(circuitTop);
+        scene.overlay().showText(60).text("Pulse Timers repeatedly emit short pulses").attachKeyFrame().placeNearTarget().pointAt(circuitTop);
         scene.idle(13);
 
         for (int i = 0; i < 3; i++) {
@@ -182,14 +172,10 @@ public class RedstoneScenes2 {
         scene.overlay().showRepeaterScrollInput(circuitPos, 60);
         scene.overlay().showControls(circuitTop, Pointing.DOWN, 60).rightClick();
         scene.idle(10);
-        scene.overlay().showText(60).text("Using the value panel, the time interval can be configured").attachKeyFrame()
-            .placeNearTarget().pointAt(circuitTop);
+        scene.overlay().showText(60).text("Using the value panel, the time interval can be configured").attachKeyFrame().placeNearTarget()
+            .pointAt(circuitTop);
 
-        world.modifyBlockEntityNBT(
-            select.position(circuitPos),
-            PulseTimerBlockEntity.class,
-            nbt -> nbt.putInt("ScrollValue", 100)
-        );
+        world.modifyBlockEntityNBT(select.position(circuitPos), PulseTimerBlockEntity.class, nbt -> nbt.putInt("ScrollValue", 100));
         scene.idle(70);
 
         world.showSection(select.fromTo(3, 1, 2, 4, 1, 2), Direction.WEST);
@@ -208,8 +194,8 @@ public class RedstoneScenes2 {
         scene.world().toggleRedstonePower(util.select().fromTo(4, 1, 2, 2, 1, 2));
         scene.idle(30);
 
-        scene.overlay().showText(60).text("Powering the input side will pause and reset them").attachKeyFrame()
-            .placeNearTarget().pointAt(util.vector().topOf(4, 0, 2));
+        scene.overlay().showText(60).text("Powering the input side will pause and reset them").attachKeyFrame().placeNearTarget()
+            .pointAt(util.vector().topOf(4, 0, 2));
         scene.idle(70);
 
         world.hideSection(select.fromTo(3, 1, 2, 4, 1, 2), Direction.EAST);
@@ -222,8 +208,8 @@ public class RedstoneScenes2 {
         scene.idle(10);
         world.cycleBlockProperty(circuitPos, BrassDiodeBlock.INVERTED);
         world.toggleRedstonePower(select.position(1, 1, 2));
-        scene.overlay().showText(60).text("Right-click the circuit base to invert the output").attachKeyFrame()
-            .placeNearTarget().pointAt(circuitTop.add(-.375, 0, .375));
+        scene.overlay().showText(60).text("Right-click the circuit base to invert the output").attachKeyFrame().placeNearTarget()
+            .pointAt(circuitTop.add(-.375, 0, .375));
 
         scene.idle(70);
         ElementLink<WorldSectionElement> link = world.showIndependentSection(select.position(0, 1, 4), Direction.EAST);
@@ -239,8 +225,8 @@ public class RedstoneScenes2 {
         world.toggleRedstonePower(select.position(0, 1, 2));
         scene.idle(10);
 
-        scene.overlay().showText(80).text("This helps trigger mechanisms that activate only without a redstone signal")
-            .placeNearTarget().pointAt(util.vector().centerOf(0, 1, 2));
+        scene.overlay().showText(80).text("This helps trigger mechanisms that activate only without a redstone signal").placeNearTarget()
+            .pointAt(util.vector().centerOf(0, 1, 2));
 
         scene.idle(86);
         world.cycleBlockProperty(circuitPos, BrassDiodeBlock.POWERING);

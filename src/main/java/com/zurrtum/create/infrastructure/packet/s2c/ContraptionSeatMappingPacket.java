@@ -3,25 +3,24 @@ package com.zurrtum.create.infrastructure.packet.s2c;
 import com.zurrtum.create.AllClientHandle;
 import com.zurrtum.create.AllPackets;
 import io.netty.buffer.ByteBuf;
-import net.minecraft.core.UUIDUtil;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.PacketType;
-import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.network.listener.ClientPlayPacketListener;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.PacketType;
+import net.minecraft.util.Uuids;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
-public record ContraptionSeatMappingPacket(int entityId, Map<UUID, Integer> mapping,
-                                           int dismountedId) implements Packet<ClientGamePacketListener> {
-    public static final StreamCodec<ByteBuf, ContraptionSeatMappingPacket> CODEC = StreamCodec.composite(
-        ByteBufCodecs.INT,
+public record ContraptionSeatMappingPacket(int entityId, Map<UUID, Integer> mapping, int dismountedId) implements Packet<ClientPlayPacketListener> {
+    public static final PacketCodec<ByteBuf, ContraptionSeatMappingPacket> CODEC = PacketCodec.tuple(
+        PacketCodecs.INTEGER,
         ContraptionSeatMappingPacket::entityId,
-        ByteBufCodecs.map(HashMap::new, UUIDUtil.STREAM_CODEC, ByteBufCodecs.INT),
+        PacketCodecs.map(HashMap::new, Uuids.PACKET_CODEC, PacketCodecs.INTEGER),
         ContraptionSeatMappingPacket::mapping,
-        ByteBufCodecs.INT,
+        PacketCodecs.INTEGER,
         ContraptionSeatMappingPacket::dismountedId,
         ContraptionSeatMappingPacket::new
     );
@@ -35,12 +34,12 @@ public record ContraptionSeatMappingPacket(int entityId, Map<UUID, Integer> mapp
     }
 
     @Override
-    public void handle(ClientGamePacketListener listener) {
+    public void apply(ClientPlayPacketListener listener) {
         AllClientHandle.INSTANCE.onContraptionSeatMapping(this);
     }
 
     @Override
-    public PacketType<ContraptionSeatMappingPacket> type() {
+    public PacketType<ContraptionSeatMappingPacket> getPacketType() {
         return AllPackets.CONTRAPTION_SEAT_MAPPING;
     }
 }

@@ -1,15 +1,15 @@
 package com.zurrtum.create.content.redstone.analogLever;
 
 import com.zurrtum.create.AllBlockEntityTypes;
-import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.catnip.animation.LerpedFloat;
 import com.zurrtum.create.catnip.animation.LerpedFloat.Chaser;
 import com.zurrtum.create.foundation.blockEntity.SmartBlockEntity;
-import net.minecraft.core.BlockPos;
-import net.minecraft.util.Mth;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
+import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
+import net.minecraft.block.BlockState;
+import net.minecraft.storage.ReadView;
+import net.minecraft.storage.WriteView;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.MathHelper;
 
 import java.util.List;
 
@@ -25,7 +25,7 @@ public class AnalogLeverBlockEntity extends SmartBlockEntity {
     }
 
     @Override
-    public void write(ValueOutput view, boolean clientPacket) {
+    public void write(WriteView view, boolean clientPacket) {
         view.putInt("State", state);
         view.putInt("ChangeTimer", lastChange);
         super.write(view, clientPacket);
@@ -33,9 +33,9 @@ public class AnalogLeverBlockEntity extends SmartBlockEntity {
 
 
     @Override
-    protected void read(ValueInput view, boolean clientPacket) {
-        state = view.getIntOr("State", 0);
-        lastChange = view.getIntOr("ChangeTimer", 0);
+    protected void read(ReadView view, boolean clientPacket) {
+        state = view.getInt("State", 0);
+        lastChange = view.getInt("ChangeTimer", 0);
         clientState.chase(state, 0.2f, Chaser.EXP);
         super.read(view, clientPacket);
     }
@@ -45,13 +45,11 @@ public class AnalogLeverBlockEntity extends SmartBlockEntity {
         super.tick();
         if (lastChange > 0) {
             lastChange--;
-            if (lastChange == 0) {
+            if (lastChange == 0)
                 updateOutput();
-            }
         }
-        if (level.isClientSide()) {
+        if (world.isClient())
             clientState.tickChaser();
-        }
     }
 
     @Override
@@ -61,7 +59,7 @@ public class AnalogLeverBlockEntity extends SmartBlockEntity {
     }
 
     private void updateOutput() {
-        AnalogLeverBlock.updateNeighbors(getBlockState(), level, worldPosition);
+        AnalogLeverBlock.updateNeighbors(getCachedState(), world, pos);
     }
 
     @Override
@@ -71,10 +69,9 @@ public class AnalogLeverBlockEntity extends SmartBlockEntity {
     public void changeState(boolean back) {
         int prevState = state;
         state += back ? -1 : 1;
-        state = Mth.clamp(state, 0, 15);
-        if (prevState != state) {
+        state = MathHelper.clamp(state, 0, 15);
+        if (prevState != state)
             lastChange = 15;
-        }
         sendData();
     }
 

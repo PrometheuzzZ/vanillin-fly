@@ -3,24 +3,25 @@ package com.zurrtum.create.infrastructure.packet.s2c;
 import com.zurrtum.create.AllClientHandle;
 import com.zurrtum.create.AllPackets;
 import io.netty.buffer.ByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.PacketType;
-import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.network.listener.ClientPlayPacketListener;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.PacketType;
 
-public record ContraptionRelocationPacket(int entityId) implements Packet<ClientGamePacketListener> {
-    public static final StreamCodec<ByteBuf, ContraptionRelocationPacket> CODEC = ByteBufCodecs.INT.map(ContraptionRelocationPacket::new,
+public record ContraptionRelocationPacket(int entityId) implements Packet<ClientPlayPacketListener> {
+    public static final PacketCodec<ByteBuf, ContraptionRelocationPacket> CODEC = PacketCodecs.INTEGER.xmap(
+        ContraptionRelocationPacket::new,
         ContraptionRelocationPacket::entityId
     );
 
     @Override
-    public void handle(ClientGamePacketListener listener) {
+    public void apply(ClientPlayPacketListener listener) {
         AllClientHandle.INSTANCE.onContraptionRelocation(this);
     }
 
     @Override
-    public PacketType<ContraptionRelocationPacket> type() {
+    public PacketType<ContraptionRelocationPacket> getPacketType() {
         return AllPackets.CONTRAPTION_RELOCATION;
     }
 }

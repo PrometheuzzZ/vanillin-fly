@@ -2,32 +2,31 @@ package com.zurrtum.create.infrastructure.packet.c2s;
 
 import com.zurrtum.create.AllHandle;
 import com.zurrtum.create.AllPackets;
-import net.minecraft.core.BlockPos;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.PacketType;
-import net.minecraft.network.protocol.game.ServerGamePacketListener;
-import net.minecraft.server.network.ServerGamePacketListenerImpl;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.item.ItemStack;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.listener.ServerPlayPacketListener;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.PacketType;
+import net.minecraft.server.network.ServerPlayNetworkHandler;
+import net.minecraft.util.math.BlockPos;
 
-public record StockKeeperCategoryRefundPacket(BlockPos pos,
-                                              ItemStack filter) implements Packet<ServerGamePacketListener> {
-    public static final StreamCodec<RegistryFriendlyByteBuf, StockKeeperCategoryRefundPacket> CODEC = StreamCodec.composite(
-        BlockPos.STREAM_CODEC,
+public record StockKeeperCategoryRefundPacket(BlockPos pos, ItemStack filter) implements Packet<ServerPlayPacketListener> {
+    public static final PacketCodec<RegistryByteBuf, StockKeeperCategoryRefundPacket> CODEC = PacketCodec.tuple(
+        BlockPos.PACKET_CODEC,
         StockKeeperCategoryRefundPacket::pos,
-        ItemStack.STREAM_CODEC,
+        ItemStack.PACKET_CODEC,
         StockKeeperCategoryRefundPacket::filter,
         StockKeeperCategoryRefundPacket::new
     );
 
     @Override
-    public void handle(ServerGamePacketListener listener) {
-        AllHandle.onStockKeeperCategoryRefund((ServerGamePacketListenerImpl) listener, this);
+    public void apply(ServerPlayPacketListener listener) {
+        AllHandle.onStockKeeperCategoryRefund((ServerPlayNetworkHandler) listener, this);
     }
 
     @Override
-    public PacketType<StockKeeperCategoryRefundPacket> type() {
+    public PacketType<StockKeeperCategoryRefundPacket> getPacketType() {
         return AllPackets.REFUND_STOCK_KEEPER_CATEGORY;
     }
 }

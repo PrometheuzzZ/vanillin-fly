@@ -1,6 +1,6 @@
 package com.zurrtum.create.content.trains.bogey;
 
-import net.minecraft.resources.Identifier;
+import net.minecraft.util.Identifier;
 
 import java.util.List;
 

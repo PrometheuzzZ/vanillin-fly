@@ -2,7 +2,7 @@ package com.zurrtum.create.catnip.data;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.network.codec.PacketCodec;
 
 import java.util.Objects;
 
@@ -28,11 +28,11 @@ public class Pair<F, S> {
         ).apply(instance, Pair::new));
     }
 
-    public static <B, F, S> StreamCodec<B, Pair<F, S>> streamCodec(
-        StreamCodec<? super B, F> firstCodec,
-        StreamCodec<? super B, S> secondCodec
+    public static <B, F, S> PacketCodec<B, Pair<F, S>> streamCodec(
+        PacketCodec<? super B, F> firstCodec,
+        PacketCodec<? super B, S> secondCodec
     ) {
-        return StreamCodec.composite(firstCodec, Pair::getFirst, secondCodec, Pair::getSecond, Pair::new);
+        return PacketCodec.tuple(firstCodec, Pair::getFirst, secondCodec, Pair::getSecond, Pair::new);
     }
 
     public F getFirst() {
@@ -57,9 +57,8 @@ public class Pair<F, S> {
 
     @Override
     public boolean equals(final Object obj) {
-        if (obj == this) {
+        if (obj == this)
             return true;
-        }
         if (obj instanceof Pair<?, ?> other) {
             return Objects.equals(first, other.first) && Objects.equals(second, other.second);
         }

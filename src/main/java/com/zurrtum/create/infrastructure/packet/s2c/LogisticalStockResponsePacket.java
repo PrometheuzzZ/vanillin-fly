@@ -4,22 +4,21 @@ import com.zurrtum.create.AllClientHandle;
 import com.zurrtum.create.AllPackets;
 import com.zurrtum.create.catnip.codecs.stream.CatnipStreamCodecBuilders;
 import com.zurrtum.create.content.logistics.BigItemStack;
-import net.minecraft.core.BlockPos;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.PacketType;
-import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.network.listener.ClientPlayPacketListener;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.PacketType;
+import net.minecraft.util.math.BlockPos;
 
 import java.util.List;
 
-public record LogisticalStockResponsePacket(boolean lastPacket, BlockPos pos,
-                                            List<BigItemStack> items) implements Packet<ClientGamePacketListener> {
-    public static final StreamCodec<RegistryFriendlyByteBuf, LogisticalStockResponsePacket> CODEC = StreamCodec.composite(
-        ByteBufCodecs.BOOL,
+public record LogisticalStockResponsePacket(boolean lastPacket, BlockPos pos, List<BigItemStack> items) implements Packet<ClientPlayPacketListener> {
+    public static final PacketCodec<RegistryByteBuf, LogisticalStockResponsePacket> CODEC = PacketCodec.tuple(
+        PacketCodecs.BOOLEAN,
         LogisticalStockResponsePacket::lastPacket,
-        BlockPos.STREAM_CODEC,
+        BlockPos.PACKET_CODEC,
         LogisticalStockResponsePacket::pos,
         CatnipStreamCodecBuilders.list(BigItemStack.STREAM_CODEC),
         LogisticalStockResponsePacket::items,
@@ -27,12 +26,12 @@ public record LogisticalStockResponsePacket(boolean lastPacket, BlockPos pos,
     );
 
     @Override
-    public void handle(ClientGamePacketListener listener) {
+    public void apply(ClientPlayPacketListener listener) {
         AllClientHandle.INSTANCE.onLogisticalStockResponse(listener, this);
     }
 
     @Override
-    public PacketType<LogisticalStockResponsePacket> type() {
+    public PacketType<LogisticalStockResponsePacket> getPacketType() {
         return AllPackets.LOGISTICS_STOCK_RESPONSE;
     }
 }

@@ -1,7 +1,7 @@
 package com.zurrtum.create.client.flywheel.lib.instance;
 
 import com.zurrtum.create.client.flywheel.api.instance.Instance;
-import net.minecraft.client.renderer.LightTexture;
+import net.minecraft.client.render.LightmapTextureManager;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Iterator;
@@ -28,7 +28,7 @@ public interface FlatLit extends Instance {
      * @return {@code this} for chaining
      */
     default FlatLit light(int blockLight, int skyLight) {
-        return light(LightTexture.pack(blockLight, skyLight));
+        return light(LightmapTextureManager.pack(blockLight, skyLight));
     }
 
     static void relight(int packedLight, @Nullable FlatLit... instances) {

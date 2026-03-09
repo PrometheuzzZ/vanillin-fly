@@ -2,7 +2,7 @@ package com.zurrtum.create.api.stress;
 
 import com.zurrtum.create.AllBlocks;
 import com.zurrtum.create.api.registry.SimpleRegistry;
-import net.minecraft.world.level.block.Block;
+import net.minecraft.block.Block;
 
 import java.util.function.DoubleSupplier;
 

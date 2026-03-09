@@ -2,26 +2,21 @@ package com.zurrtum.create.impl.effect;
 
 import com.zurrtum.create.api.effect.OpenPipeEffectHandler;
 import com.zurrtum.create.infrastructure.fluids.FluidStack;
-import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.phys.AABB;
+import net.minecraft.entity.LivingEntity;
+import net.minecraft.util.math.Box;
+import net.minecraft.world.World;
 
 import java.util.List;
 
 public class MilkEffectHandler implements OpenPipeEffectHandler {
     @Override
-    public void apply(Level level, AABB area, FluidStack fluid) {
-        if (level.getGameTime() % 5 != 0) {
+    public void apply(World level, Box area, FluidStack fluid) {
+        if (level.getTime() % 5 != 0)
             return;
-        }
 
-        List<LivingEntity> entities = level.getEntitiesOfClass(
-            LivingEntity.class,
-            area,
-            LivingEntity::isAffectedByPotions
-        );
+        List<LivingEntity> entities = level.getEntitiesByClass(LivingEntity.class, area, LivingEntity::isAffectedBySplashPotions);
         for (LivingEntity entity : entities) {
-            entity.removeAllEffects();
+            entity.clearStatusEffects();
         }
     }
 }

@@ -19,50 +19,44 @@ import mezz.jei.api.gui.drawable.IDrawable;
 import mezz.jei.api.gui.ingredient.IRecipeSlotsView;
 import mezz.jei.api.recipe.IFocusGroup;
 import mezz.jei.api.recipe.types.IRecipeType;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.core.Holder;
-import net.minecraft.core.HolderSet;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.core.registries.Registries;
-import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceKey;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.crafting.Ingredient;
-import net.minecraft.world.item.crafting.RecipeHolder;
-import net.minecraft.world.item.crafting.RecipeMap;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
+import net.minecraft.recipe.Ingredient;
+import net.minecraft.recipe.PreparedRecipes;
+import net.minecraft.recipe.RecipeEntry;
+import net.minecraft.registry.Registries;
+import net.minecraft.registry.RegistryKey;
+import net.minecraft.registry.RegistryKeys;
+import net.minecraft.registry.entry.RegistryEntry;
+import net.minecraft.registry.entry.RegistryEntryList;
+import net.minecraft.text.Text;
 import org.jetbrains.annotations.NotNull;
 import org.joml.Matrix3x2f;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public class DeployingCategory extends CreateCategory<RecipeHolder<? extends ItemApplicationRecipe>> {
-    public static List<RecipeHolder<? extends ItemApplicationRecipe>> getRecipes(RecipeMap preparedRecipes) {
-        List<RecipeHolder<? extends ItemApplicationRecipe>> recipes = new ArrayList<>();
-        recipes.addAll(preparedRecipes.byType(AllRecipeTypes.DEPLOYING));
-        recipes.addAll(preparedRecipes.byType(AllRecipeTypes.ITEM_APPLICATION));
-        List<Holder<Item>> sandpaperList = new ArrayList<>();
-        for (Holder<Item> entry : BuiltInRegistries.ITEM.getTagOrEmpty(AllItemTags.SANDPAPER)) {
+public class DeployingCategory extends CreateCategory<RecipeEntry<? extends ItemApplicationRecipe>> {
+    public static List<RecipeEntry<? extends ItemApplicationRecipe>> getRecipes(PreparedRecipes preparedRecipes) {
+        List<RecipeEntry<? extends ItemApplicationRecipe>> recipes = new ArrayList<>();
+        recipes.addAll(preparedRecipes.getAll(AllRecipeTypes.DEPLOYING));
+        recipes.addAll(preparedRecipes.getAll(AllRecipeTypes.ITEM_APPLICATION));
+        List<RegistryEntry<Item>> sandpaperList = new ArrayList<>();
+        for (RegistryEntry<Item> entry : Registries.ITEM.iterateEntries(AllItemTags.SANDPAPER)) {
             sandpaperList.add(entry);
         }
-        Ingredient ingredient = Ingredient.of(HolderSet.direct(sandpaperList));
-        for (RecipeHolder<SandPaperPolishingRecipe> entry : preparedRecipes.byType(AllRecipeTypes.SANDPAPER_POLISHING)) {
+        Ingredient ingredient = Ingredient.ofTag(RegistryEntryList.of(sandpaperList));
+        for (RecipeEntry<SandPaperPolishingRecipe> entry : preparedRecipes.getAll(AllRecipeTypes.SANDPAPER_POLISHING)) {
             SandPaperPolishingRecipe recipe = entry.value();
             ItemStack result = recipe.result();
-            recipes.add(new RecipeHolder<>(
-                ResourceKey.create(Registries.RECIPE, entry.id().identifier().withSuffix("_using_deployer")),
-                new DeployerApplicationRecipe(
-                    List.of(new ProcessingOutput(
-                        result.getItemHolder(),
-                        result.getCount(),
-                        result.getComponentsPatch(),
-                        1
-                    )),
-                    true,
-                    recipe.ingredient(),
-                    ingredient
-                )
+            recipes.add(new RecipeEntry<>(
+                RegistryKey.of(RegistryKeys.RECIPE, entry.id().getValue().withSuffixedPath("_using_deployer")), new DeployerApplicationRecipe(
+                List.of(new ProcessingOutput(result.getRegistryEntry(), result.getCount(), result.getComponentChanges(), 1)),
+                true,
+                recipe.ingredient(),
+                ingredient
+            )
             ));
         }
         return recipes;
@@ -70,13 +64,13 @@ public class DeployingCategory extends CreateCategory<RecipeHolder<? extends Ite
 
     @Override
     @NotNull
-    public IRecipeType<RecipeHolder<? extends ItemApplicationRecipe>> getRecipeType() {
+    public IRecipeType<RecipeEntry<? extends ItemApplicationRecipe>> getRecipeType() {
         return JeiClientPlugin.DEPLOYING;
     }
 
     @Override
     @NotNull
-    public Component getTitle() {
+    public Text getTitle() {
         return CreateLang.translateDirect("recipe.deploying");
     }
 
@@ -91,11 +85,7 @@ public class DeployingCategory extends CreateCategory<RecipeHolder<? extends Ite
     }
 
     @Override
-    public void setRecipe(
-        IRecipeLayoutBuilder builder,
-        RecipeHolder<? extends ItemApplicationRecipe> entry,
-        IFocusGroup focuses
-    ) {
+    public void setRecipe(IRecipeLayoutBuilder builder, RecipeEntry<? extends ItemApplicationRecipe> entry, IFocusGroup focuses) {
         ItemApplicationRecipe recipe = entry.value();
         IRecipeSlotBuilder slot = builder.addInputSlot(51, 5).setBackground(SLOT, -1, -1).add(recipe.ingredient());
         if (recipe.keepHeldItem()) {
@@ -115,18 +105,14 @@ public class DeployingCategory extends CreateCategory<RecipeHolder<? extends Ite
 
     @Override
     public void draw(
-        RecipeHolder<? extends ItemApplicationRecipe> entry,
+        RecipeEntry<? extends ItemApplicationRecipe> entry,
         IRecipeSlotsView recipeSlotsView,
-        GuiGraphics graphics,
+        DrawContext graphics,
         double mouseX,
         double mouseY
     ) {
         AllGuiTextures.JEI_SHADOW.render(graphics, 62, 57);
         AllGuiTextures.JEI_DOWN_ARROW.render(graphics, 126, entry.value().results().size() <= 2 ? 29 : 10);
-        graphics.guiRenderState.submitPicturesInPictureState(new DeployerRenderState(
-            new Matrix3x2f(graphics.pose()),
-            75,
-            -10
-        ));
+        graphics.state.addSpecialElement(new DeployerRenderState(new Matrix3x2f(graphics.getMatrices()), 75, -10));
     }
 }

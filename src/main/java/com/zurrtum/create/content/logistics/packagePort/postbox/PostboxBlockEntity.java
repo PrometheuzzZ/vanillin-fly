@@ -7,13 +7,13 @@ import com.zurrtum.create.catnip.animation.LerpedFloat.Chaser;
 import com.zurrtum.create.content.logistics.packagePort.PackagePortBlockEntity;
 import com.zurrtum.create.content.trains.station.GlobalPackagePort;
 import com.zurrtum.create.content.trains.station.GlobalStation;
-import net.minecraft.core.BlockPos;
-import net.minecraft.sounds.SoundEvents;
-import net.minecraft.sounds.SoundSource;
-import net.minecraft.world.item.BoneMealItem;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.block.BlockState;
+import net.minecraft.item.BoneMealItem;
+import net.minecraft.sound.SoundCategory;
+import net.minecraft.sound.SoundEvents;
+import net.minecraft.storage.ReadView;
+import net.minecraft.storage.WriteView;
+import net.minecraft.util.math.BlockPos;
 
 import java.lang.ref.WeakReference;
 
@@ -35,10 +35,9 @@ public class PostboxBlockEntity extends PackagePortBlockEntity {
     @Override
     public void tick() {
         super.tick();
-        if (!level.isClientSide() && !isVirtual()) {
-            if (sendParticles) {
+        if (!world.isClient() && !isVirtual()) {
+            if (sendParticles)
                 sendData();
-            }
             return;
         }
 
@@ -47,38 +46,30 @@ public class PostboxBlockEntity extends PackagePortBlockEntity {
             int target = (inventory.isEmpty() && !forceFlag) ? 0 : 1;
             if (target != currentTarget) {
                 flag.chase(target, 0.1f, Chaser.LINEAR);
-                if (target == 1) {
-                    AllSoundEvents.CONTRAPTION_ASSEMBLE.playAt(level, worldPosition, 1, 2, true);
-                }
+                if (target == 1)
+                    AllSoundEvents.CONTRAPTION_ASSEMBLE.playAt(world, pos, 1, 2, true);
             }
         }
         boolean settled = flag.getValue() > .15f;
         flag.tickChaser();
-        if (currentTarget == 0 && settled != flag.getValue() > .15f) {
-            AllSoundEvents.CONTRAPTION_DISASSEMBLE.playAt(level, worldPosition, 0.75f, 1.5f, true);
-        }
+        if (currentTarget == 0 && settled != flag.getValue() > .15f)
+            AllSoundEvents.CONTRAPTION_DISASSEMBLE.playAt(world, pos, 0.75f, 1.5f, true);
 
         if (sendParticles) {
             sendParticles = false;
-            BoneMealItem.addGrowthParticles(level, worldPosition, 40);
+            BoneMealItem.createParticles(world, pos, 40);
         }
     }
 
     @Override
     protected void onOpenChange(boolean open) {
         // cached getBlockState doesn't update if we're exploded in the meantime, refreshBlockState crashes validation
-        BlockState state = level.getBlockState(worldPosition);
-        if (!(state.getBlock() instanceof PostboxBlock)) {
+        BlockState state = world.getBlockState(pos);
+        if (!(state.getBlock() instanceof PostboxBlock))
             return;
-        }
 
-        level.setBlockAndUpdate(worldPosition, getBlockState().setValue(PostboxBlock.OPEN, open));
-        level.playSound(
-            null,
-            worldPosition,
-            open ? SoundEvents.BARREL_OPEN : SoundEvents.BARREL_CLOSE,
-            SoundSource.BLOCKS
-        );
+        world.setBlockState(pos, getCachedState().with(PostboxBlock.OPEN, open));
+        world.playSound(null, pos, open ? SoundEvents.BLOCK_BARREL_OPEN : SoundEvents.BLOCK_BARREL_CLOSE, SoundCategory.BLOCKS);
     }
 
     public void spawnParticles() {
@@ -86,35 +77,34 @@ public class PostboxBlockEntity extends PackagePortBlockEntity {
     }
 
     @Override
-    protected void write(ValueOutput view, boolean clientPacket) {
+    protected void write(WriteView view, boolean clientPacket) {
         super.write(view, clientPacket);
-        if (clientPacket && sendParticles) {
+        if (clientPacket && sendParticles)
             view.putBoolean("Particles", true);
-        }
         sendParticles = false;
     }
 
     @Override
-    protected void read(ValueInput view, boolean clientPacket) {
+    protected void read(ReadView view, boolean clientPacket) {
         super.read(view, clientPacket);
-        sendParticles = clientPacket && view.getBooleanOr("Particles", false);
+        sendParticles = clientPacket && view.getBoolean("Particles", false);
     }
 
     @Override
-    public void setChanged() {
+    public void markDirty() {
         saveOfflineBuffer();
-        super.setChanged();
+        super.markDirty();
     }
 
     private void saveOfflineBuffer() {
-        if (level == null || level.isClientSide()) {
+        if (world == null || world.isClient()) {
             return;
         }
         GlobalStation station = trackedGlobalStation.get();
         if (station == null) {
             return;
         }
-        GlobalPackagePort globalPackagePort = station.connectedPorts.get(worldPosition);
+        GlobalPackagePort globalPackagePort = station.connectedPorts.get(pos);
         if (globalPackagePort == null) {
             return;
         }

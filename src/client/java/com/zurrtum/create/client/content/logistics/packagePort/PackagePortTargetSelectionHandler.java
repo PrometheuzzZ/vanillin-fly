@@ -11,25 +11,25 @@ import com.zurrtum.create.content.logistics.packagePort.PackagePortTarget;
 import com.zurrtum.create.content.trains.station.StationBlockEntity;
 import com.zurrtum.create.infrastructure.config.AllConfigs;
 import com.zurrtum.create.infrastructure.packet.c2s.PackagePortPlacementPacket;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.multiplayer.ClientLevel;
-import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.particles.DustParticleOptions;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.BlockHitResult;
-import net.minecraft.world.phys.HitResult;
-import net.minecraft.world.phys.HitResult.Type;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.network.ClientPlayerEntity;
+import net.minecraft.client.world.ClientWorld;
+import net.minecraft.item.ItemStack;
+import net.minecraft.particle.DustParticleEffect;
+import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.util.hit.HitResult;
+import net.minecraft.util.hit.HitResult.Type;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Box;
+import net.minecraft.util.math.Vec3d;
 
 public class PackagePortTargetSelectionHandler {
 
     public static PackagePortTarget activePackageTarget;
-    public static Vec3 exactPositionOfTarget;
+    public static Vec3d exactPositionOfTarget;
     public static boolean isPostbox;
 
-    public static void flushSettings(LocalPlayer player, BlockPos pos) {
+    public static void flushSettings(ClientPlayerEntity player, BlockPos pos) {
         if (activePackageTarget == null) {
             CreateLang.translate("gui.package_port.not_targeting_anything").sendStatus(player);
             return;
@@ -37,142 +37,122 @@ public class PackagePortTargetSelectionHandler {
 
         if (validateDiff(exactPositionOfTarget, pos) == null) {
             activePackageTarget.relativePos = activePackageTarget.relativePos.subtract(pos);
-            player.connection.send(new PackagePortPlacementPacket(activePackageTarget, pos));
+            player.networkHandler.sendPacket(new PackagePortPlacementPacket(activePackageTarget, pos));
         }
 
         activePackageTarget = null;
         isPostbox = false;
     }
 
-    public static boolean onUse(Minecraft mc) {
-        HitResult hitResult = mc.hitResult;
+    public static boolean onUse(MinecraftClient mc) {
+        HitResult hitResult = mc.crosshairTarget;
 
-        if (hitResult == null || hitResult.getType() == Type.MISS) {
+        if (hitResult == null || hitResult.getType() == Type.MISS)
             return false;
-        }
-        if (!(hitResult instanceof BlockHitResult bhr)) {
+        if (!(hitResult instanceof BlockHitResult bhr))
             return false;
-        }
 
         BlockPos pos = bhr.getBlockPos();
-        if (!(mc.level.getBlockEntity(pos) instanceof StationBlockEntity sbe)) {
+        if (!(mc.world.getBlockEntity(pos) instanceof StationBlockEntity sbe))
             return false;
-        }
-        if (sbe.edgePoint == null) {
+        if (sbe.edgePoint == null)
             return false;
-        }
-        ItemStack mainHandItem = mc.player.getMainHandItem();
-        if (!mainHandItem.is(AllItemTags.POSTBOXES)) {
+        ItemStack mainHandItem = mc.player.getMainHandStack();
+        if (!mainHandItem.isIn(AllItemTags.POSTBOXES))
             return false;
-        }
 
-        PackagePortTargetSelectionHandler.exactPositionOfTarget = Vec3.atCenterOf(pos);
+        PackagePortTargetSelectionHandler.exactPositionOfTarget = Vec3d.ofCenter(pos);
         PackagePortTargetSelectionHandler.activePackageTarget = new PackagePortTarget.TrainStationFrogportTarget(pos);
         PackagePortTargetSelectionHandler.isPostbox = true;
         return true;
     }
 
-    public static void tick(Minecraft mc) {
-        LocalPlayer player = mc.player;
-        ItemStack stack = player.getMainHandItem();
-        boolean isPostbox = stack.is(AllItemTags.POSTBOXES);
-        boolean isWrench = stack.is(AllItemTags.TOOLS_WRENCH);
+    public static void tick(MinecraftClient mc) {
+        ClientPlayerEntity player = mc.player;
+        ItemStack stack = player.getMainHandStack();
+        boolean isPostbox = stack.isIn(AllItemTags.POSTBOXES);
+        boolean isWrench = stack.isIn(AllItemTags.TOOLS_WRENCH);
 
         if (!isWrench) {
-            if (activePackageTarget == null) {
+            if (activePackageTarget == null)
                 return;
-            }
-            if (!stack.is(AllItems.PACKAGE_FROGPORT) && !isPostbox) {
+            if (!stack.isOf(AllItems.PACKAGE_FROGPORT) && !isPostbox)
                 return;
-            }
         }
 
-        HitResult objectMouseOver = mc.hitResult;
-        if (!(objectMouseOver instanceof BlockHitResult blockRayTraceResult)) {
+        HitResult objectMouseOver = mc.crosshairTarget;
+        if (!(objectMouseOver instanceof BlockHitResult blockRayTraceResult))
             return;
-        }
 
         if (isWrench) {
-            if (blockRayTraceResult.getType() == Type.MISS) {
+            if (blockRayTraceResult.getType() == Type.MISS)
                 return;
-            }
             BlockPos pos = blockRayTraceResult.getBlockPos();
-            if (!(mc.level.getBlockEntity(pos) instanceof PackagePortBlockEntity ppbe)) {
+            if (!(mc.world.getBlockEntity(pos) instanceof PackagePortBlockEntity ppbe))
                 return;
-            }
-            if (ppbe.target == null) {
+            if (ppbe.target == null)
                 return;
-            }
-            Vec3 source = Vec3.atBottomCenterOf(pos);
-            Vec3 target = ppbe.target.getExactTargetLocation(ppbe, mc.level, pos);
-            if (target == Vec3.ZERO) {
+            Vec3d source = Vec3d.ofBottomCenter(pos);
+            Vec3d target = ppbe.target.getExactTargetLocation(ppbe, mc.world, pos);
+            if (target == Vec3d.ZERO)
                 return;
-            }
             Color color = new Color(0x9ede73);
             animateConnection(mc, source, target, color);
-            Outliner.getInstance().chaseAABB("ChainPointSelected", new AABB(target, target)).colored(color)
-                .lineWidth(1 / 5f).disableLineNormals();
+            Outliner.getInstance().chaseAABB("ChainPointSelected", new Box(target, target)).colored(color).lineWidth(1 / 5f).disableLineNormals();
             return;
         }
 
-        Vec3 target = exactPositionOfTarget;
+        Vec3d target = exactPositionOfTarget;
         if (blockRayTraceResult.getType() == Type.MISS) {
-            Outliner.getInstance().chaseAABB("ChainPointSelected", new AABB(target, target)).colored(0x9ede73)
-                .lineWidth(1 / 5f).disableLineNormals();
+            Outliner.getInstance().chaseAABB("ChainPointSelected", new Box(target, target)).colored(0x9ede73).lineWidth(1 / 5f).disableLineNormals();
             return;
         }
 
         BlockPos pos = blockRayTraceResult.getBlockPos();
-        if (!mc.level.getBlockState(pos).canBeReplaced()) {
-            pos = pos.relative(blockRayTraceResult.getDirection());
-        }
+        if (!mc.world.getBlockState(pos).isReplaceable())
+            pos = pos.offset(blockRayTraceResult.getSide());
 
         String validateDiff = validateDiff(target, pos);
         boolean valid = validateDiff == null;
         Color color = new Color(valid ? 0x9ede73 : 0xff7171);
-        Vec3 source = Vec3.atBottomCenterOf(pos);
+        Vec3d source = Vec3d.ofBottomCenter(pos);
 
-        CreateLang.translate(validateDiff != null ? validateDiff : "package_port.valid").color(color.getRGB())
-            .sendStatus(player);
+        CreateLang.translate(validateDiff != null ? validateDiff : "package_port.valid").color(color.getRGB()).sendStatus(player);
 
-        Outliner.getInstance().chaseAABB("ChainPointSelected", new AABB(target, target)).colored(color)
-            .lineWidth(1 / 5f).disableLineNormals();
+        Outliner.getInstance().chaseAABB("ChainPointSelected", new Box(target, target)).colored(color).lineWidth(1 / 5f).disableLineNormals();
 
-        if (!mc.level.getBlockState(pos).canBeReplaced()) {
+        if (!mc.world.getBlockState(pos).isReplaceable())
             return;
-        }
 
-        Outliner.getInstance().chaseAABB("TargetedFrogPos", new AABB(pos).contract(0, 1, 0).deflate(0.125, 0, 0.125))
-            .colored(color).lineWidth(1 / 16f).disableLineNormals();
+        Outliner.getInstance().chaseAABB("TargetedFrogPos", new Box(pos).shrink(0, 1, 0).contract(0.125, 0, 0.125)).colored(color).lineWidth(1 / 16f)
+            .disableLineNormals();
 
         animateConnection(mc, source, target, color);
 
     }
 
-    public static void animateConnection(Minecraft mc, Vec3 source, Vec3 target, Color color) {
-        DustParticleOptions data = new DustParticleOptions(color.getRGB(), 1);
-        ClientLevel world = mc.level;
+    public static void animateConnection(MinecraftClient mc, Vec3d source, Vec3d target, Color color) {
+        DustParticleEffect data = new DustParticleEffect(color.getRGB(), 1);
+        ClientWorld world = mc.world;
         double totalFlyingTicks = 10;
         int segments = (((int) totalFlyingTicks) / 3) + 1;
         double tickOffset = totalFlyingTicks / segments;
 
         for (int i = 0; i < segments; i++) {
             double ticks = ((AnimationTickHolder.getRenderTime() / 3) % tickOffset) + i * tickOffset;
-            Vec3 vec = source.lerp(target, ticks / totalFlyingTicks);
-            world.addParticle(data, vec.x, vec.y, vec.z, 0, 0, 0);
+            Vec3d vec = source.lerp(target, ticks / totalFlyingTicks);
+            world.addParticleClient(data, vec.x, vec.y, vec.z, 0, 0, 0);
         }
 
     }
 
-    public static String validateDiff(Vec3 target, BlockPos placedPos) {
-        Vec3 source = Vec3.atBottomCenterOf(placedPos);
-        Vec3 diff = target.subtract(source);
-        if (diff.y < 0 && !isPostbox) {
+    public static String validateDiff(Vec3d target, BlockPos placedPos) {
+        Vec3d source = Vec3d.ofBottomCenter(placedPos);
+        Vec3d diff = target.subtract(source);
+        if (diff.y < 0 && !isPostbox)
             return "package_port.cannot_reach_down";
-        }
-        if (diff.length() > AllConfigs.server().logistics.packagePortRange.get()) {
+        if (diff.length() > AllConfigs.server().logistics.packagePortRange.get())
             return "package_port.too_far";
-        }
         return null;
     }
 

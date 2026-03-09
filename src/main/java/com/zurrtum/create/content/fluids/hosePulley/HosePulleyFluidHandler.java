@@ -6,10 +6,10 @@ import com.zurrtum.create.foundation.fluid.FluidHelper;
 import com.zurrtum.create.infrastructure.fluids.BucketFluidInventory;
 import com.zurrtum.create.infrastructure.fluids.FluidStack;
 import com.zurrtum.create.infrastructure.fluids.SidedFluidInventory;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.storage.ReadView;
+import net.minecraft.storage.WriteView;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Optional;
@@ -46,7 +46,7 @@ public class HosePulleyFluidHandler implements SidedFluidInventory {
 
     @Override
     public int[] getAvailableSlots(@Nullable Direction side) {
-        if (HosePulleyBlock.hasPipeTowards(be.getLevel(), be.getBlockPos(), be.getBlockState(), side)) {
+        if (HosePulleyBlock.hasPipeTowards(be.getWorld(), be.getPos(), be.getCachedState(), side)) {
             return SLOTS;
         } else {
             return EMPTY_SLOTS;
@@ -99,10 +99,7 @@ public class HosePulleyFluidHandler implements SidedFluidInventory {
         int amount = stack.getAmount();
         if (amount <= HALF_BUCKET && drainer.pullNext(rootPosGetter.get(), true)) {
             FluidStack stack = drainer.getDrainableFluid(rootPosGetter.get());
-            if (!stack.isEmpty() && (amount == 0 || matches(this.stack, stack)) && drainer.pullNext(
-                rootPosGetter.get(),
-                false
-            )) {
+            if (!stack.isEmpty() && (amount == 0 || matches(this.stack, stack)) && drainer.pullNext(rootPosGetter.get(), false)) {
                 filler.counterpartActed();
                 setMaxSize(stack, MAX);
                 if (amount > 0) {
@@ -129,11 +126,7 @@ public class HosePulleyFluidHandler implements SidedFluidInventory {
     public void markDirty() {
         int amount = stack.getAmount();
         if (amount > previousAmount) {
-            if (amount >= BucketFluidInventory.CAPACITY && predicate.get() && filler.tryDeposit(
-                stack.getFluid(),
-                rootPosGetter.get(),
-                false
-            )) {
+            if (amount >= BucketFluidInventory.CAPACITY && predicate.get() && filler.tryDeposit(stack.getFluid(), rootPosGetter.get(), false)) {
                 drainer.counterpartActed();
                 amount -= BucketFluidInventory.CAPACITY;
                 if (amount == 0) {
@@ -149,13 +142,13 @@ public class HosePulleyFluidHandler implements SidedFluidInventory {
         previousAmount = stack.getAmount();
     }
 
-    public void write(ValueOutput view) {
+    public void write(WriteView view) {
         if (!stack.isEmpty()) {
-            view.store("Fluid", FluidStack.CODEC, stack);
+            view.put("Fluid", FluidStack.CODEC, stack);
         }
     }
 
-    public void read(ValueInput view) {
+    public void read(ReadView view) {
         stack = view.read("Fluid", FluidStack.CODEC).orElse(FluidStack.EMPTY);
     }
 }

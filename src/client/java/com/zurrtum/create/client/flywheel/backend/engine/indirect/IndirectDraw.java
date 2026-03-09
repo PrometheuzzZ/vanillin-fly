@@ -17,13 +17,7 @@ public class IndirectDraw {
     private final int packedMaterialProperties;
     private boolean deleted;
 
-    public IndirectDraw(
-        IndirectInstancer<?> instancer,
-        Material material,
-        MeshPool.PooledMesh mesh,
-        int bias,
-        int indexOfMeshInModel
-    ) {
+    public IndirectDraw(IndirectInstancer<?> instancer, Material material, MeshPool.PooledMesh mesh, int bias, int indexOfMeshInModel) {
         this.instancer = instancer;
         this.material = material;
         this.mesh = mesh;

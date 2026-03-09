@@ -1,7 +1,7 @@
 package com.zurrtum.create.client.flywheel.api.instance;
 
 import com.zurrtum.create.client.flywheel.api.layout.Layout;
-import net.minecraft.resources.Identifier;
+import net.minecraft.util.Identifier;
 
 /**
  * An InstanceType contains metadata for a specific instance that Flywheel can interface with.

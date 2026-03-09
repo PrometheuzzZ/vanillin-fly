@@ -2,10 +2,10 @@ package com.zurrtum.create.content.kinetics.base;
 
 import com.zurrtum.create.content.kinetics.KineticNetwork;
 import com.zurrtum.create.content.kinetics.base.IRotate.SpeedLevel;
-import net.minecraft.core.BlockPos;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.entity.BlockEntityType;
-import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.block.entity.BlockEntityType;
+import net.minecraft.util.math.BlockPos;
 
 public abstract class GeneratingKineticBlockEntity extends KineticBlockEntity {
 
@@ -21,22 +21,19 @@ public abstract class GeneratingKineticBlockEntity extends KineticBlockEntity {
 
     @Override
     public void removeSource() {
-        if (hasSource() && isSource()) {
+        if (hasSource() && isSource())
             reActivateSource = true;
-        }
         super.removeSource();
     }
 
     @Override
     public void setSource(BlockPos source) {
         super.setSource(source);
-        BlockEntity blockEntity = level.getBlockEntity(source);
-        if (!(blockEntity instanceof KineticBlockEntity sourceBE)) {
+        BlockEntity blockEntity = world.getBlockEntity(source);
+        if (!(blockEntity instanceof KineticBlockEntity sourceBE))
             return;
-        }
-        if (reActivateSource && Math.abs(sourceBE.getSpeed()) >= Math.abs(getGeneratedSpeed())) {
+        if (reActivateSource && Math.abs(sourceBE.getSpeed()) >= Math.abs(getGeneratedSpeed()))
             reActivateSource = false;
-        }
     }
 
     @Override
@@ -52,17 +49,15 @@ public abstract class GeneratingKineticBlockEntity extends KineticBlockEntity {
         float speed = getGeneratedSpeed();
         float prevSpeed = this.speed;
 
-        if (level == null || level.isClientSide()) {
+        if (world == null || world.isClient())
             return;
-        }
 
         if (prevSpeed != speed) {
             if (!hasSource()) {
                 SpeedLevel levelBefore = SpeedLevel.of(this.speed);
                 SpeedLevel levelafter = SpeedLevel.of(speed);
-                if (levelBefore != levelafter) {
+                if (levelBefore != levelafter)
                     effects.queueRotationIndicators();
-                }
             }
 
             applyNewSpeed(prevSpeed, speed);
@@ -107,9 +102,8 @@ public abstract class GeneratingKineticBlockEntity extends KineticBlockEntity {
 
             // Staying below Overpowered speed
             if (Math.abs(prevSpeed) >= Math.abs(speed)) {
-                if (Math.signum(prevSpeed) != Math.signum(speed)) {
-                    level.destroyBlock(worldPosition, true);
-                }
+                if (Math.signum(prevSpeed) != Math.signum(speed))
+                    world.breakBlock(pos, true);
                 return;
             }
 
@@ -129,6 +123,6 @@ public abstract class GeneratingKineticBlockEntity extends KineticBlockEntity {
     }
 
     public Long createNetworkId() {
-        return worldPosition.asLong();
+        return pos.asLong();
     }
 }

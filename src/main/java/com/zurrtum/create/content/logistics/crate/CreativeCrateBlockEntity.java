@@ -3,10 +3,10 @@ package com.zurrtum.create.content.logistics.crate;
 import com.zurrtum.create.AllBlockEntityTypes;
 import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.foundation.blockEntity.behaviour.filtering.ServerFilteringBehaviour;
-import net.minecraft.core.BlockPos;
-import net.minecraft.world.Clearable;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.block.BlockState;
+import net.minecraft.item.ItemStack;
+import net.minecraft.util.Clearable;
+import net.minecraft.util.math.BlockPos;
 
 import java.util.List;
 
@@ -25,13 +25,13 @@ public class CreativeCrateBlockEntity extends CrateBlockEntity implements Cleara
     }
 
     @Override
-    public void setChanged() {
-        super.setChanged();
-        inv.setChanged();
+    public void markDirty() {
+        super.markDirty();
+        inv.markDirty();
     }
 
     @Override
-    public void clearContent() {
+    public void clear() {
         filtering.setFilter(ItemStack.EMPTY);
     }
 }

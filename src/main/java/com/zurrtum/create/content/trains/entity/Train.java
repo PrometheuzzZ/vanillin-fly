@@ -29,30 +29,30 @@ import com.zurrtum.create.infrastructure.config.AllConfigs;
 import com.zurrtum.create.infrastructure.fluids.FluidInventory;
 import com.zurrtum.create.infrastructure.fluids.FluidStack;
 import com.zurrtum.create.infrastructure.packet.s2c.RemoveTrainPacket;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.core.Direction.Axis;
-import net.minecraft.core.UUIDUtil;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.chat.CommonComponents;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.ComponentSerialization;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.resources.ResourceKey;
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.util.Mth;
-import net.minecraft.world.Container;
-import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.Level.ExplosionInteraction;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.entity.FuelValues;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.entity.LivingEntity;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.inventory.Inventory;
+import net.minecraft.item.FuelRegistry;
+import net.minecraft.item.ItemStack;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.registry.RegistryKey;
+import net.minecraft.screen.ScreenTexts;
+import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.storage.ReadView;
+import net.minecraft.storage.WriteView;
+import net.minecraft.text.Text;
+import net.minecraft.text.TextCodecs;
+import net.minecraft.util.Uuids;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Direction.Axis;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.World;
+import net.minecraft.world.World.ExplosionSourceType;
 import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.apache.commons.lang3.mutable.MutableInt;
 import org.apache.commons.lang3.mutable.MutableObject;
@@ -65,22 +65,22 @@ import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 public class Train {
-    public static final StreamCodec<RegistryFriendlyByteBuf, Train> STREAM_CODEC = CatnipLargerStreamCodecs.composite(
-        UUIDUtil.STREAM_CODEC,
+    public static final PacketCodec<RegistryByteBuf, Train> STREAM_CODEC = CatnipLargerStreamCodecs.composite(
+        Uuids.PACKET_CODEC,
         train -> train.id,
-        CatnipStreamCodecBuilders.nullable(UUIDUtil.STREAM_CODEC),
+        CatnipStreamCodecBuilders.nullable(Uuids.PACKET_CODEC),
         train -> train.owner,
         CatnipStreamCodecBuilders.list(Carriage.STREAM_CODEC),
         train -> train.carriages,
-        CatnipStreamCodecBuilders.list(ByteBufCodecs.VAR_INT),
+        CatnipStreamCodecBuilders.list(PacketCodecs.VAR_INT),
         train -> train.carriageSpacing,
-        ByteBufCodecs.BOOL,
+        PacketCodecs.BOOLEAN,
         train -> train.doubleEnded,
-        ComponentSerialization.TRUSTED_CONTEXT_FREE_STREAM_CODEC,
+        TextCodecs.PACKET_CODEC,
         train -> train.name,
         TrainIconType.STREAM_CODEC,
         train -> train.icon,
-        ByteBufCodecs.INT,
+        PacketCodecs.INTEGER,
         train -> train.mapColorIndex,
         Train::new
     );
@@ -102,7 +102,7 @@ public class Train {
     public ScheduleRuntime runtime;
     public TrainIconType icon;
     public int mapColorIndex;
-    public Component name;
+    public Text name;
     public TrainStatus status;
 
     public boolean invalid;
@@ -141,7 +141,7 @@ public class Train {
     double[] stress;
 
     // advancements
-    public Player backwardsDriver;
+    public PlayerEntity backwardsDriver;
 
     private Train(
         UUID id,
@@ -149,7 +149,7 @@ public class Train {
         List<Carriage> carriages,
         List<Integer> carriageSpacing,
         boolean doubleEnded,
-        Component name,
+        Text name,
         TrainIconType icon,
         int mapColorIndex
     ) {
@@ -172,7 +172,7 @@ public class Train {
             carriages,
             carriageSpacing,
             doubleEnded,
-            Component.translatable("create.train.unnamed"),
+            Text.translatable("create.train.unnamed"),
             TrainIconType.TRADITIONAL,
             mapColorIndex
         );
@@ -185,7 +185,7 @@ public class Train {
         List<Carriage> carriages,
         List<Integer> carriageSpacing,
         boolean doubleEnded,
-        Component name,
+        Text name,
         TrainIconType icon,
         int mapColorIndex
     ) {
@@ -216,11 +216,10 @@ public class Train {
         tickOffset = RANDOM.nextInt(100);
     }
 
-    public void earlyTick(Level level) {
+    public void earlyTick(World level) {
         status.tick(level);
-        if (graph == null && !migratingPoints.isEmpty()) {
+        if (graph == null && !migratingPoints.isEmpty())
             reattachToTracks(level);
-        }
         if (graph == null) {
             addToSignalGroups(occupiedSignalBlocks.keySet());
             return;
@@ -234,24 +233,21 @@ public class Train {
         addToSignalGroups(occupiedSignalBlocks.keySet());
         addToSignalGroups(reservedSignalBlocks);
 
-        if (occupiedObservers.isEmpty()) {
+        if (occupiedObservers.isEmpty())
             return;
-        }
 
         tickOccupiedObservers(level);
     }
 
-    private void tickOccupiedObservers(Level level) {
+    private void tickOccupiedObservers(World level) {
         int storageVersion = 0;
-        for (Carriage carriage : carriages) {
+        for (Carriage carriage : carriages)
             storageVersion += carriage.storage.getVersion();
-        }
 
         for (UUID uuid : occupiedObservers) {
             TrackObserver observer = graph.getPoint(EdgePointType.OBSERVER, uuid);
-            if (observer == null) {
+            if (observer == null)
                 continue;
-            }
 
             FilterItemStack filter = observer.getFilter();
             if (filter.isEmpty()) {
@@ -263,15 +259,14 @@ public class Train {
             boolean shouldActivate = cachedMatch.getSecond();
 
             if (cachedMatch.getFirst() == storageVersion) {
-                if (shouldActivate) {
+                if (shouldActivate)
                     observer.keepAlive(this);
-                }
                 continue;
             }
 
             shouldActivate = false;
             for (Carriage carriage : carriages) {
-                Container inv = carriage.storage.getAllItems();
+                Inventory inv = carriage.storage.getAllItems();
                 if (inv != null) {
                     ItemStack find = inv.count(stack -> filter.test(level, stack), 1);
                     if (!find.isEmpty()) {
@@ -292,9 +287,8 @@ public class Train {
 
             cachedObserverFiltering.put(uuid, Pair.of(storageVersion, shouldActivate));
 
-            if (shouldActivate) {
+            if (shouldActivate)
                 observer.keepAlive(this);
-            }
         }
     }
 
@@ -302,15 +296,14 @@ public class Train {
         Map<UUID, SignalEdgeGroup> groupMap = Create.RAILWAYS.signalEdgeGroups;
         for (Iterator<UUID> iterator = groups.iterator(); iterator.hasNext(); ) {
             SignalEdgeGroup signalEdgeGroup = groupMap.get(iterator.next());
-            if (signalEdgeGroup == null) {
+            if (signalEdgeGroup == null)
                 iterator.remove();
-            } else {
+            else
                 signalEdgeGroup.trains.add(this);
-            }
         }
     }
 
-    public void tick(Level level) {
+    public void tick(World level) {
         Create.RAILWAYS.markTracksDirty();
 
         if (graph == null) {
@@ -333,9 +326,8 @@ public class Train {
         navigation.tick(level);
 
         tickPassiveSlowdown();
-        if (derailed) {
+        if (derailed)
             tickDerailedSlowdown();
-        }
 
         double distance = speed;
         Carriage previousCarriage = null;
@@ -343,9 +335,8 @@ public class Train {
         boolean stalled = false;
         double maxStress = 0;
 
-        if (carriageWaitingForChunks != -1) {
+        if (carriageWaitingForChunks != -1)
             distance = 0;
-        }
 
         for (int i = 0; i < carriageCount; i++) {
             Carriage carriage = carriages.get(i);
@@ -360,30 +351,26 @@ public class Train {
                 double total = 0;
 
                 if (leadingPoint.node1 != null && trailingPoint.node1 != null || leadingPoint.edge == null || trailingPoint.edge == null) {
-                    ResourceKey<Level> d1 = leadingPoint.node1.getLocation().dimension;
-                    ResourceKey<Level> d2 = trailingPoint.node1.getLocation().dimension;
+                    RegistryKey<World> d1 = leadingPoint.node1.getLocation().dimension;
+                    RegistryKey<World> d2 = trailingPoint.node1.getLocation().dimension;
                     for (boolean b : Iterate.trueAndFalse) {
-                        ResourceKey<Level> d = b ? d1 : d2;
-                        if (!b && d1.equals(d2)) {
+                        RegistryKey<World> d = b ? d1 : d2;
+                        if (!b && d1.equals(d2))
                             continue;
-                        }
-                        if (!d1.equals(d2)) {
+                        if (!d1.equals(d2))
                             continue;
-                        }
 
                         DimensionalCarriageEntity dimensional = carriage.getDimensionalIfPresent(d);
                         DimensionalCarriageEntity dimensional2 = previousCarriage.getDimensionalIfPresent(d);
-                        if (dimensional == null || dimensional2 == null) {
+                        if (dimensional == null || dimensional2 == null)
                             continue;
-                        }
 
-                        Vec3 leadingAnchor = dimensional.leadingAnchor();
-                        Vec3 trailingAnchor = dimensional2.trailingAnchor();
-                        if (leadingAnchor == null || trailingAnchor == null) {
+                        Vec3d leadingAnchor = dimensional.leadingAnchor();
+                        Vec3d trailingAnchor = dimensional2.trailingAnchor();
+                        if (leadingAnchor == null || trailingAnchor == null)
                             continue;
-                        }
 
-                        double distanceTo = leadingAnchor.distanceToSqr(trailingAnchor);
+                        double distanceTo = leadingAnchor.squaredDistanceTo(trailingAnchor);
                         if (carriage.leadingBogey().isUpsideDown() != previousCarriage.trailingBogey().isUpsideDown()) {
                             distanceTo = Math.sqrt(distanceTo - 4);
                         } else {
@@ -395,9 +382,8 @@ public class Train {
                 }
 
 
-                if (entries > 0) {
+                if (entries > 0)
                     actual = total / entries;
-                }
 
                 stress[i - 1] = target - actual;
                 maxStress = Math.max(maxStress, Math.abs(target - actual));
@@ -406,9 +392,8 @@ public class Train {
             previousCarriage = carriage;
 
             if (carriage.stalled) {
-                if (speedBeforeStall == null) {
+                if (speedBeforeStall == null)
                     speedBeforeStall = speed;
-                }
                 distance = 0;
                 speed = 0;
                 stalled = true;
@@ -416,7 +401,7 @@ public class Train {
         }
 
         if (!stalled && speedBeforeStall != null) {
-            speed = Mth.clamp(speedBeforeStall, -1, 1);
+            speed = MathHelper.clamp(speedBeforeStall, -1, 1);
             speedBeforeStall = null;
         }
 
@@ -446,30 +431,21 @@ public class Train {
             boolean first = i == 0;
             boolean last = i == carriageCount - 1;
             int carriageType = first ? last ? Carriage.BOTH : Carriage.FIRST : last ? Carriage.LAST : Carriage.MIDDLE;
-            double actualDistance = carriage.travel(
-                level,
-                graph,
-                distance + totalStress,
-                toFollowForward,
-                toFollowBackward,
-                carriageType
-            );
+            double actualDistance = carriage.travel(level, graph, distance + totalStress, toFollowForward, toFollowBackward, carriageType);
             blocked |= carriage.blocked || carriage.isOnIncompatibleTrack();
 
             boolean onTwoBogeys = carriage.isOnTwoBogeys();
             maxStress = Math.max(maxStress, onTwoBogeys ? carriage.bogeySpacing - carriage.getAnchorDiff() : 0);
             maxStress = Math.max(maxStress, carriage.leadingBogey().getStress());
-            if (onTwoBogeys) {
+            if (onTwoBogeys)
                 maxStress = Math.max(maxStress, carriage.trailingBogey().getStress());
-            }
 
             if (index == 0) {
                 distance = actualDistance;
                 collideWithOtherTrains(level, carriage);
                 backwardsDriver = null;
-                if (graph == null) {
+                if (graph == null)
                     return;
-                }
             }
         }
 
@@ -486,9 +462,8 @@ public class Train {
             derailed = true;
             status.highStress();
 
-        } else if (speed != 0) {
+        } else if (speed != 0)
             status.trackOK();
-        }
 
         updateNavigationTarget(level, distance);
     }
@@ -497,9 +472,8 @@ public class Train {
         return (distance, couple) -> {
 
             if (couple.getFirst() instanceof GlobalStation station) {
-                if (!station.canApproachFrom(couple.getSecond().getSecond()) || navigation.destination != station) {
+                if (!station.canApproachFrom(couple.getSecond().getSecond()) || navigation.destination != station)
                     return false;
-                }
                 speed = 0;
                 navigation.distanceToDestination = 0;
                 navigation.currentPath.clear();
@@ -513,9 +487,8 @@ public class Train {
                 return false;
             }
 
-            if (!(couple.getFirst() instanceof SignalBoundary signal)) {
+            if (!(couple.getFirst() instanceof SignalBoundary signal))
                 return false;
-            }
             if (navigation.waitingForSignal != null && navigation.waitingForSignal.getFirst().equals(signal.getId())) {
                 speed = 0;
                 navigation.distanceToSignal = 0;
@@ -524,15 +497,13 @@ public class Train {
 
             UUID groupId = signal.getGroup(couple.getSecond().getSecond());
             SignalEdgeGroup signalEdgeGroup = Create.RAILWAYS.signalEdgeGroups.get(groupId);
-            if (signalEdgeGroup == null) {
+            if (signalEdgeGroup == null)
                 return false;
-            }
 
-            if ((runtime.getSchedule() == null || runtime.paused) && signalEdgeGroup.isOccupiedUnless(this)) {
+            if ((runtime.getSchedule() == null || runtime.paused) && signalEdgeGroup.isOccupiedUnless(this))
                 carriages.forEach(c -> c.forEachPresentEntity(cce -> cce.getControllingPlayer()
-                    .map(uuid -> cce.level().getPlayerByUUID(uuid) instanceof ServerPlayer player ? player : null)
+                    .map(uuid -> cce.getEntityWorld().getPlayerByUuid(uuid) instanceof ServerPlayerEntity player ? player : null)
                     .ifPresent(AllAdvancements.RED_SIGNAL::trigger)));
-            }
 
             signalEdgeGroup.reserved = signal;
             occupy(groupId, signal.id);
@@ -547,20 +518,17 @@ public class Train {
             c.stalled = false;
             c.forEachPresentEntity(cce -> cce.getContraption().getActors().forEach(pair -> {
                 MovementBehaviour behaviour = MovementBehaviour.REGISTRY.get(pair.getKey().state());
-                if (behaviour != null) {
+                if (behaviour != null)
                     behaviour.cancelStall(pair.getValue());
-                }
             }));
         });
     }
 
     private boolean occupy(UUID groupId, @Nullable UUID boundaryId) {
         reservedSignalBlocks.remove(groupId);
-        if (boundaryId != null && occupiedSignalBlocks.containsKey(groupId)) {
-            if (boundaryId.equals(occupiedSignalBlocks.get(groupId))) {
+        if (boundaryId != null && occupiedSignalBlocks.containsKey(groupId))
+            if (boundaryId.equals(occupiedSignalBlocks.get(groupId)))
                 return false;
-            }
-        }
         return occupiedSignalBlocks.put(groupId, boundaryId) == null;
     }
 
@@ -571,19 +539,17 @@ public class Train {
                 cachedObserverFiltering.remove(observer.getId());
                 return false;
             }
-            if (!(couple.getFirst() instanceof SignalBoundary signal)) {
+            if (!(couple.getFirst() instanceof SignalBoundary signal))
                 return false;
-            }
             UUID groupId = signal.getGroup(couple.getSecond().getFirst());
             occupiedSignalBlocks.remove(groupId);
             return false;
         };
     }
 
-    private void updateNavigationTarget(Level level, double distance) {
-        if (navigation.destination == null) {
+    private void updateNavigationTarget(World level, double distance) {
+        if (navigation.destination == null)
             return;
-        }
 
         Pair<UUID, Boolean> blockingSignal = navigation.waitingForSignal;
         boolean fullRefresh = navigation.distanceToDestination > 100 && navigation.distanceToDestination % 100 > 20;
@@ -607,15 +573,12 @@ public class Train {
             fullRefresh |= signal != null && signal.types.get(blockingSignal.getSecond()) == SignalType.CROSS_SIGNAL;
         }
 
-        if (signalRefresh) {
+        if (signalRefresh)
             navigation.waitingForSignal = null;
-        }
-        if (!fullRefresh && !partialRefresh) {
+        if (!fullRefresh && !partialRefresh)
             return;
-        }
-        if (!reservedSignalBlocks.isEmpty()) {
+        if (!reservedSignalBlocks.isEmpty())
             return;
-        }
 
         if (!navigatingManually && fullRefresh) {
             DiscoveredPath preferredPath = runtime.startCurrentInstruction(level);
@@ -627,9 +590,8 @@ public class Train {
 
     private void tickDerailedSlowdown() {
         speed /= 3f;
-        if (Mth.equal(speed, 0)) {
+        if (MathHelper.approximatelyEquals(speed, 0))
             speed = 0;
-        }
     }
 
     private void tickPassiveSlowdown() {
@@ -637,113 +599,96 @@ public class Train {
             double acceleration = acceleration();
             if (speed > 0) {
                 speed = Math.max(speed - acceleration, 0);
-            } else {
+            } else
                 speed = Math.min(speed + acceleration, 0);
-            }
         }
         manualTick = false;
     }
 
     private void updateConductors() {
-        for (Carriage carriage : carriages) {
+        for (Carriage carriage : carriages)
             carriage.updateConductors();
-        }
     }
 
     public boolean hasForwardConductor() {
-        for (Carriage carriage : carriages) {
-            if (carriage.presentConductors.getFirst()) {
+        for (Carriage carriage : carriages)
+            if (carriage.presentConductors.getFirst())
                 return true;
-            }
-        }
         return false;
     }
 
     public boolean hasBackwardConductor() {
-        for (Carriage carriage : carriages) {
-            if (carriage.presentConductors.getSecond()) {
+        for (Carriage carriage : carriages)
+            if (carriage.presentConductors.getSecond())
                 return true;
-            }
-        }
         return false;
     }
 
-    private void collideWithOtherTrains(Level level, Carriage carriage) {
-        if (derailed) {
+    private void collideWithOtherTrains(World level, Carriage carriage) {
+        if (derailed)
             return;
-        }
 
         TravellingPoint trailingPoint = carriage.getTrailingPoint();
         TravellingPoint leadingPoint = carriage.getLeadingPoint();
 
-        if (leadingPoint.node1 == null || trailingPoint.node1 == null) {
+        if (leadingPoint.node1 == null || trailingPoint.node1 == null)
             return;
-        }
-        ResourceKey<Level> dimension = leadingPoint.node1.getLocation().dimension;
-        if (!dimension.equals(trailingPoint.node1.getLocation().dimension)) {
+        RegistryKey<World> dimension = leadingPoint.node1.getLocation().dimension;
+        if (!dimension.equals(trailingPoint.node1.getLocation().dimension))
             return;
-        }
 
-        Vec3 start = (speed < 0 ? trailingPoint : leadingPoint).getPosition(graph);
-        Vec3 end = (speed < 0 ? leadingPoint : trailingPoint).getPosition(graph);
+        Vec3d start = (speed < 0 ? trailingPoint : leadingPoint).getPosition(graph);
+        Vec3d end = (speed < 0 ? leadingPoint : trailingPoint).getPosition(graph);
 
-        Pair<Train, Vec3> collision = findCollidingTrain(level, start, end, dimension);
-        if (collision == null) {
+        Pair<Train, Vec3d> collision = findCollidingTrain(level, start, end, dimension);
+        if (collision == null)
             return;
-        }
 
         Train train = collision.getFirst();
 
         double combinedSpeed = Math.abs(speed) + Math.abs(train.speed);
         if (combinedSpeed > .2f) {
-            Vec3 v = collision.getSecond();
-            level.explode(null, v.x, v.y, v.z, (float) Math.min(3 * combinedSpeed, 5), ExplosionInteraction.NONE);
+            Vec3d v = collision.getSecond();
+            level.createExplosion(null, v.x, v.y, v.z, (float) Math.min(3 * combinedSpeed, 5), ExplosionSourceType.NONE);
         }
 
         crash();
         train.crash();
     }
 
-    public Pair<Train, Vec3> findCollidingTrain(Level level, Vec3 start, Vec3 end, ResourceKey<Level> dimension) {
-        Vec3 diff = end.subtract(start);
+    public Pair<Train, Vec3d> findCollidingTrain(World level, Vec3d start, Vec3d end, RegistryKey<World> dimension) {
+        Vec3d diff = end.subtract(start);
         double maxDistanceSqr = Math.pow(AllConfigs.server().trains.maxAssemblyLength.get(), 2.0);
 
         Trains:
         for (Train train : Create.RAILWAYS.sided(level).trains.values()) {
-            if (train == this) {
+            if (train == this)
                 continue;
-            }
-            if (train.graph != null && train.graph != graph) {
+            if (train.graph != null && train.graph != graph)
                 continue;
-            }
 
-            Vec3 lastPoint = null;
+            Vec3d lastPoint = null;
 
             for (Carriage otherCarriage : train.carriages) {
                 for (boolean betweenBits : Iterate.trueAndFalse) {
-                    if (betweenBits && lastPoint == null) {
+                    if (betweenBits && lastPoint == null)
                         continue;
-                    }
 
                     TravellingPoint otherLeading = otherCarriage.getLeadingPoint();
                     TravellingPoint otherTrailing = otherCarriage.getTrailingPoint();
-                    if (otherLeading.edge == null || otherTrailing.edge == null) {
+                    if (otherLeading.edge == null || otherTrailing.edge == null)
                         continue;
-                    }
-                    ResourceKey<Level> otherDimension = otherLeading.node1.getLocation().dimension;
-                    if (!otherDimension.equals(otherTrailing.node1.getLocation().dimension)) {
+                    RegistryKey<World> otherDimension = otherLeading.node1.getLocation().dimension;
+                    if (!otherDimension.equals(otherTrailing.node1.getLocation().dimension))
                         continue;
-                    }
-                    if (!otherDimension.equals(dimension)) {
+                    if (!otherDimension.equals(dimension))
                         continue;
-                    }
 
-                    Vec3 start2 = otherLeading.getPosition(train.graph);
-                    Vec3 end2 = otherTrailing.getPosition(train.graph);
+                    Vec3d start2 = otherLeading.getPosition(train.graph);
+                    Vec3d end2 = otherTrailing.getPosition(train.graph);
 
-                    if (Math.min(start2.distanceToSqr(start), end2.distanceToSqr(start)) > maxDistanceSqr) {
+                    if (Math.min(start2.squaredDistanceTo(start), end2.squaredDistanceTo(start)) > maxDistanceSqr)
                         continue Trains;
-                    }
 
                     if (betweenBits) {
                         end2 = start2;
@@ -752,42 +697,35 @@ public class Train {
 
                     lastPoint = end2;
 
-                    if ((end.y < end2.y - 3 || end2.y < end.y - 3) && (start.y < start2.y - 3 || start2.y < start.y - 3)) {
+                    if ((end.y < end2.y - 3 || end2.y < end.y - 3) && (start.y < start2.y - 3 || start2.y < start.y - 3))
                         continue;
-                    }
 
-                    Vec3 diff2 = end2.subtract(start2);
-                    Vec3 normedDiff = diff.normalize();
-                    Vec3 normedDiff2 = diff2.normalize();
+                    Vec3d diff2 = end2.subtract(start2);
+                    Vec3d normedDiff = diff.normalize();
+                    Vec3d normedDiff2 = diff2.normalize();
                     double[] intersect = VecHelper.intersect(start, start2, normedDiff, normedDiff2, Axis.Y);
 
                     if (intersect == null) {
-                        Vec3 intersectSphere = VecHelper.intersectSphere(start2, normedDiff2, start, .125f);
-                        if (intersectSphere == null) {
+                        Vec3d intersectSphere = VecHelper.intersectSphere(start2, normedDiff2, start, .125f);
+                        if (intersectSphere == null)
                             continue;
-                        }
-                        if (!Mth.equal(normedDiff2.dot(intersectSphere.subtract(start2).normalize()), 1)) {
+                        if (!MathHelper.approximatelyEquals(normedDiff2.dotProduct(intersectSphere.subtract(start2).normalize()), 1))
                             continue;
-                        }
                         intersect = new double[2];
                         intersect[0] = intersectSphere.distanceTo(start) - .125;
                         intersect[1] = intersectSphere.distanceTo(start2) - .125;
                     }
 
-                    if (intersect[0] > diff.length()) {
+                    if (intersect[0] > diff.length())
                         continue;
-                    }
-                    if (intersect[1] > diff2.length()) {
+                    if (intersect[1] > diff2.length())
                         continue;
-                    }
-                    if (intersect[0] < 0) {
+                    if (intersect[0] < 0)
                         continue;
-                    }
-                    if (intersect[1] < 0) {
+                    if (intersect[1] < 0)
                         continue;
-                    }
 
-                    return Pair.of(train, start.add(normedDiff.scale(intersect[0])));
+                    return Pair.of(train, start.add(normedDiff.multiply(intersect[0])));
                 }
             }
         }
@@ -796,79 +734,65 @@ public class Train {
 
     public void crash() {
         navigation.cancelNavigation();
-        if (derailed) {
+        if (derailed)
             return;
-        }
-        speed = -Mth.clamp(speed, -.5, .5);
+        speed = -MathHelper.clamp(speed, -.5, .5);
         derailed = true;
         graph = null;
         status.crash();
 
-        for (Carriage carriage : carriages) {
-            carriage.forEachPresentEntity(e -> e.getIndirectPassengers().forEach(entity -> {
-                if (!(entity instanceof ServerPlayer p)) {
+        for (Carriage carriage : carriages)
+            carriage.forEachPresentEntity(e -> e.getPassengersDeep().forEach(entity -> {
+                if (!(entity instanceof ServerPlayerEntity p))
                     return;
-                }
                 Optional<UUID> controllingPlayer = e.getControllingPlayer();
-                if (controllingPlayer.isPresent() && controllingPlayer.get().equals(p.getUUID())) {
+                if (controllingPlayer.isPresent() && controllingPlayer.get().equals(p.getUuid()))
                     return;
-                }
                 AllAdvancements.TRAIN_CRASH.trigger(p);
             }));
-        }
 
-        if (backwardsDriver != null) {
-            AllAdvancements.TRAIN_CRASH_BACKWARDS.trigger((ServerPlayer) backwardsDriver);
-        }
+        if (backwardsDriver != null)
+            AllAdvancements.TRAIN_CRASH_BACKWARDS.trigger((ServerPlayerEntity) backwardsDriver);
     }
 
-    public boolean disassemble(ServerPlayer sender, Direction assemblyDirection, BlockPos pos) {
-        if (!canDisassemble()) {
+    public boolean disassemble(ServerPlayerEntity sender, Direction assemblyDirection, BlockPos pos) {
+        if (!canDisassemble())
             return false;
-        }
 
         int offset = 1;
         boolean backwards = currentlyBackwards;
-        Level level = null;
+        World level = null;
 
         for (int i = 0; i < carriages.size(); i++) {
 
             Carriage carriage = carriages.get(backwards ? carriages.size() - i - 1 : i);
             CarriageContraptionEntity entity = carriage.anyAvailableEntity();
-            if (entity == null) {
+            if (entity == null)
                 return false;
-            }
-            level = entity.level();
+            level = entity.getEntityWorld();
 
-            if (entity.getContraption() instanceof CarriageContraption cc) {
+            if (entity.getContraption() instanceof CarriageContraption cc)
                 cc.returnStorageForDisassembly(carriage.storage);
-            }
-            entity.setPos(Vec3.atLowerCornerOf(pos.relative(
-                assemblyDirection,
-                backwards ? offset + carriage.bogeySpacing : offset
-            ).below(carriage.leadingBogey().isUpsideDown() ? 2 : 0)));
+            entity.setPosition(Vec3d.of(pos.offset(assemblyDirection, backwards ? offset + carriage.bogeySpacing : offset)
+                .down(carriage.leadingBogey().isUpsideDown() ? 2 : 0)));
             entity.disassemble();
 
             for (CarriageBogey bogey : carriage.bogeys) {
-                if (bogey == null) {
+                if (bogey == null)
                     continue;
-                }
-                Vec3 bogeyPosition = bogey.getAnchorPosition();
-                if (bogeyPosition == null) {
+                Vec3d bogeyPosition = bogey.getAnchorPosition();
+                if (bogeyPosition == null)
                     continue;
-                }
-                BlockEntity be = level.getBlockEntity(BlockPos.containing(bogeyPosition));
-                if (!(be instanceof AbstractBogeyBlockEntity sbbe)) {
+                BlockEntity be = level.getBlockEntity(BlockPos.ofFloored(bogeyPosition));
+                if (!(be instanceof AbstractBogeyBlockEntity sbbe))
                     continue;
-                }
                 sbbe.setBogeyData(bogey.bogeyData);
             }
 
             offset += carriage.bogeySpacing;
 
-            if (i < carriageSpacing.size()) {
+            if (i < carriageSpacing.size())
                 offset += carriageSpacing.get(backwards ? carriageSpacing.size() - i - 1 : i);
-            }
         }
 
         GlobalStation currentStation = getCurrentStation();
@@ -882,25 +806,21 @@ public class Train {
         }
 
         Create.RAILWAYS.removeTrain(id);
-        sender.level().getServer().getPlayerList().broadcastAll(new RemoveTrainPacket(this));
+        sender.getEntityWorld().getServer().getPlayerManager().sendToAll(new RemoveTrainPacket(this));
         return true;
     }
 
     public boolean canDisassemble() {
         for (Carriage carriage : carriages) {
-            if (carriage.presentInMultipleDimensions()) {
+            if (carriage.presentInMultipleDimensions())
                 return false;
-            }
             CarriageContraptionEntity entity = carriage.anyAvailableEntity();
-            if (entity == null) {
+            if (entity == null)
                 return false;
-            }
-            if (!Mth.equal(entity.pitch, 0)) {
+            if (!MathHelper.approximatelyEquals(entity.pitch, 0))
                 return false;
-            }
-            if (!Mth.equal(((entity.yaw % 90) + 360) % 90, 0)) {
+            if (!MathHelper.approximatelyEquals(((entity.yaw % 90) + 360) % 90, 0))
                 return false;
-            }
         }
         return true;
     }
@@ -908,9 +828,8 @@ public class Train {
     public boolean isTravellingOn(TrackNode node) {
         MutableBoolean affected = new MutableBoolean(false);
         forEachTravellingPoint(tp -> {
-            if (tp.node1 == node || tp.node2 == node) {
+            if (tp.node1 == node || tp.node2 == node)
                 affected.setTrue();
-            }
         });
         return affected.booleanValue();
     }
@@ -925,9 +844,8 @@ public class Train {
     public void forEachTravellingPoint(Consumer<TravellingPoint> callback) {
         for (Carriage c : carriages) {
             c.leadingBogey().points.forEach(callback::accept);
-            if (c.isOnTwoBogeys()) {
+            if (c.isOnTwoBogeys())
                 c.trailingBogey().points.forEach(callback::accept);
-            }
         }
     }
 
@@ -940,19 +858,15 @@ public class Train {
             double trailSpacing = trailingBogey.type.getWheelPointSpacing();
 
             // trailing point
-            callback.accept(
-                trailingBogey.trailing(),
-                i == 0 ? 0 : carriageSpacing.get(index) - lastWheelOffset - trailSpacing / 2
-            );
+            callback.accept(trailingBogey.trailing(), i == 0 ? 0 : carriageSpacing.get(index) - lastWheelOffset - trailSpacing / 2);
 
             // inside 1st bogey
             callback.accept(trailingBogey.leading(), trailSpacing);
 
             lastWheelOffset = trailSpacing / 2;
 
-            if (!carriage.isOnTwoBogeys()) {
+            if (!carriage.isOnTwoBogeys())
                 continue;
-            }
 
             CarriageBogey leadingBogey = carriage.leadingBogey();
             double leadSpacing = carriage.leadingBogey().type.getWheelPointSpacing();
@@ -967,7 +881,7 @@ public class Train {
         }
     }
 
-    public void reattachToTracks(Level level) {
+    public void reattachToTracks(World level) {
         if (migrationCooldown > 0) {
             migrationCooldown--;
             return;
@@ -999,17 +913,14 @@ public class Train {
             List<TrackGraphLocation> locations = successfulMigrations.get(entry.getKey());
             forEachTravellingPoint(tp -> tp.migrateTo(locations));
             migratingPoints.clear();
-            if (derailed) {
+            if (derailed)
                 status.successfulMigration();
-            }
             derailed = false;
-            if (runtime.getSchedule() != null && runtime.state == State.IN_TRANSIT) {
+            if (runtime.getSchedule() != null && runtime.state == State.IN_TRANSIT)
                 runtime.state = State.PRE_TRANSIT;
-            }
             GlobalStation currentStation = getCurrentStation();
-            if (currentStation != null) {
+            if (currentStation != null)
                 currentStation.reserveFor(this);
-            }
             updateSignalBlocks = true;
             migrationCooldown = 0;
             return;
@@ -1020,26 +931,22 @@ public class Train {
         int length = 0;
         for (int i = 0; i < carriages.size(); i++) {
             Carriage carriage = carriages.get(i);
-            if (i == 0) {
+            if (i == 0)
                 length += carriage.leadingBogey().type.getWheelPointSpacing() / 2;
-            }
-            if (i == carriages.size() - 1) {
+            if (i == carriages.size() - 1)
                 length += carriage.trailingBogey().type.getWheelPointSpacing() / 2;
-            }
 
             length += carriage.bogeySpacing;
-            if (i < carriageSpacing.size()) {
+            if (i < carriageSpacing.size())
                 length += carriageSpacing.get(i);
-            }
         }
         return length;
     }
 
     public void leaveStation() {
         GlobalStation currentStation = getCurrentStation();
-        if (currentStation != null) {
+        if (currentStation != null)
             currentStation.trainDeparted(this);
-        }
         this.currentStation = null;
     }
 
@@ -1056,23 +963,20 @@ public class Train {
     }
 
     public GlobalStation getCurrentStation() {
-        if (currentStation == null) {
+        if (currentStation == null)
             return null;
-        }
-        if (graph == null) {
+        if (graph == null)
             return null;
-        }
         return graph.getPoint(EdgePointType.STATION, currentStation);
     }
 
     @Nullable
-    public LivingEntity getOwner(Level level) {
-        if (level.getServer() == null) {
+    public LivingEntity getOwner(World level) {
+        if (level.getServer() == null)
             return null;
-        }
         try {
             UUID uuid = owner;
-            return uuid == null ? null : level.getServer().getPlayerList().getPlayer(uuid);
+            return uuid == null ? null : level.getServer().getPlayerManager().getPlayer(uuid);
         } catch (IllegalArgumentException illegalargumentexception) {
             return null;
         }
@@ -1080,18 +984,15 @@ public class Train {
 
     public void approachTargetSpeed(float accelerationMod) {
         double actualTarget = targetSpeed;
-        if (Mth.equal(actualTarget, speed)) {
+        if (MathHelper.approximatelyEquals(actualTarget, speed))
             return;
-        }
-        if (manualTick) {
+        if (manualTick)
             leaveStation();
-        }
         double acceleration = acceleration();
-        if (speed < actualTarget) {
+        if (speed < actualTarget)
             speed = Math.min(speed + acceleration * accelerationMod, actualTarget);
-        } else if (speed > actualTarget) {
+        else if (speed > actualTarget)
             speed = Math.max(speed - acceleration * accelerationMod, actualTarget);
-        }
     }
 
     public void collectInitiallyOccupiedSignalBlocks() {
@@ -1100,9 +1001,8 @@ public class Train {
         TrackNode node2 = trailingPoint.node2;
         TrackEdge edge = trailingPoint.edge;
 
-        if (edge == null) {
+        if (edge == null)
             return;
-        }
 
         double position = trailingPoint.position;
         EdgeData signalData = edge.getEdgeData();
@@ -1158,16 +1058,13 @@ public class Train {
                         occupiedObservers.add(observer.getId());
                         return false;
                     }
-                    if (!(couple.getFirst() instanceof SignalBoundary signal)) {
+                    if (!(couple.getFirst() instanceof SignalBoundary signal))
                         return false;
-                    }
                     couple.getSecond().map(signal::getGroup).forEach(id -> {
-                        if (!Create.RAILWAYS.signalEdgeGroups.containsKey(id)) {
+                        if (!Create.RAILWAYS.signalEdgeGroups.containsKey(id))
                             return;
-                        }
-                        if (id.equals(prevGroup.getValue())) {
+                        if (id.equals(prevGroup.getValue()))
                             return;
-                        }
                         occupy(id, null);
                         prevGroup.setValue(id);
                     });
@@ -1193,22 +1090,18 @@ public class Train {
     }
 
     public int getNavigationPenalty() {
-        if (manualTick) {
+        if (manualTick)
             return Penalties.MANUAL_TRAIN;
-        }
-        if (runtime.getSchedule() == null || runtime.paused) {
+        if (runtime.getSchedule() == null || runtime.paused)
             return Penalties.IDLE_TRAIN;
-        }
-        if (navigation.waitingForSignal != null && navigation.ticksWaitingForSignal > 0) {
+        if (navigation.waitingForSignal != null && navigation.ticksWaitingForSignal > 0)
             return Penalties.WAITING_TRAIN + Math.min(navigation.ticksWaitingForSignal / 20, 1000);
-        }
-        if (navigation.destination != null && navigation.distanceToDestination < 50 || navigation.distanceToSignal < 20) {
+        if (navigation.destination != null && navigation.distanceToDestination < 50 || navigation.distanceToSignal < 20)
             return Penalties.ARRIVING_TRAIN;
-        }
         return Penalties.ANY_TRAIN;
     }
 
-    public void burnFuel(Level world) {
+    public void burnFuel(World world) {
         if (fuelTicks > 0) {
             fuelTicks--;
             return;
@@ -1217,19 +1110,18 @@ public class Train {
         boolean iterateFromBack = speed < 0;
         int carriageCount = carriages.size();
 
-        FuelValues fuelRegistry = world.fuelValues();
+        FuelRegistry fuelRegistry = world.getFuelRegistry();
         for (int index = 0; index < carriageCount; index++) {
             int i = iterateFromBack ? carriageCount - 1 - index : index;
             Carriage carriage = carriages.get(i);
-            Container fuelItems = carriage.storage.getFuelItems();
-            if (fuelItems == null) {
+            Inventory fuelItems = carriage.storage.getFuelItems();
+            if (fuelItems == null)
                 continue;
-            }
 
             MutableInt burnTime = new MutableInt();
             ItemStack extract = fuelItems.extract(
                 stack -> {
-                    int ticks = fuelRegistry.burnDuration(stack);
+                    int ticks = fuelRegistry.getFuelTicks(stack);
                     if (ticks > 0) {
                         burnTime.setValue(ticks);
                         return true;
@@ -1241,7 +1133,7 @@ public class Train {
                 continue;
             }
             fuelTicks += burnTime.getValue();
-            ItemStack remainder = extract.getItem().getCraftingRemainder();
+            ItemStack remainder = extract.getItem().getRecipeRemainder();
             if (!remainder.isEmpty()) {
                 fuelItems.insertExist(remainder);
             }
@@ -1261,65 +1153,54 @@ public class Train {
         return (fuelTicks > 0 ? AllConfigs.server().trains.poweredTrainAcceleration.getF() : AllConfigs.server().trains.trainAcceleration.getF()) / 400;
     }
 
-    public void write(ValueOutput view, DimensionPalette dimensions) {
-        view.store("Id", UUIDUtil.CODEC, id);
-        if (owner != null) {
-            view.store("Owner", UUIDUtil.CODEC, owner);
-        }
-        if (graph != null) {
-            view.store("Graph", UUIDUtil.CODEC, graph.id);
-        }
-        ValueOutput.ValueOutputList carriageList = view.childrenList("Carriages");
-        carriages.forEach(carriage -> carriage.write(carriageList.addChild(), dimensions));
+    public void write(WriteView view, DimensionPalette dimensions) {
+        view.put("Id", Uuids.INT_STREAM_CODEC, id);
+        if (owner != null)
+            view.put("Owner", Uuids.INT_STREAM_CODEC, owner);
+        if (graph != null)
+            view.put("Graph", Uuids.INT_STREAM_CODEC, graph.id);
+        WriteView.ListView carriageList = view.getList("Carriages");
+        carriages.forEach(carriage -> carriage.write(carriageList.add(), dimensions));
         view.putIntArray("CarriageSpacing", carriageSpacing.stream().mapToInt(Integer::intValue).toArray());
         view.putBoolean("DoubleEnded", doubleEnded);
         view.putDouble("Speed", speed);
         view.putDouble("Throttle", throttle);
-        if (speedBeforeStall != null) {
-            view.store("SpeedBeforeStall", Codec.DOUBLE, speedBeforeStall);
-        }
+        if (speedBeforeStall != null)
+            view.put("SpeedBeforeStall", Codec.DOUBLE, speedBeforeStall);
         view.putInt("Fuel", fuelTicks);
         view.putDouble("TargetSpeed", targetSpeed);
-        view.store("IconType", TrainIconType.CODEC, icon);
+        view.put("IconType", TrainIconType.CODEC, icon);
         view.putInt("MapColorIndex", mapColorIndex);
-        view.store("Name", ComponentSerialization.CODEC, name);
-        if (currentStation != null) {
-            view.store("Station", UUIDUtil.CODEC, currentStation);
-        }
+        view.put("Name", TextCodecs.CODEC, name);
+        if (currentStation != null)
+            view.put("Station", Uuids.INT_STREAM_CODEC, currentStation);
         view.putBoolean("Backwards", currentlyBackwards);
         view.putBoolean("Derailed", derailed);
         view.putBoolean("UpdateSignals", updateSignalBlocks);
-        ValueOutput.ValueOutputList occupiedSignalBlockList = view.childrenList("SignalBlocks");
+        WriteView.ListView occupiedSignalBlockList = view.getList("SignalBlocks");
         occupiedSignalBlocks.forEach((id, boundary) -> {
-            ValueOutput item = occupiedSignalBlockList.addChild();
-            item.store("Id", UUIDUtil.CODEC, id);
+            WriteView item = occupiedSignalBlockList.add();
+            item.put("Id", Uuids.INT_STREAM_CODEC, id);
             if (boundary != null) {
-                item.store("Boundary", UUIDUtil.CODEC, boundary);
+                item.put("Boundary", Uuids.INT_STREAM_CODEC, boundary);
             }
         });
-        view.store("ReservedSignalBlocks", CreateCodecs.UUID_SET_CODEC, reservedSignalBlocks);
-        view.store("OccupiedObservers", CreateCodecs.UUID_SET_CODEC, occupiedObservers);
-        ValueOutput.ValueOutputList migratingPointList = view.childrenList("MigratingPoints");
-        migratingPoints.forEach(tm -> tm.write(migratingPointList.addChild(), dimensions));
+        view.put("ReservedSignalBlocks", CreateCodecs.UUID_SET_CODEC, reservedSignalBlocks);
+        view.put("OccupiedObservers", CreateCodecs.UUID_SET_CODEC, occupiedObservers);
+        WriteView.ListView migratingPointList = view.getList("MigratingPoints");
+        migratingPoints.forEach(tm -> tm.write(migratingPointList.add(), dimensions));
 
-        runtime.write(view.child("Runtime"));
-        navigation.write(view.child("Navigation"), dimensions);
+        runtime.write(view.get("Runtime"));
+        navigation.write(view.get("Navigation"), dimensions);
     }
 
-    public static <T> DataResult<T> encode(
-        final Train input,
-        final DynamicOps<T> ops,
-        final T empty,
-        DimensionPalette dimensions
-    ) {
+    public static <T> DataResult<T> encode(final Train input, final DynamicOps<T> ops, final T empty, DimensionPalette dimensions) {
         RecordBuilder<T> map = ops.mapBuilder();
-        map.add("Id", input.id, UUIDUtil.CODEC);
-        if (input.owner != null) {
-            map.add("Owner", input.owner, UUIDUtil.CODEC);
-        }
-        if (input.graph != null) {
-            map.add("Graph", input.graph.id, UUIDUtil.CODEC);
-        }
+        map.add("Id", input.id, Uuids.INT_STREAM_CODEC);
+        if (input.owner != null)
+            map.add("Owner", input.owner, Uuids.INT_STREAM_CODEC);
+        if (input.graph != null)
+            map.add("Graph", input.graph.id, Uuids.INT_STREAM_CODEC);
         ListBuilder<T> carriageList = ops.listBuilder();
         input.carriages.forEach(carriage -> carriageList.add(Carriage.encode(carriage, ops, empty, dimensions)));
         map.add("Carriages", carriageList.build(empty));
@@ -1327,26 +1208,24 @@ public class Train {
         map.add("DoubleEnded", ops.createBoolean(input.doubleEnded));
         map.add("Speed", ops.createDouble(input.speed));
         map.add("Throttle", ops.createDouble(input.throttle));
-        if (input.speedBeforeStall != null) {
+        if (input.speedBeforeStall != null)
             map.add("SpeedBeforeStall", ops.createDouble(input.speedBeforeStall));
-        }
         map.add("Fuel", ops.createInt(input.fuelTicks));
         map.add("TargetSpeed", ops.createDouble(input.targetSpeed));
         map.add("IconType", input.icon, TrainIconType.CODEC);
         map.add("MapColorIndex", ops.createInt(input.mapColorIndex));
-        map.add("Name", input.name, ComponentSerialization.CODEC);
-        if (input.currentStation != null) {
-            map.add("Station", input.currentStation, UUIDUtil.CODEC);
-        }
+        map.add("Name", input.name, TextCodecs.CODEC);
+        if (input.currentStation != null)
+            map.add("Station", input.currentStation, Uuids.INT_STREAM_CODEC);
         map.add("Backwards", ops.createBoolean(input.currentlyBackwards));
         map.add("Derailed", ops.createBoolean(input.derailed));
         map.add("UpdateSignals", ops.createBoolean(input.updateSignalBlocks));
         ListBuilder<T> occupiedSignalBlockList = ops.listBuilder();
         input.occupiedSignalBlocks.forEach((id, boundary) -> {
             RecordBuilder<T> item = ops.mapBuilder();
-            item.add("Id", id, UUIDUtil.CODEC);
+            item.add("Id", id, Uuids.INT_STREAM_CODEC);
             if (boundary != null) {
-                item.add("Boundary", boundary, UUIDUtil.CODEC);
+                item.add("Boundary", boundary, Uuids.INT_STREAM_CODEC);
             }
             occupiedSignalBlockList.add(item.build(empty));
         });
@@ -1362,76 +1241,66 @@ public class Train {
         return map.build(empty);
     }
 
-    public static Train read(ValueInput view, Map<UUID, TrackGraph> trackNetworks, DimensionPalette dimensions) {
-        UUID id = view.read("Id", UUIDUtil.CODEC).orElse(null);
-        UUID owner = view.read("Owner", UUIDUtil.CODEC).orElse(null);
-        UUID graphId = view.read("Graph", UUIDUtil.CODEC).orElse(null);
+    public static Train read(ReadView view, Map<UUID, TrackGraph> trackNetworks, DimensionPalette dimensions) {
+        UUID id = view.read("Id", Uuids.INT_STREAM_CODEC).orElse(null);
+        UUID owner = view.read("Owner", Uuids.INT_STREAM_CODEC).orElse(null);
+        UUID graphId = view.read("Graph", Uuids.INT_STREAM_CODEC).orElse(null);
         TrackGraph graph = graphId == null ? null : trackNetworks.get(graphId);
-        List<Carriage> carriages = view.childrenListOrEmpty("Carriages").stream()
-            .map(item -> Carriage.read(item, graph, dimensions)).collect(Collectors.toList());
+        List<Carriage> carriages = view.getListReadView("Carriages").stream().map(item -> Carriage.read(item, graph, dimensions))
+            .collect(Collectors.toList());
         List<Integer> carriageSpacing = new ArrayList<>();
-        view.getIntArray("CarriageSpacing").ifPresent(array -> {
+        view.getOptionalIntArray("CarriageSpacing").ifPresent(array -> {
             for (int i : array) {
                 carriageSpacing.add(i);
             }
         });
-        boolean doubleEnded = view.getBooleanOr("DoubleEnded", false);
-        int mapColorIndex = view.getIntOr("MapColorIndex", 0);
+        boolean doubleEnded = view.getBoolean("DoubleEnded", false);
+        int mapColorIndex = view.getInt("MapColorIndex", 0);
 
         Train train = new Train(id, owner, graph, carriages, carriageSpacing, doubleEnded, mapColorIndex);
 
-        train.speed = view.getDoubleOr("Speed", 0);
-        train.throttle = view.getDoubleOr("Throttle", 0);
+        train.speed = view.getDouble("Speed", 0);
+        train.throttle = view.getDouble("Throttle", 0);
         view.read("SpeedBeforeStall", Codec.DOUBLE).ifPresent(value -> {
             train.speedBeforeStall = value;
         });
-        train.targetSpeed = view.getDoubleOr("TargetSpeed", 0);
+        train.targetSpeed = view.getDouble("TargetSpeed", 0);
         train.icon = view.read("IconType", TrainIconType.CODEC).orElseThrow();
-        train.name = view.read("Name", ComponentSerialization.CODEC).orElse(CommonComponents.EMPTY);
-        train.currentStation = view.read("Station", UUIDUtil.CODEC).orElse(null);
-        train.currentlyBackwards = view.getBooleanOr("Backwards", false);
-        train.derailed = view.getBooleanOr("Derailed", false);
-        train.updateSignalBlocks = view.getBooleanOr("UpdateSignals", false);
-        train.fuelTicks = view.getIntOr("Fuel", 0);
+        train.name = view.read("Name", TextCodecs.CODEC).orElse(ScreenTexts.EMPTY);
+        train.currentStation = view.read("Station", Uuids.INT_STREAM_CODEC).orElse(null);
+        train.currentlyBackwards = view.getBoolean("Backwards", false);
+        train.derailed = view.getBoolean("Derailed", false);
+        train.updateSignalBlocks = view.getBoolean("UpdateSignals", false);
+        train.fuelTicks = view.getInt("Fuel", 0);
 
-        view.childrenListOrEmpty("SignalBlocks")
-            .forEach(item -> train.occupiedSignalBlocks.put(
-                item.read("Id", UUIDUtil.CODEC).orElseThrow(),
-                item.read("Boundary", UUIDUtil.CODEC).orElse(null)
-            ));
-        view.read("ReservedSignalBlocks", CreateCodecs.UUID_SET_CODEC)
-            .ifPresent(set -> train.reservedSignalBlocks.addAll(set));
-        view.read("OccupiedObservers", CreateCodecs.UUID_SET_CODEC)
-            .ifPresent(set -> train.occupiedObservers.addAll(set));
-        view.childrenListOrEmpty("MigratingPoints").forEach(item -> {
+        view.getListReadView("SignalBlocks").forEach(item -> train.occupiedSignalBlocks.put(
+            item.read("Id", Uuids.INT_STREAM_CODEC).orElseThrow(),
+            item.read("Boundary", Uuids.INT_STREAM_CODEC).orElse(null)
+        ));
+        view.read("ReservedSignalBlocks", CreateCodecs.UUID_SET_CODEC).ifPresent(set -> train.reservedSignalBlocks.addAll(set));
+        view.read("OccupiedObservers", CreateCodecs.UUID_SET_CODEC).ifPresent(set -> train.occupiedObservers.addAll(set));
+        view.getListReadView("MigratingPoints").forEach(item -> {
             train.migratingPoints.add(TrainMigration.read(item, dimensions));
         });
 
-        train.runtime.read(view.childOrEmpty("Runtime"));
-        train.navigation.read(view.childOrEmpty("Navigation"), graph, dimensions);
+        train.runtime.read(view.getReadView("Runtime"));
+        train.navigation.read(view.getReadView("Navigation"), graph, dimensions);
 
-        if (train.getCurrentStation() != null) {
+        if (train.getCurrentStation() != null)
             train.getCurrentStation().reserveFor(train);
-        }
 
         return train;
     }
 
-    public static <T> Train decode(
-        DynamicOps<T> ops,
-        T input,
-        Map<UUID, TrackGraph> trackNetworks,
-        DimensionPalette dimensions
-    ) {
+    public static <T> Train decode(DynamicOps<T> ops, T input, Map<UUID, TrackGraph> trackNetworks, DimensionPalette dimensions) {
         MapLike<T> map = ops.getMap(input).getOrThrow();
-        UUID id = UUIDUtil.CODEC.parse(ops, map.get("Id")).result().orElse(null);
-        UUID owner = UUIDUtil.CODEC.parse(ops, map.get("Owner")).result().orElse(null);
-        UUID graphId = UUIDUtil.CODEC.parse(ops, map.get("Graph")).result().orElse(null);
+        UUID id = Uuids.INT_STREAM_CODEC.parse(ops, map.get("Id")).result().orElse(null);
+        UUID owner = Uuids.INT_STREAM_CODEC.parse(ops, map.get("Owner")).result().orElse(null);
+        UUID graphId = Uuids.INT_STREAM_CODEC.parse(ops, map.get("Graph")).result().orElse(null);
         TrackGraph graph = graphId == null ? null : trackNetworks.get(graphId);
         List<Carriage> carriages = ops.getStream(map.get("Carriages"))
             .mapOrElse(
-                stream -> stream.map(item -> Carriage.decode(ops, item, graph, dimensions))
-                    .collect(Collectors.toList()),
+                stream -> stream.map(item -> Carriage.decode(ops, item, graph, dimensions)).collect(Collectors.toList()),
                 e -> new ArrayList<>()
             );
         List<Integer> carriageSpacing = ops.getIntStream(map.get("CarriageSpacing"))
@@ -1443,12 +1312,11 @@ public class Train {
 
         train.speed = ops.getNumberValue(map.get("Speed"), 0).doubleValue();
         train.throttle = ops.getNumberValue(map.get("Throttle"), 0).doubleValue();
-        Optional.ofNullable(map.get("SpeedBeforeStall"))
-            .ifPresent(value -> train.speedBeforeStall = ops.getNumberValue(value, 0).doubleValue());
+        Optional.ofNullable(map.get("SpeedBeforeStall")).ifPresent(value -> train.speedBeforeStall = ops.getNumberValue(value, 0).doubleValue());
         train.targetSpeed = ops.getNumberValue(map.get("TargetSpeed"), 0).doubleValue();
         train.icon = TrainIconType.CODEC.parse(ops, map.get("IconType")).getOrThrow();
-        train.name = ComponentSerialization.CODEC.parse(ops, map.get("Name")).result().orElse(CommonComponents.EMPTY);
-        train.currentStation = UUIDUtil.CODEC.parse(ops, map.get("Station")).result().orElse(null);
+        train.name = TextCodecs.CODEC.parse(ops, map.get("Name")).result().orElse(ScreenTexts.EMPTY);
+        train.currentStation = Uuids.INT_STREAM_CODEC.parse(ops, map.get("Station")).result().orElse(null);
         train.currentlyBackwards = ops.getBooleanValue(map.get("Backwards")).result().orElse(false);
         train.derailed = ops.getBooleanValue(map.get("Derailed")).result().orElse(false);
         train.updateSignalBlocks = ops.getBooleanValue(map.get("UpdateSignals")).result().orElse(false);
@@ -1457,14 +1325,12 @@ public class Train {
         ops.getList(map.get("SignalBlocks")).getOrThrow().accept(item -> {
             MapLike<T> data = ops.getMap(item).getOrThrow();
             train.occupiedSignalBlocks.put(
-                UUIDUtil.CODEC.parse(ops, data.get("Id")).getOrThrow(),
-                UUIDUtil.CODEC.parse(ops, data.get("Boundary")).result().orElse(null)
+                Uuids.INT_STREAM_CODEC.parse(ops, data.get("Id")).getOrThrow(),
+                Uuids.INT_STREAM_CODEC.parse(ops, data.get("Boundary")).result().orElse(null)
             );
         });
-        CreateCodecs.UUID_SET_CODEC.parse(ops, map.get("ReservedSignalBlocks"))
-            .ifSuccess(set -> train.reservedSignalBlocks.addAll(set));
-        CreateCodecs.UUID_SET_CODEC.parse(ops, map.get("OccupiedObservers"))
-            .ifSuccess(set -> train.occupiedObservers.addAll(set));
+        CreateCodecs.UUID_SET_CODEC.parse(ops, map.get("ReservedSignalBlocks")).ifSuccess(set -> train.reservedSignalBlocks.addAll(set));
+        CreateCodecs.UUID_SET_CODEC.parse(ops, map.get("OccupiedObservers")).ifSuccess(set -> train.occupiedObservers.addAll(set));
         ops.getList(map.get("MigratingPoints")).getOrThrow().accept(item -> {
             train.migratingPoints.add(TrainMigration.decode(ops, item, dimensions));
         });
@@ -1472,38 +1338,32 @@ public class Train {
         train.runtime.decode(ops, map.get("Runtime"));
         train.navigation.decode(ops, map.get("Navigation"), graph, dimensions);
 
-        if (train.getCurrentStation() != null) {
+        if (train.getCurrentStation() != null)
             train.getCurrentStation().reserveFor(train);
-        }
 
         return train;
     }
 
     public int countPlayerPassengers() {
         AtomicInteger count = new AtomicInteger();
-        for (Carriage carriage : carriages) {
-            carriage.forEachPresentEntity(e -> e.getIndirectPassengers().forEach(p -> {
-                if (p instanceof Player) {
+        for (Carriage carriage : carriages)
+            carriage.forEachPresentEntity(e -> e.getPassengersDeep().forEach(p -> {
+                if (p instanceof PlayerEntity)
                     count.incrementAndGet();
-                }
             }));
-        }
         return count.intValue();
     }
 
-    public void determineHonk(Level level) {
-        if (lowHonk != null) {
+    public void determineHonk(World level) {
+        if (lowHonk != null)
             return;
-        }
         for (Carriage carriage : carriages) {
-            DimensionalCarriageEntity dimensional = carriage.getDimensionalIfPresent(level.dimension());
-            if (dimensional == null) {
+            DimensionalCarriageEntity dimensional = carriage.getDimensionalIfPresent(level.getRegistryKey());
+            if (dimensional == null)
                 return;
-            }
             CarriageContraptionEntity entity = dimensional.entity.get();
-            if (entity == null || !(entity.getContraption() instanceof CarriageContraption otherCC)) {
+            if (entity == null || !(entity.getContraption() instanceof CarriageContraption otherCC))
                 break;
-            }
             Pair<Boolean, Integer> first = otherCC.soundQueue.getFirstWhistle(entity);
             if (first != null) {
                 lowHonk = first.getFirst();
@@ -1512,26 +1372,24 @@ public class Train {
         }
     }
 
-    public float distanceToLocationSqr(Level level, Vec3 location) {
+    public float distanceToLocationSqr(World level, Vec3d location) {
         float distance = Float.MAX_VALUE;
         for (Carriage carriage : carriages) {
-            DimensionalCarriageEntity dce = carriage.getDimensionalIfPresent(level.dimension());
-            if (dce == null || dce.positionAnchor == null) {
+            DimensionalCarriageEntity dce = carriage.getDimensionalIfPresent(level.getRegistryKey());
+            if (dce == null || dce.positionAnchor == null)
                 continue;
-            }
-            distance = Math.min(distance, (float) dce.positionAnchor.distanceToSqr(location));
+            distance = Math.min(distance, (float) dce.positionAnchor.squaredDistanceTo(location));
         }
         return distance;
     }
 
-    public List<ResourceKey<Level>> getPresentDimensions() {
-        return carriages.stream().flatMap((Carriage carriage) -> carriage.getPresentDimensions().stream()).distinct()
-            .toList();
+    public List<RegistryKey<World>> getPresentDimensions() {
+        return carriages.stream().flatMap((Carriage carriage) -> carriage.getPresentDimensions().stream()).distinct().toList();
     }
 
-    public Optional<BlockPos> getPositionInDimension(ResourceKey<Level> dimension) {
-        return carriages.stream().map(carriage -> carriage.getPositionInDimension(dimension))
-            .filter(Optional::isPresent).map(Optional::get).findFirst();
+    public Optional<BlockPos> getPositionInDimension(RegistryKey<World> dimension) {
+        return carriages.stream().map(carriage -> carriage.getPositionInDimension(dimension)).filter(Optional::isPresent).map(Optional::get)
+            .findFirst();
     }
 
 }

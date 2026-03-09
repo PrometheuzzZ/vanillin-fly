@@ -2,26 +2,27 @@ package com.zurrtum.create.infrastructure.packet.c2s;
 
 import com.zurrtum.create.AllHandle;
 import com.zurrtum.create.AllPackets;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.PacketType;
-import net.minecraft.network.protocol.game.ServerGamePacketListener;
-import net.minecraft.server.network.ServerGamePacketListenerImpl;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.item.ItemStack;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.listener.ServerPlayPacketListener;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.PacketType;
+import net.minecraft.server.network.ServerPlayNetworkHandler;
 
-public record SchematicPlacePacket(ItemStack stack) implements Packet<ServerGamePacketListener> {
-    public static final StreamCodec<RegistryFriendlyByteBuf, SchematicPlacePacket> CODEC = ItemStack.STREAM_CODEC.map(SchematicPlacePacket::new,
+public record SchematicPlacePacket(ItemStack stack) implements Packet<ServerPlayPacketListener> {
+    public static final PacketCodec<RegistryByteBuf, SchematicPlacePacket> CODEC = ItemStack.PACKET_CODEC.xmap(
+        SchematicPlacePacket::new,
         SchematicPlacePacket::stack
     );
 
     @Override
-    public void handle(ServerGamePacketListener listener) {
-        AllHandle.onSchematicPlace((ServerGamePacketListenerImpl) listener, this);
+    public void apply(ServerPlayPacketListener listener) {
+        AllHandle.onSchematicPlace((ServerPlayNetworkHandler) listener, this);
     }
 
     @Override
-    public PacketType<SchematicPlacePacket> type() {
+    public PacketType<SchematicPlacePacket> getPacketType() {
         return AllPackets.PLACE_SCHEMATIC;
     }
 }

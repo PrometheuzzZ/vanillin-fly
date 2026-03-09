@@ -1,22 +1,22 @@
 package com.zurrtum.create.client.mixin;
 
 import com.zurrtum.create.client.model.NormalsBakedQuad;
-import net.minecraft.client.renderer.block.model.BakedQuad;
+import net.minecraft.client.render.model.BakedQuad;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 
 @Mixin(BakedQuad.class)
 public class BakedQuadMixin implements NormalsBakedQuad {
     @Unique
-    private int[] normals;
+    private boolean normals;
 
     @Override
-    public void create$setNormals(int[] normals) {
-        this.normals = normals;
+    public void create$markNormals() {
+        normals = true;
     }
 
     @Override
-    public int[] create$getNormals() {
+    public boolean create$hasNormals() {
         return normals;
     }
 }

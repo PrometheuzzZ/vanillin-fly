@@ -4,29 +4,25 @@ import com.zurrtum.create.AllAdvancements;
 import com.zurrtum.create.AllBlockEntityTypes;
 import com.zurrtum.create.AllBlocks;
 import com.zurrtum.create.AllItems;
-import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.catnip.math.VecHelper;
 import com.zurrtum.create.content.logistics.packager.PackagerBlockEntity;
 import com.zurrtum.create.content.logistics.packager.repackager.RepackagerBlockEntity;
 import com.zurrtum.create.foundation.advancement.CreateTrigger;
 import com.zurrtum.create.foundation.blockEntity.SmartBlockEntity;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.core.Direction.Axis;
-import net.minecraft.sounds.SoundSource;
-import net.minecraft.util.Mth;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.SoundType;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
-import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.Vec3;
-import net.minecraft.world.phys.shapes.Shapes;
-import net.minecraft.world.phys.shapes.VoxelShape;
+import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
+import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.Blocks;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.item.ItemStack;
+import net.minecraft.sound.BlockSoundGroup;
+import net.minecraft.sound.SoundCategory;
+import net.minecraft.storage.ReadView;
+import net.minecraft.storage.WriteView;
+import net.minecraft.util.math.*;
+import net.minecraft.util.math.Direction.Axis;
+import net.minecraft.util.shape.VoxelShape;
+import net.minecraft.util.shape.VoxelShapes;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.EnumMap;
@@ -46,8 +42,8 @@ public class FactoryPanelBlockEntity extends SmartBlockEntity {
     }
 
     @Override
-    protected AABB createRenderBoundingBox() {
-        return new AABB(worldPosition).inflate(8);
+    protected Box createRenderBoundingBox() {
+        return new Box(pos).expand(8);
     }
 
     @Override
@@ -69,21 +65,18 @@ public class FactoryPanelBlockEntity extends SmartBlockEntity {
     @Override
     public void lazyTick() {
         super.lazyTick();
-        if (level.isClientSide()) {
+        if (world.isClient())
             return;
-        }
 
-        if (activePanels() == 0) {
-            level.setBlockAndUpdate(worldPosition, Blocks.AIR.defaultBlockState());
-        }
+        if (activePanels() == 0)
+            world.setBlockState(pos, Blocks.AIR.getDefaultState());
 
-        BlockState state = getBlockState();
-        if (state.is(AllBlocks.FACTORY_GAUGE)) {
-            boolean shouldBeRestocker = level.getBlockState(worldPosition.relative(FactoryPanelBlock.connectedDirection(
-                state).getOpposite())).is(AllBlocks.PACKAGER);
-            if (restocker == shouldBeRestocker) {
+        BlockState state = getCachedState();
+        if (state.isOf(AllBlocks.FACTORY_GAUGE)) {
+            boolean shouldBeRestocker = world.getBlockState(pos.offset(FactoryPanelBlock.connectedDirection(state).getOpposite()))
+                .isOf(AllBlocks.PACKAGER);
+            if (restocker == shouldBeRestocker)
                 return;
-            }
             restocker = shouldBeRestocker;
             redraw = true;
             sendData();
@@ -92,41 +85,33 @@ public class FactoryPanelBlockEntity extends SmartBlockEntity {
 
     @Nullable
     public PackagerBlockEntity getRestockedPackager() {
-        BlockState state = getBlockState();
-        if (!restocker || !state.is(AllBlocks.FACTORY_GAUGE)) {
+        BlockState state = getCachedState();
+        if (!restocker || !state.isOf(AllBlocks.FACTORY_GAUGE))
             return null;
-        }
-        BlockPos packagerPos = worldPosition.relative(FactoryPanelBlock.connectedDirection(state).getOpposite());
-        if (!level.isLoaded(packagerPos)) {
+        BlockPos packagerPos = pos.offset(FactoryPanelBlock.connectedDirection(state).getOpposite());
+        if (!world.isPosLoaded(packagerPos))
             return null;
-        }
-        BlockEntity be = level.getBlockEntity(packagerPos);
-        if (!(be instanceof PackagerBlockEntity pbe)) {
+        BlockEntity be = world.getBlockEntity(packagerPos);
+        if (!(be instanceof PackagerBlockEntity pbe))
             return null;
-        }
-        if (pbe instanceof RepackagerBlockEntity) {
+        if (pbe instanceof RepackagerBlockEntity)
             return null;
-        }
         return pbe;
     }
 
     public int activePanels() {
         int result = 0;
-        for (ServerFactoryPanelBehaviour panelBehaviour : panels.values()) {
-            if (panelBehaviour.isActive()) {
+        for (ServerFactoryPanelBehaviour panelBehaviour : panels.values())
+            if (panelBehaviour.isActive())
                 result++;
-            }
-        }
         return result;
     }
 
     @Override
     public void remove() {
-        for (ServerFactoryPanelBehaviour panelBehaviour : panels.values()) {
-            if (panelBehaviour.isActive()) {
+        for (ServerFactoryPanelBehaviour panelBehaviour : panels.values())
+            if (panelBehaviour.isActive())
                 panelBehaviour.disconnectAll();
-            }
-        }
         super.remove();
     }
 
@@ -134,28 +119,26 @@ public class FactoryPanelBlockEntity extends SmartBlockEntity {
     public void destroy() {
         super.destroy();
         int panelCount = activePanels();
-        if (panelCount > 1) {
-            Block.popResource(level, worldPosition, new ItemStack(AllItems.FACTORY_GAUGE, panelCount - 1));
-        }
+        if (panelCount > 1)
+            Block.dropStack(world, pos, new ItemStack(AllItems.FACTORY_GAUGE, panelCount - 1));
     }
 
     public boolean addPanel(PanelSlot slot, UUID frequency) {
         ServerFactoryPanelBehaviour behaviour = panels.get(slot);
         if (behaviour != null && !behaviour.isActive()) {
             behaviour.enable();
-            if (frequency != null) {
+            if (frequency != null)
                 behaviour.setNetwork(frequency);
-            }
             redraw = true;
             lastShape = null;
 
             if (activePanels() > 1) {
-                SoundType soundType = getBlockState().getSoundType();
-                level.playSound(
+                BlockSoundGroup soundType = getCachedState().getSoundGroup();
+                world.playSound(
                     null,
-                    worldPosition,
+                    pos,
                     soundType.getPlaceSound(),
-                    SoundSource.BLOCKS,
+                    SoundCategory.BLOCKS,
                     (soundType.getVolume() + 1.0F) / 2.0F,
                     soundType.getPitch() * 0.8F
                 );
@@ -174,12 +157,12 @@ public class FactoryPanelBlockEntity extends SmartBlockEntity {
             lastShape = null;
 
             if (activePanels() > 0) {
-                SoundType soundType = getBlockState().getSoundType();
-                level.playSound(
+                BlockSoundGroup soundType = getCachedState().getSoundGroup();
+                world.playSound(
                     null,
-                    worldPosition,
+                    pos,
                     soundType.getBreakSound(),
-                    SoundSource.BLOCKS,
+                    SoundCategory.BLOCKS,
                     (soundType.getVolume() + 1.0F) / 2.0F,
                     soundType.getPitch() * 0.8F
                 );
@@ -191,50 +174,43 @@ public class FactoryPanelBlockEntity extends SmartBlockEntity {
     }
 
     public VoxelShape getShape() {
-        if (lastShape != null) {
+        if (lastShape != null)
             return lastShape;
-        }
 
-        float xRot = Mth.RAD_TO_DEG * FactoryPanelBlock.getXRot(getBlockState()) + 90;
-        float yRot = Mth.RAD_TO_DEG * FactoryPanelBlock.getYRot(getBlockState());
-        Direction connectedDirection = FactoryPanelBlock.connectedDirection(getBlockState());
-        Vec3 inflateAxes = VecHelper.axisAlingedPlaneOf(connectedDirection);
+        float xRot = MathHelper.DEGREES_PER_RADIAN * FactoryPanelBlock.getXRot(getCachedState()) + 90;
+        float yRot = MathHelper.DEGREES_PER_RADIAN * FactoryPanelBlock.getYRot(getCachedState());
+        Direction connectedDirection = FactoryPanelBlock.connectedDirection(getCachedState());
+        Vec3d inflateAxes = VecHelper.axisAlingedPlaneOf(connectedDirection);
 
-        lastShape = Shapes.empty();
+        lastShape = VoxelShapes.empty();
 
         for (ServerFactoryPanelBehaviour behaviour : panels.values()) {
-            if (!behaviour.isActive()) {
+            if (!behaviour.isActive())
                 continue;
-            }
             FactoryPanelPosition panelPosition = behaviour.getPanelPosition();
-            Vec3 vec = new Vec3(
-                .25 + panelPosition.slot().xOffset * .5,
-                1 / 16f,
-                .25 + panelPosition.slot().yOffset * .5
-            );
+            Vec3d vec = new Vec3d(.25 + panelPosition.slot().xOffset * .5, 1 / 16f, .25 + panelPosition.slot().yOffset * .5);
             vec = VecHelper.rotateCentered(vec, 180, Axis.Y);
             vec = VecHelper.rotateCentered(vec, xRot, Axis.X);
             vec = VecHelper.rotateCentered(vec, yRot, Axis.Y);
-            AABB bb = new AABB(vec, vec).inflate(1 / 16f)
-                .inflate(inflateAxes.x * 3 / 16f, inflateAxes.y * 3 / 16f, inflateAxes.z * 3 / 16f);
-            lastShape = Shapes.or(lastShape, Shapes.create(bb));
+            Box bb = new Box(vec, vec).expand(1 / 16f).expand(inflateAxes.x * 3 / 16f, inflateAxes.y * 3 / 16f, inflateAxes.z * 3 / 16f);
+            lastShape = VoxelShapes.union(lastShape, VoxelShapes.cuboid(bb));
         }
 
         return lastShape;
     }
 
     @Override
-    protected void read(ValueInput view, boolean clientPacket) {
+    protected void read(ReadView view, boolean clientPacket) {
         super.read(view, clientPacket);
-        restocker = view.getBooleanOr("Restocker", false);
-        if (clientPacket && view.getBooleanOr("Redraw", false)) {
+        restocker = view.getBoolean("Restocker", false);
+        if (clientPacket && view.getBoolean("Redraw", false)) {
             lastShape = null;
-            level.sendBlockUpdated(getBlockPos(), getBlockState(), getBlockState(), 16);
+            world.updateListeners(getPos(), getCachedState(), getCachedState(), 16);
         }
     }
 
     @Override
-    protected void write(ValueOutput view, boolean clientPacket) {
+    protected void write(WriteView view, boolean clientPacket) {
         super.write(view, clientPacket);
         view.putBoolean("Restocker", restocker);
         if (clientPacket && redraw) {

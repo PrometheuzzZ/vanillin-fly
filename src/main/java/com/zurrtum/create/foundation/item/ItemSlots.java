@@ -6,12 +6,12 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 import com.zurrtum.create.foundation.codec.CreateCodecs;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.util.ExtraCodecs;
-import net.minecraft.world.Container;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.inventory.Inventory;
+import net.minecraft.item.ItemStack;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.util.dynamic.Codecs;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -22,14 +22,13 @@ import java.util.function.IntFunction;
  */
 public class ItemSlots {
     public static final Codec<ItemSlots> CODEC = RecordCodecBuilder.create(instance -> instance.group(
-        Codec.unboundedMap(CreateCodecs.boundedIntStr(0), ItemStack.CODEC).fieldOf("items")
-            .forGetter(ItemSlots::toBoxedMap),
-        ExtraCodecs.NON_NEGATIVE_INT.fieldOf("size").forGetter(ItemSlots::getSize)
+        Codec.unboundedMap(CreateCodecs.boundedIntStr(0), ItemStack.CODEC).fieldOf("items").forGetter(ItemSlots::toBoxedMap),
+        Codecs.NON_NEGATIVE_INT.fieldOf("size").forGetter(ItemSlots::getSize)
     ).apply(instance, ItemSlots::deserialize));
-    public static final StreamCodec<RegistryFriendlyByteBuf, ItemSlots> STREAM_CODEC = StreamCodec.composite(
-        ByteBufCodecs.map(HashMap::new, ByteBufCodecs.INT, ItemStack.STREAM_CODEC),
+    public static final PacketCodec<RegistryByteBuf, ItemSlots> STREAM_CODEC = PacketCodec.tuple(
+        PacketCodecs.map(HashMap::new, PacketCodecs.INTEGER, ItemStack.PACKET_CODEC),
         ItemSlots::toBoxedMap,
-        ByteBufCodecs.INT,
+        PacketCodecs.INTEGER,
         ItemSlots::getSize,
         ItemSlots::deserialize
     );
@@ -72,18 +71,18 @@ public class ItemSlots {
         return this.map.keySet().intStream().max().orElse(-1);
     }
 
-    public <T extends Container> T toHandler(IntFunction<T> factory) {
+    public <T extends Inventory> T toHandler(IntFunction<T> factory) {
         T handler = factory.apply(this.size);
-        this.forEach(handler::setItem);
+        this.forEach(handler::setStack);
         return handler;
     }
 
-    public static ItemSlots fromHandler(Container handler) {
+    public static ItemSlots fromHandler(Inventory handler) {
         ItemSlots slots = new ItemSlots();
-        int size = handler.getContainerSize();
+        int size = handler.size();
         slots.setSize(size);
         for (int i = 0; i < size; i++) {
-            ItemStack stack = handler.getItem(i);
+            ItemStack stack = handler.getStack(i);
             if (!stack.isEmpty()) {
                 slots.set(i, stack.copy());
             }

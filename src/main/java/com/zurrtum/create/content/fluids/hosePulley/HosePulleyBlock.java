@@ -7,75 +7,66 @@ import com.zurrtum.create.content.kinetics.base.HorizontalKineticBlock;
 import com.zurrtum.create.foundation.block.IBE;
 import com.zurrtum.create.infrastructure.fluids.FluidInventory;
 import com.zurrtum.create.infrastructure.fluids.FluidInventoryProvider;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.core.Direction.Axis;
-import net.minecraft.world.item.context.BlockPlaceContext;
-import net.minecraft.world.level.LevelAccessor;
-import net.minecraft.world.level.LevelReader;
-import net.minecraft.world.level.block.entity.BlockEntityType;
-import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.entity.BlockEntityType;
+import net.minecraft.item.ItemPlacementContext;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Direction.Axis;
+import net.minecraft.world.WorldAccess;
+import net.minecraft.world.WorldView;
 
 public class HosePulleyBlock extends HorizontalKineticBlock implements IBE<HosePulleyBlockEntity>, FluidInventoryProvider<HosePulleyBlockEntity> {
 
-    public HosePulleyBlock(Properties properties) {
+    public HosePulleyBlock(Settings properties) {
         super(properties);
     }
 
     @Override
-    public FluidInventory getFluidInventory(
-        LevelAccessor world,
-        BlockPos pos,
-        BlockState state,
-        HosePulleyBlockEntity blockEntity,
-        Direction context
-    ) {
+    public FluidInventory getFluidInventory(WorldAccess world, BlockPos pos, BlockState state, HosePulleyBlockEntity blockEntity, Direction context) {
         return blockEntity.handler;
     }
 
     @Override
     public Axis getRotationAxis(BlockState state) {
-        return state.getValue(HORIZONTAL_FACING).getClockWise().getAxis();
+        return state.get(HORIZONTAL_FACING).rotateYClockwise().getAxis();
     }
 
     @Override
-    public BlockState getStateForPlacement(BlockPlaceContext context) {
+    public BlockState getPlacementState(ItemPlacementContext context) {
         Direction preferredHorizontalFacing = getPreferredHorizontalFacing(context);
-        return defaultBlockState().setValue(
+        return getDefaultState().with(
             HORIZONTAL_FACING,
-            preferredHorizontalFacing != null ? preferredHorizontalFacing.getCounterClockWise() : context.getHorizontalDirection()
+            preferredHorizontalFacing != null ? preferredHorizontalFacing.rotateYCounterclockwise() : context.getHorizontalPlayerFacing()
                 .getOpposite()
         );
     }
 
     @Override
-    public boolean hasShaftTowards(LevelReader world, BlockPos pos, BlockState state, Direction face) {
-        return state.getValue(HORIZONTAL_FACING).getClockWise() == face;
+    public boolean hasShaftTowards(WorldView world, BlockPos pos, BlockState state, Direction face) {
+        return state.get(HORIZONTAL_FACING).rotateYClockwise() == face;
     }
 
-    public static boolean hasPipeTowards(LevelReader world, BlockPos pos, BlockState state, Direction face) {
-        return state.getValue(HORIZONTAL_FACING).getCounterClockWise() == face;
+    public static boolean hasPipeTowards(WorldView world, BlockPos pos, BlockState state, Direction face) {
+        return state.get(HORIZONTAL_FACING).rotateYCounterclockwise() == face;
     }
 
     @Override
-    public Direction getPreferredHorizontalFacing(BlockPlaceContext context) {
+    public Direction getPreferredHorizontalFacing(ItemPlacementContext context) {
         Direction fromParent = super.getPreferredHorizontalFacing(context);
-        if (fromParent != null) {
+        if (fromParent != null)
             return fromParent;
-        }
 
         Direction prefferedSide = null;
         for (Direction facing : Iterate.horizontalDirections) {
-            BlockPos pos = context.getClickedPos().relative(facing);
-            BlockState blockState = context.getLevel().getBlockState(pos);
-            if (FluidPipeBlock.canConnectTo(context.getLevel(), pos, blockState, facing)) {
+            BlockPos pos = context.getBlockPos().offset(facing);
+            BlockState blockState = context.getWorld().getBlockState(pos);
+            if (FluidPipeBlock.canConnectTo(context.getWorld(), pos, blockState, facing))
                 if (prefferedSide != null && prefferedSide.getAxis() != facing.getAxis()) {
                     prefferedSide = null;
                     break;
-                } else {
+                } else
                     prefferedSide = facing;
-                }
-            }
         }
         return prefferedSide == null ? null : prefferedSide.getOpposite();
     }

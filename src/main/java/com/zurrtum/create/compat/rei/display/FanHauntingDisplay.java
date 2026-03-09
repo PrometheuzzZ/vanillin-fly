@@ -9,10 +9,10 @@ import me.shedaniel.rei.api.common.display.Display;
 import me.shedaniel.rei.api.common.display.DisplaySerializer;
 import me.shedaniel.rei.api.common.entry.EntryIngredient;
 import me.shedaniel.rei.api.common.util.EntryIngredients;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.resources.Identifier;
-import net.minecraft.world.item.crafting.RecipeHolder;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.recipe.RecipeEntry;
+import net.minecraft.util.Identifier;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -25,19 +25,19 @@ public record FanHauntingDisplay(EntryIngredient input, List<ProcessingOutput> o
             EntryIngredient.codec().fieldOf("input").forGetter(FanHauntingDisplay::input),
             ProcessingOutput.CODEC.listOf().fieldOf("outputs").forGetter(FanHauntingDisplay::outputs),
             Identifier.CODEC.optionalFieldOf("location").forGetter(FanHauntingDisplay::location)
-        ).apply(instance, FanHauntingDisplay::new)), StreamCodec.composite(
+        ).apply(instance, FanHauntingDisplay::new)), PacketCodec.tuple(
             EntryIngredient.streamCodec(),
             FanHauntingDisplay::input,
-            ProcessingOutput.STREAM_CODEC.apply(ByteBufCodecs.list()),
+            ProcessingOutput.STREAM_CODEC.collect(PacketCodecs.toList()),
             FanHauntingDisplay::outputs,
-            ByteBufCodecs.optional(Identifier.STREAM_CODEC),
+            PacketCodecs.optional(Identifier.PACKET_CODEC),
             FanHauntingDisplay::location,
             FanHauntingDisplay::new
         )
     );
 
-    public FanHauntingDisplay(RecipeHolder<HauntingRecipe> entry) {
-        this(entry.id().identifier(), entry.value());
+    public FanHauntingDisplay(RecipeEntry<HauntingRecipe> entry) {
+        this(entry.id().getValue(), entry.value());
     }
 
     public FanHauntingDisplay(Identifier id, HauntingRecipe recipe) {

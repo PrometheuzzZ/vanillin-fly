@@ -1,26 +1,26 @@
 package com.zurrtum.create.client.content.trains.track;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.SubmitNodeCollector;
-import net.minecraft.client.renderer.rendertype.RenderType;
+import net.minecraft.client.render.RenderLayer;
+import net.minecraft.client.render.VertexConsumerProvider;
+import net.minecraft.client.render.command.OrderedRenderCommandQueue;
+import net.minecraft.client.util.math.MatrixStack;
 
-public abstract class TrackBlockRenderState implements SubmitNodeCollector.CustomGeometryRenderer {
-    public RenderType layer;
+public abstract class TrackBlockRenderState implements OrderedRenderCommandQueue.Custom {
+    public RenderLayer layer;
 
-    public abstract void transform(PoseStack matrices);
+    public abstract void transform(MatrixStack matrices);
 
-    public void render(PoseStack matrices, SubmitNodeCollector queue) {
-        matrices.pushPose();
+    public void render(MatrixStack matrices, OrderedRenderCommandQueue queue) {
+        matrices.push();
         transform(matrices);
-        queue.submitCustomGeometry(matrices, layer, this);
-        matrices.popPose();
+        queue.submitCustom(matrices, layer, this);
+        matrices.pop();
     }
 
-    public void render(PoseStack matrices, MultiBufferSource buffer) {
-        matrices.pushPose();
+    public void render(MatrixStack matrices, VertexConsumerProvider buffer) {
+        matrices.push();
         transform(matrices);
-        render(matrices.last(), buffer.getBuffer(layer));
-        matrices.popPose();
+        render(matrices.peek(), buffer.getBuffer(layer));
+        matrices.pop();
     }
 }

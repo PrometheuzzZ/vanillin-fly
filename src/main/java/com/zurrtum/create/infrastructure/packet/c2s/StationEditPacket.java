@@ -5,28 +5,29 @@ import com.zurrtum.create.AllPackets;
 import com.zurrtum.create.catnip.codecs.stream.CatnipStreamCodecBuilders;
 import com.zurrtum.create.content.decoration.slidingDoor.DoorControl;
 import io.netty.buffer.ByteBuf;
-import net.minecraft.core.BlockPos;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.PacketType;
-import net.minecraft.network.protocol.game.ServerGamePacketListener;
-import net.minecraft.server.network.ServerGamePacketListenerImpl;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.network.listener.ServerPlayPacketListener;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.PacketType;
+import net.minecraft.server.network.ServerPlayNetworkHandler;
+import net.minecraft.util.math.BlockPos;
 
-public record StationEditPacket(BlockPos pos, boolean dropSchedule, boolean assemblyMode, Boolean tryAssemble,
-                                DoorControl doorControl, String name) implements Packet<ServerGamePacketListener> {
-    public static final StreamCodec<ByteBuf, StationEditPacket> CODEC = StreamCodec.composite(
-        BlockPos.STREAM_CODEC,
+public record StationEditPacket(
+    BlockPos pos, boolean dropSchedule, boolean assemblyMode, Boolean tryAssemble, DoorControl doorControl, String name
+) implements Packet<ServerPlayPacketListener> {
+    public static final PacketCodec<ByteBuf, StationEditPacket> CODEC = PacketCodec.tuple(
+        BlockPos.PACKET_CODEC,
         StationEditPacket::pos,
-        ByteBufCodecs.BOOL,
+        PacketCodecs.BOOLEAN,
         StationEditPacket::dropSchedule,
-        ByteBufCodecs.BOOL,
+        PacketCodecs.BOOLEAN,
         StationEditPacket::assemblyMode,
-        CatnipStreamCodecBuilders.nullable(ByteBufCodecs.BOOL),
+        CatnipStreamCodecBuilders.nullable(PacketCodecs.BOOLEAN),
         StationEditPacket::tryAssemble,
         CatnipStreamCodecBuilders.nullable(DoorControl.STREAM_CODEC),
         StationEditPacket::doorControl,
-        CatnipStreamCodecBuilders.nullable(ByteBufCodecs.stringUtf8(256)),
+        CatnipStreamCodecBuilders.nullable(PacketCodecs.string(256)),
         StationEditPacket::name,
         StationEditPacket::new
     );
@@ -48,12 +49,12 @@ public record StationEditPacket(BlockPos pos, boolean dropSchedule, boolean asse
     }
 
     @Override
-    public void handle(ServerGamePacketListener listener) {
-        AllHandle.onStationEdit((ServerGamePacketListenerImpl) listener, this);
+    public void apply(ServerPlayPacketListener listener) {
+        AllHandle.onStationEdit((ServerPlayNetworkHandler) listener, this);
     }
 
     @Override
-    public PacketType<StationEditPacket> type() {
+    public PacketType<StationEditPacket> getPacketType() {
         return AllPackets.CONFIGURE_STATION;
     }
 }

@@ -8,42 +8,42 @@ import com.zurrtum.create.foundation.block.IBE;
 import com.zurrtum.create.foundation.block.RedStoneConnectBlock;
 import com.zurrtum.create.foundation.fluid.FluidHelper;
 import com.zurrtum.create.foundation.item.ItemHelper;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.core.Direction.Axis;
-import net.minecraft.server.level.ServerLevel;
-import net.minecraft.util.RandomSource;
-import net.minecraft.world.InteractionHand;
-import net.minecraft.world.InteractionResult;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.context.BlockPlaceContext;
-import net.minecraft.world.level.BlockGetter;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.LevelReader;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.entity.BlockEntityType;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.StateDefinition;
-import net.minecraft.world.level.block.state.properties.AttachFace;
-import net.minecraft.world.level.block.state.properties.IntegerProperty;
-import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.block.entity.BlockEntityType;
+import net.minecraft.block.enums.BlockFace;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.item.ItemPlacementContext;
+import net.minecraft.item.ItemStack;
+import net.minecraft.server.world.ServerWorld;
+import net.minecraft.state.StateManager;
+import net.minecraft.state.property.IntProperty;
+import net.minecraft.util.ActionResult;
+import net.minecraft.util.Hand;
+import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Direction.Axis;
+import net.minecraft.util.math.random.Random;
+import net.minecraft.world.BlockView;
+import net.minecraft.world.World;
+import net.minecraft.world.WorldView;
 
 public class ThresholdSwitchBlock extends DirectedDirectionalBlock implements IBE<ThresholdSwitchBlockEntity>, RedStoneConnectBlock {
 
-    public static final IntegerProperty LEVEL = IntegerProperty.create("level", 0, 5);
+    public static final IntProperty LEVEL = IntProperty.of("level", 0, 5);
 
-    public ThresholdSwitchBlock(Properties p_i48377_1_) {
+    public ThresholdSwitchBlock(Settings p_i48377_1_) {
         super(p_i48377_1_);
     }
 
     @Override
-    public void onPlace(BlockState state, Level worldIn, BlockPos pos, BlockState oldState, boolean isMoving) {
+    public void onBlockAdded(BlockState state, World worldIn, BlockPos pos, BlockState oldState, boolean isMoving) {
         updateObservedInventory(state, worldIn, pos);
     }
 
-    private void updateObservedInventory(BlockState state, LevelReader world, BlockPos pos) {
+    private void updateObservedInventory(BlockState state, WorldView world, BlockPos pos) {
         withBlockEntityDo(world, pos, ThresholdSwitchBlockEntity::updateCurrentLevel);
     }
 
@@ -53,89 +53,79 @@ public class ThresholdSwitchBlock extends DirectedDirectionalBlock implements IB
     }
 
     @Override
-    public boolean isSignalSource(BlockState state) {
+    public boolean emitsRedstonePower(BlockState state) {
         return true;
     }
 
     @Override
-    public int getSignal(BlockState blockState, BlockGetter blockAccess, BlockPos pos, Direction side) {
-        if (side == getTargetDirection(blockState).getOpposite()) {
+    public int getWeakRedstonePower(BlockState blockState, BlockView blockAccess, BlockPos pos, Direction side) {
+        if (side == getTargetDirection(blockState).getOpposite())
             return 0;
-        }
-        return getBlockEntityOptional(blockAccess, pos).filter(ThresholdSwitchBlockEntity::isPowered).map($ -> 15)
-            .orElse(0);
+        return getBlockEntityOptional(blockAccess, pos).filter(ThresholdSwitchBlockEntity::isPowered).map($ -> 15).orElse(0);
     }
 
     @Override
-    public void tick(BlockState blockState, ServerLevel world, BlockPos pos, RandomSource random) {
+    public void scheduledTick(BlockState blockState, ServerWorld world, BlockPos pos, Random random) {
         getBlockEntityOptional(world, pos).ifPresent(ThresholdSwitchBlockEntity::updatePowerAfterDelay);
     }
 
     @Override
-    protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
-        super.createBlockStateDefinition(builder.add(LEVEL));
+    protected void appendProperties(StateManager.Builder<Block, BlockState> builder) {
+        super.appendProperties(builder.add(LEVEL));
     }
 
     @Override
-    protected InteractionResult useItemOn(
+    protected ActionResult onUseWithItem(
         ItemStack stack,
         BlockState state,
-        Level level,
+        World level,
         BlockPos pos,
-        Player player,
-        InteractionHand hand,
+        PlayerEntity player,
+        Hand hand,
         BlockHitResult hitResult
     ) {
-        if (player != null && stack.is(AllItems.WRENCH)) {
-            return InteractionResult.TRY_WITH_EMPTY_HAND;
-        }
-        if (level.isClientSide()) {
+        if (player != null && stack.isOf(AllItems.WRENCH))
+            return ActionResult.PASS_TO_DEFAULT_BLOCK_ACTION;
+        if (level.isClient()) {
             withBlockEntityDo(
                 level, pos, be -> {
                     AllClientHandle.INSTANCE.openThresholdSwitchScreen(be, player);
                 }
             );
         }
-        return InteractionResult.SUCCESS;
+        return ActionResult.SUCCESS;
     }
 
     @Override
-    public BlockState getStateForPlacement(BlockPlaceContext context) {
-        BlockState state = defaultBlockState();
+    public BlockState getPlacementState(ItemPlacementContext context) {
+        BlockState state = getDefaultState();
 
         Direction preferredFacing = null;
-        for (Direction face : context.getNearestLookingDirections()) {
-            BlockEntity be = context.getLevel().getBlockEntity(context.getClickedPos().relative(face));
+        for (Direction face : context.getPlacementDirections()) {
+            BlockEntity be = context.getWorld().getBlockEntity(context.getBlockPos().offset(face));
             if (be != null && (ItemHelper.getInventory(
-                be.getLevel(),
-                be.getBlockPos(),
+                be.getWorld(),
+                be.getPos(),
                 null,
                 be,
                 null
-            ) != null || FluidHelper.hasFluidInventory(
-                be.getLevel(),
-                be.getBlockPos(),
-                null,
-                be,
-                null
-            ))) {
+            ) != null || FluidHelper.hasFluidInventory(be.getWorld(), be.getPos(), null, be, null))) {
                 preferredFacing = face;
                 break;
             }
         }
 
         if (preferredFacing == null) {
-            Direction facing = context.getNearestLookingDirection();
-            preferredFacing = context.getPlayer() != null && context.getPlayer()
-                .isShiftKeyDown() ? facing : facing.getOpposite();
+            Direction facing = context.getPlayerLookDirection();
+            preferredFacing = context.getPlayer() != null && context.getPlayer().isSneaking() ? facing : facing.getOpposite();
         }
 
         if (preferredFacing.getAxis() == Axis.Y) {
-            state = state.setValue(TARGET, preferredFacing == Direction.UP ? AttachFace.CEILING : AttachFace.FLOOR);
-            preferredFacing = context.getHorizontalDirection();
+            state = state.with(TARGET, preferredFacing == Direction.UP ? BlockFace.CEILING : BlockFace.FLOOR);
+            preferredFacing = context.getHorizontalPlayerFacing();
         }
 
-        return state.setValue(FACING, preferredFacing);
+        return state.with(FACING, preferredFacing);
     }
 
     @Override

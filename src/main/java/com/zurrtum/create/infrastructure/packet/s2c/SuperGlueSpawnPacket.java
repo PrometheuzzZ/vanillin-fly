@@ -1,42 +1,40 @@
 package com.zurrtum.create.infrastructure.packet.s2c;
 
 import com.zurrtum.create.AllPackets;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.PacketType;
-import net.minecraft.network.protocol.game.ClientboundAddEntityPacket;
-import net.minecraft.server.level.ServerEntity;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.phys.AABB;
+import net.minecraft.entity.Entity;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.PacketType;
+import net.minecraft.network.packet.s2c.play.EntitySpawnS2CPacket;
+import net.minecraft.server.network.EntityTrackerEntry;
+import net.minecraft.util.math.Box;
 
-public class SuperGlueSpawnPacket extends ClientboundAddEntityPacket {
-    public static final StreamCodec<RegistryFriendlyByteBuf, SuperGlueSpawnPacket> CODEC = Packet.codec(SuperGlueSpawnPacket::write,
+public class SuperGlueSpawnPacket extends EntitySpawnS2CPacket {
+    public static final PacketCodec<RegistryByteBuf, SuperGlueSpawnPacket> CODEC = Packet.createCodec(
+        SuperGlueSpawnPacket::write,
         SuperGlueSpawnPacket::new
     );
-    private final AABB box;
+    private final Box box;
 
-    public SuperGlueSpawnPacket(Entity entity, ServerEntity entityTrackerEntry) {
+    public SuperGlueSpawnPacket(Entity entity, EntityTrackerEntry entityTrackerEntry) {
         super(entity, entityTrackerEntry);
         box = entity.getBoundingBox();
     }
 
-    private SuperGlueSpawnPacket(RegistryFriendlyByteBuf buf) {
+    private SuperGlueSpawnPacket(RegistryByteBuf buf) {
         super(buf);
-        box = new AABB(
-            buf.readDouble(),
-            buf.readDouble(),
-            buf.readDouble(),
-            buf.readDouble(),
-            buf.readDouble(),
-            buf.readDouble()
-        ).move(getX(), getY(), getZ());
+        box = new Box(buf.readDouble(), buf.readDouble(), buf.readDouble(), buf.readDouble(), buf.readDouble(), buf.readDouble()).offset(
+            getX(),
+            getY(),
+            getZ()
+        );
     }
 
     @Override
-    public void write(RegistryFriendlyByteBuf buf) {
+    public void write(RegistryByteBuf buf) {
         super.write(buf);
-        AABB box = this.box.move(-getX(), -getY(), -getZ());
+        Box box = this.box.offset(-getX(), -getY(), -getZ());
         buf.writeDouble(box.minX);
         buf.writeDouble(box.minY);
         buf.writeDouble(box.minZ);
@@ -45,13 +43,13 @@ public class SuperGlueSpawnPacket extends ClientboundAddEntityPacket {
         buf.writeDouble(box.maxZ);
     }
 
-    public AABB getBox() {
+    public Box getBox() {
         return box;
     }
 
     @Override
     @SuppressWarnings("unchecked")
-    public PacketType<ClientboundAddEntityPacket> type() {
-        return (PacketType<ClientboundAddEntityPacket>) (PacketType<?>) AllPackets.SUPER_GLUE_SPAWN;
+    public PacketType<EntitySpawnS2CPacket> getPacketType() {
+        return (PacketType<EntitySpawnS2CPacket>) (PacketType<?>) AllPackets.SUPER_GLUE_SPAWN;
     }
 }

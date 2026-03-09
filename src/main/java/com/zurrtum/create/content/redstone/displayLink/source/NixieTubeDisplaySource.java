@@ -5,8 +5,8 @@ import com.zurrtum.create.content.redstone.displayLink.target.DisplayTargetStats
 import com.zurrtum.create.content.redstone.displayLink.target.NixieTubeDisplayTarget;
 import com.zurrtum.create.content.redstone.nixieTube.NixieTubeBlockEntity;
 import com.zurrtum.create.content.trains.display.FlapDisplaySection;
-import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.text.MutableText;
 
 public class NixieTubeDisplaySource extends SingleLineDisplaySource {
 
@@ -16,13 +16,12 @@ public class NixieTubeDisplaySource extends SingleLineDisplaySource {
     }
 
     @Override
-    protected MutableComponent provideLine(DisplayLinkContext context, DisplayTargetStats stats) {
+    protected MutableText provideLine(DisplayLinkContext context, DisplayTargetStats stats) {
         BlockEntity sourceBE = context.getSourceBlockEntity();
-        if (!(sourceBE instanceof NixieTubeBlockEntity nbe)) {
+        if (!(sourceBE instanceof NixieTubeBlockEntity nbe))
             return EMPTY_LINE;
-        }
 
-        MutableComponent text = nbe.getFullText();
+        MutableText text = nbe.getFullText();
 
         try {
             String line = text.getString();
@@ -41,17 +40,15 @@ public class NixieTubeDisplaySource extends SingleLineDisplaySource {
 
     @Override
     protected String getFlapDisplayLayoutName(DisplayLinkContext context) {
-        if (isNumeric(context)) {
+        if (isNumeric(context))
             return "Number";
-        }
         return super.getFlapDisplayLayoutName(context);
     }
 
     @Override
     protected FlapDisplaySection createSectionForValue(DisplayLinkContext context, int size) {
-        if (isNumeric(context)) {
+        if (isNumeric(context))
             return new FlapDisplaySection(size * FlapDisplaySection.MONOSPACE, "numeric", false, false);
-        }
         return super.createSectionForValue(context, size);
     }
 

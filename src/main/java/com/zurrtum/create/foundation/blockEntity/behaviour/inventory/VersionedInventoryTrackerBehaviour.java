@@ -1,9 +1,9 @@
 package com.zurrtum.create.foundation.blockEntity.behaviour.inventory;
 
-import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.foundation.blockEntity.SmartBlockEntity;
 import com.zurrtum.create.foundation.blockEntity.behaviour.BehaviourType;
-import net.minecraft.world.Container;
+import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
+import net.minecraft.inventory.Inventory;
 
 public class VersionedInventoryTrackerBehaviour extends BlockEntityBehaviour<SmartBlockEntity> {
 
@@ -21,20 +21,18 @@ public class VersionedInventoryTrackerBehaviour extends BlockEntityBehaviour<Sma
         return behaviour.hasInventory() && stillWaiting(behaviour.getInventory());
     }
 
-    public boolean stillWaiting(Container handler) {
-        if (handler instanceof VersionedInventory viw) {
+    public boolean stillWaiting(Inventory handler) {
+        if (handler instanceof VersionedInventory viw)
             return viw.getId() == ignoredId && viw.getVersion() == ignoredVersion;
-        }
         return false;
     }
 
     public void awaitNewVersion(InvManipulationBehaviour behaviour) {
-        if (behaviour.hasInventory()) {
+        if (behaviour.hasInventory())
             awaitNewVersion(behaviour.getInventory());
-        }
     }
 
-    public void awaitNewVersion(Container handler) {
+    public void awaitNewVersion(Inventory handler) {
         if (handler instanceof VersionedInventory viw) {
             ignoredId = viw.getId();
             ignoredVersion = viw.getVersion();

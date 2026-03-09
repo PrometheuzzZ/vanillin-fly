@@ -8,14 +8,14 @@ import com.zurrtum.create.content.logistics.filter.PackageFilterMenu;
 import com.zurrtum.create.foundation.gui.menu.MenuType;
 import com.zurrtum.create.infrastructure.packet.c2s.FilterScreenPacket;
 import com.zurrtum.create.infrastructure.packet.c2s.FilterScreenPacket.Option;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.input.KeyEvent;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.chat.Component;
-import net.minecraft.world.entity.player.Inventory;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.input.KeyInput;
+import net.minecraft.entity.player.PlayerInventory;
+import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NbtCompound;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.text.Text;
 import org.lwjgl.glfw.GLFW;
 
 public class PackageFilterScreen extends AbstractFilterScreen<PackageFilterMenu> {
@@ -23,24 +23,24 @@ public class PackageFilterScreen extends AbstractFilterScreen<PackageFilterMenu>
     private AddressEditBox addressBox;
     private boolean deferFocus;
 
-    public PackageFilterScreen(PackageFilterMenu menu, Inventory inv, Component title) {
+    public PackageFilterScreen(PackageFilterMenu menu, PlayerInventory inv, Text title) {
         super(menu, inv, title, AllGuiTextures.PACKAGE_FILTER);
     }
 
     public static PackageFilterScreen create(
-        Minecraft mc,
+        MinecraftClient mc,
         MenuType<ItemStack> type,
         int syncId,
-        Inventory inventory,
-        Component title,
-        RegistryFriendlyByteBuf extraData
+        PlayerInventory inventory,
+        Text title,
+        RegistryByteBuf extraData
     ) {
         return type.create(PackageFilterScreen::new, syncId, inventory, title, getStack(extraData));
     }
 
     @Override
-    protected void containerTick() {
-        super.containerTick();
+    protected void handledScreenTick() {
+        super.handledScreenTick();
         if (deferFocus) {
             deferFocus = false;
             setFocused(addressBox);
@@ -53,48 +53,46 @@ public class PackageFilterScreen extends AbstractFilterScreen<PackageFilterMenu>
         setWindowOffset(-11, 7);
         super.init();
 
-        addressBox = new AddressEditBox(this, font, leftPos + 44, topPos + 28, 129, 9, false);
-        addressBox.setTextColor(0xffffffff);
-        addressBox.setValue(menu.address);
-        addressBox.setResponder(this::onAddressEdited);
-        addRenderableWidget(addressBox);
+        addressBox = new AddressEditBox(this, textRenderer, x + 44, y + 28, 129, 9, false);
+        addressBox.setEditableColor(0xffffffff);
+        addressBox.setText(handler.address);
+        addressBox.setChangedListener(this::onAddressEdited);
+        addDrawableChild(addressBox);
 
         setFocused(addressBox);
     }
 
     @Override
-    public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
+    public void render(DrawContext graphics, int mouseX, int mouseY, float partialTicks) {
         super.render(graphics, mouseX, mouseY, partialTicks);
 
-        graphics.renderItem(PackageStyles.getDefaultBox(), leftPos + 16, topPos + 23);
+        graphics.drawItem(PackageStyles.getDefaultBox(), x + 16, y + 23);
     }
 
     public void onAddressEdited(String s) {
-        menu.address = s;
-        CompoundTag tag = new CompoundTag();
+        handler.address = s;
+        NbtCompound tag = new NbtCompound();
         tag.putString("Address", s);
-        minecraft.player.connection.send(new FilterScreenPacket(Option.UPDATE_ADDRESS, tag));
+        client.player.networkHandler.sendPacket(new FilterScreenPacket(Option.UPDATE_ADDRESS, tag));
     }
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
-        if (addressBox.mouseScrolled(mouseX, mouseY, scrollX, scrollY)) {
+        if (addressBox.mouseScrolled(mouseX, mouseY, scrollX, scrollY))
             return true;
-        }
         return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
     }
 
     @Override
-    public boolean keyPressed(KeyEvent input) {
-        if (input.key() == GLFW.GLFW_KEY_ENTER) {
+    public boolean keyPressed(KeyInput input) {
+        if (input.key() == GLFW.GLFW_KEY_ENTER)
             setFocused(null);
-        }
         return super.keyPressed(input);
     }
 
     @Override
     protected void contentsCleared() {
-        addressBox.setValue("");
+        addressBox.setText("");
         deferFocus = true;
     }
 

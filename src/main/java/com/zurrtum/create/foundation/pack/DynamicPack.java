@@ -3,15 +3,11 @@ package com.zurrtum.create.foundation.pack;
 import com.google.gson.JsonElement;
 import com.zurrtum.create.Create;
 import net.minecraft.SharedConstants;
-import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
-import net.minecraft.server.packs.PackLocationInfo;
-import net.minecraft.server.packs.PackResources;
-import net.minecraft.server.packs.PackType;
-import net.minecraft.server.packs.metadata.MetadataSectionType;
-import net.minecraft.server.packs.metadata.pack.PackMetadataSection;
-import net.minecraft.server.packs.repository.PackSource;
-import net.minecraft.server.packs.resources.IoSupplier;
+import net.minecraft.resource.*;
+import net.minecraft.resource.metadata.PackResourceMetadata;
+import net.minecraft.resource.metadata.ResourceMetadataSerializer;
+import net.minecraft.text.Text;
+import net.minecraft.util.Identifier;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -21,35 +17,27 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 // TODO - Move into catnip
-public class DynamicPack implements PackResources {
-    private final Map<String, IoSupplier<InputStream>> files = new HashMap<>();
+public class DynamicPack implements ResourcePack {
+    private final Map<String, InputSupplier<InputStream>> files = new HashMap<>();
 
     private final String packId;
-    private final PackType packType;
-    private final PackMetadataSection metadata;
-    private final PackLocationInfo packLocationInfo;
+    private final ResourceType packType;
+    private final PackResourceMetadata metadata;
+    private final ResourcePackInfo packLocationInfo;
 
-    public DynamicPack(String packId, Component title, PackType packType) {
+    public DynamicPack(String packId, Text title, ResourceType packType) {
         this.packId = packId;
         this.packType = packType;
 
-        metadata = new PackMetadataSection(
-            title,
-            SharedConstants.getCurrentVersion().packVersion(packType).minorRange()
-        );
-        packLocationInfo = new PackLocationInfo(
-            packId,
-            Component.literal(packId),
-            PackSource.BUILT_IN,
-            Optional.empty()
-        );
+        metadata = new PackResourceMetadata(title, SharedConstants.getGameVersion().packVersion(packType).majorRange());
+        packLocationInfo = new ResourcePackInfo(packId, Text.literal(packId), ResourcePackSource.BUILTIN, Optional.empty());
     }
 
-    private static String getPath(PackType packType, Identifier identifier) {
+    private static String getPath(ResourceType packType, Identifier identifier) {
         return packType.getDirectory() + "/" + identifier.getNamespace() + "/" + identifier.getPath();
     }
 
-    public DynamicPack put(Identifier location, IoSupplier<InputStream> stream) {
+    public DynamicPack put(Identifier location, InputSupplier<InputStream> stream) {
         files.put(getPath(packType, location), stream);
         return this;
     }
@@ -64,7 +52,7 @@ public class DynamicPack implements PackResources {
 
     // Automatically suffixes the Identifier with .json
     public DynamicPack put(Identifier location, JsonElement json) {
-        return put(location.withSuffix(".json"), Create.GSON.toJson(json));
+        return put(location.withSuffixedPath(".json"), Create.GSON.toJson(json));
     }
 
     public boolean isEmpty() {
@@ -72,37 +60,33 @@ public class DynamicPack implements PackResources {
     }
 
     @Override
-    public @Nullable IoSupplier<InputStream> getRootResource(String @NotNull ... elements) {
+    public @Nullable InputSupplier<InputStream> openRoot(String @NotNull ... elements) {
         return files.getOrDefault(String.join("/", elements), null);
     }
 
     @Override
-    public @Nullable IoSupplier<InputStream> getResource(@NotNull PackType packType, @NotNull Identifier identifier) {
+    public @Nullable InputSupplier<InputStream> open(@NotNull ResourceType packType, @NotNull Identifier identifier) {
         return files.getOrDefault(getPath(packType, identifier), null);
     }
 
     @Override
-    public void listResources(
-        @NotNull PackType packType,
+    public void findResources(
+        @NotNull ResourceType packType,
         @NotNull String namespace,
         @NotNull String path,
-        @NotNull ResourceOutput resourceOutput
+        @NotNull ResultConsumer resourceOutput
     ) {
-        Identifier identifier = Identifier.fromNamespaceAndPath(namespace, path);
+        Identifier identifier = Identifier.of(namespace, path);
         String directoryAndNamespace = packType.getDirectory() + "/" + namespace + "/";
         String prefix = directoryAndNamespace + path + "/";
         files.forEach((filePath, streamSupplier) -> {
-            if (filePath.startsWith(prefix)) {
-                resourceOutput.accept(
-                    identifier.withPath(filePath.substring(directoryAndNamespace.length())),
-                    streamSupplier
-                );
-            }
+            if (filePath.startsWith(prefix))
+                resourceOutput.accept(identifier.withPath(filePath.substring(directoryAndNamespace.length())), streamSupplier);
         });
     }
 
     @Override
-    public @NotNull Set<String> getNamespaces(PackType packType) {
+    public @NotNull Set<String> getNamespaces(ResourceType packType) {
         Set<String> namespaces = new HashSet<>();
         String dir = packType.getDirectory() + "/";
 
@@ -120,17 +104,17 @@ public class DynamicPack implements PackResources {
 
     @SuppressWarnings("unchecked")
     @Override
-    public @Nullable <T> T getMetadataSection(@NotNull MetadataSectionType<T> deserializer) {
-        return deserializer == PackMetadataSection.forPackType(packType) ? (T) metadata : null;
+    public @Nullable <T> T parseMetadata(@NotNull ResourceMetadataSerializer<T> deserializer) {
+        return deserializer == PackResourceMetadata.getSerializerFor(packType) ? (T) metadata : null;
     }
 
     @Override
-    public @NotNull PackLocationInfo location() {
+    public @NotNull ResourcePackInfo getInfo() {
         return packLocationInfo;
     }
 
     @Override
-    public @NotNull String packId() {
+    public @NotNull String getId() {
         return packId;
     }
 

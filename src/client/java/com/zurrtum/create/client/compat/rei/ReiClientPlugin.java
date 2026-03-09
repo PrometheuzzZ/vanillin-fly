@@ -26,9 +26,9 @@ import me.shedaniel.rei.api.common.entry.EntryIngredient;
 import me.shedaniel.rei.api.common.entry.type.VanillaEntryTypes;
 import me.shedaniel.rei.api.common.util.EntryIngredients;
 import me.shedaniel.rei.plugin.client.displays.ClientsidedCraftingDisplay;
-import net.minecraft.world.item.DyeColor;
-import net.minecraft.world.item.DyeItem;
-import net.minecraft.world.level.ItemLike;
+import net.minecraft.item.DyeItem;
+import net.minecraft.item.ItemConvertible;
+import net.minecraft.util.DyeColor;
 
 import java.util.List;
 import java.util.Objects;
@@ -38,11 +38,9 @@ import java.util.function.Consumer;
 import static com.zurrtum.create.Create.MOD_ID;
 
 public class ReiClientPlugin implements REIClientPlugin {
-    public static final CategoryIdentifier<MysteriousItemConversionDisplay> MYSTERY_CONVERSION = CategoryIdentifier.of(MOD_ID,
-        "mystery_conversion"
-    );
+    public static final CategoryIdentifier<MysteriousItemConversionDisplay> MYSTERY_CONVERSION = CategoryIdentifier.of(MOD_ID, "mystery_conversion");
 
-    private <T extends Display> Consumer<CategoryConfiguration<T>> workstations(ItemLike... item) {
+    private <T extends Display> Consumer<CategoryConfiguration<T>> workstations(ItemConvertible... item) {
         EntryIngredient[] workstations = new EntryIngredient[item.length];
         for (int i = 0; i < item.length; i++) {
             workstations[i] = EntryIngredients.of(item[i]);
@@ -87,8 +85,7 @@ public class ReiClientPlugin implements REIClientPlugin {
             entrys.getEntryStacks().filter(stack -> Objects.equals(stack.getType(), VanillaEntryTypes.FLUID)),
             registry
         );
-        DrainingDisplay.register(
-            entrys.getEntryStacks().filter(stack -> Objects.equals(stack.getType(), VanillaEntryTypes.ITEM)), registry);
+        DrainingDisplay.register(entrys.getEntryStacks().filter(stack -> Objects.equals(stack.getType(), VanillaEntryTypes.ITEM)), registry);
     }
 
     private static void registerToolboxRecipes(DisplayRegistry registry) {

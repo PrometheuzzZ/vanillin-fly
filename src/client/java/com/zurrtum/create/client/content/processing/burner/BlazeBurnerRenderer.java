@@ -1,7 +1,5 @@
 package com.zurrtum.create.client.content.processing.burner;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.zurrtum.create.catnip.animation.LerpedFloat.Chaser;
 import com.zurrtum.create.catnip.math.AngleHelper;
 import com.zurrtum.create.client.AllPartialModels;
@@ -14,27 +12,28 @@ import com.zurrtum.create.client.flywheel.lib.model.baked.PartialModel;
 import com.zurrtum.create.content.processing.burner.BlazeBurnerBlock;
 import com.zurrtum.create.content.processing.burner.BlazeBurnerBlock.HeatLevel;
 import com.zurrtum.create.content.processing.burner.BlazeBurnerBlockEntity;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.client.renderer.LightTexture;
-import net.minecraft.client.renderer.SubmitNodeCollector;
-import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
-import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
-import net.minecraft.client.renderer.blockentity.state.BlockEntityRenderState;
-import net.minecraft.client.renderer.feature.ModelFeatureRenderer;
-import net.minecraft.client.renderer.rendertype.RenderType;
-import net.minecraft.client.renderer.rendertype.RenderTypes;
-import net.minecraft.client.renderer.state.CameraRenderState;
-import net.minecraft.client.renderer.texture.TextureAtlasSprite;
-import net.minecraft.core.Direction;
-import net.minecraft.util.Mth;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.block.BlockState;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.network.ClientPlayerEntity;
+import net.minecraft.client.render.LightmapTextureManager;
+import net.minecraft.client.render.RenderLayer;
+import net.minecraft.client.render.VertexConsumer;
+import net.minecraft.client.render.block.entity.BlockEntityRenderer;
+import net.minecraft.client.render.block.entity.BlockEntityRendererFactory;
+import net.minecraft.client.render.block.entity.state.BlockEntityRenderState;
+import net.minecraft.client.render.command.ModelCommandRenderer;
+import net.minecraft.client.render.command.OrderedRenderCommandQueue;
+import net.minecraft.client.render.state.CameraRenderState;
+import net.minecraft.client.texture.Sprite;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
 public class BlazeBurnerRenderer implements BlockEntityRenderer<BlazeBurnerBlockEntity, BlazeBurnerRenderer.BlazeBurnerRenderState> {
-    public BlazeBurnerRenderer(BlockEntityRendererProvider.Context context) {
+    public BlazeBurnerRenderer(BlockEntityRendererFactory.Context context) {
     }
 
     @Override
@@ -43,19 +42,18 @@ public class BlazeBurnerRenderer implements BlockEntityRenderer<BlazeBurnerBlock
     }
 
     @Override
-    public void extractRenderState(
+    public void updateRenderState(
         BlazeBurnerBlockEntity be,
         BlazeBurnerRenderState state,
         float tickProgress,
-        Vec3 cameraPos,
-        @Nullable ModelFeatureRenderer.CrumblingOverlay crumblingOverlay
+        Vec3d cameraPos,
+        @Nullable ModelCommandRenderer.CrumblingOverlayCommand crumblingOverlay
     ) {
         HeatLevel heatLevel = be.getHeatLevelForRender();
-        if (heatLevel == HeatLevel.NONE) {
+        if (heatLevel == HeatLevel.NONE)
             return;
-        }
-        BlockEntityRenderState.extractBase(be, state, crumblingOverlay);
-        Level level = be.getLevel();
+        BlockEntityRenderState.updateBlockEntityRenderState(be, state, crumblingOverlay);
+        World level = be.getWorld();
         float animation = be.headAnimation.getValue(tickProgress) * .175f;
         float horizontalAngle = AngleHelper.rad(be.headAngle.getValue(tickProgress));
         boolean canDrawFlame = heatLevel.isAtLeast(HeatLevel.FADING);
@@ -76,12 +74,7 @@ public class BlazeBurnerRenderer implements BlockEntityRenderer<BlazeBurnerBlock
     }
 
     @Override
-    public void submit(
-        BlazeBurnerRenderState state,
-        PoseStack matrices,
-        SubmitNodeCollector queue,
-        CameraRenderState cameraState
-    ) {
+    public void render(BlazeBurnerRenderState state, MatrixStack matrices, OrderedRenderCommandQueue queue, CameraRenderState cameraState) {
         state.data.render(matrices, queue);
     }
 
@@ -100,7 +93,7 @@ public class BlazeBurnerRenderer implements BlockEntityRenderer<BlazeBurnerBlock
 
         if (!active) {
             float target = 0;
-            LocalPlayer player = Minecraft.getInstance().player;
+            ClientPlayerEntity player = MinecraftClient.getInstance().player;
             if (player != null && !player.isInvisible()) {
                 double x;
                 double z;
@@ -111,17 +104,18 @@ public class BlazeBurnerRenderer implements BlockEntityRenderer<BlazeBurnerBlock
                     x = player.getX();
                     z = player.getZ();
                 }
-                double dx = x - (be.getBlockPos().getX() + 0.5);
-                double dz = z - (be.getBlockPos().getZ() + 0.5);
-                target = AngleHelper.deg(-Mth.atan2(dz, dx)) - 90;
+                double dx = x - (be.getPos().getX() + 0.5);
+                double dz = z - (be.getPos().getZ() + 0.5);
+                target = AngleHelper.deg(-MathHelper.atan2(dz, dx)) - 90;
             }
             target = be.headAngle.getValue() + AngleHelper.getShortestAngleDiff(be.headAngle.getValue(), target);
             be.headAngle.chase(target, .25f, Chaser.exp(5));
             be.headAngle.tickChaser();
         } else {
             be.headAngle.chase(
-                (AngleHelper.horizontalAngle(be.getBlockState().getOptionalValue(BlazeBurnerBlock.FACING)
-                    .orElse(Direction.SOUTH)) + 180) % 360, .125f, Chaser.EXP
+                (AngleHelper.horizontalAngle(be.getCachedState().getOrEmpty(BlazeBurnerBlock.FACING).orElse(Direction.SOUTH)) + 180) % 360,
+                .125f,
+                Chaser.EXP
             );
             be.headAngle.tickChaser();
         }
@@ -131,7 +125,7 @@ public class BlazeBurnerRenderer implements BlockEntityRenderer<BlazeBurnerBlock
     }
 
     public static BlazeBurnerRenderData getBlazeBurnerRenderData(
-        Level level,
+        World level,
         BlockState blockState,
         HeatLevel heatLevel,
         float animation,
@@ -142,15 +136,15 @@ public class BlazeBurnerRenderer implements BlockEntityRenderer<BlazeBurnerBlock
         int hashCode
     ) {
         BlazeBurnerRenderData data = new BlazeBurnerRenderData();
-        data.layer = RenderTypes.solidMovingBlock();
+        data.layer = RenderLayer.getSolid();
         data.horizontalAngle = horizontalAngle;
         boolean blockAbove = animation > 0.125f;
         float time = AnimationTickHolder.getRenderTime(level);
         float renderTick = time / 16f + (hashCode % 13);
         float offsetMult = heatLevel.isAtLeast(HeatLevel.FADING) ? 64 : 16;
-        float offset = Mth.sin(renderTick % Mth.TWO_PI) / offsetMult;
-        float offset1 = Mth.sin((float) ((renderTick + Math.PI) % Mth.TWO_PI)) / offsetMult;
-        float offset2 = Mth.sin((renderTick + Mth.HALF_PI) % Mth.TWO_PI) / offsetMult;
+        float offset = MathHelper.sin(renderTick % MathHelper.TAU) / offsetMult;
+        float offset1 = MathHelper.sin((float) ((renderTick + Math.PI) % MathHelper.TAU)) / offsetMult;
+        float offset2 = MathHelper.sin((renderTick + MathHelper.HALF_PI) % MathHelper.TAU) / offsetMult;
         data.headY = offset - (animation * .75f);
         PartialModel blazeModel = getBlazeModel(heatLevel, blockAbove);
         data.blaze = CachedBuffers.partial(blazeModel, blockState);
@@ -164,9 +158,9 @@ public class BlazeBurnerRenderer implements BlockEntityRenderer<BlazeBurnerBlock
             boolean scale = blazeModel == AllPartialModels.BLAZE_INERT;
             data.hat.scale = scale;
             data.hat.offset = data.headY + (scale ? 0.5f : 0.75f);
-            data.hat.layer = RenderTypes.cutoutMovingBlock();
+            data.hat.layer = RenderLayer.getCutoutMipped();
             data.hat.model = CachedBuffers.partial(drawHat, blockState);
-            data.hat.angle = horizontalAngle + Mth.PI;
+            data.hat.angle = horizontalAngle + MathHelper.PI;
         }
         if (heatLevel.isAtLeast(HeatLevel.FADING)) {
             PartialModel rodsModel = heatLevel == HeatLevel.SEETHING ? AllPartialModels.BLAZE_BURNER_SUPER_RODS : AllPartialModels.BLAZE_BURNER_RODS;
@@ -178,13 +172,13 @@ public class BlazeBurnerRenderer implements BlockEntityRenderer<BlazeBurnerBlock
         }
         if (canDrawFlame && blockAbove) {
             data.flame = new FlameRenderState();
-            data.flame.layer = RenderTypes.cutoutMovingBlock();
+            data.flame.layer = RenderLayer.getCutoutMipped();
             data.flame.model = CachedBuffers.partial(AllPartialModels.BLAZE_BURNER_FLAME, blockState);
             data.flame.angle = horizontalAngle;
             data.flame.spriteShift = heatLevel == HeatLevel.SEETHING ? AllSpriteShifts.SUPER_BURNER_FLAME : AllSpriteShifts.BURNER_FLAME;
-            TextureAtlasSprite target = data.flame.spriteShift.getTarget();
-            float spriteWidth = target.getU1() - target.getU0();
-            float spriteHeight = target.getV1() - target.getV0();
+            Sprite target = data.flame.spriteShift.getTarget();
+            float spriteWidth = target.getMaxU() - target.getMinU();
+            float spriteHeight = target.getMaxV() - target.getMinV();
             float speed = 1 / 32f + 1 / 64f * heatLevel.ordinal();
             double vScroll = speed * time;
             vScroll = vScroll - Math.floor(vScroll);
@@ -202,8 +196,8 @@ public class BlazeBurnerRenderer implements BlockEntityRenderer<BlazeBurnerBlock
         public BlazeBurnerRenderData data;
     }
 
-    public static class BlazeBurnerRenderData implements SubmitNodeCollector.CustomGeometryRenderer {
-        public RenderType layer;
+    public static class BlazeBurnerRenderData implements OrderedRenderCommandQueue.Custom {
+        public RenderLayer layer;
         public float headY;
         public float horizontalAngle;
         public SuperByteBuffer blaze;
@@ -216,61 +210,61 @@ public class BlazeBurnerRenderer implements BlockEntityRenderer<BlazeBurnerBlock
         public float rods2Y;
         public FlameRenderState flame;
 
-        public void render(PoseStack matrices, SubmitNodeCollector queue) {
-            queue.submitCustomGeometry(matrices, layer, this);
+        public void render(MatrixStack matrices, OrderedRenderCommandQueue queue) {
+            queue.submitCustom(matrices, layer, this);
             if (hat != null) {
-                queue.submitCustomGeometry(matrices, hat.layer, hat);
+                queue.submitCustom(matrices, hat.layer, hat);
             }
             if (flame != null) {
-                queue.submitCustomGeometry(matrices, flame.layer, flame);
+                queue.submitCustom(matrices, flame.layer, flame);
             }
         }
 
         @Override
-        public void render(PoseStack.Pose matricesEntry, VertexConsumer vertexConsumer) {
+        public void render(MatrixStack.Entry matricesEntry, VertexConsumer vertexConsumer) {
             blaze.translate(0, headY, 0);
             blaze.rotateCentered(horizontalAngle, Direction.UP);
-            blaze.light(LightTexture.FULL_BRIGHT);
+            blaze.light(LightmapTextureManager.MAX_LIGHT_COORDINATE);
             blaze.renderInto(matricesEntry, vertexConsumer);
             if (goggles != null) {
                 goggles.translate(0, gogglesHeadY, 0);
                 goggles.rotateCentered(horizontalAngle, Direction.UP);
-                goggles.light(LightTexture.FULL_BRIGHT);
+                goggles.light(LightmapTextureManager.MAX_LIGHT_COORDINATE);
                 goggles.renderInto(matricesEntry, vertexConsumer);
             }
             if (rods != null) {
                 rods.translate(0, rodsY, 0);
-                rods.light(LightTexture.FULL_BRIGHT);
+                rods.light(LightmapTextureManager.MAX_LIGHT_COORDINATE);
                 rods.renderInto(matricesEntry, vertexConsumer);
                 rods2.translate(0, rods2Y, 0);
-                rods2.light(LightTexture.FULL_BRIGHT);
+                rods2.light(LightmapTextureManager.MAX_LIGHT_COORDINATE);
                 rods2.renderInto(matricesEntry, vertexConsumer);
             }
         }
     }
 
-    public static class HatRenderState implements SubmitNodeCollector.CustomGeometryRenderer {
-        public RenderType layer;
+    public static class HatRenderState implements OrderedRenderCommandQueue.Custom {
+        public RenderLayer layer;
         public SuperByteBuffer model;
         public float angle;
         public boolean scale;
         public float offset;
 
         @Override
-        public void render(PoseStack.Pose matricesEntry, VertexConsumer vertexConsumer) {
+        public void render(MatrixStack.Entry matricesEntry, VertexConsumer vertexConsumer) {
             model.translate(0, offset, 0);
             if (scale) {
                 model.scale(0.75f);
             }
             model.rotateCentered(angle, Direction.UP);
             model.translate(0.5f, 0, 0.5f);
-            model.light(LightTexture.FULL_BRIGHT);
+            model.light(LightmapTextureManager.MAX_LIGHT_COORDINATE);
             model.renderInto(matricesEntry, vertexConsumer);
         }
     }
 
-    public static class FlameRenderState implements SubmitNodeCollector.CustomGeometryRenderer {
-        public RenderType layer;
+    public static class FlameRenderState implements OrderedRenderCommandQueue.Custom {
+        public RenderLayer layer;
         public SuperByteBuffer model;
         public SpriteShiftEntry spriteShift;
         public float uScroll;
@@ -278,10 +272,10 @@ public class BlazeBurnerRenderer implements BlockEntityRenderer<BlazeBurnerBlock
         public float angle;
 
         @Override
-        public void render(PoseStack.Pose matricesEntry, VertexConsumer vertexConsumer) {
+        public void render(MatrixStack.Entry matricesEntry, VertexConsumer vertexConsumer) {
             model.shiftUVScrolling(spriteShift, uScroll, vScroll);
             model.rotateCentered(angle, Direction.UP);
-            model.light(LightTexture.FULL_BRIGHT);
+            model.light(LightmapTextureManager.MAX_LIGHT_COORDINATE);
             model.renderInto(matricesEntry, vertexConsumer);
         }
     }

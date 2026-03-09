@@ -2,7 +2,7 @@ package com.zurrtum.create.client.foundation.blockEntity.behaviour.tooltip;
 
 import com.zurrtum.create.client.foundation.item.TooltipHelper;
 import com.zurrtum.create.content.fluids.hosePulley.HosePulleyBlockEntity;
-import net.minecraft.network.chat.Component;
+import net.minecraft.text.Text;
 
 import java.util.List;
 
@@ -12,11 +12,10 @@ public class HosePulleyTooltipBehaviour extends KineticTooltipBehaviour<HosePull
     }
 
     @Override
-    public boolean addToGoggleTooltip(List<Component> tooltip, boolean isPlayerSneaking) {
+    public boolean addToGoggleTooltip(List<Text> tooltip, boolean isPlayerSneaking) {
         boolean addToGoggleTooltip = super.addToGoggleTooltip(tooltip, isPlayerSneaking);
-        if (blockEntity.infinite) {
+        if (blockEntity.infinite)
             TooltipHelper.addHint(tooltip, "hint.hose_pulley");
-        }
         return addToGoggleTooltip;
     }
 }

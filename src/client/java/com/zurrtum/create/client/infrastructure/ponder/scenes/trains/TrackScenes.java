@@ -13,12 +13,12 @@ import com.zurrtum.create.client.ponder.api.scene.SceneBuildingUtil;
 import com.zurrtum.create.client.ponder.api.scene.Selection;
 import com.zurrtum.create.content.processing.burner.BlazeBurnerBlock;
 import com.zurrtum.create.content.processing.burner.BlazeBurnerBlockEntity;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.block.Blocks;
+import net.minecraft.item.ItemStack;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Box;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Vec3d;
 
 import java.util.List;
 
@@ -31,15 +31,13 @@ public class TrackScenes {
         scene.showBasePlate();
         scene.idle(10);
 
-        ElementLink<WorldSectionElement> bgTrack = scene.world()
-            .showIndependentSection(util.select().position(11, 4, 9), Direction.DOWN);
+        ElementLink<WorldSectionElement> bgTrack = scene.world().showIndependentSection(util.select().position(11, 4, 9), Direction.DOWN);
         scene.world().moveSection(bgTrack, util.vector().of(0, -2, 0), 0);
 
         for (int i = 11; i >= 2; i--) {
             scene.world().showSectionAndMerge(util.select().position(i, 3, 9), Direction.DOWN, bgTrack);
-            if (i == 5) {
+            if (i == 5)
                 scene.world().showSectionAndMerge(util.select().position(7, 4, 9), Direction.DOWN, bgTrack);
-            }
             scene.idle(2);
         }
 
@@ -47,32 +45,31 @@ public class TrackScenes {
             .text("A new type of rail designed for Train Contraptions");
         scene.idle(50);
 
-        ElementLink<WorldSectionElement> fgTrack = scene.world()
-            .showIndependentSection(util.select().position(3, 3, 5), Direction.DOWN);
+        ElementLink<WorldSectionElement> fgTrack = scene.world().showIndependentSection(util.select().position(3, 3, 5), Direction.DOWN);
         scene.world().moveSection(fgTrack, util.vector().of(0, -2, 0), 0);
         scene.idle(20);
 
-        Vec3 startTrack = util.vector().topOf(3, 0, 5);
+        Vec3d startTrack = util.vector().topOf(3, 0, 5);
         scene.overlay().showText(70).pointAt(startTrack).placeNearTarget().colored(PonderPalette.GREEN).attachKeyFrame()
             .text("To place rows of track in bulk, click on an existing track");
         scene.idle(30);
 
-        ItemStack trackStack = AllItems.TRACK.getDefaultInstance();
+        ItemStack trackStack = AllItems.TRACK.getDefaultStack();
 
         scene.overlay().showControls(startTrack, Pointing.DOWN, 40).rightClick().withItem(trackStack);
 
         scene.overlay().showControls(startTrack, Pointing.DOWN, 40).rightClick().withItem(trackStack);
         scene.idle(6);
-        AABB bb = new AABB(util.grid().at(3, 1, 5)).contract(0, .75f, 0).inflate(0, 0, .85f);
+        Box bb = new Box(util.grid().at(3, 1, 5)).shrink(0, .75f, 0).expand(0, 0, .85f);
         scene.overlay().chaseBoundingBoxOutline(PonderPalette.GREEN, startTrack, bb, 32);
         scene.idle(45);
 
         scene.overlay().showControls(startTrack.add(9, 0, 0), Pointing.DOWN, 40).rightClick().withItem(trackStack);
         scene.idle(6);
-        scene.overlay().showText(40).pointAt(util.vector().topOf(12, 0, 5)).placeNearTarget()
-            .colored(PonderPalette.GREEN).text("Then place or select a second track");
+        scene.overlay().showText(40).pointAt(util.vector().topOf(12, 0, 5)).placeNearTarget().colored(PonderPalette.GREEN)
+            .text("Then place or select a second track");
         scene.idle(20);
-        scene.overlay().chaseBoundingBoxOutline(PonderPalette.GREEN, startTrack, bb.expandTowards(9, 0, 0), 30);
+        scene.overlay().chaseBoundingBoxOutline(PonderPalette.GREEN, startTrack, bb.stretch(9, 0, 0), 30);
 
         scene.world().showSectionAndMerge(util.select().fromTo(12, 3, 5, 4, 3, 5), Direction.WEST, fgTrack);
         scene.idle(55);
@@ -93,18 +90,15 @@ public class TrackScenes {
         scene.world().showSection(util.select().position(2, 1, 8), Direction.DOWN);
         scene.idle(25);
 
-        scene.overlay().showText(60).pointAt(util.vector().topOf(7, 0, 7)).placeNearTarget()
-            .text("Tracks can also be placed as turns or slopes");
+        scene.overlay().showText(60).pointAt(util.vector().topOf(7, 0, 7)).placeNearTarget().text("Tracks can also be placed as turns or slopes");
         scene.idle(40);
 
         scene.world().showSection(util.select().position(12, 1, 2), Direction.SOUTH);
         scene.idle(10);
 
-        scene.overlay().showControls(util.vector().topOf(12, 0, 2), Pointing.DOWN, 10).rightClick()
-            .withItem(trackStack);
+        scene.overlay().showControls(util.vector().topOf(12, 0, 2), Pointing.DOWN, 10).rightClick().withItem(trackStack);
         scene.idle(15);
-        scene.overlay().showControls(util.vector().topOf(2, 0, 12), Pointing.DOWN, 10).rightClick()
-            .withItem(trackStack);
+        scene.overlay().showControls(util.vector().topOf(2, 0, 12), Pointing.DOWN, 10).rightClick().withItem(trackStack);
         scene.idle(7);
         scene.world().showSection(util.select().fromTo(12, 1, 3, 12, 1, 5), Direction.DOWN);
         scene.idle(3);
@@ -113,18 +107,17 @@ public class TrackScenes {
         scene.world().showSection(util.select().fromTo(5, 1, 12, 2, 1, 12), Direction.DOWN);
         scene.idle(25);
 
-        scene.overlay().showText(70).pointAt(util.vector().topOf(11, 0, 11)).colored(PonderPalette.GREEN)
-            .attachKeyFrame().placeNearTarget()
+        scene.overlay().showText(70).pointAt(util.vector().topOf(11, 0, 11)).colored(PonderPalette.GREEN).attachKeyFrame().placeNearTarget()
             .text("When connecting, tracks will try to make each turn equally sized");
         scene.idle(70);
 
         scene.world().hideSection(util.select().fromTo(12, 1, 2, 12, 1, 5), Direction.NORTH);
         scene.world().hideSection(util.select().fromTo(5, 1, 12, 2, 1, 12), Direction.WEST);
 
-        bb = new AABB(util.grid().at(5, 1, 5)).contract(0, .75f, 0).inflate(3, 0, 3).expandTowards(.85f, 0, .85f);
+        bb = new Box(util.grid().at(5, 1, 5)).shrink(0, .75f, 0).expand(3, 0, 3).stretch(.85f, 0, .85f);
         scene.overlay().chaseBoundingBoxOutline(PonderPalette.GREEN, startTrack, bb, 32);
         scene.idle(20);
-        scene.overlay().chaseBoundingBoxOutline(PonderPalette.GREEN, startTrack, bb.move(4, 0, 4), 32);
+        scene.overlay().chaseBoundingBoxOutline(PonderPalette.GREEN, startTrack, bb.offset(4, 0, 4), 32);
         scene.idle(30);
 
         scene.world().hideSection(util.select().fromTo(12, 1, 6, 6, 1, 12), Direction.UP);
@@ -132,25 +125,22 @@ public class TrackScenes {
         scene.world().showSection(util.select().position(12, 1, 2), Direction.SOUTH);
         scene.idle(20);
 
-        scene.overlay().showControls(util.vector().topOf(12, 0, 2), Pointing.DOWN, 10).rightClick()
-            .withItem(trackStack);
+        scene.overlay().showControls(util.vector().topOf(12, 0, 2), Pointing.DOWN, 10).rightClick().withItem(trackStack);
         scene.idle(10);
 
-        scene.overlay().showControls(util.vector().topOf(2, 0, 12), Pointing.DOWN, 60).rightClick().withItem(trackStack)
-            .whileCTRL();
+        scene.overlay().showControls(util.vector().topOf(2, 0, 12), Pointing.DOWN, 60).rightClick().withItem(trackStack).whileCTRL();
         scene.idle(10);
 
-        scene.overlay().showText(60).pointAt(util.vector().topOf(2, 0, 12)).colored(PonderPalette.GREEN)
-            .attachKeyFrame().placeNearTarget().text("Holding the sprint key while connecting...");
+        scene.overlay().showText(60).pointAt(util.vector().topOf(2, 0, 12)).colored(PonderPalette.GREEN).attachKeyFrame().placeNearTarget()
+            .text("Holding the sprint key while connecting...");
         scene.idle(50);
 
-        ElementLink<WorldSectionElement> longBend = scene.world()
-            .showIndependentSection(util.select().position(2, 2, 12), Direction.DOWN);
+        ElementLink<WorldSectionElement> longBend = scene.world().showIndependentSection(util.select().position(2, 2, 12), Direction.DOWN);
         scene.world().moveSection(longBend, util.vector().of(0, -1, 0), 0);
         scene.idle(30);
 
-        scene.overlay().showText(60).pointAt(util.vector().centerOf(9, 1, 9)).colored(PonderPalette.GREEN)
-            .placeNearTarget().text("...will create the longest fitting bend instead");
+        scene.overlay().showText(60).pointAt(util.vector().centerOf(9, 1, 9)).colored(PonderPalette.GREEN).placeNearTarget()
+            .text("...will create the longest fitting bend instead");
         scene.idle(70);
 
         scene.world().hideIndependentSection(longBend, Direction.UP);
@@ -159,8 +149,7 @@ public class TrackScenes {
         scene.world().hideSection(util.select().fromTo(8, 1, 2, 2, 1, 8), Direction.UP);
         scene.idle(25);
 
-        ElementLink<WorldSectionElement> slopeStart = scene.world()
-            .showIndependentSection(util.select().fromTo(12, 6, 2, 12, 9, 12), Direction.DOWN);
+        ElementLink<WorldSectionElement> slopeStart = scene.world().showIndependentSection(util.select().fromTo(12, 6, 2, 12, 9, 12), Direction.DOWN);
         scene.world().moveSection(slopeStart, util.vector().of(0, -5, 0), 0);
         scene.idle(10);
         scene.world().showSectionAndMerge(util.select().fromTo(2, 6, 2, 2, 7, 4), Direction.DOWN, slopeStart);
@@ -184,9 +173,8 @@ public class TrackScenes {
         scene.world().showSectionAndMerge(util.select().fromTo(11, 8, 10, 3, 11, 12), Direction.UP, slopeStart);
         scene.idle(20);
 
-        scene.overlay().showText(100).pointAt(util.vector().blockSurface(util.grid().at(9, 3, 10), Direction.NORTH))
-            .placeNearTarget().attachKeyFrame()
-            .text("Materials in the off-hand will be paved under tracks automatically");
+        scene.overlay().showText(100).pointAt(util.vector().blockSurface(util.grid().at(9, 3, 10), Direction.NORTH)).placeNearTarget()
+            .attachKeyFrame().text("Materials in the off-hand will be paved under tracks automatically");
         scene.idle(80);
 
         scene.overlay().showControls(util.vector().topOf(12, 2, 7), Pointing.LEFT, 30).withItem(trackStack);
@@ -207,7 +195,7 @@ public class TrackScenes {
 
         scene.overlay().showControls(util.vector().topOf(12, 1, 3), Pointing.LEFT, 30).withItem(trackStack);
         scene.idle(4);
-        smoothStone = AllItems.METAL_GIRDER.getDefaultInstance();
+        smoothStone = AllItems.METAL_GIRDER.getDefaultStack();
         scene.overlay().showControls(util.vector().topOf(12, 1, 3), Pointing.RIGHT, 26).withItem(smoothStone);
         scene.idle(30);
 
@@ -248,24 +236,19 @@ public class TrackScenes {
             .text("...will attempt to create a paired track on the other side");
         scene.idle(40);
 
-        ElementLink<WorldSectionElement> t1 = scene.world()
-            .showIndependentSection(util.select().fromTo(5, 2, 1, 3, 3, 2), Direction.DOWN);
-        ElementLink<WorldSectionElement> t2 = scene.world()
-            .showIndependentSection(util.select().fromTo(5, 2, 3, 3, 3, 3), Direction.DOWN);
-        ElementLink<WorldSectionElement> t3 = scene.world()
-            .showIndependentSection(util.select().fromTo(5, 2, 4, 3, 3, 5), Direction.DOWN);
+        ElementLink<WorldSectionElement> t1 = scene.world().showIndependentSection(util.select().fromTo(5, 2, 1, 3, 3, 2), Direction.DOWN);
+        ElementLink<WorldSectionElement> t2 = scene.world().showIndependentSection(util.select().fromTo(5, 2, 3, 3, 3, 3), Direction.DOWN);
+        ElementLink<WorldSectionElement> t3 = scene.world().showIndependentSection(util.select().fromTo(5, 2, 4, 3, 3, 5), Direction.DOWN);
 
-        ElementLink<ParrotElement> birb = scene.special()
-            .createBirb(util.vector().centerOf(4, 3, 2), ParrotPose.FacePointOfInterestPose::new);
+        ElementLink<ParrotElement> birb = scene.special().createBirb(util.vector().centerOf(4, 3, 2), ParrotPose.FacePointOfInterestPose::new);
         scene.special().conductorBirb(birb, true);
         scene.special().movePointOfInterest(util.grid().at(4, 4, 10));
 
         scene.addKeyframe();
         scene.idle(30);
 
-        for (ElementLink<WorldSectionElement> e : List.of(t1, t2, t3)) {
+        for (ElementLink<WorldSectionElement> e : List.of(t1, t2, t3))
             scene.world().moveSection(e, util.vector().of(0, 0, 6), 30);
-        }
         scene.special().moveParrot(birb, util.vector().of(0, 0, 5.6), 28);
         scene.world().animateBogey(util.grid().at(4, 2, 3), -6, 30);
 
@@ -278,14 +261,12 @@ public class TrackScenes {
         scene.rotateCameraY(360);
         scene.idle(15);
         scene.special().movePointOfInterest(util.grid().at(4, 4, 0));
-        ElementLink<WorldSectionElement> nether = scene.world()
-            .showIndependentSection(util.select().layers(7, 1), Direction.UP);
+        ElementLink<WorldSectionElement> nether = scene.world().showIndependentSection(util.select().layers(7, 1), Direction.UP);
         scene.world().moveSection(nether, util.vector().of(0, -7, 0), 0);
         scene.special().moveParrot(birb, util.vector().of(0, 0, -.1f), 1);
         scene.idle(25);
 
-        ElementLink<WorldSectionElement> s1 = scene.world()
-            .showIndependentSection(util.select().fromTo(5, 2, 1, 3, 3, 5), null);
+        ElementLink<WorldSectionElement> s1 = scene.world().showIndependentSection(util.select().fromTo(5, 2, 1, 3, 3, 5), null);
         scene.world().rotateSection(s1, 0, 180, 0, 0);
         scene.world().moveSection(s1, util.vector().of(0, 0, 3.5f), 0);
         scene.world().moveSection(s1, util.vector().of(0, 0, -3.5f), 18);
@@ -293,8 +274,8 @@ public class TrackScenes {
         scene.world().animateBogey(util.grid().at(4, 2, 3), -3.5f, 18);
         scene.idle(30);
 
-        scene.overlay().showText(70).pointAt(util.vector().topOf(util.grid().at(3, 2, 3))).attachKeyFrame()
-            .placeNearTarget().text("Trains on this track are now able to travel across dimensions");
+        scene.overlay().showText(70).pointAt(util.vector().topOf(util.grid().at(3, 2, 3))).attachKeyFrame().placeNearTarget()
+            .text("Trains on this track are now able to travel across dimensions");
         scene.idle(40);
 
     }
@@ -311,10 +292,8 @@ public class TrackScenes {
         scene.world().cycleBlockProperty(blazeBurnerPos, BlazeBurnerBlock.HEAT_LEVEL);
         scene.world().modifyBlockEntity(blazeBurnerPos, BlazeBurnerBlockEntity.class, be -> be.hat = true);
 
-        ElementLink<WorldSectionElement> stationElement = scene.world()
-            .showIndependentSection(util.select().fromTo(0, 0, 0, 8, 0, 8), Direction.UP);
-        ElementLink<WorldSectionElement> stationTrackElement = scene.world()
-            .showIndependentSection(util.select().position(0, 2, 0), Direction.UP);
+        ElementLink<WorldSectionElement> stationElement = scene.world().showIndependentSection(util.select().fromTo(0, 0, 0, 8, 0, 8), Direction.UP);
+        ElementLink<WorldSectionElement> stationTrackElement = scene.world().showIndependentSection(util.select().position(0, 2, 0), Direction.UP);
         scene.world().showSection(util.select().position(0, 3, 0), Direction.DOWN);
         scene.idle(10);
 
@@ -336,8 +315,7 @@ public class TrackScenes {
         scene.world().showSectionAndMerge(vPlatform, Direction.NORTH, stationElement);
         scene.idle(5);
         scene.world().showSectionAndMerge(vStation, Direction.DOWN, stationElement);
-        ElementLink<ParrotElement> birb = scene.special()
-            .createBirb(util.vector().centerOf(2, 2, 7), ParrotPose.FacePointOfInterestPose::new);
+        ElementLink<ParrotElement> birb = scene.special().createBirb(util.vector().centerOf(2, 2, 7), ParrotPose.FacePointOfInterestPose::new);
         scene.special().movePointOfInterest(util.grid().at(4, 3, 4));
         scene.idle(5);
         ElementLink<WorldSectionElement> trainElement = scene.world().showIndependentSection(train, Direction.DOWN);
@@ -364,22 +342,15 @@ public class TrackScenes {
         scene.idle(10);
         scene.world().hideIndependentSection(trainElement, null);
         scene.idle(5);
-        scene.overlay().chaseBoundingBoxOutline(
-            PonderPalette.BLUE,
-            trainElement,
-            new AABB(util.grid().at(4, 2, 4)).inflate(1, .75f, .5f),
-            280
-        );
+        scene.overlay().chaseBoundingBoxOutline(PonderPalette.BLUE, trainElement, new Box(util.grid().at(4, 2, 4)).expand(1, .75f, .5f), 280);
 
         scene.idle(15);
-        scene.overlay().showText(60).pointAt(util.vector().blockSurface(util.grid().at(3, 2, 4), Direction.WEST))
-            .placeNearTarget().colored(PonderPalette.BLUE).attachKeyFrame()
-            .text("Trains will travel through inactive sections of the world without issue");
+        scene.overlay().showText(60).pointAt(util.vector().blockSurface(util.grid().at(3, 2, 4), Direction.WEST)).placeNearTarget()
+            .colored(PonderPalette.BLUE).attachKeyFrame().text("Trains will travel through inactive sections of the world without issue");
         scene.idle(70);
 
-        scene.overlay().showText(60).pointAt(util.vector().blockSurface(util.grid().at(3, 2, 4), Direction.WEST))
-            .placeNearTarget().colored(PonderPalette.BLUE).attachKeyFrame()
-            .text("They will still stop at stations or red signals");
+        scene.overlay().showText(60).pointAt(util.vector().blockSurface(util.grid().at(3, 2, 4), Direction.WEST)).placeNearTarget()
+            .colored(PonderPalette.BLUE).attachKeyFrame().text("They will still stop at stations or red signals");
         scene.idle(50);
 
         scene.world().moveSection(trackElement, util.vector().of(19, 0, 0), 190);
@@ -387,13 +358,11 @@ public class TrackScenes {
         scene.world().animateBogey(util.grid().at(4, 2, 4), 19f, 190);
 
         scene.idle(30);
-        scene.overlay().showText(90).pointAt(util.vector().blockSurface(util.grid().at(3, 2, 4), Direction.WEST))
-            .placeNearTarget().colored(PonderPalette.RED).attachKeyFrame()
-            .text("However, Drills and other on-board machines will not operate");
+        scene.overlay().showText(90).pointAt(util.vector().blockSurface(util.grid().at(3, 2, 4), Direction.WEST)).placeNearTarget()
+            .colored(PonderPalette.RED).attachKeyFrame().text("However, Drills and other on-board machines will not operate");
         scene.idle(80);
 
-        stationElement = scene.world()
-            .showIndependentSection(util.select().fromTo(0, 0, 0, 8, 0, 8).add(dStation), null);
+        stationElement = scene.world().showIndependentSection(util.select().fromTo(0, 0, 0, 8, 0, 8).add(dStation), null);
         ElementLink<WorldSectionElement> dPlatformElement = scene.world().showIndependentSection(dPlatform, null);
         birb = scene.special().createBirb(util.vector().centerOf(-2, 2, 7), ParrotPose.FacePointOfInterestPose::new);
         scene.world().moveSection(dPlatformElement, util.vector().of(-8, -2, 0), 0);
@@ -406,8 +375,8 @@ public class TrackScenes {
         trainElement = scene.world().showIndependentSection(train, null);
         scene.idle(20);
 
-        scene.overlay().showText(90).pointAt(util.vector().blockSurface(util.grid().at(3, 2, 4), Direction.WEST))
-            .placeNearTarget().attachKeyFrame().text("Once near a Player, the train will re-appear");
+        scene.overlay().showText(90).pointAt(util.vector().blockSurface(util.grid().at(3, 2, 4), Direction.WEST)).placeNearTarget().attachKeyFrame()
+            .text("Once near a Player, the train will re-appear");
         scene.idle(30);
         scene.world().animateTrainStation(util.grid().at(1, 1, 1), true);
         scene.idle(30);

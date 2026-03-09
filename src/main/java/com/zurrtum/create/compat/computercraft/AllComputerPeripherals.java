@@ -9,15 +9,12 @@ import com.zurrtum.create.content.logistics.box.PackageItem;
 import com.zurrtum.create.foundation.blockEntity.SmartBlockEntity;
 import dan200.computercraft.api.detail.VanillaDetailRegistries;
 import dan200.computercraft.api.peripheral.PeripheralLookup;
-import net.minecraft.world.level.block.entity.BlockEntityType;
+import net.minecraft.block.entity.BlockEntityType;
 
 import java.util.function.Function;
 
 public class AllComputerPeripherals {
-    private static <T extends SmartBlockEntity> void registerPeripheral(
-        BlockEntityType<T> type,
-        Function<T, SyncedPeripheral<T>> factory
-    ) {
+    private static <T extends SmartBlockEntity> void registerPeripheral(BlockEntityType<T> type, Function<T, SyncedPeripheral<T>> factory) {
         BlockEntityBehaviour.add(type, ComputerBehaviour::new);
         PeripheralLookup.get().registerForBlockEntity(
             (blockEntity, direction) -> {

@@ -8,17 +8,17 @@ import com.zurrtum.create.foundation.blockEntity.behaviour.BehaviourType;
 import com.zurrtum.create.foundation.blockEntity.behaviour.filtering.ServerFilteringBehaviour;
 import com.zurrtum.create.foundation.item.ItemHelper;
 import com.zurrtum.create.foundation.item.ItemHelper.ExtractionCountMode;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.world.Container;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.inventory.Inventory;
+import net.minecraft.item.ItemStack;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.function.Predicate;
 
-public class InvManipulationBehaviour extends CapManipulationBehaviourBase<Container, InvManipulationBehaviour> {
+public class InvManipulationBehaviour extends CapManipulationBehaviourBase<Inventory, InvManipulationBehaviour> {
 
     // Extra types available for multibehaviour
     public static final BehaviourType<InvManipulationBehaviour>
@@ -39,28 +39,23 @@ public class InvManipulationBehaviour extends CapManipulationBehaviourBase<Conta
         this(TYPE, be, target);
     }
 
-    private InvManipulationBehaviour(
-        BehaviourType<InvManipulationBehaviour> type,
-        SmartBlockEntity be,
-        InterfaceProvider target
-    ) {
+    private InvManipulationBehaviour(BehaviourType<InvManipulationBehaviour> type, SmartBlockEntity be, InterfaceProvider target) {
         super(be, target);
         behaviourType = type;
     }
 
     @Nullable
     public IdentifiedInventory getIdentifiedInventory() {
-        Container inventory = this.getInventory();
-        if (inventory == null) {
+        Inventory inventory = this.getInventory();
+        if (inventory == null)
             return null;
-        }
 
-        InventoryIdentifier identifier = InventoryIdentifier.get(this.getLevel(), this.getTarget().getOpposite());
+        InventoryIdentifier identifier = InventoryIdentifier.get(this.getWorld(), this.getTarget().getOpposite());
         return new IdentifiedInventory(identifier, inventory);
     }
 
     @Override
-    protected Container getCapability(Level world, BlockPos pos, BlockEntity blockEntity, @Nullable Direction side) {
+    protected Inventory getCapability(World world, BlockPos pos, BlockEntity blockEntity, @Nullable Direction side) {
         return ItemHelper.getInventory(world, pos, null, blockEntity, side);
     }
 
@@ -76,13 +71,11 @@ public class InvManipulationBehaviour extends CapManipulationBehaviourBase<Conta
         boolean shouldSimulate = simulateNext;
         simulateNext = false;
 
-        if (getLevel().isClientSide()) {
+        if (getWorld().isClient())
             return ItemStack.EMPTY;
-        }
-        Container inventory = targetCapability;
-        if (inventory == null) {
+        Inventory inventory = targetCapability;
+        if (inventory == null)
             return ItemStack.EMPTY;
-        }
 
         Predicate<ItemStack> test = getFilterTest(filter);
         ItemStack extract;
@@ -95,7 +88,7 @@ public class InvManipulationBehaviour extends CapManipulationBehaviourBase<Conta
         if (count == 0) {
             return extract;
         }
-        int maxCount = extract.getMaxStackSize();
+        int maxCount = extract.getMaxCount();
         if (count > maxCount) {
             extract.setCount(count);
         }
@@ -116,10 +109,9 @@ public class InvManipulationBehaviour extends CapManipulationBehaviourBase<Conta
     public ItemStack insert(ItemStack stack) {
         boolean shouldSimulate = simulateNext;
         simulateNext = false;
-        Container inventory = targetCapability;
-        if (inventory == null) {
+        Inventory inventory = targetCapability;
+        if (inventory == null)
             return stack;
-        }
         int insert;
         if (shouldSimulate) {
             insert = inventory.countSpace(stack);
@@ -139,9 +131,8 @@ public class InvManipulationBehaviour extends CapManipulationBehaviourBase<Conta
     protected Predicate<ItemStack> getFilterTest(Predicate<ItemStack> customFilter) {
         Predicate<ItemStack> test = customFilter;
         ServerFilteringBehaviour filter = blockEntity.getBehaviour(ServerFilteringBehaviour.TYPE);
-        if (filter != null) {
+        if (filter != null)
             test = customFilter.and(filter::test);
-        }
         return test;
     }
 

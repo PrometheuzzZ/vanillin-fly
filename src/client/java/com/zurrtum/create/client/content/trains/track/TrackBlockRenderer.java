@@ -4,17 +4,17 @@ import com.zurrtum.create.client.flywheel.lib.transform.Affine;
 import com.zurrtum.create.content.trains.station.StationBlockEntity;
 import com.zurrtum.create.content.trains.track.TrackTargetingBehaviour.RenderedTrackOverlayType;
 import com.zurrtum.create.infrastructure.component.BezierTrackPointLocation;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction.AxisDirection;
-import net.minecraft.world.level.BlockGetter;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.block.BlockState;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction.AxisDirection;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.BlockView;
+import net.minecraft.world.World;
 
 public interface TrackBlockRenderer {
     <Self extends Affine<Self>> void prepareTrackOverlay(
         Affine<Self> affine,
-        BlockGetter world,
+        BlockView world,
         BlockPos pos,
         BlockState state,
         BezierTrackPointLocation bezierPoint,
@@ -22,17 +22,11 @@ public interface TrackBlockRenderer {
         RenderedTrackOverlayType type
     );
 
-    TrackBlockRenderState getAssemblyRenderState(
-        StationBlockEntity be,
-        Vec3 offset,
-        Level world,
-        BlockPos pos,
-        BlockState state
-    );
+    TrackBlockRenderState getAssemblyRenderState(StationBlockEntity be, Vec3d offset, World world, BlockPos pos, BlockState state);
 
     TrackBlockRenderState getRenderState(
-        Level world,
-        Vec3 offset,
+        World world,
+        Vec3d offset,
         BlockState trackState,
         BlockPos pos,
         AxisDirection direction,

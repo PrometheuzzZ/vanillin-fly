@@ -4,11 +4,11 @@ import com.zurrtum.create.client.flywheel.api.instance.Instance;
 import com.zurrtum.create.client.flywheel.api.task.Plan;
 import com.zurrtum.create.client.flywheel.api.visualization.VisualizationContext;
 import it.unimi.dsi.fastutil.longs.LongSet;
-import net.minecraft.client.Camera;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.SectionPos;
-import net.minecraft.core.Vec3i;
-import net.minecraft.world.level.LightLayer;
+import net.minecraft.client.render.Camera;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.ChunkSectionPos;
+import net.minecraft.util.math.Vec3i;
+import net.minecraft.world.LightType;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Range;
 
@@ -53,7 +53,7 @@ public interface Engine {
      */
     void lightSections(LongSet sections);
 
-    void onLightUpdate(SectionPos sectionPos, LightLayer layer);
+    void onLightUpdate(ChunkSectionPos sectionPos, LightType layer);
 
     /**
      * Render all instances necessary for the given visual type.

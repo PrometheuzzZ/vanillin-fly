@@ -10,7 +10,7 @@ import de.crafty.eiv.common.recipe.inventory.RecipeViewMenu;
 import de.crafty.eiv.common.recipe.inventory.RecipeViewMenu.SlotDefinition;
 import de.crafty.eiv.common.recipe.inventory.RecipeViewScreen;
 import de.crafty.eiv.common.recipe.inventory.SlotContent;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.DrawContext;
 import org.joml.Matrix3x2f;
 
 import java.util.List;
@@ -67,16 +67,9 @@ public class SawingView extends CreateView {
     }
 
     @Override
-    public void renderRecipe(
-        RecipeViewScreen screen,
-        RecipePosition position,
-        GuiGraphics context,
-        int mouseX,
-        int mouseY,
-        float partialTicks
-    ) {
+    public void renderRecipe(RecipeViewScreen screen, RecipePosition position, DrawContext context, int mouseX, int mouseY, float partialTicks) {
         AllGuiTextures.JEI_DOWN_ARROW.render(context, 70, 2);
         AllGuiTextures.JEI_SHADOW.render(context, 55, 51);
-        context.guiRenderState.submitPicturesInPictureState(new SawRenderState(new Matrix3x2f(context.pose()), 64, 27));
+        context.state.addSpecialElement(new SawRenderState(new Matrix3x2f(context.getMatrices()), 64, 27));
     }
 }

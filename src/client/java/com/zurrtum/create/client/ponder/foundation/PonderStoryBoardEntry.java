@@ -2,7 +2,7 @@ package com.zurrtum.create.client.ponder.foundation;
 
 import com.zurrtum.create.client.ponder.api.registration.StoryBoardEntry;
 import com.zurrtum.create.client.ponder.api.scene.PonderStoryBoard;
-import net.minecraft.resources.Identifier;
+import net.minecraft.util.Identifier;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -17,12 +17,7 @@ public class PonderStoryBoardEntry implements StoryBoardEntry {
     private final List<Identifier> tags;
     private final List<SceneOrderingEntry> orderingEntries;
 
-    public PonderStoryBoardEntry(
-        PonderStoryBoard board,
-        String namespace,
-        Identifier schematicLocation,
-        Identifier component
-    ) {
+    public PonderStoryBoardEntry(PonderStoryBoard board, String namespace, Identifier schematicLocation, Identifier component) {
         this.board = board;
         this.namespace = namespace;
         this.schematicLocation = schematicLocation;
@@ -32,7 +27,7 @@ public class PonderStoryBoardEntry implements StoryBoardEntry {
     }
 
     public PonderStoryBoardEntry(PonderStoryBoard board, String namespace, String schematicPath, Identifier component) {
-        this(board, namespace, Identifier.fromNamespaceAndPath(namespace, schematicPath), component);
+        this(board, namespace, Identifier.of(namespace, schematicPath), component);
     }
 
     @Override

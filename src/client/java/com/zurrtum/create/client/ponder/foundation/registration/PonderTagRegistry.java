@@ -6,8 +6,8 @@ import com.google.common.collect.Multimap;
 import com.zurrtum.create.client.ponder.Ponder;
 import com.zurrtum.create.client.ponder.api.registration.TagRegistryAccess;
 import com.zurrtum.create.client.ponder.foundation.PonderTag;
-import net.minecraft.resources.Identifier;
-import net.minecraft.world.item.Items;
+import net.minecraft.item.Items;
+import net.minecraft.util.Identifier;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -22,8 +22,8 @@ public class PonderTagRegistry implements TagRegistryAccess {
     private final PonderTag MISSING = new PonderTag(
         Ponder.asResource("not_registered"),
         null,
-        Items.BARRIER.getDefaultInstance(),
-        Items.BARRIER.getDefaultInstance()
+        Items.BARRIER.getDefaultStack(),
+        Items.BARRIER.getDefaultStack()
     );
 
     private boolean allowRegistration = true;
@@ -44,25 +44,22 @@ public class PonderTagRegistry implements TagRegistryAccess {
     //
 
     public void registerTag(PonderTag tag) {
-        if (!allowRegistration) {
+        if (!allowRegistration)
             throw new IllegalStateException("Registration Phase has already ended!");
-        }
 
         registeredTags.put(tag.getId(), tag);
     }
 
     public void listTag(PonderTag tag) {
-        if (!allowRegistration) {
+        if (!allowRegistration)
             throw new IllegalStateException("Registration Phase has already ended!");
-        }
 
         listedTags.add(tag);
     }
 
     public void addTagToComponent(Identifier tag, Identifier item) {
-        if (!allowRegistration) {
+        if (!allowRegistration)
             throw new IllegalStateException("Registration Phase has already ended!");
-        }
 
         synchronized (componentTagMap) {
             componentTagMap.put(item, tag);
@@ -88,8 +85,7 @@ public class PonderTagRegistry implements TagRegistryAccess {
 
     @Override
     public Set<Identifier> getItems(Identifier tag) {
-        return componentTagMap.entries().stream().filter(e -> e.getValue().equals(tag)).map(Map.Entry::getKey)
-            .collect(ImmutableSet.toImmutableSet());
+        return componentTagMap.entries().stream().filter(e -> e.getValue().equals(tag)).map(Map.Entry::getKey).collect(ImmutableSet.toImmutableSet());
     }
 
     @Override

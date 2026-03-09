@@ -13,16 +13,16 @@ import com.zurrtum.create.content.contraptions.actors.harvester.HarvesterBlockEn
 import com.zurrtum.create.content.contraptions.actors.psi.PortableItemInterfaceBlockEntity;
 import com.zurrtum.create.content.contraptions.actors.psi.PortableStorageInterfaceBlockEntity;
 import com.zurrtum.create.content.contraptions.chassis.LinearChassisBlock;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.item.ItemEntity;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.CropBlock;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.Blocks;
+import net.minecraft.block.CropBlock;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.ItemEntity;
+import net.minecraft.item.ItemStack;
+import net.minecraft.item.Items;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Vec3d;
 
 public class MovementActorScenes {
 
@@ -38,14 +38,13 @@ public class MovementActorScenes {
         BlockPos bearing = util.grid().at(5, 1, 2);
         scene.world().showSection(util.select().position(bearing), Direction.DOWN);
         scene.idle(5);
-        ElementLink<WorldSectionElement> contraption = scene.world()
-            .showIndependentSection(util.select().fromTo(5, 2, 2, 6, 3, 2), Direction.DOWN);
+        ElementLink<WorldSectionElement> contraption = scene.world().showIndependentSection(util.select().fromTo(5, 2, 2, 6, 3, 2), Direction.DOWN);
         scene.world().configureCenterOfRotation(contraption, util.vector().centerOf(bearing));
         scene.idle(10);
         scene.world().rotateBearing(bearing, 360, 70);
         scene.world().rotateSection(contraption, 0, 360, 0, 70);
-        scene.overlay().showText(60).pointAt(util.vector().topOf(bearing.above(2))).colored(PonderPalette.RED)
-            .placeNearTarget().attachKeyFrame().text("Moving inventories can be tricky to access with automation.");
+        scene.overlay().showText(60).pointAt(util.vector().topOf(bearing.up(2))).colored(PonderPalette.RED).placeNearTarget().attachKeyFrame()
+            .text("Moving inventories can be tricky to access with automation.");
 
         scene.idle(70);
         BlockPos psi = util.grid().at(4, 2, 2);
@@ -53,15 +52,14 @@ public class MovementActorScenes {
         scene.idle(13);
         scene.effects().superGlue(psi, Direction.EAST, true);
 
-        scene.overlay().showText(80).pointAt(util.vector().topOf(psi)).colored(PonderPalette.GREEN).placeNearTarget()
-            .attachKeyFrame()
+        scene.overlay().showText(80).pointAt(util.vector().topOf(psi)).colored(PonderPalette.GREEN).placeNearTarget().attachKeyFrame()
             .text("This component can interact with storage without the need to stop the contraption.");
         scene.idle(90);
 
         BlockPos psi2 = psi.west(2);
         scene.world().showSection(util.select().position(psi2), Direction.DOWN);
-        scene.overlay().showOutlineWithText(util.select().position(psi.west()), 50).colored(PonderPalette.RED)
-            .placeNearTarget().attachKeyFrame().text("Place a second one with a gap of 1 or 2 blocks inbetween");
+        scene.overlay().showOutlineWithText(util.select().position(psi.west()), 50).colored(PonderPalette.RED).placeNearTarget().attachKeyFrame()
+            .text("Place a second one with a gap of 1 or 2 blocks inbetween");
         scene.idle(55);
 
         scene.world().rotateBearing(bearing, 360, 60);
@@ -86,25 +84,21 @@ public class MovementActorScenes {
         scene.overlay().showOutline(PonderPalette.GREEN, psi, util.select().fromTo(5, 3, 2, 6, 3, 2), 80);
         scene.idle(10);
 
-        scene.overlay().showOutlineWithText(util.select().position(psi2), 70).placeNearTarget()
-            .colored(PonderPalette.GREEN).attachKeyFrame()
+        scene.overlay().showOutlineWithText(util.select().position(psi2), 70).placeNearTarget().colored(PonderPalette.GREEN).attachKeyFrame()
             .text("While engaged, the stationary interface will represent ALL inventories on the contraption");
 
         scene.idle(80);
 
         BlockPos hopper = util.grid().at(2, 3, 2);
         scene.world().showSection(util.select().position(hopper), Direction.DOWN);
-        scene.overlay().showText(70).placeNearTarget().pointAt(util.vector().topOf(hopper)).attachKeyFrame()
-            .text("Items can now be inserted...");
+        scene.overlay().showText(70).placeNearTarget().pointAt(util.vector().topOf(hopper)).attachKeyFrame().text("Items can now be inserted...");
 
         ItemStack itemStack = new ItemStack(Items.COPPER_INGOT);
-        Vec3 entitySpawn = util.vector().topOf(hopper.above(3));
+        Vec3d entitySpawn = util.vector().topOf(hopper.up(3));
 
-        ElementLink<EntityElement> entity1 = scene.world()
-            .createItemEntity(entitySpawn, util.vector().of(0, 0.2, 0), itemStack);
+        ElementLink<EntityElement> entity1 = scene.world().createItemEntity(entitySpawn, util.vector().of(0, 0.2, 0), itemStack);
         scene.idle(10);
-        ElementLink<EntityElement> entity2 = scene.world()
-            .createItemEntity(entitySpawn, util.vector().of(0, 0.2, 0), itemStack);
+        ElementLink<EntityElement> entity2 = scene.world().createItemEntity(entitySpawn, util.vector().of(0, 0.2, 0), itemStack);
         scene.idle(10);
         scene.world().modifyEntity(entity1, Entity::discard);
         scene.idle(10);
@@ -120,8 +114,7 @@ public class MovementActorScenes {
         scene.world().showSection(util.select().fromTo(0, 1, 0, 1, 2, 6), Direction.DOWN);
         scene.idle(10);
         scene.world().createItemOnBelt(beltPos, Direction.EAST, itemStack.copy());
-        scene.overlay().showText(40).placeNearTarget().pointAt(util.vector().topOf(beltPos.above()))
-            .text("...or extracted from the contraption");
+        scene.overlay().showText(40).placeNearTarget().pointAt(util.vector().topOf(beltPos.up())).text("...or extracted from the contraption");
         scene.idle(15);
         scene.world().createItemOnBelt(beltPos, Direction.EAST, itemStack);
 
@@ -160,8 +153,7 @@ public class MovementActorScenes {
         scene.world().showSection(util.select().layer(1), Direction.DOWN);
         scene.idle(5);
 
-        ElementLink<WorldSectionElement> contraption = scene.world()
-            .showIndependentSection(util.select().layersFrom(2), Direction.DOWN);
+        ElementLink<WorldSectionElement> contraption = scene.world().showIndependentSection(util.select().layersFrom(2), Direction.DOWN);
         BlockPos bearing = util.grid().at(3, 1, 3);
         scene.world().configureCenterOfRotation(contraption, util.vector().topOf(bearing));
         scene.idle(20);
@@ -189,10 +181,9 @@ public class MovementActorScenes {
         scene.scaleSceneView(0.9f);
 
         Selection crops = util.select().fromTo(4, 1, 2, 3, 1, 2)
-            .add(util.select().fromTo(3, 1, 1, 2, 1, 1).add(util.select().position(2, 1, 3))
-                .add(util.select().position(1, 1, 2)));
+            .add(util.select().fromTo(3, 1, 1, 2, 1, 1).add(util.select().position(2, 1, 3)).add(util.select().position(1, 1, 2)));
 
-        scene.world().setBlocks(crops, Blocks.WHEAT.defaultBlockState().setValue(CropBlock.AGE, 7), false);
+        scene.world().setBlocks(crops, Blocks.WHEAT.getDefaultState().with(CropBlock.AGE, 7), false);
         scene.world().showSection(util.select().layer(0), Direction.UP);
 
         BlockPos bearingPos = util.grid().at(4, 1, 4);
@@ -202,10 +193,7 @@ public class MovementActorScenes {
         scene.world().showSection(util.select().position(bearingPos), Direction.DOWN);
         scene.idle(5);
         ElementLink<WorldSectionElement> contraption = scene.world()
-            .showIndependentSection(
-                util.select().fromTo(4, 2, 4, 2, 2, 5).add(util.select().fromTo(2, 1, 5, 0, 1, 5)),
-                Direction.DOWN
-            );
+            .showIndependentSection(util.select().fromTo(4, 2, 4, 2, 2, 5).add(util.select().fromTo(2, 1, 5, 0, 1, 5)), Direction.DOWN);
         scene.world().configureCenterOfRotation(contraption, util.vector().centerOf(bearingPos));
         scene.idle(10);
 
@@ -214,22 +202,16 @@ public class MovementActorScenes {
             scene.idle(5);
         }
 
-        scene.overlay().showText(60).attachKeyFrame().placeNearTarget()
-            .pointAt(util.vector().blockSurface(util.grid().at(1, 1, 4), Direction.SOUTH))
+        scene.overlay().showText(60).attachKeyFrame().placeNearTarget().pointAt(util.vector().blockSurface(util.grid().at(1, 1, 4), Direction.SOUTH))
             .text("Whenever Harvesters are moved as part of an animated Contraption...");
         scene.idle(70);
 
-        for (int i = 0; i < 3; i++) {
-            scene.world().modifyBlockEntity(
-                util.grid().at(i, 1, 4),
-                HarvesterBlockEntity.class,
-                hte -> hte.setAnimatedSpeed(-150)
-            );
-        }
+        for (int i = 0; i < 3; i++)
+            scene.world().modifyBlockEntity(util.grid().at(i, 1, 4), HarvesterBlockEntity.class, hte -> hte.setAnimatedSpeed(-150));
         scene.world().rotateBearing(bearingPos, -360, 140);
         scene.world().rotateSection(contraption, 0, -360, 0, 140);
 
-        BlockState harvested = Blocks.WHEAT.defaultBlockState();
+        BlockState harvested = Blocks.WHEAT.getDefaultState();
         ItemStack wheatItem = new ItemStack(Items.WHEAT);
 
         scene.idle(5);
@@ -256,37 +238,29 @@ public class MovementActorScenes {
         scene.world().setBlock(current, harvested, true);
         scene.world().createItemEntity(util.vector().centerOf(current), util.vector().of(.2, 0.3, 0), wheatItem);
 
-        scene.overlay().showText(80).pointAt(util.vector().topOf(1, 0, 2))
-            .text("They will harvest and reset any mature crops on their way").placeNearTarget();
+        scene.overlay().showText(80).pointAt(util.vector().topOf(1, 0, 2)).text("They will harvest and reset any mature crops on their way")
+            .placeNearTarget();
 
         scene.idle(101);
         scene.world().hideSection(crops, Direction.DOWN);
         scene.idle(15);
         scene.world().modifyEntities(ItemEntity.class, Entity::discard);
-        scene.world().setBlocks(crops, Blocks.WHEAT.defaultBlockState().setValue(CropBlock.AGE, 7), false);
+        scene.world().setBlocks(crops, Blocks.WHEAT.getDefaultState().with(CropBlock.AGE, 7), false);
         scene.world().showSection(crops, Direction.UP);
 
-        for (int i = 0; i < 3; i++) {
-            scene.world()
-                .modifyBlockEntity(util.grid().at(i, 1, 4), HarvesterBlockEntity.class, hte -> hte.setAnimatedSpeed(0));
-        }
+        for (int i = 0; i < 3; i++)
+            scene.world().modifyBlockEntity(util.grid().at(i, 1, 4), HarvesterBlockEntity.class, hte -> hte.setAnimatedSpeed(0));
         scene.idle(10);
 
         scene.world().cycleBlockProperty(util.grid().at(1, 1, 5), LinearChassisBlock.STICKY_TOP);
         scene.world().glueBlockOnto(util.grid().at(1, 2, 5), Direction.DOWN, contraption);
 
-        scene.overlay().showText(60).attachKeyFrame().placeNearTarget()
-            .pointAt(util.vector().blockSurface(util.grid().at(1, 2, 5), Direction.WEST))
+        scene.overlay().showText(60).attachKeyFrame().placeNearTarget().pointAt(util.vector().blockSurface(util.grid().at(1, 2, 5), Direction.WEST))
             .sharedText("storage_on_contraption");
         scene.idle(70);
 
-        for (int i = 0; i < 3; i++) {
-            scene.world().modifyBlockEntity(
-                util.grid().at(i, 1, 4),
-                HarvesterBlockEntity.class,
-                hte -> hte.setAnimatedSpeed(-150)
-            );
-        }
+        for (int i = 0; i < 3; i++)
+            scene.world().modifyBlockEntity(util.grid().at(i, 1, 4), HarvesterBlockEntity.class, hte -> hte.setAnimatedSpeed(-150));
         scene.world().rotateBearing(bearingPos, -360, 140);
         scene.world().rotateSection(contraption, 0, -360, 0, 140);
 
@@ -310,10 +284,8 @@ public class MovementActorScenes {
 
         scene.idle(116);
         scene.overlay().showControls(util.vector().topOf(1, 2, 5), Pointing.DOWN, 50).withItem(wheatItem);
-        for (int i = 0; i < 3; i++) {
-            scene.world()
-                .modifyBlockEntity(util.grid().at(i, 1, 4), HarvesterBlockEntity.class, hte -> hte.setAnimatedSpeed(0));
-        }
+        for (int i = 0; i < 3; i++)
+            scene.world().modifyBlockEntity(util.grid().at(i, 1, 4), HarvesterBlockEntity.class, hte -> hte.setAnimatedSpeed(0));
     }
 
     public static void plough(SceneBuilder builder, SceneBuildingUtil util) {
@@ -327,24 +299,20 @@ public class MovementActorScenes {
         Selection dynamic = util.select().fromTo(4, 0, 6, 5, 1, 6);
 
         scene.showBasePlate();
-        ElementLink<WorldSectionElement> cogs = scene.world()
-            .showIndependentSection(util.select().fromTo(4, 0, 6, 5, 1, 6), Direction.UP);
+        ElementLink<WorldSectionElement> cogs = scene.world().showIndependentSection(util.select().fromTo(4, 0, 6, 5, 1, 6), Direction.UP);
         scene.idle(5);
         scene.world().showSection(kinetics.substract(dynamic), Direction.DOWN);
-        ElementLink<WorldSectionElement> pistonHead = scene.world()
-            .showIndependentSection(util.select().fromTo(5, 1, 1, 7, 1, 1), Direction.DOWN);
+        ElementLink<WorldSectionElement> pistonHead = scene.world().showIndependentSection(util.select().fromTo(5, 1, 1, 7, 1, 1), Direction.DOWN);
         scene.world().moveSection(pistonHead, util.vector().of(0, 0, 1), 0);
         scene.idle(5);
-        ElementLink<WorldSectionElement> contraption = scene.world()
-            .showIndependentSection(util.select().fromTo(4, 1, 3, 4, 1, 2), Direction.DOWN);
+        ElementLink<WorldSectionElement> contraption = scene.world().showIndependentSection(util.select().fromTo(4, 1, 3, 4, 1, 2), Direction.DOWN);
         scene.idle(10);
         scene.world().showSectionAndMerge(util.select().position(3, 1, 3), Direction.EAST, contraption);
         scene.idle(5);
         scene.world().showSectionAndMerge(util.select().position(3, 1, 2), Direction.EAST, contraption);
         scene.idle(20);
 
-        scene.overlay().showText(60).attachKeyFrame().placeNearTarget()
-            .pointAt(util.vector().blockSurface(util.grid().at(3, 1, 3), Direction.EAST))
+        scene.overlay().showText(60).attachKeyFrame().placeNearTarget().pointAt(util.vector().blockSurface(util.grid().at(3, 1, 3), Direction.EAST))
             .text("Whenever Ploughs are moved as part of an animated Contraption...");
         scene.idle(50);
         scene.world().showSection(garbage, Direction.EAST);
@@ -356,7 +324,7 @@ public class MovementActorScenes {
         scene.world().moveSection(contraption, util.vector().of(-2, 0, 0), 60);
         scene.idle(15);
 
-        Vec3 m = util.vector().of(-0.1, .2, 0);
+        Vec3d m = util.vector().of(-0.1, .2, 0);
         scene.world().destroyBlock(util.grid().at(2, 1, 3));
         scene.world().createItemEntity(util.vector().centerOf(2, 1, 3), m, new ItemStack(Items.LEVER));
         scene.world().destroyBlock(util.grid().at(2, 1, 2));
@@ -369,8 +337,7 @@ public class MovementActorScenes {
         scene.world().destroyBlock(util.grid().at(1, 1, 2));
         scene.world().createItemEntity(util.vector().centerOf(1, 1, 2), m, new ItemStack(Items.REDSTONE));
 
-        scene.overlay().showText(60).placeNearTarget()
-            .pointAt(util.vector().blockSurface(util.grid().at(1, 1, 3), Direction.EAST))
+        scene.overlay().showText(60).placeNearTarget().pointAt(util.vector().blockSurface(util.grid().at(1, 1, 3), Direction.EAST))
             .text("...they will break blocks without a solid collision hitbox");
         scene.idle(50);
 
@@ -379,13 +346,11 @@ public class MovementActorScenes {
         scene.world().moveSection(contraption, util.vector().of(2, 0, 0), 40);
         scene.world().hideSection(garbage, Direction.UP);
         scene.idle(40);
-        scene.world().setBlocks(garbage, Blocks.SNOW.defaultBlockState(), false);
+        scene.world().setBlocks(garbage, Blocks.SNOW.getDefaultState(), false);
         scene.world().modifyEntities(ItemEntity.class, Entity::discard);
-        ElementLink<WorldSectionElement> chest = scene.world()
-            .showIndependentSection(util.select().position(4, 2, 2), Direction.DOWN);
+        ElementLink<WorldSectionElement> chest = scene.world().showIndependentSection(util.select().position(4, 2, 2), Direction.DOWN);
 
-        scene.overlay().showText(60).attachKeyFrame().placeNearTarget()
-            .pointAt(util.vector().blockSurface(util.grid().at(4, 2, 2), Direction.WEST))
+        scene.overlay().showText(60).attachKeyFrame().placeNearTarget().pointAt(util.vector().blockSurface(util.grid().at(4, 2, 2), Direction.WEST))
             .sharedText("storage_on_contraption");
         scene.idle(15);
         scene.effects().superGlue(util.grid().at(4, 2, 2), Direction.DOWN, true);
@@ -405,8 +370,7 @@ public class MovementActorScenes {
         scene.world().destroyBlock(util.grid().at(1, 1, 2));
         scene.idle(15);
 
-        scene.overlay().showControls(util.vector().topOf(2, 2, 2), Pointing.DOWN, 40)
-            .withItem(new ItemStack(Items.SNOWBALL));
+        scene.overlay().showControls(util.vector().topOf(2, 2, 2), Pointing.DOWN, 40).withItem(new ItemStack(Items.SNOWBALL));
         scene.idle(40);
         scene.world().hideIndependentSection(chest, Direction.UP);
         scene.world().modifyKineticSpeed(util.select().everywhere(), f -> -f);
@@ -417,10 +381,9 @@ public class MovementActorScenes {
         Selection dirt = util.select().fromTo(2, 0, 3, 1, 0, 2);
         scene.world().hideSection(dirt, Direction.DOWN);
         scene.idle(15);
-        scene.world().setBlocks(dirt, Blocks.GRASS_BLOCK.defaultBlockState(), false);
+        scene.world().setBlocks(dirt, Blocks.GRASS_BLOCK.getDefaultState(), false);
         scene.world().showSection(dirt, Direction.UP);
-        scene.overlay().showText(60).placeNearTarget().attachKeyFrame()
-            .pointAt(util.vector().blockSurface(util.grid().at(3, 1, 3), Direction.EAST))
+        scene.overlay().showText(60).placeNearTarget().attachKeyFrame().pointAt(util.vector().blockSurface(util.grid().at(3, 1, 3), Direction.EAST))
             .text("Additionally, ploughs can create farmland");
         scene.idle(30);
 
@@ -429,9 +392,9 @@ public class MovementActorScenes {
         scene.world().moveSection(contraption, util.vector().of(-2, 0, 0), 60);
         scene.world().moveSection(chest, util.vector().of(-2, 0, 0), 60);
         scene.idle(15);
-        scene.world().setBlocks(util.select().fromTo(2, 0, 2, 2, 0, 3), Blocks.FARMLAND.defaultBlockState(), true);
+        scene.world().setBlocks(util.select().fromTo(2, 0, 2, 2, 0, 3), Blocks.FARMLAND.getDefaultState(), true);
         scene.idle(30);
-        scene.world().setBlocks(util.select().fromTo(1, 0, 2, 1, 0, 3), Blocks.FARMLAND.defaultBlockState(), true);
+        scene.world().setBlocks(util.select().fromTo(1, 0, 2, 1, 0, 3), Blocks.FARMLAND.getDefaultState(), true);
         scene.idle(20);
 
         scene.world().modifyKineticSpeed(util.select().everywhere(), f -> -f);
@@ -466,8 +429,7 @@ public class MovementActorScenes {
         scene.world().rotateBearing(bearingPos, 90, 20);
 
         scene.idle(10);
-        ElementLink<ParrotElement> birb = scene.special()
-            .createBirb(util.vector().topOf(3, 0, 2).add(0, 0, 0.5), ParrotPose.FlappyPose::new);
+        ElementLink<ParrotElement> birb = scene.special().createBirb(util.vector().topOf(3, 0, 2).add(0, 0, 0.5), ParrotPose.FlappyPose::new);
         scene.idle(11);
 
         scene.world().modifyKineticSpeed(util.select().everywhere(), f -> -2 * f);
@@ -511,8 +473,7 @@ public class MovementActorScenes {
         scene.world().showSection(util.select().position(bearingPos), Direction.DOWN);
         scene.idle(5);
 
-        ElementLink<WorldSectionElement> contraptionLink = scene.world()
-            .showIndependentSection(contraption, Direction.DOWN);
+        ElementLink<WorldSectionElement> contraptionLink = scene.world().showIndependentSection(contraption, Direction.DOWN);
         scene.world().configureCenterOfRotation(contraptionLink, util.vector().centerOf(bearingPos));
         scene.idle(10);
 
@@ -521,7 +482,7 @@ public class MovementActorScenes {
         scene.world().rotateBearing(bearingPos, -30, 20);
         scene.world().rotateSection(contraptionLink, 0, -30, 0, 20);
 
-        BlockState harvested = Blocks.WHEAT.defaultBlockState();
+        BlockState harvested = Blocks.WHEAT.getDefaultState();
 
         scene.idle(20);
         scene.overlay().showText(60).placeNearTarget().pointAt(util.vector().topOf(cobblePos))
@@ -532,11 +493,10 @@ public class MovementActorScenes {
             scene.world().incrementBlockBreakingProgress(cobblePos);
         }
 
-        Vec3 m = util.vector().of(.1, 0, -.1);
+        Vec3d m = util.vector().of(.1, 0, -.1);
         ItemStack cobbleItem = new ItemStack(Items.COBBLESTONE);
         ItemStack wheatItem = new ItemStack(Items.WHEAT);
-        ElementLink<EntityElement> item1 = scene.world()
-            .createItemEntity(util.vector().centerOf(cobblePos), m, cobbleItem);
+        ElementLink<EntityElement> item1 = scene.world().createItemEntity(util.vector().centerOf(cobblePos), m, cobbleItem);
 
         scene.idle(5);
 
@@ -545,8 +505,7 @@ public class MovementActorScenes {
         scene.idle(5);
 
         scene.world().setBlock(wheatPos, harvested, true);
-        ElementLink<EntityElement> item2 = scene.world()
-            .createItemEntity(util.vector().centerOf(wheatPos), m, wheatItem);
+        ElementLink<EntityElement> item2 = scene.world().createItemEntity(util.vector().centerOf(wheatPos), m, wheatItem);
         scene.idle(35);
 
         scene.world().modifyBlockEntity(harvesterPos, HarvesterBlockEntity.class, hte -> hte.setAnimatedSpeed(0));
@@ -569,8 +528,8 @@ public class MovementActorScenes {
         scene.idle(15);
         scene.effects().superGlue(controlsPos1, Direction.DOWN, true);
 
-        scene.overlay().showText(60).placeNearTarget().pointAt(util.vector().topOf(controlsPos1).add(0, -4 / 16f, 0))
-            .attachKeyFrame().text("Contraption Controls can be used to toggle them on the fly");
+        scene.overlay().showText(60).placeNearTarget().pointAt(util.vector().topOf(controlsPos1).add(0, -4 / 16f, 0)).attachKeyFrame()
+            .text("Contraption Controls can be used to toggle them on the fly");
         scene.idle(55);
 
         scene.world().rotateBearing(bearingPos, -15, 10);
@@ -582,8 +541,7 @@ public class MovementActorScenes {
         scene.world().setKineticSpeed(util.select().position(drillPos), 0);
         scene.overlay().showControls(util.vector().of(1.5, 2.75, 4.5), Pointing.DOWN, 15).rightClick();
         scene.idle(7);
-        scene.world()
-            .modifyBlockEntity(controlsPos1, ContraptionControlsBlockEntity.class, ccte -> ccte.disabled = true);
+        scene.world().modifyBlockEntity(controlsPos1, ContraptionControlsBlockEntity.class, ccte -> ccte.disabled = true);
         scene.effects().indicateRedstone(util.grid().at(1, 2, 4));
         scene.idle(10);
         scene.world().rotateBearing(bearingPos, -60, 40);
@@ -592,8 +550,7 @@ public class MovementActorScenes {
 
         scene.overlay().showControls(util.vector().of(3.5, 2.75, 1), Pointing.DOWN, 15).rightClick();
         scene.idle(7);
-        scene.world()
-            .modifyBlockEntity(controlsPos1, ContraptionControlsBlockEntity.class, ccte -> ccte.disabled = false);
+        scene.world().modifyBlockEntity(controlsPos1, ContraptionControlsBlockEntity.class, ccte -> ccte.disabled = false);
         scene.effects().indicateRedstone(util.grid().at(3, 2, 0));
         scene.idle(10);
         scene.world().modifyBlockEntity(harvesterPos, HarvesterBlockEntity.class, hte -> hte.setAnimatedSpeed(-280));
@@ -617,26 +574,23 @@ public class MovementActorScenes {
         scene.idle(15);
         scene.effects().superGlue(controlsPos2, Direction.DOWN, true);
 
-        scene.overlay().showText(60).placeNearTarget().pointAt(util.vector().topOf(controlsPos2).add(0, -4 / 16f, 0))
-            .attachKeyFrame().text("They can be attached anywhere on the contraption");
+        scene.overlay().showText(60).placeNearTarget().pointAt(util.vector().topOf(controlsPos2).add(0, -4 / 16f, 0)).attachKeyFrame()
+            .text("They can be attached anywhere on the contraption");
         scene.idle(75);
 
         scene.overlay().showControls(util.vector().topOf(controlsPos2), Pointing.DOWN, 30).rightClick()
-            .withItem(AllItems.MECHANICAL_DRILL.getDefaultInstance());
+            .withItem(AllItems.MECHANICAL_DRILL.getDefaultStack());
         scene.idle(5);
         scene.overlay().showControls(util.vector().centerOf(controlsPos1), Pointing.UP, 25).rightClick()
-            .withItem(AllItems.MECHANICAL_HARVESTER.getDefaultInstance());
+            .withItem(AllItems.MECHANICAL_HARVESTER.getDefaultStack());
         scene.idle(2);
-        scene.world().setFilterData(
-            util.select().position(controlsPos2),
-            ContraptionControlsBlockEntity.class,
-            AllItems.MECHANICAL_DRILL.getDefaultInstance()
-        );
+        scene.world()
+            .setFilterData(util.select().position(controlsPos2), ContraptionControlsBlockEntity.class, AllItems.MECHANICAL_DRILL.getDefaultStack());
         scene.idle(5);
         scene.world().setFilterData(
             util.select().position(controlsPos1),
             ContraptionControlsBlockEntity.class,
-            AllItems.MECHANICAL_HARVESTER.getDefaultInstance()
+            AllItems.MECHANICAL_HARVESTER.getDefaultStack()
         );
         scene.idle(30);
 
@@ -646,8 +600,7 @@ public class MovementActorScenes {
 
         scene.overlay().showControls(util.vector().topOf(controlsPos2), Pointing.RIGHT, 15).rightClick();
         scene.idle(7);
-        scene.world()
-            .modifyBlockEntity(controlsPos2, ContraptionControlsBlockEntity.class, ccte -> ccte.disabled = true);
+        scene.world().modifyBlockEntity(controlsPos2, ContraptionControlsBlockEntity.class, ccte -> ccte.disabled = true);
         scene.effects().indicateRedstone(controlsPos2);
         scene.idle(10);
 
@@ -656,8 +609,7 @@ public class MovementActorScenes {
         scene.world().rotateSection(contraptionLink, 0, -90, 0, 60);
         scene.idle(25);
         scene.world().setBlock(wheatPos, harvested, true);
-        ElementLink<EntityElement> item3 = scene.world()
-            .createItemEntity(util.vector().centerOf(wheatPos), m, wheatItem);
+        ElementLink<EntityElement> item3 = scene.world().createItemEntity(util.vector().centerOf(wheatPos), m, wheatItem);
         scene.idle(35);
         scene.world().modifyBlockEntity(harvesterPos, HarvesterBlockEntity.class, hte -> hte.setAnimatedSpeed(0));
         scene.idle(5);
@@ -665,8 +617,7 @@ public class MovementActorScenes {
         scene.world().modifyEntity(item3, Entity::discard);
         scene.world().hideIndependentSection(contraptionLink, Direction.UP);
         scene.idle(15);
-        scene.world()
-            .modifyBlockEntity(controlsPos2, ContraptionControlsBlockEntity.class, ccte -> ccte.disabled = false);
+        scene.world().modifyBlockEntity(controlsPos2, ContraptionControlsBlockEntity.class, ccte -> ccte.disabled = false);
         contraptionLink = scene.world().showIndependentSection(contraption, Direction.DOWN);
         scene.world().showSectionAndMerge(util.select().position(controlsPos1), Direction.DOWN, contraptionLink);
         scene.world().showSectionAndMerge(util.select().position(controlsPos2), Direction.DOWN, contraptionLink);
@@ -678,14 +629,12 @@ public class MovementActorScenes {
 
         scene.world().showSection(leverCol, Direction.EAST);
 
-        scene.overlay().showText(50).placeNearTarget().independent(100).attachKeyFrame()
-            .text("If it is redstone-activated during assembly...");
+        scene.overlay().showText(50).placeNearTarget().independent(100).attachKeyFrame().text("If it is redstone-activated during assembly...");
         scene.idle(30);
 
         scene.world().toggleRedstonePower(leverCol);
         scene.effects().indicateRedstone(leverPos);
-        scene.world()
-            .modifyBlockEntity(controlsPos1, ContraptionControlsBlockEntity.class, ccte -> ccte.disabled = true);
+        scene.world().modifyBlockEntity(controlsPos1, ContraptionControlsBlockEntity.class, ccte -> ccte.disabled = true);
         scene.idle(35);
 
         scene.world().setKineticSpeed(util.select().position(drillPos), 64);
@@ -701,8 +650,7 @@ public class MovementActorScenes {
             scene.world().incrementBlockBreakingProgress(cobblePos);
         }
 
-        ElementLink<EntityElement> item4 = scene.world()
-            .createItemEntity(util.vector().centerOf(cobblePos), m, cobbleItem);
+        ElementLink<EntityElement> item4 = scene.world().createItemEntity(util.vector().centerOf(cobblePos), m, cobbleItem);
 
         scene.idle(5);
         scene.world().rotateBearing(bearingPos, -60, 40);

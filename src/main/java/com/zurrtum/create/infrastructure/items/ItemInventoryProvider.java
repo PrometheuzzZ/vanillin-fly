@@ -2,37 +2,37 @@ package com.zurrtum.create.infrastructure.items;
 
 import com.google.common.collect.MapMaker;
 import com.zurrtum.create.foundation.blockEntity.SmartBlockEntity;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.world.Container;
-import net.minecraft.world.WorldlyContainer;
-import net.minecraft.world.WorldlyContainerHolder;
-import net.minecraft.world.level.LevelAccessor;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.InventoryProvider;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.inventory.Inventory;
+import net.minecraft.inventory.SidedInventory;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.world.WorldAccess;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Map;
 
-public interface ItemInventoryProvider<T extends SmartBlockEntity> extends WorldlyContainerHolder {
-    Map<Container, WorldlyContainer> WRAPPERS = new MapMaker().weakValues().makeMap();
+public interface ItemInventoryProvider<T extends SmartBlockEntity> extends InventoryProvider {
+    Map<Inventory, SidedInventory> WRAPPERS = new MapMaker().weakValues().makeMap();
 
     @Override
-    default WorldlyContainer getContainer(BlockState state, LevelAccessor world, BlockPos pos) {
-        Container inventory = getInventory(state, world, pos, null, null);
+    default SidedInventory getInventory(BlockState state, WorldAccess world, BlockPos pos) {
+        Inventory inventory = getInventory(state, world, pos, null, null);
         if (inventory == null) {
             return null;
         }
-        if (inventory instanceof WorldlyContainer sidedInventory) {
+        if (inventory instanceof SidedInventory sidedInventory) {
             return sidedInventory;
         }
         return WRAPPERS.computeIfAbsent(inventory, SidedInventoryWrapper::new);
     }
 
     @SuppressWarnings("unchecked")
-    default Container getInventory(
+    default Inventory getInventory(
         @Nullable BlockState state,
-        LevelAccessor world,
+        WorldAccess world,
         BlockPos pos,
         @Nullable BlockEntity blockEntity,
         Direction context
@@ -49,17 +49,16 @@ public interface ItemInventoryProvider<T extends SmartBlockEntity> extends World
             }
         } else {
             if (state == null) {
-                state = blockEntity.getBlockState();
+                state = blockEntity.getCachedState();
             }
         }
         Class<T> expectedClass = getBlockEntityClass();
-        if (!expectedClass.isInstance(blockEntity)) {
+        if (!expectedClass.isInstance(blockEntity))
             return null;
-        }
         return getInventory(world, pos, state, (T) blockEntity, context);
     }
 
     Class<T> getBlockEntityClass();
 
-    Container getInventory(LevelAccessor world, BlockPos pos, BlockState state, T blockEntity, Direction context);
+    Inventory getInventory(WorldAccess world, BlockPos pos, BlockState state, T blockEntity, Direction context);
 }

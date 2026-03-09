@@ -6,7 +6,7 @@ import com.zurrtum.create.content.logistics.tunnel.BrassTunnelBlockEntity;
 import com.zurrtum.create.foundation.blockEntity.SmartBlockEntity;
 import com.zurrtum.create.foundation.blockEntity.behaviour.filtering.ServerFilteringBehaviour;
 import com.zurrtum.create.foundation.blockEntity.behaviour.filtering.ServerSidedFilteringBehaviour;
-import net.minecraft.core.Direction;
+import net.minecraft.util.math.Direction;
 
 import java.util.EnumMap;
 import java.util.Map;

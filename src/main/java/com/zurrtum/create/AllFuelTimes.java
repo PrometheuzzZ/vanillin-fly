@@ -1,12 +1,12 @@
 package com.zurrtum.create;
 
-import net.minecraft.world.level.ItemLike;
+import net.minecraft.item.ItemConvertible;
 
 import java.util.IdentityHashMap;
 import java.util.Map;
 
 public class AllFuelTimes {
-    public static final Map<ItemLike, Integer> ALL = new IdentityHashMap<>();
+    public static final Map<ItemConvertible, Integer> ALL = new IdentityHashMap<>();
 
     public static void register() {
         ALL.put(AllItems.BLAZE_CAKE, 6400);

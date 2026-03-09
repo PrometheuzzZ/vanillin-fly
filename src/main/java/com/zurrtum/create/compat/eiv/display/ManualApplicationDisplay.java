@@ -7,11 +7,11 @@ import com.zurrtum.create.content.processing.recipe.ProcessingOutput;
 import com.zurrtum.create.foundation.codec.CreateCodecs;
 import de.crafty.eiv.common.api.recipe.EivRecipeType;
 import de.crafty.eiv.common.api.recipe.IEivServerRecipe;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.Tag;
-import net.minecraft.resources.RegistryOps;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.crafting.RecipeHolder;
+import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NbtCompound;
+import net.minecraft.nbt.NbtElement;
+import net.minecraft.recipe.RecipeEntry;
+import net.minecraft.registry.RegistryOps;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -26,7 +26,7 @@ public class ManualApplicationDisplay extends CreateDisplay {
     public ManualApplicationDisplay() {
     }
 
-    public ManualApplicationDisplay(RecipeHolder<? extends ItemApplicationRecipe> entry) {
+    public ManualApplicationDisplay(RecipeEntry<? extends ItemApplicationRecipe> entry) {
         ItemApplicationRecipe recipe = entry.value();
         List<ProcessingOutput> outputs = recipe.results();
         int size = outputs.size();
@@ -42,23 +42,23 @@ public class ManualApplicationDisplay extends CreateDisplay {
     }
 
     @Override
-    public void writeToTag(CompoundTag tag) {
-        RegistryOps<Tag> ops = getServerOps();
-        tag.store("results", STACKS_CODEC, ops, results);
-        tag.store("chances", CreateCodecs.FLOAT_LIST_CODEC, ops, chances);
-        tag.store("target", STACKS_CODEC, ops, target);
-        tag.store("ingredient", STACKS_CODEC, ops, ingredient);
+    public void writeToTag(NbtCompound tag) {
+        RegistryOps<NbtElement> ops = getServerOps();
+        tag.put("results", STACKS_CODEC, ops, results);
+        tag.put("chances", CreateCodecs.FLOAT_LIST_CODEC, ops, chances);
+        tag.put("target", STACKS_CODEC, ops, target);
+        tag.put("ingredient", STACKS_CODEC, ops, ingredient);
         tag.putBoolean("keepHeldItem", keepHeldItem);
     }
 
     @Override
-    public void loadFromTag(CompoundTag tag) {
-        RegistryOps<Tag> ops = getClientOps();
-        results = tag.read("results", STACKS_CODEC, ops).orElseThrow();
-        chances = tag.read("chances", CreateCodecs.FLOAT_LIST_CODEC, ops).orElseThrow();
-        target = tag.read("target", STACKS_CODEC, ops).orElseThrow();
-        ingredient = tag.read("ingredient", STACKS_CODEC, ops).orElseThrow();
-        keepHeldItem = tag.getBooleanOr("keepHeldItem", false);
+    public void loadFromTag(NbtCompound tag) {
+        RegistryOps<NbtElement> ops = getClientOps();
+        results = tag.get("results", STACKS_CODEC, ops).orElseThrow();
+        chances = tag.get("chances", CreateCodecs.FLOAT_LIST_CODEC, ops).orElseThrow();
+        target = tag.get("target", STACKS_CODEC, ops).orElseThrow();
+        ingredient = tag.get("ingredient", STACKS_CODEC, ops).orElseThrow();
+        keepHeldItem = tag.getBoolean("keepHeldItem", false);
     }
 
     @Override

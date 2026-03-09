@@ -3,29 +3,29 @@ package com.zurrtum.create.infrastructure.packet.c2s;
 import com.zurrtum.create.AllHandle;
 import com.zurrtum.create.AllPackets;
 import io.netty.buffer.ByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.PacketType;
-import net.minecraft.network.protocol.game.ServerGamePacketListener;
-import net.minecraft.server.network.ServerGamePacketListenerImpl;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.network.listener.ServerPlayPacketListener;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.PacketType;
+import net.minecraft.server.network.ServerPlayNetworkHandler;
 
-public record PlaceExtendedCurvePacket(boolean mainHand, boolean ctrlDown) implements Packet<ServerGamePacketListener> {
-    public static final StreamCodec<ByteBuf, PlaceExtendedCurvePacket> CODEC = StreamCodec.composite(
-        ByteBufCodecs.BOOL,
+public record PlaceExtendedCurvePacket(boolean mainHand, boolean ctrlDown) implements Packet<ServerPlayPacketListener> {
+    public static final PacketCodec<ByteBuf, PlaceExtendedCurvePacket> CODEC = PacketCodec.tuple(
+        PacketCodecs.BOOLEAN,
         PlaceExtendedCurvePacket::mainHand,
-        ByteBufCodecs.BOOL,
+        PacketCodecs.BOOLEAN,
         PlaceExtendedCurvePacket::ctrlDown,
         PlaceExtendedCurvePacket::new
     );
 
     @Override
-    public void handle(ServerGamePacketListener listener) {
-        AllHandle.onPlaceExtendedCurve((ServerGamePacketListenerImpl) listener, this);
+    public void apply(ServerPlayPacketListener listener) {
+        AllHandle.onPlaceExtendedCurve((ServerPlayNetworkHandler) listener, this);
     }
 
     @Override
-    public PacketType<PlaceExtendedCurvePacket> type() {
+    public PacketType<PlaceExtendedCurvePacket> getPacketType() {
         return AllPackets.PLACE_CURVED_TRACK;
     }
 }

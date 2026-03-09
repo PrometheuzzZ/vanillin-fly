@@ -1,31 +1,27 @@
 package com.zurrtum.create.mixin;
 
-import net.minecraft.core.Registry;
-import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.Identifier;
-import net.minecraft.resources.ResourceKey;
+import com.zurrtum.create.Create;
+import com.zurrtum.create.content.kinetics.fan.processing.FanProcessingTypeRegistry;
+import com.zurrtum.create.content.kinetics.mechanicalArm.ArmInteractionPointType;
+import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.registry.Registries;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
-
-import static com.zurrtum.create.Create.MOD_ID;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(Registries.class)
 public class RegistriesMixin {
-    @Inject(method = "elementsDirPath(Lnet/minecraft/resources/ResourceKey;)Ljava/lang/String;", at = @At("HEAD"), cancellable = true)
-    private static void getPath(ResourceKey<? extends Registry<?>> registryRef, CallbackInfoReturnable<String> cir) {
-        Identifier id = registryRef.identifier();
-        if (id.getNamespace().equals(MOD_ID)) {
-            cir.setReturnValue(id.getPath());
+    @Inject(method = "freezeRegistries()V", at = @At("HEAD"))
+    private static void onInitialize(CallbackInfo ci) {
+        if (!FabricLoader.getInstance().isModLoaded("fabric-api")) {
+            Create.register();
         }
     }
 
-    @Inject(method = "tagsDirPath(Lnet/minecraft/resources/ResourceKey;)Ljava/lang/String;", at = @At("HEAD"), cancellable = true)
-    private static void getTagPath(ResourceKey<? extends Registry<?>> registryRef, CallbackInfoReturnable<String> cir) {
-        Identifier id = registryRef.identifier();
-        if (id.getNamespace().equals(MOD_ID)) {
-            cir.setReturnValue("tags/" + id.getPath());
-        }
+    @Inject(method = "freezeRegistries()V", at = @At("TAIL"))
+    private static void afterFreeze(CallbackInfo ci) {
+        ArmInteractionPointType.register();
+        FanProcessingTypeRegistry.register();
     }
 }

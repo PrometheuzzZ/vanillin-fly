@@ -1,9 +1,5 @@
 package com.zurrtum.create.client.ponder.foundation.element;
 
-import com.mojang.blaze3d.vertex.MeshData;
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.SheetedDecalTextureGenerator;
-import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.zurrtum.create.catnip.data.Pair;
 import com.zurrtum.create.catnip.math.VecHelper;
 import com.zurrtum.create.catnip.registry.RegisteredObjectsHelper;
@@ -11,11 +7,8 @@ import com.zurrtum.create.client.catnip.animation.AnimationTickHolder;
 import com.zurrtum.create.client.catnip.client.render.model.BakedModelBufferer;
 import com.zurrtum.create.client.catnip.client.render.model.ShadeSeparatedResultConsumer;
 import com.zurrtum.create.client.catnip.outliner.AABBOutline;
-import com.zurrtum.create.client.catnip.render.SuperByteBuffer;
-import com.zurrtum.create.client.catnip.render.SuperByteBufferBuilder;
-import com.zurrtum.create.client.catnip.render.SuperByteBufferCache;
+import com.zurrtum.create.client.catnip.render.*;
 import com.zurrtum.create.client.catnip.render.SuperByteBufferCache.Compartment;
-import com.zurrtum.create.client.catnip.render.SuperRenderTypeBuffer;
 import com.zurrtum.create.client.compat.sodium.SodiumCompat;
 import com.zurrtum.create.client.flywheel.lib.transform.TransformStack;
 import com.zurrtum.create.client.ponder.Ponder;
@@ -23,36 +16,33 @@ import com.zurrtum.create.client.ponder.api.element.WorldSectionElement;
 import com.zurrtum.create.client.ponder.api.level.PonderLevel;
 import com.zurrtum.create.client.ponder.api.scene.Selection;
 import com.zurrtum.create.client.ponder.foundation.PonderScene;
-import net.minecraft.client.Camera;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.SubmitNodeCollector;
-import net.minecraft.client.renderer.block.BlockRenderDispatcher;
-import net.minecraft.client.renderer.blockentity.BlockEntityRenderDispatcher;
-import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
-import net.minecraft.client.renderer.blockentity.state.BlockEntityRenderState;
-import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
-import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
-import net.minecraft.client.renderer.item.ItemModelResolver;
-import net.minecraft.client.renderer.rendertype.RenderType;
-import net.minecraft.client.renderer.rendertype.RenderTypes;
-import net.minecraft.client.renderer.state.CameraRenderState;
-import net.minecraft.client.resources.model.ModelBakery;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction.Axis;
-import net.minecraft.util.Mth;
-import net.minecraft.world.level.ClipContext;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.EntityBlock;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.entity.BlockEntityTicker;
-import net.minecraft.world.level.block.entity.BlockEntityType;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.BlockHitResult;
-import net.minecraft.world.phys.Vec3;
-import net.minecraft.world.phys.shapes.CollisionContext;
-import net.minecraft.world.phys.shapes.VoxelShape;
+import net.minecraft.block.Block;
+import net.minecraft.block.BlockEntityProvider;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.ShapeContext;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.block.entity.BlockEntityTicker;
+import net.minecraft.block.entity.BlockEntityType;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.item.ItemModelManager;
+import net.minecraft.client.render.*;
+import net.minecraft.client.render.block.BlockRenderManager;
+import net.minecraft.client.render.block.entity.BlockEntityRenderManager;
+import net.minecraft.client.render.block.entity.BlockEntityRenderer;
+import net.minecraft.client.render.block.entity.state.BlockEntityRenderState;
+import net.minecraft.client.render.command.OrderedRenderCommandQueue;
+import net.minecraft.client.render.entity.EntityRenderManager;
+import net.minecraft.client.render.model.ModelBaker;
+import net.minecraft.client.render.state.CameraRenderState;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction.Axis;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.util.shape.VoxelShape;
+import net.minecraft.world.RaycastContext;
+import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -65,20 +55,19 @@ public class WorldSectionElementImpl extends AnimatedSceneElementBase implements
 
     public static final Compartment<Pair<Integer, Integer>> PONDER_WORLD_SECTION = new Compartment<>();
 
-    private static final ThreadLocal<ThreadLocalObjects> THREAD_LOCAL_OBJECTS = ThreadLocal.withInitial(
-        ThreadLocalObjects::new);
+    private static final ThreadLocal<ThreadLocalObjects> THREAD_LOCAL_OBJECTS = ThreadLocal.withInitial(ThreadLocalObjects::new);
 
     @Nullable List<BlockEntity> renderedBlockEntities;
-    @Nullable List<Pair<BlockEntity, Consumer<Level>>> tickableBlockEntities;
+    @Nullable List<Pair<BlockEntity, Consumer<World>>> tickableBlockEntities;
     @Nullable Selection section;
     boolean redraw;
 
-    Vec3 prevAnimatedOffset = Vec3.ZERO;
-    Vec3 animatedOffset = Vec3.ZERO;
-    Vec3 prevAnimatedRotation = Vec3.ZERO;
-    Vec3 animatedRotation = Vec3.ZERO;
-    Vec3 centerOfRotation = Vec3.ZERO;
-    @Nullable Vec3 stabilizationAnchor = null;
+    Vec3d prevAnimatedOffset = Vec3d.ZERO;
+    Vec3d animatedOffset = Vec3d.ZERO;
+    Vec3d prevAnimatedRotation = Vec3d.ZERO;
+    Vec3d animatedRotation = Vec3d.ZERO;
+    Vec3d centerOfRotation = Vec3d.ZERO;
+    @Nullable Vec3d stabilizationAnchor = null;
 
     @Nullable BlockPos selectedBlock;
 
@@ -93,11 +82,10 @@ public class WorldSectionElementImpl extends AnimatedSceneElementBase implements
     @Override
     public void mergeOnto(WorldSectionElement other) {
         setVisible(false);
-        if (other.isEmpty()) {
+        if (other.isEmpty())
             other.set(section);
-        } else {
+        else
             other.add(section);
-        }
     }
 
     @Override
@@ -121,12 +109,12 @@ public class WorldSectionElementImpl extends AnimatedSceneElementBase implements
     }
 
     @Override
-    public void setCenterOfRotation(Vec3 center) {
+    public void setCenterOfRotation(Vec3d center) {
         centerOfRotation = center;
     }
 
     @Override
-    public void stabilizeRotation(Vec3 anchor) {
+    public void stabilizeRotation(Vec3d anchor) {
         stabilizationAnchor = anchor;
     }
 
@@ -148,10 +136,10 @@ public class WorldSectionElementImpl extends AnimatedSceneElementBase implements
     }
 
     public void resetAnimatedTransform() {
-        prevAnimatedOffset = Vec3.ZERO;
-        animatedOffset = Vec3.ZERO;
-        prevAnimatedRotation = Vec3.ZERO;
-        animatedRotation = Vec3.ZERO;
+        prevAnimatedOffset = Vec3d.ZERO;
+        animatedOffset = Vec3d.ZERO;
+        prevAnimatedRotation = Vec3d.ZERO;
+        animatedRotation = Vec3d.ZERO;
     }
 
     @Override
@@ -170,28 +158,26 @@ public class WorldSectionElementImpl extends AnimatedSceneElementBase implements
     }
 
     @Override
-    public void setAnimatedRotation(Vec3 eulerAngles, boolean force) {
+    public void setAnimatedRotation(Vec3d eulerAngles, boolean force) {
         this.animatedRotation = eulerAngles;
-        if (force) {
+        if (force)
             prevAnimatedRotation = animatedRotation;
-        }
     }
 
     @Override
-    public Vec3 getAnimatedRotation() {
+    public Vec3d getAnimatedRotation() {
         return animatedRotation;
     }
 
     @Override
-    public void setAnimatedOffset(Vec3 offset, boolean force) {
+    public void setAnimatedOffset(Vec3d offset, boolean force) {
         this.animatedOffset = offset;
-        if (force) {
+        if (force)
             prevAnimatedOffset = animatedOffset;
-        }
     }
 
     @Override
-    public Vec3 getAnimatedOffset() {
+    public Vec3d getAnimatedOffset() {
         return animatedOffset;
     }
 
@@ -201,31 +187,30 @@ public class WorldSectionElementImpl extends AnimatedSceneElementBase implements
     }
 
     @Override
-    public Pair<Vec3, BlockHitResult> rayTrace(PonderLevel world, Vec3 source, Vec3 target) {
+    public Pair<Vec3d, BlockHitResult> rayTrace(PonderLevel world, Vec3d source, Vec3d target) {
         world.setMask(this.section);
-        Vec3 transformedTarget = reverseTransformVec(target);
-        BlockHitResult rayTraceBlocks = world.clip(new ClipContext(
+        Vec3d transformedTarget = reverseTransformVec(target);
+        BlockHitResult rayTraceBlocks = world.raycast(new RaycastContext(
             reverseTransformVec(source),
             transformedTarget,
-            ClipContext.Block.OUTLINE,
-            ClipContext.Fluid.NONE,
-            CollisionContext.empty()
+            RaycastContext.ShapeType.OUTLINE,
+            RaycastContext.FluidHandling.NONE,
+            ShapeContext.absent()
         ));
         world.clearMask();
 
-        double t = rayTraceBlocks.getLocation().subtract(transformedTarget).lengthSqr() / source.subtract(target)
-            .lengthSqr();
-        Vec3 actualHit = VecHelper.lerp((float) t, target, source);
+        double t = rayTraceBlocks.getPos().subtract(transformedTarget).lengthSquared() / source.subtract(target).lengthSquared();
+        Vec3d actualHit = VecHelper.lerp((float) t, target, source);
         return Pair.of(actualHit, rayTraceBlocks);
     }
 
-    private Vec3 reverseTransformVec(Vec3 in) {
+    private Vec3d reverseTransformVec(Vec3d in) {
         float pt = AnimationTickHolder.getPartialTicks();
         in = in.subtract(VecHelper.lerp(pt, prevAnimatedOffset, animatedOffset));
-        if (!animatedRotation.equals(Vec3.ZERO) || !prevAnimatedRotation.equals(Vec3.ZERO)) {
-            double rotX = Mth.lerp(pt, prevAnimatedRotation.x, animatedRotation.x);
-            double rotZ = Mth.lerp(pt, prevAnimatedRotation.z, animatedRotation.z);
-            double rotY = Mth.lerp(pt, prevAnimatedRotation.y, animatedRotation.y);
+        if (!animatedRotation.equals(Vec3d.ZERO) || !prevAnimatedRotation.equals(Vec3d.ZERO)) {
+            double rotX = MathHelper.lerp(pt, prevAnimatedRotation.x, animatedRotation.x);
+            double rotZ = MathHelper.lerp(pt, prevAnimatedRotation.z, animatedRotation.z);
+            double rotY = MathHelper.lerp(pt, prevAnimatedRotation.y, animatedRotation.y);
             in = in.subtract(centerOfRotation);
             in = VecHelper.rotate(in, -rotX, Axis.X);
             in = VecHelper.rotate(in, -rotZ, Axis.Z);
@@ -242,21 +227,21 @@ public class WorldSectionElementImpl extends AnimatedSceneElementBase implements
         return in;
     }
 
-    public void transformMS(PoseStack ms, float pt) {
+    public void transformMS(MatrixStack ms, float pt) {
 
-        Vec3 vec = VecHelper.lerp(pt, prevAnimatedOffset, animatedOffset);
+        Vec3d vec = VecHelper.lerp(pt, prevAnimatedOffset, animatedOffset);
         ms.translate(vec.x, vec.y, vec.z);
-        if (!animatedRotation.equals(Vec3.ZERO) || !prevAnimatedRotation.equals(Vec3.ZERO)) {
-            double rotX = Mth.lerp(pt, prevAnimatedRotation.x, animatedRotation.x);
-            double rotZ = Mth.lerp(pt, prevAnimatedRotation.z, animatedRotation.z);
-            double rotY = Mth.lerp(pt, prevAnimatedRotation.y, animatedRotation.y);
+        if (!animatedRotation.equals(Vec3d.ZERO) || !prevAnimatedRotation.equals(Vec3d.ZERO)) {
+            double rotX = MathHelper.lerp(pt, prevAnimatedRotation.x, animatedRotation.x);
+            double rotZ = MathHelper.lerp(pt, prevAnimatedRotation.z, animatedRotation.z);
+            double rotY = MathHelper.lerp(pt, prevAnimatedRotation.y, animatedRotation.y);
 
-            TransformStack.of(ms).translate(centerOfRotation).rotateXDegrees((float) rotX).rotateYDegrees((float) rotY)
-                .rotateZDegrees((float) rotZ).translateBack(centerOfRotation);
+            TransformStack.of(ms).translate(centerOfRotation).rotateXDegrees((float) rotX).rotateYDegrees((float) rotY).rotateZDegrees((float) rotZ)
+                .translateBack(centerOfRotation);
 
             if (stabilizationAnchor != null) {
-                TransformStack.of(ms).translate(stabilizationAnchor).rotateXDegrees((float) -rotX)
-                    .rotateYDegrees((float) -rotY).rotateZDegrees((float) -rotZ).translateBack(stabilizationAnchor);
+                TransformStack.of(ms).translate(stabilizationAnchor).rotateXDegrees((float) -rotX).rotateYDegrees((float) -rotY)
+                    .rotateZDegrees((float) -rotZ).translateBack(stabilizationAnchor);
             }
         }
     }
@@ -265,14 +250,12 @@ public class WorldSectionElementImpl extends AnimatedSceneElementBase implements
     public void tick(PonderScene scene) {
         prevAnimatedOffset = animatedOffset;
         prevAnimatedRotation = animatedRotation;
-        if (!isVisible()) {
+        if (!isVisible())
             return;
-        }
-        loadBEsIfMissing(scene.getLevel());
-        renderedBlockEntities.removeIf(be -> scene.getLevel().getBlockEntity(be.getBlockPos()) != be);
-        tickableBlockEntities.removeIf(be -> scene.getLevel()
-            .getBlockEntity(be.getFirst().getBlockPos()) != be.getFirst());
-        tickableBlockEntities.forEach(be -> be.getSecond().accept(scene.getLevel()));
+        loadBEsIfMissing(scene.getWorld());
+        renderedBlockEntities.removeIf(be -> scene.getWorld().getBlockEntity(be.getPos()) != be);
+        tickableBlockEntities.removeIf(be -> scene.getWorld().getBlockEntity(be.getFirst().getPos()) != be.getFirst());
+        tickableBlockEntities.forEach(be -> be.getSecond().accept(scene.getWorld()));
     }
 
     @Override
@@ -286,26 +269,22 @@ public class WorldSectionElementImpl extends AnimatedSceneElementBase implements
 
     @SuppressWarnings("deprecation")
     protected void loadBEsIfMissing(PonderLevel world) {
-        if (renderedBlockEntities != null) {
+        if (renderedBlockEntities != null)
             return;
-        }
         tickableBlockEntities = new ArrayList<>();
         renderedBlockEntities = new ArrayList<>();
         section.forEach(pos -> {
             BlockEntity blockEntity = world.getBlockEntity(pos);
             BlockState blockState = world.getBlockState(pos);
             Block block = blockState.getBlock();
-            if (blockEntity == null) {
+            if (blockEntity == null)
                 return;
-            }
-            if (!(block instanceof EntityBlock provider)) {
+            if (!(block instanceof BlockEntityProvider provider))
                 return;
-            }
-            blockEntity.setBlockState(world.getBlockState(pos));
+            blockEntity.setCachedState(world.getBlockState(pos));
             BlockEntityTicker<?> ticker = provider.getTicker(world, blockState, blockEntity.getType());
-            if (ticker != null) {
+            if (ticker != null)
                 addTicker(blockEntity, ticker);
-            }
             renderedBlockEntities.add(blockEntity);
         });
     }
@@ -314,156 +293,135 @@ public class WorldSectionElementImpl extends AnimatedSceneElementBase implements
     private <T extends BlockEntity> void addTicker(T blockEntity, BlockEntityTicker<?> ticker) {
         tickableBlockEntities.add(Pair.of(
             blockEntity,
-            w -> ((BlockEntityTicker<T>) ticker).tick(
-                w,
-                blockEntity.getBlockPos(),
-                blockEntity.getBlockState(),
-                blockEntity
-            )
+            w -> ((BlockEntityTicker<T>) ticker).tick(w, blockEntity.getPos(), blockEntity.getCachedState(), blockEntity)
         ));
     }
 
     @Override
     public void renderFirst(
-        BlockEntityRenderDispatcher blockEntityRenderDispatcher,
-        BlockRenderDispatcher blockRenderManager,
+        BlockEntityRenderManager blockEntityRenderDispatcher,
+        BlockRenderManager blockRenderManager,
         PonderLevel world,
-        MultiBufferSource buffer,
-        SubmitNodeCollector queue,
+        VertexConsumerProvider buffer,
+        OrderedRenderCommandQueue queue,
         Camera camera,
         CameraRenderState cameraRenderState,
-        PoseStack poseStack,
+        MatrixStack poseStack,
         float fade,
         float pt
     ) {
         int light = -1;
-        if (fade != 1) {
-            light = Mth.lerpInt(fade, 5, 15);
-        }
+        if (fade != 1)
+            light = MathHelper.lerp(fade, 5, 15);
         if (redraw) {
             renderedBlockEntities = null;
             tickableBlockEntities = null;
         }
 
-        poseStack.pushPose();
+        poseStack.push();
         transformMS(poseStack, pt);
         world.pushFakeLight(light);
         renderBlockEntities(blockEntityRenderDispatcher, world, poseStack, queue, camera, cameraRenderState, pt);
         world.popLight();
 
         Map<BlockPos, Integer> blockBreakingProgressions = world.getBlockBreakingProgressions();
-        PoseStack overlayMS = null;
+        MatrixStack overlayMS = null;
 
         for (Map.Entry<BlockPos, Integer> entry : blockBreakingProgressions.entrySet()) {
             BlockPos pos = entry.getKey();
-            if (!section.test(pos)) {
+            if (!section.test(pos))
                 continue;
-            }
 
             if (overlayMS == null) {
-                overlayMS = new PoseStack();
-                PoseStack.Pose matrixEntry = poseStack.last();
-                overlayMS.last().pose().set(matrixEntry.pose());
-                overlayMS.last().normal().set(matrixEntry.normal());
+                overlayMS = new MatrixStack();
+                MatrixStack.Entry matrixEntry = poseStack.peek();
+                overlayMS.peek().getPositionMatrix().set(matrixEntry.getPositionMatrix());
+                overlayMS.peek().getNormalMatrix().set(matrixEntry.getNormalMatrix());
             }
 
-            VertexConsumer builder = new SheetedDecalTextureGenerator(
-                buffer.getBuffer(ModelBakery.DESTROY_TYPES.get(
-                    entry.getValue())), overlayMS.last(), 1
+            VertexConsumer builder = new OverlayVertexConsumer(
+                buffer.getBuffer(ModelBaker.BLOCK_DESTRUCTION_RENDER_LAYERS.get(entry.getValue())),
+                overlayMS.peek(),
+                1
             );
 
-            poseStack.pushPose();
+            poseStack.push();
             poseStack.translate(pos.getX(), pos.getY(), pos.getZ());
-            blockRenderManager.renderBreakingTexture(world.getBlockState(pos), pos, world, poseStack, builder);
-            poseStack.popPose();
+            blockRenderManager.renderDamage(world.getBlockState(pos), pos, world, poseStack, builder);
+            poseStack.pop();
         }
 
-        poseStack.popPose();
+        poseStack.pop();
     }
 
     @Override
-    protected void renderLayer(
-        PonderLevel world,
-        MultiBufferSource buffer,
-        ChunkSectionLayer type,
-        PoseStack poseStack,
-        float fade,
-        float pt
-    ) {
+    protected void renderLayer(PonderLevel world, VertexConsumerProvider buffer, BlockRenderLayer type, MatrixStack poseStack, float fade, float pt) {
         SuperByteBufferCache bufferCache = SuperByteBufferCache.getInstance();
 
         int code = hashCode() ^ world.hashCode();
         Pair<Integer, Integer> key = Pair.of(code, type.ordinal());
 
-        if (redraw) {
+        if (redraw)
             bufferCache.invalidate(PONDER_WORLD_SECTION, key);
-        }
 
         SodiumCompat.markPonderSpriteActive(world, section);
-        SuperByteBuffer structureBuffer = bufferCache.get(
-            PONDER_WORLD_SECTION,
-            key,
-            () -> buildStructureBuffer(world, type)
-        );
-        if (structureBuffer.isEmpty()) {
+        SuperByteBuffer structureBuffer = bufferCache.get(PONDER_WORLD_SECTION, key, () -> buildStructureBuffer(world, type));
+        if (structureBuffer.isEmpty())
             return;
-        }
 
         transformMS(structureBuffer.getTransforms(), pt);
 
         int light = lightCoordsFromFade(fade);
-        RenderType layer = switch (type) {
-            case SOLID -> RenderTypes.solidMovingBlock();
-            case CUTOUT -> RenderTypes.cutoutMovingBlock();
-            case TRANSLUCENT -> RenderTypes.translucentMovingBlock();
-            case TRIPWIRE -> RenderTypes.tripwireMovingBlock();
+        RenderLayer layer = switch (type) {
+            case CUTOUT -> RenderLayer.getCutout();
+            case SOLID -> RenderLayer.getSolid();
+            case CUTOUT_MIPPED -> RenderLayer.getCutoutMipped();
+            case TRANSLUCENT -> PonderRenderTypes.translucent();
+            case TRIPWIRE -> RenderLayer.getTripwire();
         };
-        structureBuffer.light(light).renderInto(poseStack.last(), buffer.getBuffer(layer));
+        structureBuffer.light(light).renderInto(poseStack.peek(), buffer.getBuffer(layer));
     }
 
     @Override
     protected void renderLast(
-        EntityRenderDispatcher entityRenderManager,
-        ItemModelResolver itemModelManager,
+        EntityRenderManager entityRenderManager,
+        ItemModelManager itemModelManager,
         PonderLevel world,
-        MultiBufferSource buffer,
-        SubmitNodeCollector queue,
+        VertexConsumerProvider buffer,
+        OrderedRenderCommandQueue queue,
         Camera camera,
         CameraRenderState cameraRenderState,
-        PoseStack poseStack,
+        MatrixStack poseStack,
         float fade,
         float pt
     ) {
         redraw = false;
-        if (selectedBlock == null) {
+        if (selectedBlock == null)
             return;
-        }
         BlockState blockState = world.getBlockState(selectedBlock);
-        if (blockState.isAir()) {
+        if (blockState.isAir())
             return;
-        }
-        Minecraft mc = Minecraft.getInstance();
-        VoxelShape shape = blockState.getShape(world, selectedBlock, CollisionContext.of(mc.player));
-        if (shape.isEmpty()) {
+        MinecraftClient mc = MinecraftClient.getInstance();
+        VoxelShape shape = blockState.getOutlineShape(world, selectedBlock, ShapeContext.of(mc.player));
+        if (shape.isEmpty())
             return;
-        }
 
-        poseStack.pushPose();
+        poseStack.push();
         transformMS(poseStack, pt);
         poseStack.translate(selectedBlock.getX(), selectedBlock.getY(), selectedBlock.getZ());
 
-        AABBOutline aabbOutline = new AABBOutline(shape.bounds().inflate(1 / 128f));
+        AABBOutline aabbOutline = new AABBOutline(shape.getBoundingBox().expand(1 / 128f));
         aabbOutline.getParams().lineWidth(1 / 64f).colored(0xefefef).disableLineNormals();
-        aabbOutline.render(mc, poseStack, (SuperRenderTypeBuffer) buffer, Vec3.ZERO, pt);
+        aabbOutline.render(mc, poseStack, (SuperRenderTypeBuffer) buffer, Vec3d.ZERO, pt);
 
-        poseStack.popPose();
+        poseStack.pop();
     }
 
     private void renderBlockEntities(
-        BlockEntityRenderDispatcher dispatcher,
+        BlockEntityRenderManager dispatcher,
         PonderLevel world,
-        PoseStack ms,
-        SubmitNodeCollector queue,
+        MatrixStack ms,
+        OrderedRenderCommandQueue queue,
         Camera camera,
         CameraRenderState cameraRenderState,
         float pt
@@ -471,24 +429,24 @@ public class WorldSectionElementImpl extends AnimatedSceneElementBase implements
         loadBEsIfMissing(world);
 
         Iterator<BlockEntity> iterator = renderedBlockEntities.iterator();
-        Vec3 cameraPos = camera.position();
+        Vec3d cameraPos = camera.getCameraPos();
         while (iterator.hasNext()) {
             BlockEntity tile = iterator.next();
-            BlockEntityRenderer<BlockEntity, BlockEntityRenderState> renderer = dispatcher.getRenderer(tile);
+            BlockEntityRenderer<BlockEntity, BlockEntityRenderState> renderer = dispatcher.get(tile);
             if (renderer == null) {
                 iterator.remove();
                 continue;
             }
 
-            BlockPos pos = tile.getBlockPos();
-            ms.pushPose();
+            BlockPos pos = tile.getPos();
+            ms.push();
             ms.translate(pos.getX(), pos.getY(), pos.getZ());
 
             try {
                 BlockEntityRenderState state = renderer.createRenderState();
-                renderer.extractRenderState(tile, state, pt, cameraPos, null);
-                if (state.blockEntityType != BlockEntityType.TEST_BLOCK) {
-                    renderer.submit(state, ms, queue, cameraRenderState);
+                renderer.updateRenderState(tile, state, pt, cameraPos, null);
+                if (state.type != BlockEntityType.TEST_BLOCK) {
+                    renderer.render(state, ms, queue, cameraRenderState);
                 }
             } catch (Exception e) {
                 iterator.remove();
@@ -496,11 +454,11 @@ public class WorldSectionElementImpl extends AnimatedSceneElementBase implements
                 Ponder.LOGGER.error(message, e);
             }
 
-            ms.popPose();
+            ms.pop();
         }
     }
 
-    private SuperByteBuffer buildStructureBuffer(PonderLevel world, ChunkSectionLayer layer) {
+    private SuperByteBuffer buildStructureBuffer(PonderLevel world, BlockRenderLayer layer) {
         ThreadLocalObjects objects = THREAD_LOCAL_OBJECTS.get();
         SbbBuilder sbbBuilder = objects.sbbBuilder;
         sbbBuilder.prepare(layer);
@@ -517,15 +475,15 @@ public class WorldSectionElementImpl extends AnimatedSceneElementBase implements
     }
 
     private static class SbbBuilder extends SuperByteBufferBuilder implements ShadeSeparatedResultConsumer {
-        private ChunkSectionLayer renderType;
+        private BlockRenderLayer renderType;
 
-        public void prepare(ChunkSectionLayer renderType) {
+        public void prepare(BlockRenderLayer renderType) {
             prepare();
             this.renderType = renderType;
         }
 
         @Override
-        public void accept(ChunkSectionLayer renderType, boolean shaded, MeshData data) {
+        public void accept(BlockRenderLayer renderType, boolean shaded, BuiltBuffer data) {
             if (renderType != this.renderType) {
                 return;
             }

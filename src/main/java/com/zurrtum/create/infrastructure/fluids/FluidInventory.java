@@ -6,9 +6,9 @@ import it.unimi.dsi.fastutil.objects.Object2IntLinkedOpenCustomHashMap;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntSortedMap;
 import it.unimi.dsi.fastutil.objects.ObjectIterator;
-import net.minecraft.core.Direction;
-import net.minecraft.core.component.PatchedDataComponentMap;
-import net.minecraft.world.Clearable;
+import net.minecraft.component.MergedComponentMap;
+import net.minecraft.util.Clearable;
+import net.minecraft.util.math.Direction;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
@@ -19,10 +19,7 @@ import java.util.stream.StreamSupport;
 public interface FluidInventory extends Clearable, Iterable<FluidStack> {
     Hash.Strategy<FluidStack> FLUID_STACK_HASH_STRATEGY = new Hash.Strategy<>() {
         public boolean equals(FluidStack stack, FluidStack other) {
-            return stack == other || stack != null && other != null && FluidStack.areFluidsAndComponentsEqual(
-                stack,
-                other
-            );
+            return stack == other || stack != null && other != null && FluidStack.areFluidsAndComponentsEqual(stack, other);
         }
 
         public int hashCode(FluidStack stack) {
@@ -31,7 +28,7 @@ public interface FluidInventory extends Clearable, Iterable<FluidStack> {
     };
 
     @Override
-    default void clearContent() {
+    default void clear() {
         for (int i = 0, size = size(); i < size; i++) {
             setStack(i, FluidStack.EMPTY);
         }
@@ -226,8 +223,7 @@ public interface FluidInventory extends Clearable, Iterable<FluidStack> {
             int amount = stack.getAmount();
             return countSpace(stack, amount) == amount;
         }
-        Object2IntLinkedOpenCustomHashMap<FluidStack> map = new Object2IntLinkedOpenCustomHashMap<>(
-            FLUID_STACK_HASH_STRATEGY);
+        Object2IntLinkedOpenCustomHashMap<FluidStack> map = new Object2IntLinkedOpenCustomHashMap<>(FLUID_STACK_HASH_STRATEGY);
         for (FluidStack stack : stacks) {
             map.merge(stack, stack.getAmount(), Integer::sum);
         }
@@ -570,8 +566,7 @@ public interface FluidInventory extends Clearable, Iterable<FluidStack> {
             }
             return List.of(stack.directCopy(amount - insert));
         }
-        Object2IntLinkedOpenCustomHashMap<FluidStack> map = new Object2IntLinkedOpenCustomHashMap<>(
-            FLUID_STACK_HASH_STRATEGY);
+        Object2IntLinkedOpenCustomHashMap<FluidStack> map = new Object2IntLinkedOpenCustomHashMap<>(FLUID_STACK_HASH_STRATEGY);
         for (FluidStack stack : stacks) {
             map.merge(stack, stack.getAmount(), Integer::sum);
         }
@@ -893,8 +888,7 @@ public interface FluidInventory extends Clearable, Iterable<FluidStack> {
         if (listSize == 1) {
             return preciseInsert(stacks.getFirst());
         }
-        Object2IntLinkedOpenCustomHashMap<FluidStack> map = new Object2IntLinkedOpenCustomHashMap<>(
-            FLUID_STACK_HASH_STRATEGY);
+        Object2IntLinkedOpenCustomHashMap<FluidStack> map = new Object2IntLinkedOpenCustomHashMap<>(FLUID_STACK_HASH_STRATEGY);
         for (FluidStack stack : stacks) {
             map.merge(stack, stack.getAmount(), Integer::sum);
         }
@@ -958,9 +952,9 @@ public interface FluidInventory extends Clearable, Iterable<FluidStack> {
 
     @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
     default FluidStack removeMaxSize(FluidStack stack, Optional<Integer> max) {
-        PatchedDataComponentMap components = stack.directComponents();
-        components.ensureMapOwnership();
-        components.patch.remove(AllDataComponents.FLUID_MAX_CAPACITY, max);
+        MergedComponentMap components = stack.directComponents();
+        components.onWrite();
+        components.changedComponents.remove(AllDataComponents.FLUID_MAX_CAPACITY, max);
         return stack;
     }
 
@@ -995,9 +989,9 @@ public interface FluidInventory extends Clearable, Iterable<FluidStack> {
 
     @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
     default void setMaxSize(FluidStack stack, Optional<Integer> max) {
-        PatchedDataComponentMap components = stack.directComponents();
-        components.ensureMapOwnership();
-        components.patch.put(AllDataComponents.FLUID_MAX_CAPACITY, max);
+        MergedComponentMap components = stack.directComponents();
+        components.onWrite();
+        components.changedComponents.put(AllDataComponents.FLUID_MAX_CAPACITY, max);
     }
 
     void setStack(int slot, FluidStack stack);

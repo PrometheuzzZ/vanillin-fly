@@ -1,8 +1,6 @@
 package com.zurrtum.create.client.content.equipment.blueprint;
 
 import com.google.common.collect.ImmutableList;
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.math.Axis;
 import com.zurrtum.create.AllPackets;
 import com.zurrtum.create.client.AllPartialModels;
 import com.zurrtum.create.client.catnip.gui.element.GuiGameElement;
@@ -16,14 +14,16 @@ import com.zurrtum.create.content.equipment.blueprint.BlueprintEntity;
 import com.zurrtum.create.content.equipment.blueprint.BlueprintEntity.BlueprintSection;
 import com.zurrtum.create.content.equipment.blueprint.BlueprintMenu;
 import com.zurrtum.create.foundation.gui.menu.MenuType;
-import net.minecraft.ChatFormatting;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.renderer.Rect2i;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.chat.Component;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.client.util.math.Rect2i;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.player.PlayerInventory;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
+import net.minecraft.util.math.RotationAxis;
 
 import java.util.Collections;
 import java.util.LinkedList;
@@ -40,25 +40,24 @@ public class BlueprintScreen extends AbstractSimiContainerScreen<BlueprintMenu> 
     private IconButton confirmButton;
     private ElementWidget renderedItem;
 
-    public BlueprintScreen(BlueprintMenu menu, Inventory inv, Component title) {
+    public BlueprintScreen(BlueprintMenu menu, PlayerInventory inv, Text title) {
         super(menu, inv, title);
         this.background = AllGuiTextures.BLUEPRINT;
     }
 
     public static BlueprintScreen create(
-        Minecraft mc,
+        MinecraftClient mc,
         MenuType<BlueprintSection> type,
         int syncId,
-        Inventory inventory,
-        Component title,
-        RegistryFriendlyByteBuf extraData
+        PlayerInventory inventory,
+        Text title,
+        RegistryByteBuf extraData
     ) {
         int entityID = extraData.readVarInt();
         int section = extraData.readVarInt();
-        Entity entityByID = mc.level.getEntity(entityID);
-        if (!(entityByID instanceof BlueprintEntity blueprintEntity)) {
+        Entity entityByID = mc.world.getEntityById(entityID);
+        if (!(entityByID instanceof BlueprintEntity blueprintEntity))
             return null;
-        }
         return type.create(BlueprintScreen::new, syncId, inventory, title, blueprintEntity.getSection(section));
     }
 
@@ -68,109 +67,88 @@ public class BlueprintScreen extends AbstractSimiContainerScreen<BlueprintMenu> 
         setWindowOffset(1, 0);
         super.init();
 
-        resetButton = new IconButton(
-            leftPos + background.getWidth() - 62,
-            topPos + background.getHeight() - 24,
-            AllIcons.I_TRASH
-        );
+        resetButton = new IconButton(x + background.getWidth() - 62, y + background.getHeight() - 24, AllIcons.I_TRASH);
         resetButton.withCallback(() -> {
-            menu.clearContents();
+            handler.clearContents();
             contentsCleared();
-            minecraft.player.connection.send(AllPackets.CLEAR_CONTAINER);
+            client.player.networkHandler.sendPacket(AllPackets.CLEAR_CONTAINER);
         });
-        confirmButton = new IconButton(
-            leftPos + background.getWidth() - 33,
-            topPos + background.getHeight() - 24,
-            AllIcons.I_CONFIRM
-        );
+        confirmButton = new IconButton(x + background.getWidth() - 33, y + background.getHeight() - 24, AllIcons.I_CONFIRM);
         confirmButton.withCallback(() -> {
-            minecraft.player.closeContainer();
+            client.player.closeHandledScreen();
         });
 
-        addRenderableWidget(resetButton);
-        addRenderableWidget(confirmButton);
+        addDrawableChild(resetButton);
+        addDrawableChild(confirmButton);
 
-        extraAreas = ImmutableList.of(new Rect2i(
-            leftPos + background.getWidth(),
-            topPos + background.getHeight() - 36,
-            56,
-            44
-        ));
+        extraAreas = ImmutableList.of(new Rect2i(x + background.getWidth(), y + background.getHeight() - 36, 56, 44));
 
-        renderedItem = new ElementWidget(
-            leftPos + background.getWidth() + 1,
-            topPos + background.getHeight() - 34
-        ).showingElement(GuiGameElement.of(AllPartialModels.CRAFTING_BLUEPRINT_1x1).scale(2.5F)
-            .transform(this::transform).padding(13));
-        addRenderableWidget(renderedItem);
+        renderedItem = new ElementWidget(x + background.getWidth() + 1, y + background.getHeight() - 34).showingElement(GuiGameElement.of(
+            AllPartialModels.CRAFTING_BLUEPRINT_1x1).scale(2.5F).transform(this::transform).padding(13));
+        addDrawableChild(renderedItem);
     }
 
-    private void transform(PoseStack ms, float p) {
+    private void transform(MatrixStack ms, float p) {
         ms.translate(0.48F, 0.04F, 0);
         ms.scale(1, -1, 1);
-        ms.mulPose(Axis.ZP.rotationDegrees(22.5F));
-        ms.mulPose(Axis.XP.rotationDegrees(45F));
-        ms.mulPose(Axis.YP.rotationDegrees(-45F));
+        ms.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(22.5F));
+        ms.multiply(RotationAxis.POSITIVE_X.rotationDegrees(45F));
+        ms.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(-45F));
     }
 
     @Override
-    public void removed() {
-        super.removed();
+    public void close() {
+        super.close();
         renderedItem.getRenderElement().clear();
     }
 
     @Override
-    protected void renderBg(GuiGraphics graphics, float partialTicks, int mouseX, int mouseY) {
+    protected void drawBackground(DrawContext graphics, float partialTicks, int mouseX, int mouseY) {
         int invX = getLeftOfCentered(PLAYER_INVENTORY.getWidth());
-        int invY = topPos + background.getHeight() + 4;
+        int invY = y + background.getHeight() + 4;
         renderPlayerInventory(graphics, invX, invY);
 
-        background.render(graphics, leftPos, topPos);
-        graphics.drawString(font, title, leftPos + 15, topPos + 4, 0xFFFFFFFF, false);
+        background.render(graphics, x, y);
+        graphics.drawText(textRenderer, title, x + 15, y + 4, 0xFFFFFFFF, false);
     }
 
     @Override
-    protected void renderTooltip(GuiGraphics graphics, int x, int y) {
-        if (!menu.getCarried().isEmpty() || hoveredSlot == null || hoveredSlot.container == menu.playerInventory) {
-            super.renderTooltip(graphics, x, y);
+    protected void drawMouseoverTooltip(DrawContext graphics, int x, int y) {
+        if (!handler.getCursorStack().isEmpty() || focusedSlot == null || focusedSlot.inventory == handler.playerInventory) {
+            super.drawMouseoverTooltip(graphics, x, y);
             return;
         }
 
-        List<Component> list = new LinkedList<>();
-        if (hoveredSlot.hasItem()) {
-            list = getTooltipFromContainerItem(hoveredSlot.getItem());
-        }
+        List<Text> list = new LinkedList<>();
+        if (focusedSlot.hasStack())
+            list = getTooltipFromItem(focusedSlot.getStack());
 
-        graphics.setComponentTooltipForNextFrame(font, addToTooltip(list, hoveredSlot.getContainerSlot()), x, y);
+        graphics.drawTooltip(textRenderer, addToTooltip(list, focusedSlot.getIndex()), x, y);
     }
 
-    private List<Component> addToTooltip(List<Component> list, int slot) {
-        if (slot < 0 || slot > 10) {
+    private List<Text> addToTooltip(List<Text> list, int slot) {
+        if (slot < 0 || slot > 10)
             return list;
-        }
 
         if (slot < 9) {
-            list.add(CreateLang.translateDirect("crafting_blueprint.crafting_slot").withStyle(ChatFormatting.GOLD));
-            list.add(CreateLang.translateDirect("crafting_blueprint.filter_items_viable")
-                .withStyle(ChatFormatting.GRAY));
+            list.add(CreateLang.translateDirect("crafting_blueprint.crafting_slot").formatted(Formatting.GOLD));
+            list.add(CreateLang.translateDirect("crafting_blueprint.filter_items_viable").formatted(Formatting.GRAY));
         } else if (slot == 9) {
-            list.add(CreateLang.translateDirect("crafting_blueprint.display_slot").withStyle(ChatFormatting.GOLD));
+            list.add(CreateLang.translateDirect("crafting_blueprint.display_slot").formatted(Formatting.GOLD));
         } else {
-            list.add(CreateLang.translateDirect("crafting_blueprint.secondary_display_slot")
-                .withStyle(ChatFormatting.GOLD));
-            list.add(CreateLang.translateDirect("crafting_blueprint.optional").withStyle(ChatFormatting.GRAY));
+            list.add(CreateLang.translateDirect("crafting_blueprint.secondary_display_slot").formatted(Formatting.GOLD));
+            list.add(CreateLang.translateDirect("crafting_blueprint.optional").formatted(Formatting.GRAY));
         }
 
         return list;
     }
 
     @Override
-    protected void containerTick() {
-        if (!menu.contentHolder.isEntityAlive()) {
-            minecraft.player.closeContainer();
-        }
+    protected void handledScreenTick() {
+        if (!handler.contentHolder.isEntityAlive())
+            client.player.closeHandledScreen();
 
-        super.containerTick();
+        super.handledScreenTick();
     }
 
     protected void contentsCleared() {

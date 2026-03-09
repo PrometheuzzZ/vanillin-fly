@@ -7,16 +7,16 @@ import com.zurrtum.create.api.registry.SimpleRegistry;
 import com.zurrtum.create.catnip.data.Iterate;
 import com.zurrtum.create.catnip.math.BlockFace;
 import com.zurrtum.create.content.logistics.vault.ItemVaultBlockEntity;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.world.WorldlyContainer;
-import net.minecraft.world.WorldlyContainerHolder;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.ChestBlock;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.properties.ChestType;
-import net.minecraft.world.level.block.state.properties.Property;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.ChestBlock;
+import net.minecraft.block.InventoryProvider;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.block.enums.ChestType;
+import net.minecraft.inventory.SidedInventory;
+import net.minecraft.state.property.Property;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.world.World;
 
 import java.util.Arrays;
 import java.util.Collection;
@@ -33,8 +33,8 @@ public class AllInventoryIdentifiers {
 
         // connect double chests
         InventoryIdentifier.REGISTRY.registerProvider(block -> {
-            Collection<Property<?>> properties = block.getStateDefinition().getProperties();
-            if (properties.contains(ChestBlock.TYPE) && properties.contains(ChestBlock.FACING)) {
+            Collection<Property<?>> properties = block.getStateManager().getProperties();
+            if (properties.contains(ChestBlock.CHEST_TYPE) && properties.contains(ChestBlock.FACING)) {
                 return AllInventoryIdentifiers::chest;
             }
             return null;
@@ -42,7 +42,7 @@ public class AllInventoryIdentifiers {
 
         // best-effort for WorldlyContainerHolders (just composters in vanilla)
         InventoryIdentifier.REGISTRY.registerProvider(block -> {
-            if (block instanceof WorldlyContainerHolder) {
+            if (block instanceof InventoryProvider) {
                 return AllInventoryIdentifiers::worldlyContainerBlock;
             }
             return null;
@@ -57,18 +57,18 @@ public class AllInventoryIdentifiers {
         );
     }
 
-    private static InventoryIdentifier single(Level level, BlockState state, BlockFace face) {
+    private static InventoryIdentifier single(World level, BlockState state, BlockFace face) {
         return new InventoryIdentifier.Single(face.getPos());
     }
 
-    private static InventoryIdentifier chest(Level level, BlockState state, BlockFace face) {
-        ChestType type = state.getValue(ChestBlock.TYPE);
+    private static InventoryIdentifier chest(World level, BlockState state, BlockFace face) {
+        ChestType type = state.get(ChestBlock.CHEST_TYPE);
 
         if (type != ChestType.SINGLE) {
-            Direction toOther = ChestBlock.getConnectedDirection(state);
-            BlockPos otherPos = face.getPos().relative(toOther);
+            Direction toOther = ChestBlock.getFacing(state);
+            BlockPos otherPos = face.getPos().offset(toOther);
             BlockState otherState = level.getBlockState(otherPos);
-            if (otherState.is(state.getBlock()) && ChestBlock.getConnectedDirection(otherState) == toOther.getOpposite()) {
+            if (otherState.isOf(state.getBlock()) && ChestBlock.getFacing(otherState) == toOther.getOpposite()) {
                 return new InventoryIdentifier.Pair(face.getPos(), otherPos);
             }
         }
@@ -76,20 +76,20 @@ public class AllInventoryIdentifiers {
         return new InventoryIdentifier.Single(face.getPos());
     }
 
-    private static InventoryIdentifier worldlyContainerBlock(Level level, BlockState state, BlockFace face) {
-        WorldlyContainerHolder holder = (WorldlyContainerHolder) state.getBlock();
-        WorldlyContainer container = holder.getContainer(state, level, face.getPos());
+    private static InventoryIdentifier worldlyContainerBlock(World level, BlockState state, BlockFace face) {
+        InventoryProvider holder = (InventoryProvider) state.getBlock();
+        SidedInventory container = holder.getInventory(state, level, face.getPos());
         return ofWorldlyContainer(container, face);
     }
 
-    private static InventoryIdentifier ofWorldlyContainer(WorldlyContainer container, BlockFace face) {
+    private static InventoryIdentifier ofWorldlyContainer(SidedInventory container, BlockFace face) {
         Direction side = face.getFace();
-        int[] slots = container.getSlotsForFace(side);
+        int[] slots = container.getAvailableSlots(side);
         // get all faces that have the same slots as the given one
         Set<Direction> directions = EnumSet.of(side);
         for (Direction direction : Iterate.directions) {
             if (direction != side) {
-                int[] faceSlots = container.getSlotsForFace(direction);
+                int[] faceSlots = container.getAvailableSlots(direction);
                 if (Arrays.equals(slots, faceSlots)) {
                     directions.add(direction);
                 }
@@ -101,9 +101,9 @@ public class AllInventoryIdentifiers {
     // called manually when no other Finder is found.
     // currently just checks for WorldlyContainer BlockEntities, which would
     // fill the registry with Finders pointlessly if done through a provider.
-    public static InventoryIdentifier fallback(Level level, BlockState state, BlockFace face) {
+    public static InventoryIdentifier fallback(World level, BlockState state, BlockFace face) {
         BlockEntity be = level.getBlockEntity(face.getPos());
-        if (be instanceof WorldlyContainer container) {
+        if (be instanceof SidedInventory container) {
             return ofWorldlyContainer(container, face);
         }
 

@@ -13,29 +13,29 @@ import mezz.jei.api.gui.drawable.IDrawable;
 import mezz.jei.api.gui.ingredient.IRecipeSlotsView;
 import mezz.jei.api.recipe.IFocusGroup;
 import mezz.jei.api.recipe.types.IRecipeType;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.network.chat.Component;
-import net.minecraft.world.item.crafting.RecipeHolder;
-import net.minecraft.world.item.crafting.RecipeMap;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.recipe.PreparedRecipes;
+import net.minecraft.recipe.RecipeEntry;
+import net.minecraft.text.Text;
 import org.jetbrains.annotations.NotNull;
 import org.joml.Matrix3x2f;
 
 import java.util.List;
 
 public class CompactingCategory extends BasinCategory<CompactingRecipe> {
-    public static List<RecipeHolder<CompactingRecipe>> getRecipes(RecipeMap preparedRecipes) {
-        return preparedRecipes.byType(AllRecipeTypes.COMPACTING).stream().toList();
+    public static List<RecipeEntry<CompactingRecipe>> getRecipes(PreparedRecipes preparedRecipes) {
+        return preparedRecipes.getAll(AllRecipeTypes.COMPACTING).stream().toList();
     }
 
     @Override
     @NotNull
-    public IRecipeType<RecipeHolder<CompactingRecipe>> getRecipeType() {
+    public IRecipeType<RecipeEntry<CompactingRecipe>> getRecipeType() {
         return JeiClientPlugin.PACKING;
     }
 
     @Override
     @NotNull
-    public Component getTitle() {
+    public Text getTitle() {
         return CreateLang.translateDirect("recipe.packing");
     }
 
@@ -45,7 +45,7 @@ public class CompactingCategory extends BasinCategory<CompactingRecipe> {
     }
 
     @Override
-    public void setRecipe(IRecipeLayoutBuilder builder, RecipeHolder<CompactingRecipe> entry, IFocusGroup iFocusGroup) {
+    public void setRecipe(IRecipeLayoutBuilder builder, RecipeEntry<CompactingRecipe> entry, IFocusGroup iFocusGroup) {
         CompactingRecipe recipe = entry.value();
         addIngredientSlots(builder, recipe);
         List<ProcessingOutput> results = recipe.results();
@@ -55,19 +55,9 @@ public class CompactingCategory extends BasinCategory<CompactingRecipe> {
     }
 
     @Override
-    public void draw(
-        RecipeHolder<CompactingRecipe> entry,
-        IRecipeSlotsView recipeSlotsView,
-        GuiGraphics graphics,
-        double mouseX,
-        double mouseY
-    ) {
+    public void draw(RecipeEntry<CompactingRecipe> entry, IRecipeSlotsView recipeSlotsView, DrawContext graphics, double mouseX, double mouseY) {
         CompactingRecipe recipe = entry.value();
         drawBackground(recipe, graphics, recipe.results().size());
-        graphics.guiRenderState.submitPicturesInPictureState(new PressBasinRenderState(
-            new Matrix3x2f(graphics.pose()),
-            91,
-            -5
-        ));
+        graphics.state.addSpecialElement(new PressBasinRenderState(new Matrix3x2f(graphics.getMatrices()), 91, -5));
     }
 }

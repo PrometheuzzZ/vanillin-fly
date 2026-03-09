@@ -3,7 +3,7 @@ package com.zurrtum.create.client.catnip.event;
 import com.zurrtum.create.client.catnip.lang.LangNumberFormat;
 import com.zurrtum.create.client.ponder.Ponder;
 import com.zurrtum.create.foundation.utility.CreateResourceReloader;
-import net.minecraft.server.packs.resources.ResourceManager;
+import net.minecraft.resource.ResourceManager;
 
 public class ClientResourceReloadListener extends CreateResourceReloader {
     public ClientResourceReloadListener() {
@@ -11,7 +11,7 @@ public class ClientResourceReloadListener extends CreateResourceReloader {
     }
 
     @Override
-    public void onResourceManagerReload(ResourceManager resourceManager) {
+    public void reload(ResourceManager resourceManager) {
         LangNumberFormat.numberFormat.update();
         Ponder.invalidateRenderers();
     }

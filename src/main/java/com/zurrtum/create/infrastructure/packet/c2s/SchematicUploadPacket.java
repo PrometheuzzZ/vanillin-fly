@@ -3,28 +3,27 @@ package com.zurrtum.create.infrastructure.packet.c2s;
 import com.zurrtum.create.AllHandle;
 import com.zurrtum.create.AllPackets;
 import com.zurrtum.create.catnip.codecs.stream.CatnipStreamCodecBuilders;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.PacketType;
-import net.minecraft.network.protocol.game.ServerGamePacketListener;
-import net.minecraft.server.network.ServerGamePacketListenerImpl;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.network.listener.ServerPlayPacketListener;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.PacketType;
+import net.minecraft.server.network.ServerPlayNetworkHandler;
 
-public record SchematicUploadPacket(int code, long size, String schematic,
-                                    byte[] data) implements Packet<ServerGamePacketListener> {
+public record SchematicUploadPacket(int code, long size, String schematic, byte[] data) implements Packet<ServerPlayPacketListener> {
     public static final int BEGIN = 0;
     public static final int WRITE = 1;
     public static final int FINISH = 2;
 
-    public static final StreamCodec<RegistryFriendlyByteBuf, SchematicUploadPacket> CODEC = StreamCodec.composite(
-        ByteBufCodecs.VAR_INT,
+    public static final PacketCodec<RegistryByteBuf, SchematicUploadPacket> CODEC = PacketCodec.tuple(
+        PacketCodecs.VAR_INT,
         SchematicUploadPacket::code,
-        ByteBufCodecs.VAR_LONG,
+        PacketCodecs.VAR_LONG,
         SchematicUploadPacket::size,
-        CatnipStreamCodecBuilders.nullable(ByteBufCodecs.stringUtf8(256)),
+        CatnipStreamCodecBuilders.nullable(PacketCodecs.string(256)),
         SchematicUploadPacket::schematic,
-        CatnipStreamCodecBuilders.nullable(ByteBufCodecs.byteArray(Integer.MAX_VALUE)),
+        CatnipStreamCodecBuilders.nullable(PacketCodecs.byteArray(Integer.MAX_VALUE)),
         SchematicUploadPacket::data,
         SchematicUploadPacket::new
     );
@@ -42,12 +41,12 @@ public record SchematicUploadPacket(int code, long size, String schematic,
     }
 
     @Override
-    public void handle(ServerGamePacketListener listener) {
-        AllHandle.onSchematicUpload((ServerGamePacketListenerImpl) listener, this);
+    public void apply(ServerPlayPacketListener listener) {
+        AllHandle.onSchematicUpload((ServerPlayNetworkHandler) listener, this);
     }
 
     @Override
-    public PacketType<SchematicUploadPacket> type() {
+    public PacketType<SchematicUploadPacket> getPacketType() {
         return AllPackets.UPLOAD_SCHEMATIC;
     }
 }

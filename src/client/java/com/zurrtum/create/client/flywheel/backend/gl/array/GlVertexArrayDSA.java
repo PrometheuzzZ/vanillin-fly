@@ -44,11 +44,7 @@ public class GlVertexArrayDSA extends GlVertexArray {
     }
 
     @Override
-    public void bindAttributes(
-        final int bindingIndex,
-        final int startAttribIndex,
-        List<VertexAttribute> vertexAttributes
-    ) {
+    public void bindAttributes(final int bindingIndex, final int startAttribIndex, List<VertexAttribute> vertexAttributes) {
         final int handle = handle();
         int attribIndex = startAttribIndex;
         int offset = 0;
@@ -61,14 +57,7 @@ public class GlVertexArrayDSA extends GlVertexArray {
 
             if (!attribute.equals(attributes[attribIndex])) {
                 if (attribute instanceof VertexAttribute.Float f) {
-                    GL45C.glVertexArrayAttribFormat(
-                        handle,
-                        attribIndex,
-                        f.size(),
-                        f.type().glEnum,
-                        f.normalized(),
-                        offset
-                    );
+                    GL45C.glVertexArrayAttribFormat(handle, attribIndex, f.size(), f.type().glEnum, f.normalized(), offset);
                 } else if (attribute instanceof VertexAttribute.Int vi) {
                     GL45C.glVertexArrayAttribIFormat(handle, attribIndex, vi.size(), vi.type().glEnum, offset);
                 }

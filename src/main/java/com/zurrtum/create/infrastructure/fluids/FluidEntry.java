@@ -1,6 +1,6 @@
 package com.zurrtum.create.infrastructure.fluids;
 
-import net.minecraft.world.item.BucketItem;
+import net.minecraft.item.BucketItem;
 
 public class FluidEntry {
     public FlowableFluid flowing = null;

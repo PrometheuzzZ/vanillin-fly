@@ -9,148 +9,129 @@ import com.zurrtum.create.catnip.data.Iterate;
 import com.zurrtum.create.content.contraptions.StructureTransform;
 import com.zurrtum.create.content.equipment.wrench.IWrenchable;
 import com.zurrtum.create.foundation.block.IBE;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.core.particles.ParticleTypes;
-import net.minecraft.world.InteractionHand;
-import net.minecraft.world.InteractionResult;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.BlockGetter;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.Mirror;
-import net.minecraft.world.level.block.RotatedPillarBlock;
-import net.minecraft.world.level.block.Rotation;
-import net.minecraft.world.level.block.entity.BlockEntityType;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.properties.BooleanProperty;
-import net.minecraft.world.phys.BlockHitResult;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.PillarBlock;
+import net.minecraft.block.entity.BlockEntityType;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.item.ItemStack;
+import net.minecraft.particle.ParticleTypes;
+import net.minecraft.state.property.BooleanProperty;
+import net.minecraft.util.ActionResult;
+import net.minecraft.util.BlockMirror;
+import net.minecraft.util.BlockRotation;
+import net.minecraft.util.Hand;
+import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.BlockView;
+import net.minecraft.world.World;
 
-public abstract class AbstractChassisBlock extends RotatedPillarBlock implements IWrenchable, IBE<ChassisBlockEntity>, TransformableBlock {
+public abstract class AbstractChassisBlock extends PillarBlock implements IWrenchable, IBE<ChassisBlockEntity>, TransformableBlock {
 
-    public AbstractChassisBlock(Properties properties) {
+    public AbstractChassisBlock(Settings properties) {
         super(properties);
     }
 
     @Override
-    protected InteractionResult useItemOn(
+    protected ActionResult onUseWithItem(
         ItemStack stack,
         BlockState state,
-        Level level,
+        World level,
         BlockPos pos,
-        Player player,
-        InteractionHand hand,
+        PlayerEntity player,
+        Hand hand,
         BlockHitResult hitResult
     ) {
-        if (!player.mayBuild()) {
-            return InteractionResult.TRY_WITH_EMPTY_HAND;
-        }
+        if (!player.canModifyBlocks())
+            return ActionResult.PASS_TO_DEFAULT_BLOCK_ACTION;
 
-        boolean isSlimeBall = stack.is(AllItemTags.SLIME_BALLS) || stack.is(AllItems.SUPER_GLUE);
+        boolean isSlimeBall = stack.isIn(AllItemTags.SLIME_BALLS) || stack.isOf(AllItems.SUPER_GLUE);
 
-        BooleanProperty affectedSide = getGlueableSide(state, hitResult.getDirection());
-        if (affectedSide == null) {
-            return InteractionResult.TRY_WITH_EMPTY_HAND;
-        }
+        BooleanProperty affectedSide = getGlueableSide(state, hitResult.getSide());
+        if (affectedSide == null)
+            return ActionResult.PASS_TO_DEFAULT_BLOCK_ACTION;
 
-        if (isSlimeBall && state.getValue(affectedSide)) {
+        if (isSlimeBall && state.get(affectedSide)) {
             for (Direction face : Iterate.directions) {
                 BooleanProperty glueableSide = getGlueableSide(state, face);
-                if (glueableSide != null && !state.getValue(glueableSide) && glueAllowedOnSide(
-                    level,
-                    pos,
-                    state,
-                    face
-                )) {
-                    if (level.isClientSide()) {
-                        Vec3 vec = hitResult.getLocation();
-                        level.addParticle(ParticleTypes.ITEM_SLIME, vec.x, vec.y, vec.z, 0, 0, 0);
-                        return InteractionResult.SUCCESS;
+                if (glueableSide != null && !state.get(glueableSide) && glueAllowedOnSide(level, pos, state, face)) {
+                    if (level.isClient()) {
+                        Vec3d vec = hitResult.getPos();
+                        level.addParticleClient(ParticleTypes.ITEM_SLIME, vec.x, vec.y, vec.z, 0, 0, 0);
+                        return ActionResult.SUCCESS;
                     }
                     AllSoundEvents.SLIME_ADDED.playOnServer(level, pos, .5f, 1);
-                    state = state.setValue(glueableSide, true);
+                    state = state.with(glueableSide, true);
                 }
             }
-            if (!level.isClientSide()) {
-                level.setBlockAndUpdate(pos, state);
-            }
-            return InteractionResult.SUCCESS;
+            if (!level.isClient())
+                level.setBlockState(pos, state);
+            return ActionResult.SUCCESS;
         }
 
-        if ((!stack.isEmpty() || !player.isShiftKeyDown()) && !isSlimeBall) {
-            return InteractionResult.TRY_WITH_EMPTY_HAND;
-        }
-        if (state.getValue(affectedSide) == isSlimeBall) {
-            return InteractionResult.TRY_WITH_EMPTY_HAND;
-        }
-        if (!glueAllowedOnSide(level, pos, state, hitResult.getDirection())) {
-            return InteractionResult.TRY_WITH_EMPTY_HAND;
-        }
-        if (level.isClientSide()) {
-            Vec3 vec = hitResult.getLocation();
-            level.addParticle(ParticleTypes.ITEM_SLIME, vec.x, vec.y, vec.z, 0, 0, 0);
-            return InteractionResult.SUCCESS;
+        if ((!stack.isEmpty() || !player.isSneaking()) && !isSlimeBall)
+            return ActionResult.PASS_TO_DEFAULT_BLOCK_ACTION;
+        if (state.get(affectedSide) == isSlimeBall)
+            return ActionResult.PASS_TO_DEFAULT_BLOCK_ACTION;
+        if (!glueAllowedOnSide(level, pos, state, hitResult.getSide()))
+            return ActionResult.PASS_TO_DEFAULT_BLOCK_ACTION;
+        if (level.isClient()) {
+            Vec3d vec = hitResult.getPos();
+            level.addParticleClient(ParticleTypes.ITEM_SLIME, vec.x, vec.y, vec.z, 0, 0, 0);
+            return ActionResult.SUCCESS;
         }
 
         AllSoundEvents.SLIME_ADDED.playOnServer(level, pos, .5f, 1);
-        level.setBlockAndUpdate(pos, state.setValue(affectedSide, isSlimeBall));
-        return InteractionResult.SUCCESS;
+        level.setBlockState(pos, state.with(affectedSide, isSlimeBall));
+        return ActionResult.SUCCESS;
     }
 
     @Override
-    public BlockState rotate(BlockState state, Rotation rotation) {
-        if (rotation == Rotation.NONE) {
+    public BlockState rotate(BlockState state, BlockRotation rotation) {
+        if (rotation == BlockRotation.NONE)
             return state;
-        }
 
         BlockState rotated = super.rotate(state, rotation);
         for (Direction face : Iterate.directions) {
             BooleanProperty glueableSide = getGlueableSide(rotated, face);
-            if (glueableSide != null) {
-                rotated = rotated.setValue(glueableSide, false);
-            }
+            if (glueableSide != null)
+                rotated = rotated.with(glueableSide, false);
         }
 
         for (Direction face : Iterate.directions) {
             BooleanProperty glueableSide = getGlueableSide(state, face);
-            if (glueableSide == null || !state.getValue(glueableSide)) {
+            if (glueableSide == null || !state.get(glueableSide))
                 continue;
-            }
             Direction rotatedFacing = rotation.rotate(face);
             BooleanProperty rotatedGlueableSide = getGlueableSide(rotated, rotatedFacing);
-            if (rotatedGlueableSide != null) {
-                rotated = rotated.setValue(rotatedGlueableSide, true);
-            }
+            if (rotatedGlueableSide != null)
+                rotated = rotated.with(rotatedGlueableSide, true);
         }
 
         return rotated;
     }
 
     @Override
-    public BlockState mirror(BlockState state, Mirror mirrorIn) {
-        if (mirrorIn == Mirror.NONE) {
+    public BlockState mirror(BlockState state, BlockMirror mirrorIn) {
+        if (mirrorIn == BlockMirror.NONE)
             return state;
-        }
 
         BlockState mirrored = state;
         for (Direction face : Iterate.directions) {
             BooleanProperty glueableSide = getGlueableSide(mirrored, face);
-            if (glueableSide != null) {
-                mirrored = mirrored.setValue(glueableSide, false);
-            }
+            if (glueableSide != null)
+                mirrored = mirrored.with(glueableSide, false);
         }
 
         for (Direction face : Iterate.directions) {
             BooleanProperty glueableSide = getGlueableSide(state, face);
-            if (glueableSide == null || !state.getValue(glueableSide)) {
+            if (glueableSide == null || !state.get(glueableSide))
                 continue;
-            }
-            Direction mirroredFacing = mirrorIn.mirror(face);
+            Direction mirroredFacing = mirrorIn.apply(face);
             BooleanProperty mirroredGlueableSide = getGlueableSide(mirrored, mirroredFacing);
-            if (mirroredGlueableSide != null) {
-                mirrored = mirrored.setValue(mirroredGlueableSide, true);
-            }
+            if (mirroredGlueableSide != null)
+                mirrored = mirrored.with(mirroredGlueableSide, true);
         }
 
         return mirrored;
@@ -169,30 +150,26 @@ public abstract class AbstractChassisBlock extends RotatedPillarBlock implements
     }
 
     protected BlockState transformInner(BlockState state, StructureTransform transform) {
-        if (transform.rotation == Rotation.NONE) {
+        if (transform.rotation == BlockRotation.NONE)
             return state;
-        }
 
-        BlockState rotated = state.setValue(AXIS, transform.rotateAxis(state.getValue(AXIS)));
+        BlockState rotated = state.with(AXIS, transform.rotateAxis(state.get(AXIS)));
         AbstractChassisBlock block = (AbstractChassisBlock) state.getBlock();
 
         for (Direction face : Iterate.directions) {
             BooleanProperty glueableSide = block.getGlueableSide(rotated, face);
-            if (glueableSide != null) {
-                rotated = rotated.setValue(glueableSide, false);
-            }
+            if (glueableSide != null)
+                rotated = rotated.with(glueableSide, false);
         }
 
         for (Direction face : Iterate.directions) {
             BooleanProperty glueableSide = block.getGlueableSide(state, face);
-            if (glueableSide == null || !state.getValue(glueableSide)) {
+            if (glueableSide == null || !state.get(glueableSide))
                 continue;
-            }
             Direction rotatedFacing = transform.rotateFacing(face);
             BooleanProperty rotatedGlueableSide = block.getGlueableSide(rotated, rotatedFacing);
-            if (rotatedGlueableSide != null) {
-                rotated = rotated.setValue(rotatedGlueableSide, true);
-            }
+            if (rotatedGlueableSide != null)
+                rotated = rotated.with(rotatedGlueableSide, true);
         }
 
         return rotated;
@@ -200,7 +177,7 @@ public abstract class AbstractChassisBlock extends RotatedPillarBlock implements
 
     public abstract BooleanProperty getGlueableSide(BlockState state, Direction face);
 
-    protected boolean glueAllowedOnSide(BlockGetter world, BlockPos pos, BlockState state, Direction side) {
+    protected boolean glueAllowedOnSide(BlockView world, BlockPos pos, BlockState state, Direction side) {
         return true;
     }
 

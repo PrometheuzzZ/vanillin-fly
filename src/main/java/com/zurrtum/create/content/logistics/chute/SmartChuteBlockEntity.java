@@ -4,11 +4,11 @@ import com.zurrtum.create.AllBlockEntityTypes;
 import com.zurrtum.create.api.behaviour.BlockEntityBehaviour;
 import com.zurrtum.create.foundation.blockEntity.behaviour.filtering.ServerFilteringBehaviour;
 import com.zurrtum.create.foundation.item.ItemHelper.ExtractionCountMode;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.world.Clearable;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.block.BlockState;
+import net.minecraft.item.ItemStack;
+import net.minecraft.util.Clearable;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
 
 import java.util.List;
 
@@ -37,26 +37,26 @@ public class SmartChuteBlockEntity extends ChuteBlockEntity implements Clearable
 
     @Override
     protected boolean canActivate() {
-        BlockState blockState = getBlockState();
-        return blockState.hasProperty(SmartChuteBlock.POWERED) && !blockState.getValue(SmartChuteBlock.POWERED);
+        BlockState blockState = getCachedState();
+        return blockState.contains(SmartChuteBlock.POWERED) && !blockState.get(SmartChuteBlock.POWERED);
     }
 
     @Override
     public void addBehaviours(List<BlockEntityBehaviour<?>> behaviours) {
-        behaviours.add(filtering = new ServerFilteringBehaviour(this).showCountWhen(this::isExtracting)
-            .withCallback($ -> invVersionTracker.reset()));
+        behaviours.add(filtering = new ServerFilteringBehaviour(this).showCountWhen(this::isExtracting).withCallback($ -> invVersionTracker.reset()));
         super.addBehaviours(behaviours);
     }
 
     @Override
-    public void clearContent() {
+    public void clear() {
         filtering.setFilter(ItemStack.EMPTY);
     }
 
     private boolean isExtracting() {
         boolean up = getItemMotion() < 0;
-        BlockPos chutePos = worldPosition.relative(up ? Direction.UP : Direction.DOWN);
-        BlockState blockState = level.getBlockState(chutePos);
-        return !AbstractChuteBlock.isChute(blockState) && !blockState.canBeReplaced();
+        BlockPos chutePos = pos.offset(up ? Direction.UP : Direction.DOWN);
+        BlockState blockState = world.getBlockState(chutePos);
+        return !AbstractChuteBlock.isChute(blockState) && !blockState.isReplaceable();
     }
+
 }

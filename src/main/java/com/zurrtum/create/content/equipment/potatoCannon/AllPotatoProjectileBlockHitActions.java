@@ -4,18 +4,18 @@ import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import com.zurrtum.create.api.equipment.potatoCannon.PotatoProjectileBlockHitAction;
 import com.zurrtum.create.api.registry.CreateRegistries;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.core.Holder;
-import net.minecraft.core.Registry;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.Identifier;
-import net.minecraft.world.entity.item.FallingBlockEntity;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.LevelAccessor;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.block.Block;
+import net.minecraft.entity.FallingBlockEntity;
+import net.minecraft.item.ItemStack;
+import net.minecraft.registry.Registries;
+import net.minecraft.registry.Registry;
+import net.minecraft.registry.entry.RegistryEntry;
+import net.minecraft.util.Identifier;
+import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.world.World;
+import net.minecraft.world.WorldAccess;
 
 import static com.zurrtum.create.Create.MOD_ID;
 
@@ -26,41 +26,32 @@ public class AllPotatoProjectileBlockHitActions {
     }
 
     private static void register(String name, MapCodec<? extends PotatoProjectileBlockHitAction> codec) {
-        Registry.register(
-            CreateRegistries.POTATO_PROJECTILE_BLOCK_HIT_ACTION,
-            Identifier.fromNamespaceAndPath(MOD_ID, name),
-            codec
-        );
+        Registry.register(CreateRegistries.POTATO_PROJECTILE_BLOCK_HIT_ACTION, Identifier.of(MOD_ID, name), codec);
     }
 
-    public record PlantCrop(Holder<Block> cropBlock) implements PotatoProjectileBlockHitAction {
-        public static final MapCodec<PlantCrop> CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
-                BuiltInRegistries.BLOCK.holderByNameCodec().fieldOf("block").forGetter(PlantCrop::cropBlock))
-            .apply(instance, PlantCrop::new));
+    public record PlantCrop(RegistryEntry<Block> cropBlock) implements PotatoProjectileBlockHitAction {
+        public static final MapCodec<PlantCrop> CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(Registries.BLOCK.getEntryCodec()
+            .fieldOf("block").forGetter(PlantCrop::cropBlock)).apply(instance, PlantCrop::new));
 
         @SuppressWarnings("deprecation")
         public PlantCrop(Block cropBlock) {
-            this(cropBlock.builtInRegistryHolder());
+            this(cropBlock.getRegistryEntry());
         }
 
         @Override
-        public boolean execute(LevelAccessor level, ItemStack projectile, BlockHitResult ray) {
-            if (level.isClientSide()) {
+        public boolean execute(WorldAccess level, ItemStack projectile, BlockHitResult ray) {
+            if (level.isClient())
                 return true;
-            }
 
             BlockPos hitPos = ray.getBlockPos();
-            if (level instanceof Level l && !l.isLoaded(hitPos)) {
+            if (level instanceof World l && !l.isPosLoaded(hitPos))
                 return true;
-            }
-            Direction face = ray.getDirection();
-            if (face != Direction.UP) {
+            Direction face = ray.getSide();
+            if (face != Direction.UP)
                 return false;
-            }
-            BlockPos placePos = hitPos.relative(face);
-            if (!level.getBlockState(placePos).canBeReplaced()) {
+            BlockPos placePos = hitPos.offset(face);
+            if (!level.getBlockState(placePos).isReplaceable())
                 return false;
-            }
             //TODO
             //            if (!(cropBlock.value() instanceof SpecialPlantable specialPlantable))
             //                return false;
@@ -75,52 +66,46 @@ public class AllPotatoProjectileBlockHitActions {
         }
     }
 
-    public record PlaceBlockOnGround(Holder<Block> block) implements PotatoProjectileBlockHitAction {
-        public static final MapCodec<PlaceBlockOnGround> CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
-                BuiltInRegistries.BLOCK.holderByNameCodec().fieldOf("block").forGetter(PlaceBlockOnGround::block))
-            .apply(instance, PlaceBlockOnGround::new));
+    public record PlaceBlockOnGround(RegistryEntry<Block> block) implements PotatoProjectileBlockHitAction {
+        public static final MapCodec<PlaceBlockOnGround> CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(Registries.BLOCK.getEntryCodec()
+            .fieldOf("block").forGetter(PlaceBlockOnGround::block)).apply(instance, PlaceBlockOnGround::new));
 
         @SuppressWarnings("deprecation")
         public PlaceBlockOnGround(Block block) {
-            this(block.builtInRegistryHolder());
+            this(block.getRegistryEntry());
         }
 
         @Override
-        public boolean execute(LevelAccessor levelAccessor, ItemStack projectile, BlockHitResult ray) {
-            if (levelAccessor.isClientSide()) {
+        public boolean execute(WorldAccess levelAccessor, ItemStack projectile, BlockHitResult ray) {
+            if (levelAccessor.isClient())
                 return true;
-            }
 
             BlockPos hitPos = ray.getBlockPos();
-            if (levelAccessor instanceof Level l && !l.isLoaded(hitPos)) {
+            if (levelAccessor instanceof World l && !l.isPosLoaded(hitPos))
                 return true;
-            }
-            Direction face = ray.getDirection();
-            BlockPos placePos = hitPos.relative(face);
-            if (!levelAccessor.getBlockState(placePos).canBeReplaced()) {
+            Direction face = ray.getSide();
+            BlockPos placePos = hitPos.offset(face);
+            if (!levelAccessor.getBlockState(placePos).isReplaceable())
                 return false;
-            }
 
             if (face == Direction.UP) {
-                levelAccessor.setBlock(placePos, block.value().defaultBlockState(), Block.UPDATE_ALL);
-            } else if (levelAccessor instanceof Level level) {
+                levelAccessor.setBlockState(placePos, block.value().getDefaultState(), Block.NOTIFY_ALL);
+            } else if (levelAccessor instanceof World level) {
                 double y = ray.getBlockPos().getY() - 0.5;
-                if (!level.isEmptyBlock(placePos.above())) {
+                if (!level.isAir(placePos.up()))
                     y = Math.min(y, placePos.getY());
-                }
-                if (!level.isEmptyBlock(placePos.below())) {
+                if (!level.isAir(placePos.down()))
                     y = Math.max(y, placePos.getY());
-                }
 
                 FallingBlockEntity falling = new FallingBlockEntity(
                     level,
                     placePos.getX() + 0.5,
                     y,
                     placePos.getZ() + 0.5,
-                    block.value().defaultBlockState()
+                    block.value().getDefaultState()
                 );
-                falling.time = 1;
-                level.addFreshEntity(falling);
+                falling.timeFalling = 1;
+                level.spawnEntity(falling);
             }
 
             return true;

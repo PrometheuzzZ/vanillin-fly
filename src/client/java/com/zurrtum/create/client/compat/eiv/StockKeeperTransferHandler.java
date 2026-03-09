@@ -11,12 +11,12 @@ import de.crafty.eiv.common.api.recipe.IEivViewRecipe;
 import de.crafty.eiv.common.recipe.inventory.SlotContent;
 import de.crafty.eiv.common.recipe.item.FluidItem;
 import it.unimi.dsi.fastutil.ints.IntSet;
-import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.core.component.DataComponents;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.resources.Identifier;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.component.CustomData;
+import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.component.DataComponentTypes;
+import net.minecraft.component.type.NbtComponent;
+import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NbtCompound;
+import net.minecraft.util.Identifier;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -42,7 +42,7 @@ public class StockKeeperTransferHandler implements RecipeTransferHandler {
                 if (stack.isEmpty()) {
                     continue;
                 }
-                id = Identifier.fromNamespaceAndPath(MOD_ID, "result_" + result.hashCode());
+                id = Identifier.of(MOD_ID, "result_" + result.hashCode());
                 output = stack;
             }
         }
@@ -123,7 +123,7 @@ public class StockKeeperTransferHandler implements RecipeTransferHandler {
         if (inputs.data().size() > 9) {
             return false;
         }
-        InventorySummary summary = screen.getMenu().contentHolder.getLastClientsideStockSnapshotAsSummary();
+        InventorySummary summary = screen.getScreenHandler().contentHolder.getLastClientsideStockSnapshotAsSummary();
         if (summary == null) {
             return false;
         }
@@ -135,25 +135,25 @@ public class StockKeeperTransferHandler implements RecipeTransferHandler {
         if (craft) {
             CraftableBigItemStack cbis = new CraftableBigItemStack(id, inputs, output);
             screen.recipesToOrder.add(cbis);
-            screen.searchBox.setValue("");
+            screen.searchBox.setText("");
             screen.refreshSearchNextTick = true;
-            screen.requestCraftable(cbis, AllKeys.hasShiftDown() ? cbis.stack.getMaxStackSize() : 1);
+            screen.requestCraftable(cbis, AllKeys.hasShiftDown() ? cbis.stack.getMaxCount() : 1);
         }
         button.setSuccess();
         return true;
     }
 
     private static ItemStack getRawStack(ItemStack stack) {
-        CustomData custom = stack.get(DataComponents.CUSTOM_DATA);
+        NbtComponent custom = stack.get(DataComponentTypes.CUSTOM_DATA);
         if (custom != null && !custom.isEmpty()) {
-            CompoundTag nbt = custom.copyTag();
+            NbtCompound nbt = custom.copyNbt();
             if (nbt.contains("eiv_recipeTag")) {
                 stack = stack.copy();
-                if (nbt.size() == 1) {
-                    stack.remove(DataComponents.CUSTOM_DATA);
+                if (nbt.getSize() == 1) {
+                    stack.remove(DataComponentTypes.CUSTOM_DATA);
                 } else {
                     nbt.remove("eiv_recipeTag");
-                    stack.set(DataComponents.CUSTOM_DATA, CustomData.of(nbt));
+                    stack.set(DataComponentTypes.CUSTOM_DATA, NbtComponent.of(nbt));
                 }
             }
         }

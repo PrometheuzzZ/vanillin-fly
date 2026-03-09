@@ -1,6 +1,5 @@
 package com.zurrtum.create.client.content.trains.entity;
 
-import com.mojang.blaze3d.vertex.PoseStack;
 import com.zurrtum.create.client.AllBogeyStyleRenders;
 import com.zurrtum.create.client.content.contraptions.render.ClientContraption;
 import com.zurrtum.create.client.content.contraptions.render.OrientedContraptionVisual;
@@ -14,16 +13,17 @@ import com.zurrtum.create.content.contraptions.behaviour.MovementContext;
 import com.zurrtum.create.content.trains.entity.CarriageBogey;
 import com.zurrtum.create.content.trains.entity.CarriageContraption;
 import com.zurrtum.create.content.trains.entity.CarriageContraptionEntity;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate.StructureBlockInfo;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.nbt.NbtCompound;
+import net.minecraft.structure.StructureTemplate.StructureBlockInfo;
 import org.apache.commons.lang3.tuple.MutablePair;
 import org.joml.Vector3f;
 
 public class CarriageContraptionVisual extends OrientedContraptionVisual<CarriageContraptionEntity> {
     public static final int MAX_NUM_BOGEYS = 2;
 
-    private final PoseStack poseStack = new PoseStack();
+    private final MatrixStack poseStack = new MatrixStack();
 
     private final CarriageContraption contraption;
 
@@ -35,11 +35,7 @@ public class CarriageContraptionVisual extends OrientedContraptionVisual<Carriag
     // Used to check if a bogey is hidden in a portal.
     private final int[] bogeyPos = new int[MAX_NUM_BOGEYS];
 
-    public CarriageContraptionVisual(
-        VisualizationContext context,
-        CarriageContraptionEntity entity,
-        float partialTick
-    ) {
+    public CarriageContraptionVisual(VisualizationContext context, CarriageContraptionEntity entity, float partialTick) {
         super(context, entity, partialTick);
 
         // An extra block because bogeys are always slightly outside the contraption bounds.
@@ -64,7 +60,7 @@ public class CarriageContraptionVisual extends OrientedContraptionVisual<Carriag
 
     @Override
     protected <T extends BlockEntity> void setupVisualizer(T be, float partialTicks) {
-        if (entity.getContraption() instanceof CarriageContraption cc && cc.isHiddenInPortal(be.getBlockPos())) {
+        if (entity.getContraption() instanceof CarriageContraption cc && cc.isHiddenInPortal(be.getPos())) {
             return;
         }
         super.setupVisualizer(be, partialTicks);
@@ -93,16 +89,10 @@ public class CarriageContraptionVisual extends OrientedContraptionVisual<Carriag
 
             for (var bogey : carriage.bogeys) {
                 if (bogey != null) {
-                    visuals[numBogeys] = AllBogeyStyleRenders.createVisual(
-                        bogey.getStyle(),
-                        bogey.getSize(),
-                        visualizationContext,
-                        pt,
-                        true
-                    );
+                    visuals[numBogeys] = AllBogeyStyleRenders.createVisual(bogey.getStyle(), bogey.getSize(), visualizationContext, pt, true);
                     bogeys[numBogeys] = bogey;
-                    bogeyPos[numBogeys] = bogey.isLeading ? 0 : carriage.bogeySpacing * contraption.getAssemblyDirection()
-                        .getCounterClockWise().getAxisDirection().getStep();
+                    bogeyPos[numBogeys] = bogey.isLeading ? 0 : carriage.bogeySpacing * contraption.getAssemblyDirection().rotateYCounterclockwise()
+                        .getDirection().offset();
                     numBogeys++;
                 }
             }
@@ -123,7 +113,7 @@ public class CarriageContraptionVisual extends OrientedContraptionVisual<Carriag
         var carriage = entity.getCarriage();
         int bogeySpacing = carriage.bogeySpacing;
 
-        poseStack.pushPose();
+        poseStack.push();
 
         Vector3f visualPosition = getVisualPosition(partialTick);
         TransformStack.of(poseStack).translate(visualPosition);
@@ -134,7 +124,7 @@ public class CarriageContraptionVisual extends OrientedContraptionVisual<Carriag
                 continue;
             }
 
-            poseStack.pushPose();
+            poseStack.push();
 
             CarriageBogey bogey = bogeys[bogeyIdx];
 
@@ -149,15 +139,15 @@ public class CarriageContraptionVisual extends OrientedContraptionVisual<Carriag
             );
             poseStack.translate(0, -1.5 - 1 / 128f, 0);
 
-            CompoundTag bogeyData = bogey.bogeyData;
+            NbtCompound bogeyData = bogey.bogeyData;
             if (bogeyData == null) {
-                bogeyData = new CompoundTag();
+                bogeyData = new NbtCompound();
             }
             visuals[bogeyIdx].update(bogeyData, bogey.wheelAngle.getValue(partialTick), poseStack);
-            poseStack.popPose();
+            poseStack.pop();
         }
 
-        poseStack.popPose();
+        poseStack.pop();
     }
 
     @Override

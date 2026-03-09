@@ -1,92 +1,91 @@
 package com.zurrtum.create.catnip.levelWrappers;
 
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.core.Holder;
-import net.minecraft.core.RegistryAccess;
-import net.minecraft.core.particles.ExplosionParticleInfo;
-import net.minecraft.core.particles.ParticleOptions;
-import net.minecraft.resources.ResourceKey;
-import net.minecraft.server.level.FullChunkStatus;
-import net.minecraft.sounds.SoundEvent;
-import net.minecraft.sounds.SoundSource;
-import net.minecraft.util.random.WeightedList;
-import net.minecraft.world.TickRateManager;
-import net.minecraft.world.attribute.EnvironmentAttributeSystem;
-import net.minecraft.world.damagesource.DamageSource;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.boss.enderdragon.EnderDragonPart;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.flag.FeatureFlagSet;
-import net.minecraft.world.item.alchemy.PotionBrewing;
-import net.minecraft.world.item.crafting.RecipeAccess;
-import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.ExplosionDamageCalculator;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.biome.Biome;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.entity.FuelValues;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.border.WorldBorder;
-import net.minecraft.world.level.chunk.ChunkAccess;
-import net.minecraft.world.level.chunk.ChunkSource;
-import net.minecraft.world.level.chunk.LevelChunk;
-import net.minecraft.world.level.chunk.status.ChunkStatus;
-import net.minecraft.world.level.dimension.DimensionType;
-import net.minecraft.world.level.entity.LevelEntityGetter;
-import net.minecraft.world.level.gameevent.GameEvent;
-import net.minecraft.world.level.lighting.LevelLightEngine;
-import net.minecraft.world.level.material.Fluid;
-import net.minecraft.world.level.material.FluidState;
-import net.minecraft.world.level.material.Fluids;
-import net.minecraft.world.level.saveddata.maps.MapId;
-import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
-import net.minecraft.world.level.storage.LevelData;
-import net.minecraft.world.level.storage.WritableLevelData;
-import net.minecraft.world.phys.Vec3;
-import net.minecraft.world.scores.Scoreboard;
-import net.minecraft.world.ticks.BlackholeTickAccess;
-import net.minecraft.world.ticks.LevelTickAccess;
+import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.Blocks;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.component.type.MapIdComponent;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.boss.dragon.EnderDragonPart;
+import net.minecraft.entity.damage.DamageSource;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.fluid.Fluid;
+import net.minecraft.fluid.FluidState;
+import net.minecraft.fluid.Fluids;
+import net.minecraft.item.FuelRegistry;
+import net.minecraft.item.map.MapState;
+import net.minecraft.particle.BlockParticleEffect;
+import net.minecraft.particle.ParticleEffect;
+import net.minecraft.recipe.BrewingRecipeRegistry;
+import net.minecraft.recipe.RecipeManager;
+import net.minecraft.registry.DynamicRegistryManager;
+import net.minecraft.registry.RegistryKey;
+import net.minecraft.registry.entry.RegistryEntry;
+import net.minecraft.resource.featuretoggle.FeatureSet;
+import net.minecraft.scoreboard.Scoreboard;
+import net.minecraft.server.world.ChunkLevelType;
+import net.minecraft.sound.SoundCategory;
+import net.minecraft.sound.SoundEvent;
+import net.minecraft.util.collection.Pool;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.ChunkPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.MutableWorldProperties;
+import net.minecraft.world.World;
+import net.minecraft.world.WorldProperties;
+import net.minecraft.world.biome.Biome;
+import net.minecraft.world.border.WorldBorder;
+import net.minecraft.world.chunk.Chunk;
+import net.minecraft.world.chunk.ChunkManager;
+import net.minecraft.world.chunk.ChunkStatus;
+import net.minecraft.world.chunk.WorldChunk;
+import net.minecraft.world.chunk.light.LightingProvider;
+import net.minecraft.world.dimension.DimensionType;
+import net.minecraft.world.entity.EntityLookup;
+import net.minecraft.world.event.GameEvent;
+import net.minecraft.world.explosion.ExplosionBehavior;
+import net.minecraft.world.tick.EmptyTickSchedulers;
+import net.minecraft.world.tick.QueryableTickScheduler;
+import net.minecraft.world.tick.TickManager;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Collection;
 import java.util.List;
 import java.util.function.BooleanSupplier;
 
-public class SchematicChunkSource extends ChunkSource {
-    private final Level fallbackWorld;
+public class SchematicChunkSource extends ChunkManager {
+    private final World fallbackWorld;
 
-    public SchematicChunkSource(Level world) {
+    public SchematicChunkSource(World world) {
         fallbackWorld = world;
     }
 
     @Nullable
     @Override
-    public ChunkAccess getChunkForLighting(int x, int z) {
+    public Chunk getChunk(int x, int z) {
         return new EmptierChunk(fallbackWorld);
     }
 
     @Override
-    public Level getLevel() {
+    public World getWorld() {
         return fallbackWorld;
     }
 
     @Nullable
     @Override
-    public ChunkAccess getChunk(int x, int z, ChunkStatus status, boolean p_212849_4_) {
-        return getChunkForLighting(x, z);
+    public Chunk getChunk(int x, int z, ChunkStatus status, boolean p_212849_4_) {
+        return getChunk(x, z);
     }
 
     @Override
-    public String gatherStats() {
+    public String getDebugString() {
         return "WrappedChunkProvider";
     }
 
     @Override
-    public LevelLightEngine getLightEngine() {
-        return fallbackWorld.getLightEngine();
+    public LightingProvider getLightingProvider() {
+        return fallbackWorld.getLightingProvider();
     }
 
     @Override
@@ -94,19 +93,18 @@ public class SchematicChunkSource extends ChunkSource {
     }
 
     @Override
-    public int getLoadedChunksCount() {
+    public int getLoadedChunkCount() {
         return 0;
     }
 
-    public static class EmptierChunk extends LevelChunk {
+    public static class EmptierChunk extends WorldChunk {
 
-        private static final class DummyLevel extends Level {
+        private static final class DummyLevel extends World {
             private DummyLevel(
-                WritableLevelData pLevelData,
-                ResourceKey<Level> pDimension,
-                RegistryAccess pRegistryAccess,
-                Holder<DimensionType> pDimensionTypeRegistration,
-                EnvironmentAttributeSystem pEnvironmentAttributes,
+                MutableWorldProperties pLevelData,
+                RegistryKey<World> pDimension,
+                DynamicRegistryManager pRegistryAccess,
+                RegistryEntry<DimensionType> pDimensionTypeRegistration,
                 boolean pIsClientSide,
                 boolean pIsDebug,
                 long pBiomeZoomSeed,
@@ -123,39 +121,22 @@ public class SchematicChunkSource extends ChunkSource {
                     pMaxChainedNeighborUpdates
                 );
                 access = pRegistryAccess;
-                environmentAttributes = pEnvironmentAttributes;
             }
 
-            private final RegistryAccess access;
-            private final EnvironmentAttributeSystem environmentAttributes;
+            private final DynamicRegistryManager access;
             private final WorldBorder border = new WorldBorder();
 
-            private DummyLevel(Level level) {
-                this(
-                    null,
-                    null,
-                    level.registryAccess(),
-                    level.dimensionTypeRegistration(),
-                    level.environmentAttributes(),
-                    false,
-                    false,
-                    0,
-                    0
-                );
+            private DummyLevel(World level) {
+                this(null, null, level.getRegistryManager(), level.getDimensionEntry(), false, false, 0, 0);
             }
 
             @Override
-            public EnvironmentAttributeSystem environmentAttributes() {
-                return environmentAttributes;
+            public void setSpawnPoint(WorldProperties.SpawnPoint spawnPoint) {
             }
 
             @Override
-            public void setRespawnData(LevelData.RespawnData spawnPoint) {
-            }
-
-            @Override
-            public LevelData.RespawnData getRespawnData() {
-                return levelData.getRespawnData();
+            public WorldProperties.SpawnPoint getSpawnPoint() {
+                return properties.getSpawnPoint();
             }
 
             @Override
@@ -164,44 +145,44 @@ public class SchematicChunkSource extends ChunkSource {
             }
 
             @Override
-            public ChunkSource getChunkSource() {
+            public ChunkManager getChunkManager() {
                 return null;
             }
 
             @Override
-            public void levelEvent(Entity pPlayer, int pType, BlockPos pPos, int pData) {
+            public void syncWorldEvent(Entity pPlayer, int pType, BlockPos pPos, int pData) {
             }
 
             @Override
-            public void gameEvent(@Nullable Entity entity, Holder<GameEvent> gameEvent, Vec3 pos) {
+            public void emitGameEvent(@Nullable Entity entity, RegistryEntry<GameEvent> gameEvent, Vec3d pos) {
             }
 
             @Override
-            public void gameEvent(Holder<GameEvent> holder, Vec3 vec3, GameEvent.Context context) {
+            public void emitGameEvent(RegistryEntry<GameEvent> holder, Vec3d vec3, GameEvent.Emitter context) {
             }
 
             @Override
-            public RegistryAccess registryAccess() {
+            public DynamicRegistryManager getRegistryManager() {
                 return access;
             }
 
             @Override
-            public PotionBrewing potionBrewing() {
+            public BrewingRecipeRegistry getBrewingRecipeRegistry() {
                 return null;
             }
 
             @Override
-            public FuelValues fuelValues() {
+            public FuelRegistry getFuelRegistry() {
                 return null;
             }
 
             @Override
-            public List<? extends Player> players() {
+            public List<? extends PlayerEntity> getPlayers() {
                 return null;
             }
 
             @Override
-            public Holder<Biome> getUncachedNoiseBiome(int pX, int pY, int pZ) {
+            public RegistryEntry<Biome> getGeneratorStoredBiome(int pX, int pY, int pZ) {
                 return null;
             }
 
@@ -211,12 +192,12 @@ public class SchematicChunkSource extends ChunkSource {
             }
 
             @Override
-            public float getShade(Direction pDirection, boolean pShade) {
+            public float getBrightness(Direction pDirection, boolean pShade) {
                 return 0;
             }
 
             @Override
-            public void sendBlockUpdated(BlockPos pPos, BlockState pOldState, BlockState pNewState, int pFlags) {
+            public void updateListeners(BlockPos pPos, BlockState pOldState, BlockState pNewState, int pFlags) {
             }
 
             @Override
@@ -226,49 +207,42 @@ public class SchematicChunkSource extends ChunkSource {
                 double pY,
                 double pZ,
                 SoundEvent pSound,
-                SoundSource pCategory,
+                SoundCategory pCategory,
                 float pVolume,
                 float pPitch
+            ) {
+            }
+
+            @Override
+            public void playSoundFromEntity(Entity pPlayer, Entity pEntity, SoundEvent pEvent, SoundCategory pCategory, float pVolume, float pPitch) {
+            }
+
+            @Override
+            public void createExplosion(
+                @Nullable Entity entity,
+                @Nullable DamageSource damageSource,
+                @Nullable ExplosionBehavior behavior,
+                double x,
+                double y,
+                double z,
+                float power,
+                boolean createFire,
+                ExplosionSourceType explosionSourceType,
+                ParticleEffect smallParticle,
+                ParticleEffect largeParticle,
+                Pool<BlockParticleEffect> blockParticles,
+                RegistryEntry<SoundEvent> soundEvent
             ) {
             }
 
             @Override
             public void playSound(
                 Entity pPlayer,
-                Entity pEntity,
-                SoundEvent pEvent,
-                SoundSource pCategory,
-                float pVolume,
-                float pPitch
-            ) {
-            }
-
-            @Override
-            public void explode(
-                @Nullable Entity entity,
-                @Nullable DamageSource damageSource,
-                @Nullable ExplosionDamageCalculator behavior,
-                double x,
-                double y,
-                double z,
-                float power,
-                boolean createFire,
-                ExplosionInteraction explosionSourceType,
-                ParticleOptions smallParticle,
-                ParticleOptions largeParticle,
-                WeightedList<ExplosionParticleInfo> blockParticles,
-                Holder<SoundEvent> soundEvent
-            ) {
-            }
-
-            @Override
-            public void playSeededSound(
-                Entity pPlayer,
                 double pX,
                 double pY,
                 double pZ,
-                Holder<SoundEvent> pSound,
-                SoundSource pSource,
+                RegistryEntry<SoundEvent> pSound,
+                SoundCategory pSource,
                 float pVolume,
                 float pPitch,
                 long pSeed
@@ -276,13 +250,13 @@ public class SchematicChunkSource extends ChunkSource {
             }
 
             @Override
-            public void playSeededSound(
+            public void playSound(
                 Entity p_220363_,
                 double p_220364_,
                 double p_220365_,
                 double p_220366_,
                 SoundEvent p_220367_,
-                SoundSource p_220368_,
+                SoundCategory p_220368_,
                 float p_220369_,
                 float p_220370_,
                 long p_220371_
@@ -290,11 +264,11 @@ public class SchematicChunkSource extends ChunkSource {
             }
 
             @Override
-            public void playSeededSound(
+            public void playSoundFromEntity(
                 Entity p_220372_,
                 Entity p_220373_,
-                Holder<SoundEvent> p_220374_,
-                SoundSource p_220375_,
+                RegistryEntry<SoundEvent> p_220374_,
+                SoundCategory p_220375_,
                 float p_220376_,
                 float p_220377_,
                 long p_220378_
@@ -302,28 +276,28 @@ public class SchematicChunkSource extends ChunkSource {
             }
 
             @Override
-            public String gatherChunkSourceStats() {
+            public String asString() {
                 return null;
             }
 
             @Override
-            public Entity getEntity(int pId) {
+            public Entity getEntityById(int pId) {
                 return null;
             }
 
             @Override
-            public Collection<EnderDragonPart> dragonParts() {
+            public Collection<EnderDragonPart> getEnderDragonParts() {
                 return List.of();
             }
 
             @Nullable
             @Override
-            public MapItemSavedData getMapData(MapId mapId) {
+            public MapState getMapState(MapIdComponent mapId) {
                 return null;
             }
 
             @Override
-            public void destroyBlockProgress(int pBreakerId, BlockPos pPos, int pProgress) {
+            public void setBlockBreakingInfo(int pBreakerId, BlockPos pPos, int pProgress) {
             }
 
             @Override
@@ -332,43 +306,43 @@ public class SchematicChunkSource extends ChunkSource {
             }
 
             @Override
-            public RecipeAccess recipeAccess() {
+            public RecipeManager getRecipeManager() {
                 return null;
             }
 
             @Override
-            public LevelEntityGetter<Entity> getEntities() {
+            public EntityLookup<Entity> getEntityLookup() {
                 return null;
             }
 
             @Override
-            public LevelTickAccess<Block> getBlockTicks() {
-                return BlackholeTickAccess.emptyLevelList();
+            public QueryableTickScheduler<Block> getBlockTickScheduler() {
+                return EmptyTickSchedulers.getClientTickScheduler();
             }
 
             @Override
-            public LevelTickAccess<Fluid> getFluidTicks() {
-                return BlackholeTickAccess.emptyLevelList();
+            public QueryableTickScheduler<Fluid> getFluidTickScheduler() {
+                return EmptyTickSchedulers.getClientTickScheduler();
             }
 
             @Override
-            public FeatureFlagSet enabledFeatures() {
-                return FeatureFlagSet.of();
+            public FeatureSet getEnabledFeatures() {
+                return FeatureSet.empty();
             }
 
             @Override
-            public TickRateManager tickRateManager() {
+            public TickManager getTickManager() {
                 return null;
             }
         }
 
-        public EmptierChunk(Level level) {
-            super(new DummyLevel(level), ChunkPos.ZERO);
+        public EmptierChunk(World level) {
+            super(new DummyLevel(level), ChunkPos.ORIGIN);
         }
 
         @Override
         public BlockState getBlockState(BlockPos p_180495_1_) {
-            return Blocks.VOID_AIR.defaultBlockState();
+            return Blocks.VOID_AIR.getDefaultState();
         }
 
         @Nullable
@@ -378,21 +352,21 @@ public class SchematicChunkSource extends ChunkSource {
 
         @Override
         public FluidState getFluidState(BlockPos p_204610_1_) {
-            return Fluids.EMPTY.defaultFluidState();
+            return Fluids.EMPTY.getDefaultState();
         }
 
         @Override
-        public int getLightEmission(BlockPos p_217298_1_) {
+        public int getLuminance(BlockPos p_217298_1_) {
             return 0;
         }
 
         @Nullable
-        public BlockEntity getBlockEntity(BlockPos p_177424_1_, EntityCreationType p_177424_2_) {
+        public BlockEntity getBlockEntity(BlockPos p_177424_1_, CreationType p_177424_2_) {
             return null;
         }
 
         @Override
-        public void addAndRegisterBlockEntity(BlockEntity p_150813_1_) {
+        public void addBlockEntity(BlockEntity p_150813_1_) {
         }
 
         @Override
@@ -412,13 +386,13 @@ public class SchematicChunkSource extends ChunkSource {
         }
 
         @Override
-        public boolean isYSpaceEmpty(int p_76606_1_, int p_76606_2_) {
+        public boolean areSectionsEmptyBetween(int p_76606_1_, int p_76606_2_) {
             return true;
         }
 
         @Override
-        public FullChunkStatus getFullStatus() {
-            return FullChunkStatus.FULL;
+        public ChunkLevelType getLevelType() {
+            return ChunkLevelType.FULL;
         }
     }
 }

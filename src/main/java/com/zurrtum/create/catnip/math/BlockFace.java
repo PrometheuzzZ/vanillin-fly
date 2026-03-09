@@ -4,23 +4,22 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import com.zurrtum.create.catnip.data.Pair;
 import com.zurrtum.create.catnip.nbt.NBTHelper;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.network.codec.StreamCodec;
+import net.minecraft.nbt.NbtCompound;
+import net.minecraft.network.PacketByteBuf;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
 
 public class BlockFace extends Pair<BlockPos, Direction> {
     public static Codec<BlockFace> CODEC = RecordCodecBuilder.create(instance -> instance.group(
-        BlockPos.CODEC.fieldOf(
-            "pos").forGetter(BlockFace::getPos),
-        Direction.CODEC.fieldOf("direction").forGetter(BlockFace::getFace)
+        BlockPos.CODEC.fieldOf("pos")
+            .forGetter(BlockFace::getPos), Direction.CODEC.fieldOf("direction").forGetter(BlockFace::getFace)
     ).apply(instance, BlockFace::new));
 
-    public static StreamCodec<FriendlyByteBuf, BlockFace> STREAM_CODEC = StreamCodec.composite(
-        BlockPos.STREAM_CODEC,
+    public static PacketCodec<PacketByteBuf, BlockFace> STREAM_CODEC = PacketCodec.tuple(
+        BlockPos.PACKET_CODEC,
         BlockFace::getPos,
-        Direction.STREAM_CODEC,
+        Direction.PACKET_CODEC,
         BlockFace::getFace,
         BlockFace::new
     );
@@ -30,9 +29,8 @@ public class BlockFace extends Pair<BlockPos, Direction> {
     }
 
     public boolean isEquivalent(BlockFace other) {
-        if (equals(other)) {
+        if (equals(other))
             return true;
-        }
         return getConnectedPos().equals(other.getPos()) && getPos().equals(other.getConnectedPos());
     }
 
@@ -53,21 +51,18 @@ public class BlockFace extends Pair<BlockPos, Direction> {
     }
 
     public BlockPos getConnectedPos() {
-        return getPos().relative(getFace());
+        return getPos().offset(getFace());
     }
 
-    public CompoundTag serializeNBT() {
-        CompoundTag compoundNBT = new CompoundTag();
-        compoundNBT.store("Pos", BlockPos.CODEC, getPos());
+    public NbtCompound serializeNBT() {
+        NbtCompound compoundNBT = new NbtCompound();
+        compoundNBT.put("Pos", BlockPos.CODEC, getPos());
         NBTHelper.writeEnum(compoundNBT, "Face", getFace());
         return compoundNBT;
     }
 
-    public static BlockFace fromNBT(CompoundTag compound) {
-        return new BlockFace(
-            NBTHelper.readBlockPos(compound, "Pos"),
-            NBTHelper.readEnum(compound, "Face", Direction.class)
-        );
+    public static BlockFace fromNBT(NbtCompound compound) {
+        return new BlockFace(NBTHelper.readBlockPos(compound, "Pos"), NBTHelper.readEnum(compound, "Face", Direction.class));
     }
 
 }

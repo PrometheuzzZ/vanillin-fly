@@ -4,37 +4,24 @@ import com.zurrtum.create.AllSoundEvents;
 import com.zurrtum.create.catnip.data.Pair;
 import com.zurrtum.create.client.catnip.animation.AnimationTickHolder;
 import com.zurrtum.create.client.infrastructure.config.AllConfigs;
-import net.minecraft.client.Minecraft;
-import net.minecraft.core.BlockPos;
-import net.minecraft.sounds.SoundEvents;
-import net.minecraft.world.entity.Entity;
-import org.jspecify.annotations.Nullable;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.entity.Entity;
+import net.minecraft.sound.SoundEvents;
+import net.minecraft.util.math.BlockPos;
 
 import java.util.*;
 import java.util.function.BiFunction;
 
 public class SoundScapes {
+
+    private static final Map<AmbienceGroup, Map<PitchGroup, Set<BlockPos>>> counter = new IdentityHashMap<>();
+    private static final Map<Pair<AmbienceGroup, PitchGroup>, SoundScape> activeSounds = new HashMap<>();
     static final int MAX_AMBIENT_SOURCE_DISTANCE = 16;
     static final int UPDATE_INTERVAL = 5;
     static final int SOUND_VOLUME_ARG_MAX = 15;
-    public static SoundScapes DEFAULT = new SoundScapes(false);
-    public static SoundScapes current = DEFAULT;
-    private final boolean includePaused;
-
-    public SoundScapes(boolean includePaused) {
-        this.includePaused = includePaused;
-    }
-
-    public static void setInstance(@Nullable SoundScapes instance) {
-        current.callInvalidateAll();
-        current = instance != null ? instance : DEFAULT;
-    }
-
-    private final Map<AmbienceGroup, Map<PitchGroup, Set<BlockPos>>> counter = new IdentityHashMap<>();
-    private final Map<Pair<AmbienceGroup, PitchGroup>, SoundScape> activeSounds = new HashMap<>();
 
     private static SoundScape kinetic(float pitch, AmbienceGroup group) {
-        return new SoundScape(pitch, group).continuous(SoundEvents.MINECART_INSIDE, .25f, 1);
+        return new SoundScape(pitch, group).continuous(SoundEvents.ENTITY_MINECART_INSIDE, .25f, 1);
     }
 
     private static SoundScape cogwheel(float pitch, AmbienceGroup group) {
@@ -43,8 +30,7 @@ public class SoundScapes {
 
     private static SoundScape crushing(float pitch, AmbienceGroup group) {
         return new SoundScape(pitch, group).repeating(AllSoundEvents.CRUSHING_1.getMainEvent(), 1.545f, .75f, 1)
-            .repeating(AllSoundEvents.CRUSHING_2.getMainEvent(), 0.425f, .75f, 2)
-            .repeating(AllSoundEvents.CRUSHING_3.getMainEvent(), 2f, 1.75f, 2);
+            .repeating(AllSoundEvents.CRUSHING_2.getMainEvent(), 0.425f, .75f, 2).repeating(AllSoundEvents.CRUSHING_3.getMainEvent(), 2f, 1.75f, 2);
     }
 
     private static SoundScape milling(float pitch, AmbienceGroup group) {
@@ -53,32 +39,20 @@ public class SoundScapes {
     }
 
     public static void play(AmbienceGroup group, BlockPos pos, float pitch) {
-        current.callPlay(group, pos, pitch);
-    }
-
-    private void callPlay(AmbienceGroup group, BlockPos pos, float pitch) {
-        if (!AllConfigs.client().enableAmbientSounds.get()) {
+        if (!AllConfigs.client().enableAmbientSounds.get())
             return;
-        }
-        if (!outOfRange(pos)) {
+        if (!outOfRange(pos))
             addSound(group, pos, pitch);
-        }
     }
 
     public static void tick() {
-        current.callTick();
-    }
-
-    private void callTick() {
         activeSounds.values().forEach(SoundScape::tick);
 
-        if (AnimationTickHolder.getTicks(includePaused) % UPDATE_INTERVAL != 0) {
+        if (AnimationTickHolder.getTicks() % UPDATE_INTERVAL != 0)
             return;
-        }
 
         boolean disable = !AllConfigs.client().enableAmbientSounds.get();
-        for (Iterator<Map.Entry<Pair<AmbienceGroup, PitchGroup>, SoundScape>> iterator = activeSounds.entrySet()
-            .iterator(); iterator.hasNext(); ) {
+        for (Iterator<Map.Entry<Pair<AmbienceGroup, PitchGroup>, SoundScape>> iterator = activeSounds.entrySet().iterator(); iterator.hasNext(); ) {
 
             Map.Entry<Pair<AmbienceGroup, PitchGroup>, SoundScape> entry = iterator.next();
             Pair<AmbienceGroup, PitchGroup> key = entry.getKey();
@@ -93,10 +67,9 @@ public class SoundScapes {
         counter.values().forEach(m -> m.values().forEach(Set::clear));
     }
 
-    private void addSound(AmbienceGroup group, BlockPos pos, float pitch) {
+    private static void addSound(AmbienceGroup group, BlockPos pos, float pitch) {
         PitchGroup groupFromPitch = getGroupFromPitch(pitch);
-        Set<BlockPos> set = counter.computeIfAbsent(group, ag -> new IdentityHashMap<>())
-            .computeIfAbsent(groupFromPitch, pg -> new HashSet<>());
+        Set<BlockPos> set = counter.computeIfAbsent(group, ag -> new IdentityHashMap<>()).computeIfAbsent(groupFromPitch, pg -> new HashSet<>());
         set.add(pos);
 
         Pair<AmbienceGroup, PitchGroup> pair = Pair.of(group, groupFromPitch);
@@ -110,62 +83,48 @@ public class SoundScapes {
     }
 
     public static void invalidateAll() {
-        current.callInvalidateAll();
-    }
-
-    private void callInvalidateAll() {
         counter.clear();
         activeSounds.forEach(($, sound) -> sound.remove());
         activeSounds.clear();
     }
 
     protected static boolean outOfRange(BlockPos pos) {
-        return !getCameraPos().closerThan(pos, MAX_AMBIENT_SOURCE_DISTANCE);
+        return !getCameraPos().isWithinDistance(pos, MAX_AMBIENT_SOURCE_DISTANCE);
     }
 
     protected static BlockPos getCameraPos() {
-        Entity renderViewEntity = Minecraft.getInstance().getCameraEntity();
-        if (renderViewEntity == null) {
-            return BlockPos.ZERO;
-        }
-        return renderViewEntity.blockPosition();
+        Entity renderViewEntity = MinecraftClient.getInstance().getCameraEntity();
+        if (renderViewEntity == null)
+            return BlockPos.ORIGIN;
+        return renderViewEntity.getBlockPos();
     }
 
     public static int getSoundCount(AmbienceGroup group, PitchGroup pitchGroup) {
-        return current.callGetSoundCount(group, pitchGroup);
-    }
-
-    private int callGetSoundCount(AmbienceGroup group, PitchGroup pitchGroup) {
-        return callGetAllLocations(group, pitchGroup).size();
+        return getAllLocations(group, pitchGroup).size();
     }
 
     public static Set<BlockPos> getAllLocations(AmbienceGroup group, PitchGroup pitchGroup) {
-        return current.callGetAllLocations(group, pitchGroup);
-    }
-
-    private Set<BlockPos> callGetAllLocations(AmbienceGroup group, PitchGroup pitchGroup) {
         return counter.getOrDefault(group, Collections.emptyMap()).getOrDefault(pitchGroup, Collections.emptySet());
     }
 
     public static PitchGroup getGroupFromPitch(float pitch) {
-        if (pitch < .70) {
+        if (pitch < .70)
             return PitchGroup.VERY_LOW;
-        }
-        if (pitch < .90) {
+        if (pitch < .90)
             return PitchGroup.LOW;
-        }
-        if (pitch < 1.10) {
+        if (pitch < 1.10)
             return PitchGroup.NORMAL;
-        }
-        if (pitch < 1.30) {
+        if (pitch < 1.30)
             return PitchGroup.HIGH;
-        }
         return PitchGroup.VERY_HIGH;
     }
 
     public enum AmbienceGroup {
 
-        KINETIC(SoundScapes::kinetic), COG(SoundScapes::cogwheel), CRUSHING(SoundScapes::crushing), MILLING(SoundScapes::milling),
+        KINETIC(SoundScapes::kinetic),
+        COG(SoundScapes::cogwheel),
+        CRUSHING(SoundScapes::crushing),
+        MILLING(SoundScapes::milling),
 
         ;
 
@@ -182,7 +141,11 @@ public class SoundScapes {
     }
 
     public enum PitchGroup {
-        VERY_LOW, LOW, NORMAL, HIGH, VERY_HIGH
+        VERY_LOW,
+        LOW,
+        NORMAL,
+        HIGH,
+        VERY_HIGH
     }
 
 }

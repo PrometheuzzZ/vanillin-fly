@@ -2,8 +2,8 @@ package com.zurrtum.create.content.equipment.bell;
 
 import com.zurrtum.create.content.contraptions.behaviour.BellMovementBehaviour;
 import com.zurrtum.create.content.contraptions.behaviour.MovementContext;
-import net.minecraft.core.BlockPos;
-import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.world.ServerWorld;
+import net.minecraft.util.math.BlockPos;
 
 public class HauntedBellMovementBehaviour extends BellMovementBehaviour {
 
@@ -12,14 +12,13 @@ public class HauntedBellMovementBehaviour extends BellMovementBehaviour {
     @Override
     public void tick(MovementContext context) {
         int recharge = getRecharge(context);
-        if (recharge > 0) {
+        if (recharge > 0)
             setRecharge(context, recharge - 1);
-        }
     }
 
     @Override
     public void visitNewPosition(MovementContext context, BlockPos pos) {
-        if (!context.world.isClientSide() && context.world instanceof ServerLevel serverLevel && getRecharge(context) == 0) {
+        if (!context.world.isClient() && context.world instanceof ServerWorld serverLevel && getRecharge(context) == 0) {
             HauntedBellPulser.sendPulse(serverLevel, pos, DISTANCE, false);
             setRecharge(context, HauntedBellBlockEntity.RECHARGE_TICKS);
             playSound(context);

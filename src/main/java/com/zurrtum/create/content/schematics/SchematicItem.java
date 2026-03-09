@@ -5,26 +5,22 @@ import com.zurrtum.create.AllClientHandle;
 import com.zurrtum.create.AllDataComponents;
 import com.zurrtum.create.AllItems;
 import com.zurrtum.create.foundation.utility.CreatePaths;
-import net.minecraft.ChatFormatting;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.registries.Registries;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.NbtAccounter;
+import net.minecraft.component.type.TooltipDisplayComponent;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
+import net.minecraft.item.ItemUsageContext;
+import net.minecraft.item.tooltip.TooltipType;
+import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtIo;
-import net.minecraft.network.chat.Component;
-import net.minecraft.world.InteractionHand;
-import net.minecraft.world.InteractionResult;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.TooltipFlag;
-import net.minecraft.world.item.component.TooltipDisplay;
-import net.minecraft.world.item.context.UseOnContext;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.Mirror;
-import net.minecraft.world.level.block.Rotation;
-import net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings;
-import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
+import net.minecraft.nbt.NbtSizeTracker;
+import net.minecraft.registry.RegistryKeys;
+import net.minecraft.structure.StructurePlacementData;
+import net.minecraft.structure.StructureTemplate;
+import net.minecraft.text.Text;
+import net.minecraft.util.*;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.World;
 import org.slf4j.Logger;
 
 import java.io.BufferedInputStream;
@@ -41,19 +37,19 @@ public class SchematicItem extends Item {
 
     private static final Logger LOGGER = LogUtils.getLogger();
 
-    public SchematicItem(Properties properties) {
+    public SchematicItem(Settings properties) {
         super(properties);
     }
 
-    public static ItemStack create(Level level, String schematic, String owner) {
-        ItemStack blueprint = AllItems.SCHEMATIC.getDefaultInstance();
+    public static ItemStack create(World level, String schematic, String owner) {
+        ItemStack blueprint = AllItems.SCHEMATIC.getDefaultStack();
 
         blueprint.set(AllDataComponents.SCHEMATIC_DEPLOYED, false);
         blueprint.set(AllDataComponents.SCHEMATIC_OWNER, owner);
         blueprint.set(AllDataComponents.SCHEMATIC_FILE, schematic);
-        blueprint.set(AllDataComponents.SCHEMATIC_ANCHOR, BlockPos.ZERO);
-        blueprint.set(AllDataComponents.SCHEMATIC_ROTATION, Rotation.NONE);
-        blueprint.set(AllDataComponents.SCHEMATIC_MIRROR, Mirror.NONE);
+        blueprint.set(AllDataComponents.SCHEMATIC_ANCHOR, BlockPos.ORIGIN);
+        blueprint.set(AllDataComponents.SCHEMATIC_ROTATION, BlockRotation.NONE);
+        blueprint.set(AllDataComponents.SCHEMATIC_MIRROR, BlockMirror.NONE);
 
         writeSize(level, blueprint);
         return blueprint;
@@ -61,54 +57,52 @@ public class SchematicItem extends Item {
 
     @Override
     @SuppressWarnings("deprecation")
-    public void appendHoverText(
+    public void appendTooltip(
         ItemStack stack,
         TooltipContext context,
-        TooltipDisplay displayComponent,
-        Consumer<Component> tooltip,
-        TooltipFlag flagIn
+        TooltipDisplayComponent displayComponent,
+        Consumer<Text> tooltip,
+        TooltipType flagIn
     ) {
-        if (stack.has(AllDataComponents.SCHEMATIC_FILE)) {
-            tooltip.accept(Component.literal(ChatFormatting.GOLD + stack.get(AllDataComponents.SCHEMATIC_FILE)));
+        if (stack.contains(AllDataComponents.SCHEMATIC_FILE)) {
+            tooltip.accept(Text.literal(Formatting.GOLD + stack.get(AllDataComponents.SCHEMATIC_FILE)));
         } else {
-            tooltip.accept(Component.translatable("create.schematic.invalid").withStyle(ChatFormatting.RED));
+            tooltip.accept(Text.translatable("create.schematic.invalid").formatted(Formatting.RED));
         }
-        super.appendHoverText(stack, context, displayComponent, tooltip, flagIn);
+        super.appendTooltip(stack, context, displayComponent, tooltip, flagIn);
     }
 
-    public static void writeSize(Level level, ItemStack blueprint) {
+    public static void writeSize(World level, ItemStack blueprint) {
         StructureTemplate t = loadSchematic(level, blueprint);
         blueprint.set(AllDataComponents.SCHEMATIC_BOUNDS, t.getSize());
         SchematicInstances.clearHash(blueprint);
     }
 
-    public static StructurePlaceSettings getSettings(ItemStack blueprint) {
+    public static StructurePlacementData getSettings(ItemStack blueprint) {
         return getSettings(blueprint, true);
     }
 
-    public static StructurePlaceSettings getSettings(ItemStack blueprint, boolean processNBT) {
-        StructurePlaceSettings settings = new StructurePlaceSettings();
-        settings.setRotation(blueprint.getOrDefault(AllDataComponents.SCHEMATIC_ROTATION, Rotation.NONE));
-        settings.setMirror(blueprint.getOrDefault(AllDataComponents.SCHEMATIC_MIRROR, Mirror.NONE));
-        if (processNBT) {
+    public static StructurePlacementData getSettings(ItemStack blueprint, boolean processNBT) {
+        StructurePlacementData settings = new StructurePlacementData();
+        settings.setRotation(blueprint.getOrDefault(AllDataComponents.SCHEMATIC_ROTATION, BlockRotation.NONE));
+        settings.setMirror(blueprint.getOrDefault(AllDataComponents.SCHEMATIC_MIRROR, BlockMirror.NONE));
+        if (processNBT)
             settings.addProcessor(SchematicProcessor.INSTANCE);
-        }
         return settings;
     }
 
-    public static StructureTemplate loadSchematic(Level level, ItemStack blueprint) {
+    public static StructureTemplate loadSchematic(World level, ItemStack blueprint) {
         StructureTemplate t = new StructureTemplate();
         String owner = blueprint.get(AllDataComponents.SCHEMATIC_OWNER);
         String schematic = blueprint.get(AllDataComponents.SCHEMATIC_FILE);
 
-        if (owner == null || schematic == null || !schematic.endsWith(".nbt")) {
+        if (owner == null || schematic == null || !schematic.endsWith(".nbt"))
             return t;
-        }
 
         Path dir;
         Path file;
 
-        if (!level.isClientSide()) {
+        if (!level.isClient()) {
             dir = CreatePaths.UPLOADED_SCHEMATICS_DIR;
             file = Paths.get(owner, schematic);
         } else {
@@ -117,15 +111,15 @@ public class SchematicItem extends Item {
         }
 
         Path path = dir.resolve(file).normalize();
-        if (!path.startsWith(dir)) {
+        if (!path.startsWith(dir))
             return t;
-        }
 
-        try (DataInputStream stream = new DataInputStream(new BufferedInputStream(new GZIPInputStream(Files.newInputStream(path,
+        try (DataInputStream stream = new DataInputStream(new BufferedInputStream(new GZIPInputStream(Files.newInputStream(
+            path,
             StandardOpenOption.READ
         ))))) {
-            CompoundTag nbt = NbtIo.read(stream, NbtAccounter.create(0x20000000L));
-            t.load(level.holderLookup(Registries.BLOCK), nbt);
+            NbtCompound nbt = NbtIo.readCompound(stream, NbtSizeTracker.of(0x20000000L));
+            t.readNbt(level.createCommandRegistryWrapper(RegistryKeys.BLOCK), nbt);
         } catch (IOException e) {
             LOGGER.warn("Failed to read schematic", e);
         }
@@ -134,31 +128,26 @@ public class SchematicItem extends Item {
     }
 
     @Override
-    public InteractionResult useOn(UseOnContext context) {
-        if (context.getPlayer() != null && !onItemUse(context.getPlayer(), context.getHand())) {
-            return super.useOn(context);
-        }
-        return InteractionResult.SUCCESS;
+    public ActionResult useOnBlock(ItemUsageContext context) {
+        if (context.getPlayer() != null && !onItemUse(context.getPlayer(), context.getHand()))
+            return super.useOnBlock(context);
+        return ActionResult.SUCCESS;
     }
 
     @Override
-    public InteractionResult use(Level worldIn, Player playerIn, InteractionHand handIn) {
-        if (!onItemUse(playerIn, handIn)) {
+    public ActionResult use(World worldIn, PlayerEntity playerIn, Hand handIn) {
+        if (!onItemUse(playerIn, handIn))
             return super.use(worldIn, playerIn, handIn);
-        }
-        return InteractionResult.SUCCESS;
+        return ActionResult.SUCCESS;
     }
 
-    private boolean onItemUse(Player player, InteractionHand hand) {
-        if (!player.isShiftKeyDown() || hand != InteractionHand.MAIN_HAND) {
+    private boolean onItemUse(PlayerEntity player, Hand hand) {
+        if (!player.isSneaking() || hand != Hand.MAIN_HAND)
             return false;
-        }
-        if (!player.getItemInHand(hand).has(AllDataComponents.SCHEMATIC_FILE)) {
+        if (!player.getStackInHand(hand).contains(AllDataComponents.SCHEMATIC_FILE))
             return false;
-        }
-        if (!player.level().isClientSide()) {
+        if (!player.getEntityWorld().isClient())
             return true;
-        }
         AllClientHandle.INSTANCE.openSchematicEditScreen();
         return true;
     }

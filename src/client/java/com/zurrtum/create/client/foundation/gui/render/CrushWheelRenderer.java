@@ -1,62 +1,62 @@
 package com.zurrtum.create.client.foundation.gui.render;
 
-import com.mojang.blaze3d.platform.Lighting;
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.zurrtum.create.AllBlocks;
 import com.zurrtum.create.client.catnip.animation.AnimationTickHolder;
 import com.zurrtum.create.client.flywheel.lib.model.baked.SinglePosVirtualBlockGetter;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.render.pip.PictureInPictureRenderer;
-import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.Sheets;
-import net.minecraft.client.renderer.block.BlockRenderDispatcher;
-import net.minecraft.client.renderer.block.model.BlockModelPart;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction.Axis;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.block.BlockState;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.render.SpecialGuiElementRenderer;
+import net.minecraft.client.render.DiffuseLighting;
+import net.minecraft.client.render.TexturedRenderLayers;
+import net.minecraft.client.render.VertexConsumer;
+import net.minecraft.client.render.VertexConsumerProvider;
+import net.minecraft.client.render.block.BlockRenderManager;
+import net.minecraft.client.render.model.BlockModelPart;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.state.property.Properties;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction.Axis;
+import net.minecraft.util.math.RotationAxis;
 
 import java.util.List;
 
-public class CrushWheelRenderer extends PictureInPictureRenderer<CrushWheelRenderState> {
-    private final BlockState blockState = AllBlocks.CRUSHING_WHEEL.defaultBlockState()
-        .setValue(BlockStateProperties.AXIS, Axis.X);
+public class CrushWheelRenderer extends SpecialGuiElementRenderer<CrushWheelRenderState> {
+    private final BlockState blockState = AllBlocks.CRUSHING_WHEEL.getDefaultState().with(Properties.AXIS, Axis.X);
 
-    public CrushWheelRenderer(MultiBufferSource.BufferSource vertexConsumers) {
+    public CrushWheelRenderer(VertexConsumerProvider.Immediate vertexConsumers) {
         super(vertexConsumers);
     }
 
     @Override
-    protected void renderToTexture(CrushWheelRenderState state, PoseStack matrices) {
-        Minecraft mc = Minecraft.getInstance();
-        mc.gameRenderer.getLighting().setupFor(Lighting.Entry.ENTITY_IN_UI);
+    protected void render(CrushWheelRenderState state, MatrixStack matrices) {
+        MinecraftClient mc = MinecraftClient.getInstance();
+        mc.gameRenderer.getDiffuseLighting().setShaderLights(DiffuseLighting.Type.ENTITY_IN_UI);
         matrices.scale(1, 1, -1);
-        matrices.mulPose(com.mojang.math.Axis.YP.rotationDegrees(-22.5f));
+        matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(-22.5f));
         matrices.translate(-1.5f, -0.6f, -0.5f);
         matrices.scale(1, -1, 1);
 
-        BlockRenderDispatcher blockRenderManager = mc.getBlockRenderer();
+        BlockRenderManager blockRenderManager = mc.getBlockRenderManager();
         SinglePosVirtualBlockGetter world = SinglePosVirtualBlockGetter.createFullBright();
-        VertexConsumer buffer = bufferSource.getBuffer(Sheets.cutoutBlockSheet());
-        List<BlockModelPart> parts = blockRenderManager.getBlockModel(blockState).collectParts(mc.level.random);
+        VertexConsumer buffer = vertexConsumers.getBuffer(TexturedRenderLayers.getEntityCutout());
+        List<BlockModelPart> parts = blockRenderManager.getModel(blockState).getParts(mc.world.random);
         world.blockState(blockState);
 
         float angle = getCurrentAngle();
-        matrices.pushPose();
+        matrices.push();
         matrices.translate(0.5f, 0.5f, 0.5f);
-        matrices.mulPose(com.mojang.math.Axis.ZP.rotationDegrees(-angle));
-        matrices.mulPose(com.mojang.math.Axis.YP.rotationDegrees(90));
+        matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(-angle));
+        matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(90));
         matrices.translate(-0.5f, -0.5f, -0.5f);
-        blockRenderManager.renderBatched(blockState, BlockPos.ZERO, world, matrices, buffer, false, parts);
-        matrices.popPose();
+        blockRenderManager.renderBlock(blockState, BlockPos.ORIGIN, world, matrices, buffer, false, parts);
+        matrices.pop();
 
         matrices.translate(0.5f, 0.5f, 0.5f);
         matrices.translate(2, 0, 0);
-        matrices.mulPose(com.mojang.math.Axis.ZP.rotationDegrees(angle));
-        matrices.mulPose(com.mojang.math.Axis.YP.rotationDegrees(90));
+        matrices.multiply(RotationAxis.POSITIVE_Z.rotationDegrees(angle));
+        matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(90));
         matrices.translate(-0.5f, -0.5f, -0.5f);
-        blockRenderManager.renderBatched(blockState, BlockPos.ZERO, world, matrices, buffer, false, parts);
+        blockRenderManager.renderBlock(blockState, BlockPos.ORIGIN, world, matrices, buffer, false, parts);
     }
 
     public static float getCurrentAngle() {
@@ -64,12 +64,12 @@ public class CrushWheelRenderer extends PictureInPictureRenderer<CrushWheelRende
     }
 
     @Override
-    public Class<CrushWheelRenderState> getRenderStateClass() {
+    public Class<CrushWheelRenderState> getElementClass() {
         return CrushWheelRenderState.class;
     }
 
     @Override
-    protected String getTextureLabel() {
+    protected String getName() {
         return "Crush Wheel";
     }
 }

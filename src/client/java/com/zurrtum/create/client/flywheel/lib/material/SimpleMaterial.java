@@ -1,8 +1,8 @@
 package com.zurrtum.create.client.flywheel.lib.material;
 
 import com.zurrtum.create.client.flywheel.api.material.*;
-import net.minecraft.client.renderer.texture.TextureAtlas;
-import net.minecraft.resources.Identifier;
+import net.minecraft.client.texture.SpriteAtlasTexture;
+import net.minecraft.util.Identifier;
 
 public class SimpleMaterial implements Material {
     protected final MaterialShaders shaders;
@@ -161,7 +161,7 @@ public class SimpleMaterial implements Material {
             fog = FogShaders.LINEAR;
             cutout = CutoutShaders.OFF;
             light = LightShaders.SMOOTH_WHEN_EMBEDDED;
-            texture = TextureAtlas.LOCATION_BLOCKS;
+            texture = SpriteAtlasTexture.BLOCK_ATLAS_TEXTURE;
             blur = false;
             mipmap = true;
             backfaceCulling = true;

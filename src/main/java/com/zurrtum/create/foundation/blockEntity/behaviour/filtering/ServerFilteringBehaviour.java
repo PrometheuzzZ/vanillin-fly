@@ -12,24 +12,24 @@ import com.zurrtum.create.foundation.blockEntity.behaviour.BehaviourType;
 import com.zurrtum.create.foundation.blockEntity.behaviour.ValueSettings;
 import com.zurrtum.create.foundation.blockEntity.behaviour.ValueSettingsHandleBehaviour;
 import com.zurrtum.create.infrastructure.fluids.FluidStack;
-import net.minecraft.ChatFormatting;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.network.chat.Component;
-import net.minecraft.sounds.SoundEvents;
-import net.minecraft.sounds.SoundSource;
-import net.minecraft.util.Mth;
-import net.minecraft.world.InteractionHand;
-import net.minecraft.world.entity.item.ItemEntity;
-import net.minecraft.world.entity.player.Inventory;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
-import net.minecraft.world.phys.BlockHitResult;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.entity.ItemEntity;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.entity.player.PlayerInventory;
+import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
+import net.minecraft.sound.SoundCategory;
+import net.minecraft.sound.SoundEvents;
+import net.minecraft.storage.ReadView;
+import net.minecraft.storage.WriteView;
+import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
+import net.minecraft.util.Hand;
+import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
@@ -64,18 +64,18 @@ public class ServerFilteringBehaviour extends BlockEntityBehaviour<SmartBlockEnt
     }
 
     @Override
-    public void write(ValueOutput view, boolean clientPacket) {
-        view.store("Filter", FilterItemStack.CODEC, filter);
+    public void write(WriteView view, boolean clientPacket) {
+        view.put("Filter", FilterItemStack.CODEC, filter);
         view.putInt("FilterAmount", count);
         view.putBoolean("UpTo", upTo);
         super.write(view, clientPacket);
     }
 
     @Override
-    public void read(ValueInput view, boolean clientPacket) {
+    public void read(ReadView view, boolean clientPacket) {
         filter = view.read("Filter", FilterItemStack.CODEC).orElseGet(FilterItemStack::empty);
-        count = view.getIntOr("FilterAmount", 0);
-        upTo = view.getBooleanOr("UpTo", false);
+        count = view.getInt("FilterAmount", 0);
+        upTo = view.getBoolean("UpTo", false);
 
         // Migrate from previous behaviour
         if (count == 0) {
@@ -122,27 +122,24 @@ public class ServerFilteringBehaviour extends BlockEntityBehaviour<SmartBlockEnt
 
     public boolean setFilter(ItemStack stack) {
         ItemStack filter = stack.copy();
-        if (!filter.isEmpty() && !predicate.test(filter)) {
+        if (!filter.isEmpty() && !predicate.test(filter))
             return false;
-        }
         this.filter = FilterItemStack.of(filter);
-        if (!upTo && !stack.isEmpty()) {
-            count = Math.min(count, stack.getMaxStackSize());
-        }
+        if (!upTo && !stack.isEmpty())
+            count = Math.min(count, stack.getMaxCount());
         callback.accept(filter);
-        blockEntity.setChanged();
+        blockEntity.markDirty();
         blockEntity.sendData();
         return true;
     }
 
     @Override
-    public void setValueSettings(Player player, ValueSettings settings, boolean ctrlDown) {
-        if (getValueSettings().equals(settings)) {
+    public void setValueSettings(PlayerEntity player, ValueSettings settings, boolean ctrlDown) {
+        if (getValueSettings().equals(settings))
             return;
-        }
-        count = Mth.clamp(settings.value(), 1, getMaxStackSize());
+        count = MathHelper.clamp(settings.value(), 1, getMaxStackSize());
         upTo = settings.row() == 0;
-        blockEntity.setChanged();
+        blockEntity.markDirty();
         blockEntity.sendData();
         playFeedbackSound(this);
     }
@@ -155,18 +152,17 @@ public class ServerFilteringBehaviour extends BlockEntityBehaviour<SmartBlockEnt
     @Override
     public void destroy() {
         if (filter.isFilterItem()) {
-            Vec3 pos = VecHelper.getCenterOf(getPos());
-            Level world = getLevel();
-            world.addFreshEntity(new ItemEntity(world, pos.x, pos.y, pos.z, getFilter().copy()));
+            Vec3d pos = VecHelper.getCenterOf(getPos());
+            World world = getWorld();
+            world.spawnEntity(new ItemEntity(world, pos.x, pos.y, pos.z, getFilter().copy()));
         }
         super.destroy();
     }
 
     @Override
     public ItemRequirement getRequiredItems() {
-        if (filter.isFilterItem()) {
+        if (filter.isFilterItem())
             return new ItemRequirement(ItemRequirement.ItemUseType.CONSUME, getFilter());
-        }
 
         return ItemRequirement.NONE;
     }
@@ -180,10 +176,9 @@ public class ServerFilteringBehaviour extends BlockEntityBehaviour<SmartBlockEnt
     }
 
     public int getMaxStackSize(ItemStack filter) {
-        if (filter.isEmpty()) {
+        if (filter.isEmpty())
             return 64;
-        }
-        return filter.getMaxStackSize();
+        return filter.getMaxCount();
     }
 
     public ItemStack getFilter(Direction side) {
@@ -199,11 +194,11 @@ public class ServerFilteringBehaviour extends BlockEntityBehaviour<SmartBlockEnt
     }
 
     public boolean test(ItemStack stack) {
-        return !isActive() || filter.test(blockEntity.getLevel(), stack);
+        return !isActive() || filter.test(blockEntity.getWorld(), stack);
     }
 
     public boolean test(FluidStack stack) {
-        return !isActive() || filter.test(blockEntity.getLevel(), stack);
+        return !isActive() || filter.test(blockEntity.getWorld(), stack);
     }
 
     public boolean isActive() {
@@ -234,121 +229,104 @@ public class ServerFilteringBehaviour extends BlockEntityBehaviour<SmartBlockEnt
     }
 
     @Override
-    public boolean writeToClipboard(ValueOutput view, Direction side) {
+    public boolean writeToClipboard(WriteView view, Direction side) {
         ValueSettingsHandleBehaviour.super.writeToClipboard(view, side);
         ItemStack filter = getFilter(side);
-        view.store("Filter", ItemStack.OPTIONAL_CODEC, filter);
+        view.put("Filter", ItemStack.OPTIONAL_CODEC, filter);
         return true;
     }
 
     @Override
-    public boolean readFromClipboard(ValueInput view, Player player, Direction side, boolean simulate) {
-        if (!mayInteract(player)) {
+    public boolean readFromClipboard(ReadView view, PlayerEntity player, Direction side, boolean simulate) {
+        if (!mayInteract(player))
             return false;
-        }
         boolean upstreamResult = ValueSettingsHandleBehaviour.super.readFromClipboard(view, player, side, simulate);
         Optional<ItemStack> filterItem = view.read("Filter", ItemStack.OPTIONAL_CODEC);
-        if (filterItem.isEmpty()) {
+        if (filterItem.isEmpty())
             return upstreamResult;
-        }
-        if (simulate) {
+        if (simulate)
             return true;
-        }
-        if (getLevel().isClientSide()) {
+        if (getWorld().isClient())
             return true;
-        }
 
         ItemStack refund = ItemStack.EMPTY;
         ItemStack filter = getFilter(side);
-        if (filter.getItem() instanceof FilterItem && !player.isCreative()) {
+        if (filter.getItem() instanceof FilterItem && !player.isCreative())
             refund = filter.copy();
-        }
 
         ItemStack copied = filterItem.get();
 
-        Inventory inventory = player.getInventory();
+        PlayerInventory inventory = player.getInventory();
         if (copied.getItem() instanceof FilterItem filterType && !player.isCreative()) {
             if (refund.getItem() == filterType) {
                 setFilter(side, copied);
                 return true;
-            } else if (inventory.extract(filterType.getDefaultInstance()) == 1 || !inventory.extract(
-                stack -> stack.getItem() == filterType,
-                1
-            ).isEmpty()) {
-                if (!refund.isEmpty()) {
-                    inventory.placeItemBackInInventory(refund);
-                }
+            } else if (inventory.extract(filterType.getDefaultStack()) == 1 || !inventory.extract(stack -> stack.getItem() == filterType, 1)
+                .isEmpty()) {
+                if (!refund.isEmpty())
+                    inventory.offerOrDrop(refund);
                 setFilter(side, copied);
                 return true;
             }
 
-            player.displayClientMessage(
-                Component.translatable(
-                    "create.logistics.filter.requires_item_in_inventory",
-                    copied.getHoverName().copy().withStyle(ChatFormatting.WHITE)
-                ).withStyle(ChatFormatting.RED), true
+            player.sendMessage(
+                Text.translatable("create.logistics.filter.requires_item_in_inventory", copied.getName().copy().formatted(Formatting.WHITE))
+                    .formatted(Formatting.RED), true
             );
-            AllSoundEvents.DENY.playOnServer(player.level(), player.blockPosition(), 1, 1);
+            AllSoundEvents.DENY.playOnServer(player.getEntityWorld(), player.getBlockPos(), 1, 1);
             return false;
         }
 
-        if (!refund.isEmpty()) {
-            inventory.placeItemBackInInventory(refund);
-        }
+        if (!refund.isEmpty())
+            inventory.offerOrDrop(refund);
 
         return setFilter(side, copied);
     }
 
     @Override
-    public void onShortInteract(Player player, InteractionHand hand, Direction side, BlockHitResult hitResult) {
-        Level level = getLevel();
+    public void onShortInteract(PlayerEntity player, Hand hand, Direction side, BlockHitResult hitResult) {
+        World level = getWorld();
         BlockPos pos = getPos();
-        ItemStack itemInHand = player.getItemInHand(hand);
+        ItemStack itemInHand = player.getStackInHand(hand);
         ItemStack toApply = itemInHand.copy();
 
-        if (!canShortInteract(toApply)) {
+        if (!canShortInteract(toApply))
             return;
-        }
-        if (level.isClientSide()) {
+        if (level.isClient())
             return;
-        }
 
         ItemStack filter = getFilter(side);
         if (filter.getItem() instanceof FilterItem) {
-            Inventory inventory = player.getInventory();
-            if (!player.isCreative() || inventory.count(filter, 1) == 0) {
-                inventory.placeItemBackInInventory(filter.copy());
-            }
+            PlayerInventory inventory = player.getInventory();
+            if (!player.isCreative() || inventory.count(filter, 1) == 0)
+                inventory.offerOrDrop(filter.copy());
         }
 
-        if (toApply.getItem() instanceof FilterItem) {
+        if (toApply.getItem() instanceof FilterItem)
             toApply.setCount(1);
-        }
 
         if (!setFilter(side, toApply)) {
-            player.displayClientMessage(Component.translatable("create.logistics.filter.invalid_item"), true);
-            AllSoundEvents.DENY.playOnServer(player.level(), player.blockPosition(), 1, 1);
+            player.sendMessage(Text.translatable("create.logistics.filter.invalid_item"), true);
+            AllSoundEvents.DENY.playOnServer(player.getEntityWorld(), player.getBlockPos(), 1, 1);
             return;
         }
 
         if (!player.isCreative()) {
             if (toApply.getItem() instanceof FilterItem) {
-                if (itemInHand.getCount() == 1) {
-                    player.setItemInHand(hand, ItemStack.EMPTY);
-                } else {
-                    itemInHand.shrink(1);
-                }
+                if (itemInHand.getCount() == 1)
+                    player.setStackInHand(hand, ItemStack.EMPTY);
+                else
+                    itemInHand.decrement(1);
             }
         }
 
-        level.playSound(null, pos, SoundEvents.ITEM_FRAME_ADD_ITEM, SoundSource.BLOCKS, .25f, .1f);
+        level.playSound(null, pos, SoundEvents.ENTITY_ITEM_FRAME_ADD_ITEM, SoundCategory.BLOCKS, .25f, .1f);
     }
 
     public boolean canShortInteract(ItemStack toApply) {
-        if (toApply.is(AllItems.WRENCH)) {
+        if (toApply.isOf(AllItems.WRENCH))
             return false;
-        }
-        return !toApply.is(AllItems.MECHANICAL_ARM);
+        return !toApply.isOf(AllItems.MECHANICAL_ARM);
     }
 
     public boolean isRecipeFilter() {
@@ -363,7 +341,7 @@ public class ServerFilteringBehaviour extends BlockEntityBehaviour<SmartBlockEnt
     public static class CustomInteract extends ServerFilteringBehaviour {
         private final @Nullable List<Item> blackList;
 
-        public CustomInteract(SmartBlockEntity be, List<Item> blackList) {
+        public CustomInteract(SmartBlockEntity be, @Nullable List<Item> blackList) {
             super(be);
             this.blackList = blackList;
         }
@@ -376,7 +354,7 @@ public class ServerFilteringBehaviour extends BlockEntityBehaviour<SmartBlockEnt
         public boolean canShortInteract(ItemStack toApply) {
             if (blackList != null) {
                 for (Item item : blackList) {
-                    if (toApply.is(item)) {
+                    if (toApply.isOf(item)) {
                         return false;
                     }
                 }

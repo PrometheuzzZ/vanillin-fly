@@ -3,10 +3,10 @@ package com.zurrtum.create.content.kinetics.simpleRelays;
 import com.zurrtum.create.AllBlockEntityTypes;
 import com.zurrtum.create.content.kinetics.base.IRotate;
 import com.zurrtum.create.content.kinetics.base.KineticBlockEntity;
-import net.minecraft.core.BlockPos;
-import net.minecraft.world.level.block.entity.BlockEntityType;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.AABB;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.entity.BlockEntityType;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Box;
 
 import java.util.List;
 
@@ -25,20 +25,18 @@ public class SimpleKineticBlockEntity extends KineticBlockEntity {
     }
 
     @Override
-    protected AABB createRenderBoundingBox() {
-        return new AABB(worldPosition).inflate(1);
+    protected Box createRenderBoundingBox() {
+        return new Box(pos).expand(1);
     }
 
     @Override
     public List<BlockPos> addPropagationLocations(IRotate block, BlockState state, List<BlockPos> neighbours) {
-        if (!ICogWheel.isLargeCog(state)) {
+        if (!ICogWheel.isLargeCog(state))
             return super.addPropagationLocations(block, state, neighbours);
-        }
 
-        BlockPos.betweenClosedStream(new BlockPos(-1, -1, -1), new BlockPos(1, 1, 1)).forEach(offset -> {
-            if (offset.distSqr(BlockPos.ZERO) == 2) {
-                neighbours.add(worldPosition.offset(offset));
-            }
+        BlockPos.stream(new BlockPos(-1, -1, -1), new BlockPos(1, 1, 1)).forEach(offset -> {
+            if (offset.getSquaredDistance(BlockPos.ZERO) == 2)
+                neighbours.add(pos.add(offset));
         });
         return neighbours;
     }

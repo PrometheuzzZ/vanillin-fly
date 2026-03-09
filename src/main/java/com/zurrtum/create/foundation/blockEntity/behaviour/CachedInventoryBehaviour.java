@@ -5,19 +5,19 @@ import com.zurrtum.create.foundation.blockEntity.SmartBlockEntity;
 import net.fabricmc.fabric.api.transfer.v1.item.InventoryStorage;
 import net.fabricmc.fabric.api.transfer.v1.item.ItemVariant;
 import net.fabricmc.fabric.api.transfer.v1.storage.Storage;
-import net.minecraft.core.Direction;
-import net.minecraft.world.Container;
-import net.minecraft.world.WorldlyContainer;
+import net.minecraft.inventory.Inventory;
+import net.minecraft.inventory.SidedInventory;
+import net.minecraft.util.math.Direction;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.function.Function;
 
 public class CachedInventoryBehaviour<T extends SmartBlockEntity> extends BlockEntityBehaviour<T> {
     public static final BehaviourType<CachedInventoryBehaviour<?>> TYPE = new BehaviourType<>();
-    private final Function<T, Container> factory;
+    private final Function<T, Inventory> factory;
     private Function<Direction, Storage<ItemVariant>> getter;
 
-    public CachedInventoryBehaviour(T be, Function<T, Container> factory) {
+    public CachedInventoryBehaviour(T be, Function<T, Inventory> factory) {
         super(be);
         this.factory = factory;
         reset();
@@ -33,18 +33,18 @@ public class CachedInventoryBehaviour<T extends SmartBlockEntity> extends BlockE
 
     @SuppressWarnings("unchecked")
     private Storage<ItemVariant> firstGet(Direction direction) {
-        Container inventory = factory.apply(blockEntity);
+        Inventory inventory = factory.apply(blockEntity);
         if (inventory == null) {
             return null;
         }
         Storage<ItemVariant> storage = InventoryStorage.of(inventory, null);
-        if (inventory instanceof WorldlyContainer) {
+        if (inventory instanceof SidedInventory) {
             Storage<ItemVariant>[] sides = new Storage[6];
             getter = side -> {
                 if (side == null) {
                     return storage;
                 } else {
-                    int i = side.get3DDataValue();
+                    int i = side.getIndex();
                     Storage<ItemVariant> sideStorage = sides[i];
                     if (sideStorage == null) {
                         sideStorage = sides[i] = InventoryStorage.of(inventory, side);

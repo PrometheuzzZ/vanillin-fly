@@ -2,39 +2,38 @@ package com.zurrtum.create.infrastructure.packet.c2s;
 
 import com.zurrtum.create.AllHandle;
 import com.zurrtum.create.AllPackets;
-import net.minecraft.core.UUIDUtil;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.PacketType;
-import net.minecraft.network.protocol.game.ServerGamePacketListener;
-import net.minecraft.resources.Identifier;
-import net.minecraft.server.network.ServerGamePacketListenerImpl;
+import net.minecraft.network.RegistryByteBuf;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.network.listener.ServerPlayPacketListener;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.PacketType;
+import net.minecraft.server.network.ServerPlayNetworkHandler;
+import net.minecraft.util.Identifier;
+import net.minecraft.util.Uuids;
 
 import java.util.UUID;
 
-public record TrainEditPacket(UUID id, String name, Identifier iconType,
-                              int mapColor) implements Packet<ServerGamePacketListener> {
-    public static StreamCodec<RegistryFriendlyByteBuf, TrainEditPacket> CODEC = StreamCodec.composite(
-        UUIDUtil.STREAM_CODEC,
+public record TrainEditPacket(UUID id, String name, Identifier iconType, int mapColor) implements Packet<ServerPlayPacketListener> {
+    public static PacketCodec<RegistryByteBuf, TrainEditPacket> CODEC = PacketCodec.tuple(
+        Uuids.PACKET_CODEC,
         TrainEditPacket::id,
-        ByteBufCodecs.stringUtf8(256),
+        PacketCodecs.string(256),
         TrainEditPacket::name,
-        Identifier.STREAM_CODEC,
+        Identifier.PACKET_CODEC,
         TrainEditPacket::iconType,
-        ByteBufCodecs.INT,
+        PacketCodecs.INTEGER,
         TrainEditPacket::mapColor,
         TrainEditPacket::new
     );
 
     @Override
-    public void handle(ServerGamePacketListener listener) {
-        AllHandle.onTrainEdit((ServerGamePacketListenerImpl) listener, this);
+    public void apply(ServerPlayPacketListener listener) {
+        AllHandle.onTrainEdit((ServerPlayNetworkHandler) listener, this);
     }
 
     @Override
-    public PacketType<TrainEditPacket> type() {
+    public PacketType<TrainEditPacket> getPacketType() {
         return AllPackets.C_CONFIGURE_TRAIN;
     }
 }

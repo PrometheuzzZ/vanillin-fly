@@ -9,10 +9,9 @@ import com.zurrtum.create.client.flywheel.lib.material.Materials;
 import com.zurrtum.create.client.flywheel.lib.material.SimpleMaterial;
 import com.zurrtum.create.client.flywheel.lib.memory.MemoryBlock;
 import com.zurrtum.create.client.flywheel.lib.vertex.PosVertexView;
-import net.minecraft.client.renderer.Sheets;
-import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
-import net.minecraft.client.renderer.rendertype.RenderType;
-import net.minecraft.client.renderer.rendertype.RenderTypes;
+import net.minecraft.client.render.BlockRenderLayer;
+import net.minecraft.client.render.RenderLayer;
+import net.minecraft.client.render.TexturedRenderLayers;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
@@ -26,46 +25,42 @@ public final class ModelUtil {
 
     // Array of chunk materials to make lookups easier.
     // Index by (renderTypeIdx * 4 + shaded * 2 + ambientOcclusion).
-    private static final Material[] CHUNK_MATERIALS = new Material[16];
-    private static final Map<RenderType, Material> ITEM_CHUNK_MATERIALS = new IdentityHashMap<>();
+    private static final Material[] CHUNK_MATERIALS = new Material[20];
+    private static final Map<RenderLayer, Material> ITEM_CHUNK_MATERIALS = new IdentityHashMap<>();
 
     static {
-        Material[] baseChunkMaterials = new Material[]{
-            Materials.SOLID_BLOCK, Materials.CUTOUT_BLOCK, Materials.TRANSLUCENT_BLOCK, Materials.TRIPWIRE_BLOCK,
-        };
+        Material[] baseChunkMaterials = new Material[]{Materials.SOLID_BLOCK, Materials.CUTOUT_MIPPED_BLOCK, Materials.CUTOUT_BLOCK, Materials.TRANSLUCENT_BLOCK, Materials.TRIPWIRE_BLOCK,};
         for (int chunkLayerIdx = 0, size = baseChunkMaterials.length; chunkLayerIdx < size; chunkLayerIdx++) {
             int baseMaterialIdx = chunkLayerIdx * 4;
             Material baseChunkMaterial = baseChunkMaterials[chunkLayerIdx];
 
             // shaded: false, ambientOcclusion: false
-            CHUNK_MATERIALS[baseMaterialIdx] = SimpleMaterial.builderOf(baseChunkMaterial)
-                .cardinalLightingMode(CardinalLightingMode.OFF).ambientOcclusion(false).build();
+            CHUNK_MATERIALS[baseMaterialIdx] = SimpleMaterial.builderOf(baseChunkMaterial).cardinalLightingMode(CardinalLightingMode.OFF)
+                .ambientOcclusion(false).build();
             // shaded: false, ambientOcclusion: true
-            CHUNK_MATERIALS[baseMaterialIdx + 1] = SimpleMaterial.builderOf(baseChunkMaterial)
-                .cardinalLightingMode(CardinalLightingMode.OFF).build();
+            CHUNK_MATERIALS[baseMaterialIdx + 1] = SimpleMaterial.builderOf(baseChunkMaterial).cardinalLightingMode(CardinalLightingMode.OFF).build();
             // shaded: true, ambientOcclusion: false
-            CHUNK_MATERIALS[baseMaterialIdx + 2] = SimpleMaterial.builderOf(baseChunkMaterial).ambientOcclusion(false)
-                .build();
+            CHUNK_MATERIALS[baseMaterialIdx + 2] = SimpleMaterial.builderOf(baseChunkMaterial).ambientOcclusion(false).build();
             // shaded: true, ambientOcclusion: true
             CHUNK_MATERIALS[baseMaterialIdx + 3] = baseChunkMaterial;
         }
-        ITEM_CHUNK_MATERIALS.put(RenderTypes.solidMovingBlock(), CHUNK_MATERIALS[2]);
-        ITEM_CHUNK_MATERIALS.put(RenderTypes.cutoutMovingBlock(), CHUNK_MATERIALS[6]);
-        ITEM_CHUNK_MATERIALS.put(RenderTypes.translucentMovingBlock(), CHUNK_MATERIALS[10]);
-        ITEM_CHUNK_MATERIALS.put(RenderTypes.tripwireMovingBlock(), CHUNK_MATERIALS[14]);
-        ITEM_CHUNK_MATERIALS.put(Sheets.cutoutBlockSheet(), CHUNK_MATERIALS[7]);
-        ITEM_CHUNK_MATERIALS.put(Sheets.solidBlockSheet(), CHUNK_MATERIALS[3]);
-        ITEM_CHUNK_MATERIALS.put(Sheets.translucentBlockItemSheet(), Materials.TRANSLUCENT_ITEM_ENTITY_BLOCK);
-        ITEM_CHUNK_MATERIALS.put(Sheets.translucentItemSheet(), Materials.TRANSLUCENT_ITEM_ENTITY_ITEM);
-        ITEM_CHUNK_MATERIALS.put(RenderTypes.glint(), Materials.GLINT);
-        ITEM_CHUNK_MATERIALS.put(RenderTypes.glintTranslucent(), Materials.TRANSLUCENT_GLINT);
-        ITEM_CHUNK_MATERIALS.put(RenderTypes.entityGlint(), Materials.GLINT_ENTITY);
+        ITEM_CHUNK_MATERIALS.put(RenderLayer.getSolid(), CHUNK_MATERIALS[2]);
+        ITEM_CHUNK_MATERIALS.put(RenderLayer.getCutoutMipped(), CHUNK_MATERIALS[6]);
+        ITEM_CHUNK_MATERIALS.put(RenderLayer.getCutout(), CHUNK_MATERIALS[10]);
+        ITEM_CHUNK_MATERIALS.put(RenderLayer.getTranslucentMovingBlock(), CHUNK_MATERIALS[14]);
+        ITEM_CHUNK_MATERIALS.put(RenderLayer.getTripwire(), CHUNK_MATERIALS[18]);
+        ITEM_CHUNK_MATERIALS.put(TexturedRenderLayers.getEntityCutout(), CHUNK_MATERIALS[7]);
+        ITEM_CHUNK_MATERIALS.put(TexturedRenderLayers.getEntitySolid(), CHUNK_MATERIALS[3]);
+        ITEM_CHUNK_MATERIALS.put(TexturedRenderLayers.getItemEntityTranslucentCull(), Materials.TRANSLUCENT_ENTITY);
+        ITEM_CHUNK_MATERIALS.put(RenderLayer.getGlint(), Materials.GLINT);
+        ITEM_CHUNK_MATERIALS.put(RenderLayer.getGlintTranslucent(), Materials.TRANSLUCENT_GLINT);
+        ITEM_CHUNK_MATERIALS.put(RenderLayer.getEntityGlint(), Materials.GLINT_ENTITY);
     }
 
     private ModelUtil() {
     }
 
-    public static Material getMaterial(ChunkSectionLayer chunkRenderType, boolean shaded, boolean ambientOcclusion) {
+    public static Material getMaterial(BlockRenderLayer chunkRenderType, boolean shaded, boolean ambientOcclusion) {
         int materialIdx = chunkRenderType.ordinal() * 4;
         if (ambientOcclusion) {
             materialIdx++;
@@ -77,7 +72,7 @@ public final class ModelUtil {
     }
 
     @Nullable
-    public static Material getItemMaterial(RenderType renderType) {
+    public static Material getItemMaterial(RenderLayer renderType) {
         return ITEM_CHUNK_MATERIALS.get(renderType);
     }
 

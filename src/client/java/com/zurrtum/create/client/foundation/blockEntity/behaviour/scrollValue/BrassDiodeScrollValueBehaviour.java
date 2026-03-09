@@ -7,10 +7,10 @@ import com.zurrtum.create.client.foundation.utility.CreateLang;
 import com.zurrtum.create.foundation.blockEntity.SmartBlockEntity;
 import com.zurrtum.create.foundation.blockEntity.behaviour.ValueSettings;
 import com.zurrtum.create.foundation.blockEntity.behaviour.scrollValue.ServerScrollValueBehaviour;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.text.MutableText;
+import net.minecraft.text.Text;
+import net.minecraft.util.hit.BlockHitResult;
 
 public class BrassDiodeScrollValueBehaviour extends ScrollValueBehaviour<SmartBlockEntity, ServerScrollValueBehaviour> {
     public BrassDiodeScrollValueBehaviour(SmartBlockEntity be) {
@@ -19,7 +19,7 @@ public class BrassDiodeScrollValueBehaviour extends ScrollValueBehaviour<SmartBl
     }
 
     @Override
-    public ValueSettingsBoard createBoard(Player player, BlockHitResult hitResult) {
+    public ValueSettingsBoard createBoard(PlayerEntity player, BlockHitResult hitResult) {
         return new ValueSettingsBoard(
             label,
             60,
@@ -29,9 +29,9 @@ public class BrassDiodeScrollValueBehaviour extends ScrollValueBehaviour<SmartBl
         );
     }
 
-    public MutableComponent formatSettings(ValueSettings settings) {
+    public MutableText formatSettings(ValueSettings settings) {
         int value = Math.max(1, settings.value());
-        return Component.literal(switch (settings.row()) {
+        return Text.literal(switch (settings.row()) {
             case 0 -> Math.max(2, value) + "t";
             case 1 -> "0:" + (value < 10 ? "0" : "") + value;
             default -> value + ":00";
@@ -39,12 +39,10 @@ public class BrassDiodeScrollValueBehaviour extends ScrollValueBehaviour<SmartBl
     }
 
     private static String format(int value) {
-        if (value < 60) {
+        if (value < 60)
             return value + "t";
-        }
-        if (value < 20 * 60) {
+        if (value < 20 * 60)
             return (value / 20) + "s";
-        }
         return (value / 20 / 60) + "m";
     }
 }

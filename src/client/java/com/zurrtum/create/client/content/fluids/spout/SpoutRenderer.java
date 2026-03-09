@@ -1,32 +1,33 @@
 package com.zurrtum.create.client.content.fluids.spout;
 
-import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.zurrtum.create.client.AllPartialModels;
 import com.zurrtum.create.client.catnip.render.CachedBuffers;
 import com.zurrtum.create.client.catnip.render.FluidRenderHelper;
+import com.zurrtum.create.client.catnip.render.PonderRenderTypes;
 import com.zurrtum.create.client.catnip.render.SuperByteBuffer;
+import com.zurrtum.create.client.flywheel.lib.util.ShadersModHelper;
 import com.zurrtum.create.content.fluids.spout.SpoutBlockEntity;
 import com.zurrtum.create.foundation.blockEntity.behaviour.fluid.SmartFluidTankBehaviour;
 import com.zurrtum.create.foundation.blockEntity.behaviour.fluid.SmartFluidTankBehaviour.TankSegment;
 import com.zurrtum.create.infrastructure.fluids.FluidStack;
-import net.minecraft.client.renderer.SubmitNodeCollector;
-import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
-import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
-import net.minecraft.client.renderer.blockentity.state.BlockEntityRenderState;
-import net.minecraft.client.renderer.feature.ModelFeatureRenderer;
-import net.minecraft.client.renderer.rendertype.RenderType;
-import net.minecraft.client.renderer.rendertype.RenderTypes;
-import net.minecraft.client.renderer.state.CameraRenderState;
-import net.minecraft.core.component.DataComponentPatch;
-import net.minecraft.util.Mth;
-import net.minecraft.world.level.material.Fluid;
-import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.client.render.RenderLayer;
+import net.minecraft.client.render.VertexConsumer;
+import net.minecraft.client.render.block.entity.BlockEntityRenderer;
+import net.minecraft.client.render.block.entity.BlockEntityRendererFactory;
+import net.minecraft.client.render.block.entity.state.BlockEntityRenderState;
+import net.minecraft.client.render.command.ModelCommandRenderer;
+import net.minecraft.client.render.command.OrderedRenderCommandQueue;
+import net.minecraft.client.render.state.CameraRenderState;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.component.ComponentChanges;
+import net.minecraft.fluid.Fluid;
+import net.minecraft.util.math.Box;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.Vec3d;
 import org.jetbrains.annotations.Nullable;
 
 public class SpoutRenderer implements BlockEntityRenderer<SpoutBlockEntity, SpoutRenderer.SpoutRenderState> {
-    public SpoutRenderer(BlockEntityRendererProvider.Context context) {
+    public SpoutRenderer(BlockEntityRendererFactory.Context context) {
     }
 
     @Override
@@ -35,18 +36,18 @@ public class SpoutRenderer implements BlockEntityRenderer<SpoutBlockEntity, Spou
     }
 
     @Override
-    public void extractRenderState(
+    public void updateRenderState(
         SpoutBlockEntity be,
         SpoutRenderState state,
         float tickProgress,
-        Vec3 cameraPos,
-        @Nullable ModelFeatureRenderer.CrumblingOverlay crumblingOverlay
+        Vec3d cameraPos,
+        @Nullable ModelCommandRenderer.CrumblingOverlayCommand crumblingOverlay
     ) {
         SmartFluidTankBehaviour tank = be.tank;
         if (tank == null) {
             return;
         }
-        BlockEntityRenderState.extractBase(be, state, crumblingOverlay);
+        BlockEntityRenderState.updateBlockEntityRenderState(be, state, crumblingOverlay);
         TankSegment primaryTank = tank.getPrimaryTank();
         FluidStack fluidStack = primaryTank.getRenderedFluid();
         float radius = 0;
@@ -63,27 +64,27 @@ public class SpoutRenderer implements BlockEntityRenderer<SpoutBlockEntity, Spou
                 float yMin = min - yOffset;
                 float offset = top ? max - min : yOffset;
                 state.fluid = new FluidRenderState(
-                    RenderTypes.translucentMovingBlock(),
+                    ShadersModHelper.isShaderPackInUse() ? RenderLayer.getTranslucentMovingBlock() : PonderRenderTypes.fluid(),
                     fluidStack.getFluid(),
                     fluidStack.getComponentChanges(),
                     min,
                     max,
                     yMin,
                     offset,
-                    state.lightCoords
+                    state.lightmapCoordinates
                 );
             }
             if (processingTicks != -1) {
                 float processingProgress = 1 - (processingPT - 5) / 10;
-                processingProgress = Mth.clamp(processingProgress, 0, 1);
+                processingProgress = MathHelper.clamp(processingProgress, 0, 1);
                 radius = (float) (Math.pow(((2 * processingProgress) - 1), 2) - 1);
-                AABB box = new AABB(0.5, 0.0, 0.5, 0.5, -1.2, 0.5).inflate(radius / 32f);
+                Box box = new Box(0.5, 0.0, 0.5, 0.5, -1.2, 0.5).expand(radius / 32f);
                 state.process = new ProcessRenderState(
-                    RenderTypes.translucentMovingBlock(),
+                    PonderRenderTypes.fluid(),
                     fluidStack.getFluid(),
                     fluidStack.getComponentChanges(),
                     box,
-                    state.lightCoords
+                    state.lightmapCoordinates
                 );
             }
         }
@@ -91,7 +92,7 @@ public class SpoutRenderer implements BlockEntityRenderer<SpoutBlockEntity, Spou
         if (processingPT < 0) {
             squeeze = 0;
         } else if (processingPT < 2) {
-            squeeze = Mth.lerpInt(processingPT / 2f, 0, -1);
+            squeeze = MathHelper.lerp(processingPT / 2f, 0, -1);
         } else if (processingPT < 10) {
             squeeze = -1;
         } else {
@@ -101,30 +102,18 @@ public class SpoutRenderer implements BlockEntityRenderer<SpoutBlockEntity, Spou
         SuperByteBuffer middle = CachedBuffers.partial(AllPartialModels.SPOUT_MIDDLE, state.blockState);
         SuperByteBuffer bottom = CachedBuffers.partial(AllPartialModels.SPOUT_BOTTOM, state.blockState);
         float offset = -3 * squeeze / 32f;
-        state.bits = new BitsRenderState(
-            RenderTypes.solidMovingBlock(),
-            top,
-            middle,
-            bottom,
-            offset,
-            state.lightCoords
-        );
+        state.bits = new BitsRenderState(RenderLayer.getSolid(), top, middle, bottom, offset, state.lightmapCoordinates);
     }
 
     @Override
-    public void submit(
-        SpoutRenderState state,
-        PoseStack matrices,
-        SubmitNodeCollector queue,
-        CameraRenderState cameraState
-    ) {
+    public void render(SpoutRenderState state, MatrixStack matrices, OrderedRenderCommandQueue queue, CameraRenderState cameraState) {
         if (state.process != null) {
-            queue.submitCustomGeometry(matrices, state.process.layer, state.process);
+            queue.submitCustom(matrices, state.process.layer, state.process);
         }
-        queue.submitCustomGeometry(matrices, state.bits.layer, state.bits);
+        queue.submitCustom(matrices, state.bits.layer, state.bits);
         if (state.fluid != null) {
             matrices.translate(0, state.fluid.offset, 0);
-            queue.submitCustomGeometry(matrices, state.fluid.layer, state.fluid);
+            queue.submitCustom(matrices, state.fluid.layer, state.fluid);
         }
     }
 
@@ -134,33 +123,20 @@ public class SpoutRenderer implements BlockEntityRenderer<SpoutBlockEntity, Spou
         public BitsRenderState bits;
     }
 
-    public record FluidRenderState(RenderType layer, Fluid fluid, DataComponentPatch changes, float min, float max,
-                                   float yMin, float offset,
-                                   int light) implements SubmitNodeCollector.CustomGeometryRenderer {
+    public record FluidRenderState(
+        RenderLayer layer, Fluid fluid, ComponentChanges changes, float min, float max, float yMin, float offset, int light
+    ) implements OrderedRenderCommandQueue.Custom {
         @Override
-        public void render(PoseStack.Pose matricesEntry, VertexConsumer vertexConsumer) {
-            FluidRenderHelper.renderFluidBox(
-                fluid,
-                changes,
-                min,
-                yMin,
-                min,
-                max,
-                min,
-                max,
-                vertexConsumer,
-                matricesEntry,
-                light,
-                false,
-                true
-            );
+        public void render(MatrixStack.Entry matricesEntry, VertexConsumer vertexConsumer) {
+            FluidRenderHelper.renderFluidBox(fluid, changes, min, yMin, min, max, min, max, vertexConsumer, matricesEntry, light, false, true);
         }
     }
 
-    public record ProcessRenderState(RenderType layer, Fluid fluid, DataComponentPatch changes, AABB box,
-                                     int light) implements SubmitNodeCollector.CustomGeometryRenderer {
+    public record ProcessRenderState(
+        RenderLayer layer, Fluid fluid, ComponentChanges changes, Box box, int light
+    ) implements OrderedRenderCommandQueue.Custom {
         @Override
-        public void render(PoseStack.Pose matricesEntry, VertexConsumer vertexConsumer) {
+        public void render(MatrixStack.Entry matricesEntry, VertexConsumer vertexConsumer) {
             FluidRenderHelper.renderFluidBox(
                 fluid,
                 changes,
@@ -179,10 +155,11 @@ public class SpoutRenderer implements BlockEntityRenderer<SpoutBlockEntity, Spou
         }
     }
 
-    public record BitsRenderState(RenderType layer, SuperByteBuffer top, SuperByteBuffer middle, SuperByteBuffer bottom,
-                                  float offset, int light) implements SubmitNodeCollector.CustomGeometryRenderer {
+    public record BitsRenderState(
+        RenderLayer layer, SuperByteBuffer top, SuperByteBuffer middle, SuperByteBuffer bottom, float offset, int light
+    ) implements OrderedRenderCommandQueue.Custom {
         @Override
-        public void render(PoseStack.Pose matricesEntry, VertexConsumer vertexConsumer) {
+        public void render(MatrixStack.Entry matricesEntry, VertexConsumer vertexConsumer) {
             top.light(light).renderInto(matricesEntry, vertexConsumer);
             matricesEntry.translate(0, offset, 0);
             middle.light(light).renderInto(matricesEntry, vertexConsumer);

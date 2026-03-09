@@ -1,7 +1,7 @@
 package com.zurrtum.create.content.logistics.crate;
 
 import com.zurrtum.create.infrastructure.items.ItemInventory;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.item.ItemStack;
 
 import java.util.function.Supplier;
 
@@ -14,27 +14,26 @@ public class BottomlessItemHandler implements ItemInventory {
     }
 
     @Override
-    public int getContainerSize() {
+    public int size() {
         return 2;
     }
 
     @Override
-    public ItemStack getItem(int slot) {
-        if (slot == 0) {
+    public ItemStack getStack(int slot) {
+        if (slot == 0)
             return stack;
-        }
         return ItemStack.EMPTY;
     }
 
     @Override
-    public void setItem(int slot, ItemStack stack) {
+    public void setStack(int slot, ItemStack stack) {
     }
 
     @Override
-    public void setChanged() {
+    public void markDirty() {
         ItemStack stack = suppliedItemStack.get();
-        int max = stack.getMaxStackSize();
-        if (stack == ItemStack.EMPTY || this.stack.is(stack.getItem())) {
+        int max = stack.getMaxCount();
+        if (stack == ItemStack.EMPTY || this.stack.isOf(stack.getItem())) {
             this.stack.setCount(max);
         } else {
             this.stack = stack.copyWithCount(max);

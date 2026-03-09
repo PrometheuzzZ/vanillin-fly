@@ -10,10 +10,10 @@ import me.shedaniel.rei.api.common.display.Display;
 import me.shedaniel.rei.api.common.display.DisplaySerializer;
 import me.shedaniel.rei.api.common.entry.EntryIngredient;
 import me.shedaniel.rei.api.common.util.EntryIngredients;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.resources.Identifier;
-import net.minecraft.world.item.crafting.RecipeHolder;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.codec.PacketCodecs;
+import net.minecraft.recipe.RecipeEntry;
+import net.minecraft.util.Identifier;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -26,19 +26,19 @@ public record PressingDisplay(EntryIngredient input, List<ProcessingOutput> outp
             EntryIngredient.codec().fieldOf("inputs").forGetter(PressingDisplay::input),
             ProcessingOutput.CODEC.listOf().fieldOf("outputs").forGetter(PressingDisplay::outputs),
             Identifier.CODEC.optionalFieldOf("location").forGetter(PressingDisplay::location)
-        ).apply(instance, PressingDisplay::new)), StreamCodec.composite(
+        ).apply(instance, PressingDisplay::new)), PacketCodec.tuple(
             EntryIngredient.streamCodec(),
             PressingDisplay::input,
-            ProcessingOutput.STREAM_CODEC.apply(ByteBufCodecs.list()),
+            ProcessingOutput.STREAM_CODEC.collect(PacketCodecs.toList()),
             PressingDisplay::outputs,
-            ByteBufCodecs.optional(Identifier.STREAM_CODEC),
+            PacketCodecs.optional(Identifier.PACKET_CODEC),
             PressingDisplay::location,
             PressingDisplay::new
         )
     );
 
-    public PressingDisplay(RecipeHolder<PressingRecipe> entry) {
-        this(entry.id().identifier(), entry.value());
+    public PressingDisplay(RecipeEntry<PressingRecipe> entry) {
+        this(entry.id().getValue(), entry.value());
     }
 
     public PressingDisplay(Identifier id, PressingRecipe recipe) {

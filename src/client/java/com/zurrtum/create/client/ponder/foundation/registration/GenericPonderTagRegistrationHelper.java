@@ -3,7 +3,7 @@ package com.zurrtum.create.client.ponder.foundation.registration;
 import com.zurrtum.create.client.ponder.api.registration.MultiTagBuilder;
 import com.zurrtum.create.client.ponder.api.registration.PonderTagRegistrationHelper;
 import com.zurrtum.create.client.ponder.api.registration.TagBuilder;
-import net.minecraft.resources.Identifier;
+import net.minecraft.util.Identifier;
 
 import java.util.List;
 import java.util.function.Function;
@@ -13,10 +13,7 @@ public class GenericPonderTagRegistrationHelper<T> implements PonderTagRegistrat
     private final PonderTagRegistrationHelper<Identifier> helperDelegate;
     private final Function<T, Identifier> keyGen;
 
-    public GenericPonderTagRegistrationHelper(
-        PonderTagRegistrationHelper<Identifier> helperDelegate,
-        Function<T, Identifier> keyGen
-    ) {
+    public GenericPonderTagRegistrationHelper(PonderTagRegistrationHelper<Identifier> helperDelegate, Function<T, Identifier> keyGen) {
         this.helperDelegate = helperDelegate;
         this.keyGen = keyGen;
     }

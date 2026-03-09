@@ -1,6 +1,5 @@
 package com.zurrtum.create.client.content.schematics.client;
 
-import com.mojang.blaze3d.platform.InputConstants;
 import com.zurrtum.create.AllItems;
 import com.zurrtum.create.Create;
 import com.zurrtum.create.catnip.math.VecHelper;
@@ -16,21 +15,17 @@ import com.zurrtum.create.content.schematics.SchematicExport;
 import com.zurrtum.create.content.schematics.SchematicExport.SchematicExportResult;
 import com.zurrtum.create.foundation.utility.CreatePaths;
 import com.zurrtum.create.infrastructure.packet.c2s.InstantSchematicPacket;
-import net.minecraft.ChatFormatting;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.core.Direction.AxisDirection;
-import net.minecraft.core.Vec3i;
-import net.minecraft.util.Mth;
-import net.minecraft.world.InteractionHand;
-import net.minecraft.world.item.context.BlockPlaceContext;
-import net.minecraft.world.item.context.UseOnContext;
-import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.BlockHitResult;
-import net.minecraft.world.phys.HitResult.Type;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.network.ClientPlayerEntity;
+import net.minecraft.client.util.InputUtil;
+import net.minecraft.item.ItemPlacementContext;
+import net.minecraft.item.ItemUsageContext;
+import net.minecraft.util.Formatting;
+import net.minecraft.util.Hand;
+import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.util.hit.HitResult.Type;
+import net.minecraft.util.math.*;
+import net.minecraft.util.math.Direction.AxisDirection;
 import org.lwjgl.glfw.GLFW;
 
 import java.io.IOException;
@@ -47,26 +42,21 @@ public class SchematicAndQuillHandler {
     private Direction selectedFace;
     private int range = 10;
 
-    public boolean mouseScrolled(Minecraft mc, double delta) {
-        if (!isActive(mc)) {
+    public boolean mouseScrolled(MinecraftClient mc, double delta) {
+        if (!isActive(mc))
             return false;
-        }
-        if (!AllKeys.hasControlDown()) {
+        if (!AllKeys.hasControlDown())
             return false;
-        }
-        if (secondPos == null) {
-            range = (int) Mth.clamp(range + delta, 1, 100);
-        }
-        if (selectedFace == null) {
+        if (secondPos == null)
+            range = (int) MathHelper.clamp(range + delta, 1, 100);
+        if (selectedFace == null)
             return true;
-        }
 
-        AABB bb = new AABB(Vec3.atLowerCornerOf(firstPos), Vec3.atLowerCornerOf(secondPos));
-        Vec3i vec = selectedFace.getUnitVec3i();
-        Vec3 projectedView = mc.gameRenderer.getMainCamera().position();
-        if (bb.contains(projectedView)) {
+        Box bb = new Box(Vec3d.of(firstPos), Vec3d.of(secondPos));
+        Vec3i vec = selectedFace.getVector();
+        Vec3d projectedView = mc.gameRenderer.getCamera().getPos();
+        if (bb.contains(projectedView))
             delta *= -1;
-        }
 
         // Round away from zero to avoid an implicit floor
         int intDelta = (int) (delta > 0 ? Math.ceil(delta) : Math.floor(delta));
@@ -75,40 +65,33 @@ public class SchematicAndQuillHandler {
         int y = vec.getY() * intDelta;
         int z = vec.getZ() * intDelta;
 
-        AxisDirection axisDirection = selectedFace.getAxisDirection();
-        if (axisDirection == AxisDirection.NEGATIVE) {
-            bb = bb.move(-x, -y, -z);
-        }
+        AxisDirection axisDirection = selectedFace.getDirection();
+        if (axisDirection == AxisDirection.NEGATIVE)
+            bb = bb.offset(-x, -y, -z);
 
-        double maxX = Math.max(bb.maxX - x * axisDirection.getStep(), bb.minX);
-        double maxY = Math.max(bb.maxY - y * axisDirection.getStep(), bb.minY);
-        double maxZ = Math.max(bb.maxZ - z * axisDirection.getStep(), bb.minZ);
-        bb = new AABB(bb.minX, bb.minY, bb.minZ, maxX, maxY, maxZ);
+        double maxX = Math.max(bb.maxX - x * axisDirection.offset(), bb.minX);
+        double maxY = Math.max(bb.maxY - y * axisDirection.offset(), bb.minY);
+        double maxZ = Math.max(bb.maxZ - z * axisDirection.offset(), bb.minZ);
+        bb = new Box(bb.minX, bb.minY, bb.minZ, maxX, maxY, maxZ);
 
-        firstPos = BlockPos.containing(bb.minX, bb.minY, bb.minZ);
-        secondPos = BlockPos.containing(bb.maxX, bb.maxY, bb.maxZ);
-        LocalPlayer player = mc.player;
-        CreateLang.translate(
-            "schematicAndQuill.dimensions",
-            (int) bb.getXsize() + 1,
-            (int) bb.getYsize() + 1,
-            (int) bb.getZsize() + 1
-        ).sendStatus(player);
+        firstPos = BlockPos.ofFloored(bb.minX, bb.minY, bb.minZ);
+        secondPos = BlockPos.ofFloored(bb.maxX, bb.maxY, bb.maxZ);
+        ClientPlayerEntity player = mc.player;
+        CreateLang.translate("schematicAndQuill.dimensions", (int) bb.getLengthX() + 1, (int) bb.getLengthY() + 1, (int) bb.getLengthZ() + 1)
+            .sendStatus(player);
 
         return true;
     }
 
-    public boolean onMouseInput(Minecraft mc, int button) {
-        if (button != 1) {
+    public boolean onMouseInput(MinecraftClient mc, int button) {
+        if (button != 1)
             return false;
-        }
-        if (!isActive(mc)) {
+        if (!isActive(mc))
             return false;
-        }
 
-        LocalPlayer player = mc.player;
+        ClientPlayerEntity player = mc.player;
 
-        if (player.isShiftKeyDown()) {
+        if (player.isSneaking()) {
             discard(mc);
             return true;
         }
@@ -134,105 +117,82 @@ public class SchematicAndQuillHandler {
         return true;
     }
 
-    public void discard(Minecraft mc) {
+    public void discard(MinecraftClient mc) {
         firstPos = null;
         secondPos = null;
         CreateLang.translate("schematicAndQuill.abort").sendStatus(mc.player);
     }
 
-    public void tick(Minecraft mc) {
-        if (!isActive(mc)) {
+    public void tick(MinecraftClient mc) {
+        if (!isActive(mc))
             return;
-        }
 
-        LocalPlayer player = mc.player;
-        if (InputConstants.isKeyDown(mc.getWindow(), GLFW.GLFW_KEY_LEFT_CONTROL)) {
+        ClientPlayerEntity player = mc.player;
+        if (InputUtil.isKeyPressed(mc.getWindow(), GLFW.GLFW_KEY_LEFT_CONTROL)) {
             float pt = AnimationTickHolder.getPartialTicks();
-            Vec3 targetVec = player.getEyePosition(pt).add(player.getLookAngle().scale(range));
-            selectedPos = BlockPos.containing(targetVec);
+            Vec3d targetVec = player.getCameraPosVec(pt).add(player.getRotationVector().multiply(range));
+            selectedPos = BlockPos.ofFloored(targetVec);
 
         } else {
-            BlockHitResult trace = RaycastHelper.rayTraceRange(player.level(), player, 75);
+            BlockHitResult trace = RaycastHelper.rayTraceRange(player.getEntityWorld(), player, 75);
             if (trace != null && trace.getType() == Type.BLOCK) {
 
                 BlockPos hit = trace.getBlockPos();
-                boolean replaceable = player.level().getBlockState(hit)
-                    .canBeReplaced(new BlockPlaceContext(new UseOnContext(player, InteractionHand.MAIN_HAND, trace)));
-                if (trace.getDirection().getAxis().isVertical() && !replaceable) {
-                    hit = hit.relative(trace.getDirection());
-                }
+                boolean replaceable = player.getEntityWorld().getBlockState(hit)
+                    .canReplace(new ItemPlacementContext(new ItemUsageContext(player, Hand.MAIN_HAND, trace)));
+                if (trace.getSide().getAxis().isVertical() && !replaceable)
+                    hit = hit.offset(trace.getSide());
                 selectedPos = hit;
-            } else {
+            } else
                 selectedPos = null;
-            }
         }
 
         selectedFace = null;
         if (secondPos != null) {
-            AABB bb = new AABB(Vec3.atLowerCornerOf(firstPos), Vec3.atLowerCornerOf(secondPos)).expandTowards(1, 1, 1)
-                .inflate(.45f);
-            Vec3 projectedView = mc.gameRenderer.getMainCamera().position();
+            Box bb = new Box(Vec3d.of(firstPos), Vec3d.of(secondPos)).stretch(1, 1, 1).expand(.45f);
+            Vec3d projectedView = mc.gameRenderer.getCamera().getPos();
             boolean inside = bb.contains(projectedView);
-            PredicateTraceResult result = RaycastHelper.rayTraceUntil(
-                player,
-                70,
-                pos -> inside ^ bb.contains(VecHelper.getCenterOf(pos))
-            );
+            PredicateTraceResult result = RaycastHelper.rayTraceUntil(player, 70, pos -> inside ^ bb.contains(VecHelper.getCenterOf(pos)));
             selectedFace = result.missed() ? null : inside ? result.getFacing().getOpposite() : result.getFacing();
         }
 
-        AABB currentSelectionBox = getCurrentSelectionBox();
-        if (currentSelectionBox != null) {
+        Box currentSelectionBox = getCurrentSelectionBox();
+        if (currentSelectionBox != null)
             outliner().chaseAABB(outlineSlot, currentSelectionBox).colored(0x6886c5)
-                .withFaceTextures(AllSpecialTextures.CHECKERED, AllSpecialTextures.HIGHLIGHT_CHECKERED)
-                .lineWidth(1 / 16f).highlightFace(selectedFace);
-        }
+                .withFaceTextures(AllSpecialTextures.CHECKERED, AllSpecialTextures.HIGHLIGHT_CHECKERED).lineWidth(1 / 16f)
+                .highlightFace(selectedFace);
     }
 
-    private AABB getCurrentSelectionBox() {
+    private Box getCurrentSelectionBox() {
         if (secondPos == null) {
-            if (firstPos == null) {
-                return selectedPos == null ? null : new AABB(selectedPos);
-            }
-            return selectedPos == null ? new AABB(firstPos) : new AABB(
-                Vec3.atLowerCornerOf(firstPos),
-                Vec3.atLowerCornerOf(selectedPos)
-            ).expandTowards(1, 1, 1);
+            if (firstPos == null)
+                return selectedPos == null ? null : new Box(selectedPos);
+            return selectedPos == null ? new Box(firstPos) : new Box(Vec3d.of(firstPos), Vec3d.of(selectedPos)).stretch(1, 1, 1);
         }
-        return new AABB(Vec3.atLowerCornerOf(firstPos), Vec3.atLowerCornerOf(secondPos)).expandTowards(1, 1, 1);
+        return new Box(Vec3d.of(firstPos), Vec3d.of(secondPos)).stretch(1, 1, 1);
     }
 
-    private boolean isActive(Minecraft mc) {
-        return mc != null && mc.level != null && mc.screen == null && mc.player.getMainHandItem()
-            .is(AllItems.SCHEMATIC_AND_QUILL);
+    private boolean isActive(MinecraftClient mc) {
+        return mc != null && mc.world != null && mc.currentScreen == null && mc.player.getMainHandStack().isOf(AllItems.SCHEMATIC_AND_QUILL);
     }
 
-    public void saveSchematic(Minecraft mc, String string, boolean convertImmediately) {
-        SchematicExportResult result = SchematicExport.saveSchematic(
-            CreatePaths.SCHEMATICS_DIR,
-            string,
-            false,
-            mc.level,
-            firstPos,
-            secondPos
-        );
-        LocalPlayer player = mc.player;
+    public void saveSchematic(MinecraftClient mc, String string, boolean convertImmediately) {
+        SchematicExportResult result = SchematicExport.saveSchematic(CreatePaths.SCHEMATICS_DIR, string, false, mc.world, firstPos, secondPos);
+        ClientPlayerEntity player = mc.player;
         if (result == null) {
-            CreateLang.translate("schematicAndQuill.failed").style(ChatFormatting.RED).sendStatus(player);
+            CreateLang.translate("schematicAndQuill.failed").style(Formatting.RED).sendStatus(player);
             return;
         }
         Path file = result.file();
         CreateLang.translate("schematicAndQuill.saved", file.getFileName().toString()).sendStatus(player);
         firstPos = null;
         secondPos = null;
-        if (!convertImmediately) {
+        if (!convertImmediately)
             return;
-        }
         try {
-            if (!ClientSchematicLoader.validateSizeLimitation(mc, Files.size(file))) {
+            if (!ClientSchematicLoader.validateSizeLimitation(mc, Files.size(file)))
                 return;
-            }
-            player.connection.send(new InstantSchematicPacket(result.fileName(), result.origin(), result.bounds()));
+            player.networkHandler.sendPacket(new InstantSchematicPacket(result.fileName(), result.origin(), result.bounds()));
         } catch (IOException e) {
             Create.LOGGER.error("Error instantly uploading Schematic file: " + file, e);
         }

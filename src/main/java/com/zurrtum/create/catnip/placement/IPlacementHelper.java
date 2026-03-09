@@ -3,17 +3,17 @@ package com.zurrtum.create.catnip.placement;
 import com.zurrtum.create.catnip.data.Iterate;
 import com.zurrtum.create.catnip.data.Pair;
 import com.zurrtum.create.catnip.math.VecHelper;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.core.Vec3i;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.BlockItem;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.BlockHitResult;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.Blocks;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.item.BlockItem;
+import net.minecraft.item.ItemStack;
+import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.Vec3d;
+import net.minecraft.util.math.Vec3i;
+import net.minecraft.world.World;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -52,79 +52,52 @@ public interface IPlacementHelper {
      * Use {@link PlacementOffset#success(Vec3i)} with the new BlockPos to indicate a success
      * and call {@link PlacementOffset#withTransform(Function)} if the blocks default state has to be modified before it is placed
      */
-    PlacementOffset getOffset(Player player, Level world, BlockState state, BlockPos pos, BlockHitResult ray);
+    PlacementOffset getOffset(PlayerEntity player, World world, BlockState state, BlockPos pos, BlockHitResult ray);
 
     //sets the offset's ghost state with the default state of the held block item, this is used in PlacementHelpers and can be ignored in most cases
-    default PlacementOffset getOffset(
-        Player player,
-        Level world,
-        BlockState state,
-        BlockPos pos,
-        BlockHitResult ray,
-        ItemStack heldItem
-    ) {
+    default PlacementOffset getOffset(PlayerEntity player, World world, BlockState state, BlockPos pos, BlockHitResult ray, ItemStack heldItem) {
         PlacementOffset offset = getOffset(player, world, state, pos, ray);
         if (heldItem.getItem() instanceof BlockItem blockItem) {
-            offset = offset.withGhostState(blockItem.getBlock().defaultBlockState());
+            offset = offset.withGhostState(blockItem.getBlock().getDefaultState());
         }
         return offset;
     }
 
-    static List<Direction> orderedByDistanceOnlyAxis(BlockPos pos, Vec3 hit, Direction.Axis axis) {
+    static List<Direction> orderedByDistanceOnlyAxis(BlockPos pos, Vec3d hit, Direction.Axis axis) {
         return orderedByDistance(pos, hit, dir -> dir.getAxis() == axis);
     }
 
-    static List<Direction> orderedByDistanceOnlyAxis(
-        BlockPos pos,
-        Vec3 hit,
-        Direction.Axis axis,
-        Predicate<Direction> includeDirection
-    ) {
+    static List<Direction> orderedByDistanceOnlyAxis(BlockPos pos, Vec3d hit, Direction.Axis axis, Predicate<Direction> includeDirection) {
         return orderedByDistance(pos, hit, ((Predicate<Direction>) dir -> dir.getAxis() == axis).and(includeDirection));
     }
 
-    static List<Direction> orderedByDistanceExceptAxis(BlockPos pos, Vec3 hit, Direction.Axis axis) {
+    static List<Direction> orderedByDistanceExceptAxis(BlockPos pos, Vec3d hit, Direction.Axis axis) {
         return orderedByDistance(pos, hit, dir -> dir.getAxis() != axis);
     }
 
-    static List<Direction> orderedByDistanceExceptAxis(
-        BlockPos pos,
-        Vec3 hit,
-        Direction.Axis axis,
-        Predicate<Direction> includeDirection
-    ) {
+    static List<Direction> orderedByDistanceExceptAxis(BlockPos pos, Vec3d hit, Direction.Axis axis, Predicate<Direction> includeDirection) {
         return orderedByDistance(pos, hit, ((Predicate<Direction>) dir -> dir.getAxis() != axis).and(includeDirection));
     }
 
-    static List<Direction> orderedByDistanceExceptAxis(
-        BlockPos pos,
-        Vec3 hit,
-        Direction.Axis first,
-        Direction.Axis second
-    ) {
+    static List<Direction> orderedByDistanceExceptAxis(BlockPos pos, Vec3d hit, Direction.Axis first, Direction.Axis second) {
         return orderedByDistanceExceptAxis(pos, hit, first, d -> d.getAxis() != second);
     }
 
     static List<Direction> orderedByDistanceExceptAxis(
         BlockPos pos,
-        Vec3 hit,
+        Vec3d hit,
         Direction.Axis first,
         Direction.Axis second,
         Predicate<Direction> includeDirection
     ) {
-        return orderedByDistanceExceptAxis(
-            pos,
-            hit,
-            first,
-            ((Predicate<Direction>) d -> d.getAxis() != second).and(includeDirection)
-        );
+        return orderedByDistanceExceptAxis(pos, hit, first, ((Predicate<Direction>) d -> d.getAxis() != second).and(includeDirection));
     }
 
-    static List<Direction> orderedByDistance(BlockPos pos, Vec3 hit) {
+    static List<Direction> orderedByDistance(BlockPos pos, Vec3d hit) {
         return orderedByDistance(pos, hit, _$ -> true);
     }
 
-    static List<Direction> orderedByDistance(BlockPos pos, Vec3 hit, Predicate<Direction> includeDirection) {
+    static List<Direction> orderedByDistance(BlockPos pos, Vec3d hit, Predicate<Direction> includeDirection) {
         List<Direction> directions = new ArrayList<>();
 
         for (Direction dir : Iterate.directions) {
@@ -136,12 +109,12 @@ public interface IPlacementHelper {
         return orderedByDistance(pos, hit, directions);
     }
 
-    static List<Direction> orderedByDistance(BlockPos pos, Vec3 hit, Collection<Direction> directions) {
-        Vec3 centerToHit = hit.subtract(VecHelper.getCenterOf(pos));
+    static List<Direction> orderedByDistance(BlockPos pos, Vec3d hit, Collection<Direction> directions) {
+        Vec3d centerToHit = hit.subtract(VecHelper.getCenterOf(pos));
 
         List<Pair<Direction, Double>> distances = new ArrayList<>();
         for (Direction dir : directions) {
-            distances.add(Pair.of(dir, Vec3.atLowerCornerOf(dir.getUnitVec3i()).distanceTo(centerToHit)));
+            distances.add(Pair.of(dir, Vec3d.of(dir.getVector()).distanceTo(centerToHit)));
         }
 
         distances.sort(Comparator.comparingDouble(Pair::getSecond));

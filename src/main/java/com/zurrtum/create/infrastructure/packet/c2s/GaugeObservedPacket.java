@@ -3,26 +3,26 @@ package com.zurrtum.create.infrastructure.packet.c2s;
 import com.zurrtum.create.AllHandle;
 import com.zurrtum.create.AllPackets;
 import io.netty.buffer.ByteBuf;
-import net.minecraft.core.BlockPos;
-import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.network.protocol.PacketType;
-import net.minecraft.network.protocol.game.ServerGamePacketListener;
-import net.minecraft.server.network.ServerGamePacketListenerImpl;
+import net.minecraft.network.codec.PacketCodec;
+import net.minecraft.network.listener.ServerPlayPacketListener;
+import net.minecraft.network.packet.Packet;
+import net.minecraft.network.packet.PacketType;
+import net.minecraft.server.network.ServerPlayNetworkHandler;
+import net.minecraft.util.math.BlockPos;
 
-public record GaugeObservedPacket(BlockPos pos) implements Packet<ServerGamePacketListener> {
-    public static final StreamCodec<ByteBuf, GaugeObservedPacket> CODEC = BlockPos.STREAM_CODEC.map(
+public record GaugeObservedPacket(BlockPos pos) implements Packet<ServerPlayPacketListener> {
+    public static final PacketCodec<ByteBuf, GaugeObservedPacket> CODEC = BlockPos.PACKET_CODEC.xmap(
         GaugeObservedPacket::new,
         GaugeObservedPacket::pos
     );
 
     @Override
-    public void handle(ServerGamePacketListener listener) {
-        AllHandle.onGaugeObserved((ServerGamePacketListenerImpl) listener, this);
+    public void apply(ServerPlayPacketListener listener) {
+        AllHandle.onGaugeObserved((ServerPlayNetworkHandler) listener, this);
     }
 
     @Override
-    public PacketType<GaugeObservedPacket> type() {
+    public PacketType<GaugeObservedPacket> getPacketType() {
         return AllPackets.OBSERVER_STRESSOMETER;
     }
 }

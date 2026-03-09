@@ -64,14 +64,7 @@ public final class GlCompat {
 
     }
 
-    public static void safeMultiDrawElementsIndirect(
-        GlProgram drawProgram,
-        int mode,
-        int type,
-        int start,
-        int end,
-        long stride
-    ) {
+    public static void safeMultiDrawElementsIndirect(GlProgram drawProgram, int mode, int type, int start, int end, long stride) {
         int count = end - start;
         long indirect = (long) start * stride;
         if (DRIVER == Driver.INTEL) {

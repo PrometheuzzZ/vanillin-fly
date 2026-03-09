@@ -2,10 +2,10 @@ package com.zurrtum.create.mixin;
 
 import com.zurrtum.create.AllDataComponents;
 import com.zurrtum.create.infrastructure.component.ClipboardContent;
-import net.minecraft.core.component.DataComponentType;
-import net.minecraft.core.component.PatchedDataComponentMap;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.ItemLike;
+import net.minecraft.component.ComponentType;
+import net.minecraft.component.MergedComponentMap;
+import net.minecraft.item.ItemConvertible;
+import net.minecraft.item.ItemStack;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
@@ -17,39 +17,14 @@ import java.util.function.BiFunction;
 @Mixin(ItemStack.class)
 public class ItemStackMixin {
     @SuppressWarnings("removal")
-    @Inject(method = "<init>(Lnet/minecraft/world/level/ItemLike;ILnet/minecraft/core/component/PatchedDataComponentMap;)V", at = @At("TAIL"))
-    private void create$migrateOldClipboardComponents(
-        ItemLike item,
-        int count,
-        PatchedDataComponentMap components,
-        CallbackInfo ci
-    ) {
+    @Inject(method = "<init>(Lnet/minecraft/item/ItemConvertible;ILnet/minecraft/component/MergedComponentMap;)V", at = @At("TAIL"))
+    private void create$migrateOldClipboardComponents(ItemConvertible item, int count, MergedComponentMap components, CallbackInfo ci) {
         ClipboardContent content = ClipboardContent.EMPTY;
 
-        content = create$migrateComponent(
-            content,
-            components,
-            AllDataComponents.CLIPBOARD_PAGES,
-            ClipboardContent::setPages
-        );
-        content = create$migrateComponent(
-            content,
-            components,
-            AllDataComponents.CLIPBOARD_TYPE,
-            ClipboardContent::setType
-        );
-        content = create$migrateComponent(
-            content,
-            components,
-            AllDataComponents.CLIPBOARD_READ_ONLY,
-            (c, v) -> c.setReadOnly(true)
-        );
-        content = create$migrateComponent(
-            content,
-            components,
-            AllDataComponents.CLIPBOARD_COPIED_VALUES,
-            ClipboardContent::setCopiedValues
-        );
+        content = create$migrateComponent(content, components, AllDataComponents.CLIPBOARD_PAGES, ClipboardContent::setPages);
+        content = create$migrateComponent(content, components, AllDataComponents.CLIPBOARD_TYPE, ClipboardContent::setType);
+        content = create$migrateComponent(content, components, AllDataComponents.CLIPBOARD_READ_ONLY, (c, v) -> c.setReadOnly(true));
+        content = create$migrateComponent(content, components, AllDataComponents.CLIPBOARD_COPIED_VALUES, ClipboardContent::setCopiedValues);
         content = create$migrateComponent(
             content,
             components,
@@ -65,8 +40,8 @@ public class ItemStackMixin {
     @Unique
     private static <T> ClipboardContent create$migrateComponent(
         ClipboardContent content,
-        PatchedDataComponentMap components,
-        DataComponentType<T> componentType,
+        MergedComponentMap components,
+        ComponentType<T> componentType,
         BiFunction<ClipboardContent, T, ClipboardContent> function
     ) {
         T value = components.get(componentType);

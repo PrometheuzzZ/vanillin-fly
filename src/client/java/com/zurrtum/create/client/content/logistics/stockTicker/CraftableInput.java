@@ -7,7 +7,7 @@ import it.unimi.dsi.fastutil.objects.Object2IntOpenCustomHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenCustomHashMap;
 import it.unimi.dsi.fastutil.objects.ObjectSet;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.item.ItemStack;
 
 import java.util.Arrays;
 import java.util.Iterator;
@@ -74,7 +74,7 @@ public record CraftableInput(Object2ObjectMap<List<ItemStack>, IntList> data, bo
 
     public static boolean contains(List<ItemStack> list, ItemStack stack) {
         for (ItemStack item : list) {
-            if (ItemStack.isSameItemSameComponents(item, stack)) {
+            if (ItemStack.areItemsAndComponentsEqual(item, stack)) {
                 return true;
             }
         }
@@ -91,7 +91,7 @@ public record CraftableInput(Object2ObjectMap<List<ItemStack>, IntList> data, bo
             int size = list.size();
             int[] codes = new int[size];
             for (int i = 0; i < size; i++) {
-                codes[i] = ItemStack.hashItemAndComponents(list.get(i));
+                codes[i] = ItemStack.hashCode(list.get(i));
             }
             Arrays.sort(codes);
             int hash = 0;
@@ -115,7 +115,7 @@ public record CraftableInput(Object2ObjectMap<List<ItemStack>, IntList> data, bo
                 return false;
             }
             if (size == 1) {
-                return ItemStack.isSameItemSameComponents(a.getFirst(), b.getFirst());
+                return ItemStack.areItemsAndComponentsEqual(a.getFirst(), b.getFirst());
             }
             int end = size - 1;
             List<ItemStack> queue = new LinkedList<>();
@@ -124,14 +124,14 @@ public record CraftableInput(Object2ObjectMap<List<ItemStack>, IntList> data, bo
             ItemStack stack;
             for (int i = 0; i < end; i++) {
                 stack = a.get(i);
-                if (ItemStack.isSameItemSameComponents(stack, current)) {
+                if (ItemStack.areItemsAndComponentsEqual(stack, current)) {
                     current = b.get(index++);
                     continue;
                 }
                 queue.add(stack);
             }
             stack = a.get(end);
-            if (ItemStack.isSameItemSameComponents(stack, current)) {
+            if (ItemStack.areItemsAndComponentsEqual(stack, current)) {
                 if (index == size) {
                     return true;
                 }
@@ -148,7 +148,7 @@ public record CraftableInput(Object2ObjectMap<List<ItemStack>, IntList> data, bo
                 iterator = queue.iterator();
                 do {
                     stack = iterator.next();
-                    if (ItemStack.isSameItemSameComponents(stack, current)) {
+                    if (ItemStack.areItemsAndComponentsEqual(stack, current)) {
                         iterator.remove();
                         current = b.get(index++);
                         continue Find;
@@ -156,7 +156,7 @@ public record CraftableInput(Object2ObjectMap<List<ItemStack>, IntList> data, bo
                 } while (iterator.hasNext());
                 return false;
             }
-            return ItemStack.isSameItemSameComponents(queue.getFirst(), current);
+            return ItemStack.areItemsAndComponentsEqual(queue.getFirst(), current);
         }
     }
 }

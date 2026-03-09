@@ -12,25 +12,25 @@ import com.zurrtum.create.content.redstone.RoseQuartzLampBlock;
 import com.zurrtum.create.content.schematics.requirement.ItemRequirement;
 import com.zurrtum.create.content.schematics.requirement.ItemRequirement.ItemUseType;
 import com.zurrtum.create.foundation.blockEntity.SmartBlockEntity;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.core.component.DataComponentPatch;
-import net.minecraft.world.Clearable;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.TrapDoorBlock;
-import net.minecraft.world.level.block.entity.BlockEntity;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.properties.BlockStateProperties;
-import net.minecraft.world.level.storage.ValueInput;
-import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.TrapdoorBlock;
+import net.minecraft.block.entity.BlockEntity;
+import net.minecraft.component.ComponentChanges;
+import net.minecraft.item.ItemStack;
+import net.minecraft.state.property.Properties;
+import net.minecraft.storage.ReadView;
+import net.minecraft.storage.WriteView;
+import net.minecraft.util.Clearable;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
 
 import java.util.List;
 import java.util.Optional;
 
 public class CopycatBlockEntity extends SmartBlockEntity implements SpecialBlockEntityItemRequirement, TransformableBlockEntity, PartialSafeNBT, Clearable {
 
-    private BlockState material = AllBlocks.COPYCAT_BASE.defaultBlockState();
+    private BlockState material = AllBlocks.COPYCAT_BASE.getDefaultState();
     private ItemStack consumedItem = ItemStack.EMPTY;
 
     public CopycatBlockEntity(BlockPos pos, BlockState state) {
@@ -38,9 +38,9 @@ public class CopycatBlockEntity extends SmartBlockEntity implements SpecialBlock
     }
 
     @Override
-    public void preRemoveSideEffects(BlockPos pos, BlockState oldState) {
-        super.preRemoveSideEffects(pos, oldState);
-        Block.popResource(level, pos, consumedItem);
+    public void onBlockReplaced(BlockPos pos, BlockState oldState) {
+        super.onBlockReplaced(pos, oldState);
+        Block.dropStack(world, pos, consumedItem);
     }
 
     public BlockState getMaterial() {
@@ -48,33 +48,29 @@ public class CopycatBlockEntity extends SmartBlockEntity implements SpecialBlock
     }
 
     public boolean hasCustomMaterial() {
-        return !getMaterial().is(AllBlocks.COPYCAT_BASE);
+        return !getMaterial().isOf(AllBlocks.COPYCAT_BASE);
     }
 
     public void setMaterial(BlockState blockState) {
-        BlockState wrapperState = getBlockState();
+        BlockState wrapperState = getCachedState();
 
-        if (!material.is(blockState.getBlock())) {
+        if (!material.isOf(blockState.getBlock()))
             for (Direction side : Iterate.directions) {
-                BlockPos neighbour = worldPosition.relative(side);
-                BlockState neighbourState = level.getBlockState(neighbour);
-                if (neighbourState != wrapperState) {
+                BlockPos neighbour = pos.offset(side);
+                BlockState neighbourState = world.getBlockState(neighbour);
+                if (neighbourState != wrapperState)
                     continue;
-                }
-                if (!(level.getBlockEntity(neighbour) instanceof CopycatBlockEntity cbe)) {
+                if (!(world.getBlockEntity(neighbour) instanceof CopycatBlockEntity cbe))
                     continue;
-                }
                 BlockState otherMaterial = cbe.getMaterial();
-                if (!otherMaterial.is(blockState.getBlock())) {
+                if (!otherMaterial.isOf(blockState.getBlock()))
                     continue;
-                }
                 blockState = otherMaterial;
                 break;
             }
-        }
 
         material = blockState;
-        if (!level.isClientSide()) {
+        if (!world.isClient()) {
             notifyUpdate();
             return;
         }
@@ -82,26 +78,22 @@ public class CopycatBlockEntity extends SmartBlockEntity implements SpecialBlock
     }
 
     public boolean cycleMaterial() {
-        if (material.hasProperty(TrapDoorBlock.HALF) && material.getValueOrElse(TrapDoorBlock.OPEN, false)) {
-            setMaterial(material.cycle(TrapDoorBlock.HALF));
-        } else if (material.hasProperty(BlockStateProperties.FACING)) {
-            setMaterial(material.cycle(BlockStateProperties.FACING));
-        } else if (material.hasProperty(BlockStateProperties.HORIZONTAL_FACING)) {
-            setMaterial(material.setValue(
-                BlockStateProperties.HORIZONTAL_FACING,
-                material.getValue(BlockStateProperties.HORIZONTAL_FACING).getClockWise()
-            ));
-        } else if (material.hasProperty(BlockStateProperties.AXIS)) {
-            setMaterial(material.cycle(BlockStateProperties.AXIS));
-        } else if (material.hasProperty(BlockStateProperties.HORIZONTAL_AXIS)) {
-            setMaterial(material.cycle(BlockStateProperties.HORIZONTAL_AXIS));
-        } else if (material.hasProperty(BlockStateProperties.LIT)) {
-            setMaterial(material.cycle(BlockStateProperties.LIT));
-        } else if (material.hasProperty(RoseQuartzLampBlock.POWERING)) {
+        if (material.contains(TrapdoorBlock.HALF) && material.get(TrapdoorBlock.OPEN, false))
+            setMaterial(material.cycle(TrapdoorBlock.HALF));
+        else if (material.contains(Properties.FACING))
+            setMaterial(material.cycle(Properties.FACING));
+        else if (material.contains(Properties.HORIZONTAL_FACING))
+            setMaterial(material.with(Properties.HORIZONTAL_FACING, material.get(Properties.HORIZONTAL_FACING).rotateYClockwise()));
+        else if (material.contains(Properties.AXIS))
+            setMaterial(material.cycle(Properties.AXIS));
+        else if (material.contains(Properties.HORIZONTAL_AXIS))
+            setMaterial(material.cycle(Properties.HORIZONTAL_AXIS));
+        else if (material.contains(Properties.LIT))
+            setMaterial(material.cycle(Properties.LIT));
+        else if (material.contains(RoseQuartzLampBlock.POWERING))
             setMaterial(material.cycle(RoseQuartzLampBlock.POWERING));
-        } else {
+        else
             return false;
-        }
 
         return true;
     }
@@ -112,13 +104,13 @@ public class CopycatBlockEntity extends SmartBlockEntity implements SpecialBlock
 
     public void setConsumedItem(ItemStack stack) {
         consumedItem = stack.copyWithCount(1);
-        setChanged();
+        markDirty();
     }
 
     private void redraw() {
-        if (level != null) {
-            level.sendBlockUpdated(getBlockPos(), getBlockState(), getBlockState(), 16);
-            level.getChunkSource().getLightEngine().checkBlock(worldPosition);
+        if (world != null) {
+            world.updateListeners(getPos(), getCachedState(), getCachedState(), 16);
+            world.getChunkManager().getLightingProvider().checkBlock(pos);
         }
     }
 
@@ -128,9 +120,8 @@ public class CopycatBlockEntity extends SmartBlockEntity implements SpecialBlock
 
     @Override
     public ItemRequirement getRequiredItems(BlockState state) {
-        if (consumedItem.isEmpty()) {
+        if (consumedItem.isEmpty())
             return ItemRequirement.NONE;
-        }
         return new ItemRequirement(ItemUseType.CONSUME, consumedItem);
     }
 
@@ -141,7 +132,7 @@ public class CopycatBlockEntity extends SmartBlockEntity implements SpecialBlock
     }
 
     @Override
-    protected void read(ValueInput view, boolean clientPacket) {
+    protected void read(ReadView view, boolean clientPacket) {
         super.read(view, clientPacket);
 
         consumedItem = view.read("Item", ItemStack.CODEC).orElse(ItemStack.EMPTY);
@@ -157,55 +148,47 @@ public class CopycatBlockEntity extends SmartBlockEntity implements SpecialBlock
 
         // Validate Material
         if (!clientPacket) {
-            BlockState blockState = getBlockState();
-            if (blockState == null) {
+            BlockState blockState = getCachedState();
+            if (blockState == null)
                 return;
-            }
-            if (!(blockState.getBlock() instanceof CopycatBlock cb)) {
+            if (!(blockState.getBlock() instanceof CopycatBlock cb))
                 return;
-            }
-            BlockState acceptedBlockState = cb.getAcceptedBlockState(level, worldPosition, consumedItem, null);
-            if (acceptedBlockState != null && material.is(acceptedBlockState.getBlock())) {
+            BlockState acceptedBlockState = cb.getAcceptedBlockState(world, pos, consumedItem, null);
+            if (acceptedBlockState != null && material.isOf(acceptedBlockState.getBlock()))
                 return;
-            }
             consumedItem = ItemStack.EMPTY;
-            material = AllBlocks.COPYCAT_BASE.defaultBlockState();
+            material = AllBlocks.COPYCAT_BASE.getDefaultState();
         }
 
-        if (clientPacket && prevMaterial != material) {
+        if (clientPacket && prevMaterial != material)
             redraw();
-        }
     }
 
     @Override
-    public void writeSafe(ValueOutput view) {
+    public void writeSafe(WriteView view) {
         super.writeSafe(view);
 
-        ItemStack stackWithoutComponents = new ItemStack(
-            consumedItem.getItemHolder(),
-            consumedItem.getCount(),
-            DataComponentPatch.EMPTY
-        );
+        ItemStack stackWithoutComponents = new ItemStack(consumedItem.getRegistryEntry(), consumedItem.getCount(), ComponentChanges.EMPTY);
 
         write(view, stackWithoutComponents, material);
     }
 
     @Override
-    protected void write(ValueOutput view, boolean clientPacket) {
+    protected void write(WriteView view, boolean clientPacket) {
         super.write(view, clientPacket);
         write(view, consumedItem, material);
     }
 
-    protected void write(ValueOutput view, ItemStack stack, BlockState material) {
+    protected void write(WriteView view, ItemStack stack, BlockState material) {
         if (!stack.isEmpty()) {
-            view.store("Item", ItemStack.CODEC, stack);
+            view.put("Item", ItemStack.CODEC, stack);
         }
-        view.store("Material", BlockState.CODEC, material);
+        view.put("Material", BlockState.CODEC, material);
     }
 
     @Override
-    public void clearContent() {
-        material = AllBlocks.COPYCAT_BASE.defaultBlockState();
+    public void clear() {
+        material = AllBlocks.COPYCAT_BASE.getDefaultState();
         consumedItem = ItemStack.EMPTY;
     }
 }

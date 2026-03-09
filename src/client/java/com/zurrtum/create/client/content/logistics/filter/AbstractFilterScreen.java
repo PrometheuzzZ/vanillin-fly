@@ -14,12 +14,12 @@ import com.zurrtum.create.client.foundation.item.TooltipHelper;
 import com.zurrtum.create.content.logistics.filter.AbstractFilterMenu;
 import com.zurrtum.create.infrastructure.packet.c2s.FilterScreenPacket;
 import com.zurrtum.create.infrastructure.packet.c2s.FilterScreenPacket.Option;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.renderer.Rect2i;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.world.entity.player.Inventory;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.util.math.Rect2i;
+import net.minecraft.entity.player.PlayerInventory;
+import net.minecraft.item.ItemStack;
+import net.minecraft.text.MutableText;
+import net.minecraft.text.Text;
 
 import java.util.Collections;
 import java.util.List;
@@ -35,76 +35,53 @@ public abstract class AbstractFilterScreen<F extends AbstractFilterMenu> extends
     private IconButton confirmButton;
     private ElementWidget renderedItem;
 
-    protected AbstractFilterScreen(F menu, Inventory inv, Component title, AllGuiTextures background) {
+    protected AbstractFilterScreen(F menu, PlayerInventory inv, Text title, AllGuiTextures background) {
         super(menu, inv, title);
         this.background = background;
     }
 
     @Override
     protected void init() {
-        setWindowSize(
-            Math.max(background.getWidth(), PLAYER_INVENTORY.getWidth()),
-            background.getHeight() + 4 + PLAYER_INVENTORY.getHeight()
-        );
+        setWindowSize(Math.max(background.getWidth(), PLAYER_INVENTORY.getWidth()), background.getHeight() + 4 + PLAYER_INVENTORY.getHeight());
         super.init();
 
-        resetButton = new IconButton(
-            leftPos + background.getWidth() - 62,
-            topPos + background.getHeight() - 24,
-            AllIcons.I_TRASH
-        );
+        resetButton = new IconButton(x + background.getWidth() - 62, y + background.getHeight() - 24, AllIcons.I_TRASH);
         resetButton.withCallback(() -> {
-            menu.clearContents();
+            handler.clearContents();
             contentsCleared();
-            minecraft.player.connection.send(AllPackets.CLEAR_CONTAINER);
+            client.player.networkHandler.sendPacket(AllPackets.CLEAR_CONTAINER);
         });
-        confirmButton = new IconButton(
-            leftPos + background.getWidth() - 33,
-            topPos + background.getHeight() - 24,
-            AllIcons.I_CONFIRM
-        );
+        confirmButton = new IconButton(x + background.getWidth() - 33, y + background.getHeight() - 24, AllIcons.I_CONFIRM);
         confirmButton.withCallback(() -> {
-            minecraft.player.closeContainer();
+            client.player.closeHandledScreen();
         });
 
-        addRenderableWidget(resetButton);
-        addRenderableWidget(confirmButton);
+        addDrawableChild(resetButton);
+        addDrawableChild(confirmButton);
 
-        extraAreas = ImmutableList.of(new Rect2i(
-            leftPos + background.getWidth(),
-            topPos + background.getHeight() - 40,
-            80,
-            48
-        ));
+        extraAreas = ImmutableList.of(new Rect2i(x + background.getWidth(), y + background.getHeight() - 40, 80, 48));
 
         renderedItem = new ElementWidget(
-            leftPos + background.getWidth() + 8,
-            topPos + background.getHeight() - 52
-        ).showingElement(GuiGameElement.of(menu.contentHolder).scale(4));
-        addRenderableWidget(renderedItem);
+            x + background.getWidth() + 8,
+            y + background.getHeight() - 52
+        ).showingElement(GuiGameElement.of(handler.contentHolder).scale(4));
+        addDrawableChild(renderedItem);
     }
 
     @Override
-    public void removed() {
-        super.removed();
+    public void close() {
+        super.close();
         renderedItem.getRenderElement().clear();
     }
 
     @Override
-    protected void renderBg(GuiGraphics graphics, float partialTicks, int mouseX, int mouseY) {
+    protected void drawBackground(DrawContext graphics, float partialTicks, int mouseX, int mouseY) {
         int invX = getLeftOfCentered(PLAYER_INVENTORY.getWidth());
-        int invY = topPos + background.getHeight() + 4;
+        int invY = y + background.getHeight() + 4;
         renderPlayerInventory(graphics, invX, invY);
 
-        background.render(graphics, leftPos, topPos);
-        graphics.drawString(
-            font,
-            title,
-            leftPos + (background.getWidth() - 8) / 2 - font.width(title) / 2,
-            topPos + 4,
-            getTitleColor(),
-            false
-        );
+        background.render(graphics, x, y);
+        graphics.drawText(textRenderer, title, x + (background.getWidth() - 8) / 2 - textRenderer.getWidth(title) / 2, y + 4, getTitleColor(), false);
     }
 
     protected int getTitleColor() {
@@ -112,12 +89,11 @@ public abstract class AbstractFilterScreen<F extends AbstractFilterMenu> extends
     }
 
     @Override
-    protected void containerTick() {
-        if (!ItemStack.matches(minecraft.player.getMainHandItem(), menu.contentHolder)) {
-            minecraft.player.closeContainer();
-        }
+    protected void handledScreenTick() {
+        if (!ItemStack.areEqual(client.player.getMainHandStack(), handler.contentHolder))
+            client.player.closeHandledScreen();
 
-        super.containerTick();
+        super.handledScreenTick();
 
         handleTooltips();
         handleIndicators();
@@ -134,17 +110,15 @@ public abstract class AbstractFilterScreen<F extends AbstractFilterMenu> extends
         }
 
         if (AllKeys.hasShiftDown()) {
-            List<MutableComponent> tooltipDescriptions = getTooltipDescriptions();
-            for (int i = 0; i < tooltipButtons.size(); i++) {
+            List<MutableText> tooltipDescriptions = getTooltipDescriptions();
+            for (int i = 0; i < tooltipButtons.size(); i++)
                 fillToolTip(tooltipButtons.get(i), tooltipDescriptions.get(i));
-            }
         }
     }
 
     public void handleIndicators() {
-        for (IconButton button : getTooltipButtons()) {
+        for (IconButton button : getTooltipButtons())
             button.green = !isButtonEnabled(button);
-        }
     }
 
     protected abstract boolean isButtonEnabled(IconButton button);
@@ -153,15 +127,14 @@ public abstract class AbstractFilterScreen<F extends AbstractFilterMenu> extends
         return Collections.emptyList();
     }
 
-    protected List<MutableComponent> getTooltipDescriptions() {
+    protected List<MutableText> getTooltipDescriptions() {
         return Collections.emptyList();
     }
 
-    private void fillToolTip(IconButton button, Component tooltip) {
-        if (!button.isHoveredOrFocused()) {
+    private void fillToolTip(IconButton button, Text tooltip) {
+        if (!button.isSelected())
             return;
-        }
-        List<Component> tip = button.getToolTip();
+        List<Text> tip = button.getToolTip();
         tip.addAll(TooltipHelper.cutTextComponent(tooltip, Palette.ALL_GRAY));
     }
 
@@ -169,7 +142,7 @@ public abstract class AbstractFilterScreen<F extends AbstractFilterMenu> extends
     }
 
     protected void sendOptionUpdate(Option option) {
-        minecraft.player.connection.send(new FilterScreenPacket(option));
+        client.player.networkHandler.sendPacket(new FilterScreenPacket(option));
     }
 
     @Override

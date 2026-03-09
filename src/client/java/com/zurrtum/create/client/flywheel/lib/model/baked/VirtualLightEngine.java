@@ -1,38 +1,34 @@
 package com.zurrtum.create.client.flywheel.lib.model.baked;
 
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.SectionPos;
-import net.minecraft.world.level.BlockGetter;
-import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.LightLayer;
-import net.minecraft.world.level.chunk.DataLayer;
-import net.minecraft.world.level.chunk.LightChunk;
-import net.minecraft.world.level.chunk.LightChunkGetter;
-import net.minecraft.world.level.lighting.LayerLightEventListener;
-import net.minecraft.world.level.lighting.LevelLightEngine;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.ChunkPos;
+import net.minecraft.util.math.ChunkSectionPos;
+import net.minecraft.world.BlockView;
+import net.minecraft.world.LightType;
+import net.minecraft.world.chunk.ChunkNibbleArray;
+import net.minecraft.world.chunk.ChunkProvider;
+import net.minecraft.world.chunk.light.ChunkLightingView;
+import net.minecraft.world.chunk.light.LightSourceView;
+import net.minecraft.world.chunk.light.LightingProvider;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.function.ToIntFunction;
 
-public final class VirtualLightEngine extends LevelLightEngine {
-    private final LayerLightEventListener blockListener;
-    private final LayerLightEventListener skyListener;
+public final class VirtualLightEngine extends LightingProvider {
+    private final ChunkLightingView blockListener;
+    private final ChunkLightingView skyListener;
 
-    public VirtualLightEngine(
-        ToIntFunction<BlockPos> blockLightFunc,
-        ToIntFunction<BlockPos> skyLightFunc,
-        BlockGetter level
-    ) {
+    public VirtualLightEngine(ToIntFunction<BlockPos> blockLightFunc, ToIntFunction<BlockPos> skyLightFunc, BlockView level) {
         super(
-            new LightChunkGetter() {
+            new ChunkProvider() {
                 @Override
                 @Nullable
-                public LightChunk getChunkForLighting(int x, int z) {
+                public LightSourceView getChunk(int x, int z) {
                     return null;
                 }
 
                 @Override
-                public BlockGetter getLevel() {
+                public BlockView getWorld() {
                     return level;
                 }
             }, false, false
@@ -43,18 +39,18 @@ public final class VirtualLightEngine extends LevelLightEngine {
     }
 
     @Override
-    public LayerLightEventListener getLayerListener(LightLayer layer) {
-        return layer == LightLayer.BLOCK ? blockListener : skyListener;
+    public ChunkLightingView get(LightType layer) {
+        return layer == LightType.BLOCK ? blockListener : skyListener;
     }
 
     @Override
-    public int getRawBrightness(BlockPos pos, int amount) {
-        int i = skyListener.getLightValue(pos) - amount;
-        int j = blockListener.getLightValue(pos);
+    public int getLight(BlockPos pos, int amount) {
+        int i = skyListener.getLightLevel(pos) - amount;
+        int j = blockListener.getLightLevel(pos);
         return Math.max(j, i);
     }
 
-    private static class VirtualLayerLightEventListener implements LayerLightEventListener {
+    private static class VirtualLayerLightEventListener implements ChunkLightingView {
         private final ToIntFunction<BlockPos> lightFunc;
 
         public VirtualLayerLightEventListener(ToIntFunction<BlockPos> lightFunc) {
@@ -66,34 +62,34 @@ public final class VirtualLightEngine extends LevelLightEngine {
         }
 
         @Override
-        public boolean hasLightWork() {
+        public boolean hasUpdates() {
             return false;
         }
 
         @Override
-        public int runLightUpdates() {
+        public int doLightUpdates() {
             return 0;
         }
 
         @Override
-        public void updateSectionStatus(SectionPos pos, boolean isSectionEmpty) {
+        public void setSectionStatus(ChunkSectionPos pos, boolean isSectionEmpty) {
         }
 
         @Override
-        public void setLightEnabled(ChunkPos pos, boolean lightEnabled) {
+        public void setColumnEnabled(ChunkPos pos, boolean lightEnabled) {
         }
 
         @Override
-        public void propagateLightSources(ChunkPos pos) {
+        public void propagateLight(ChunkPos pos) {
         }
 
         @Override
-        public DataLayer getDataLayerData(SectionPos pos) {
+        public ChunkNibbleArray getLightSection(ChunkSectionPos pos) {
             return null;
         }
 
         @Override
-        public int getLightValue(BlockPos pos) {
+        public int getLightLevel(BlockPos pos) {
             return lightFunc.applyAsInt(pos);
         }
     }

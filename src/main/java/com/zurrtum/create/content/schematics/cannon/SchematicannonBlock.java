@@ -3,74 +3,61 @@ package com.zurrtum.create.content.schematics.cannon;
 import com.zurrtum.create.AllBlockEntityTypes;
 import com.zurrtum.create.AllShapes;
 import com.zurrtum.create.foundation.block.IBE;
-import net.minecraft.core.BlockPos;
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.util.Mth;
-import net.minecraft.world.InteractionResult;
-import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.BlockGetter;
-import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.entity.BlockEntityType;
-import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.redstone.Orientation;
-import net.minecraft.world.phys.BlockHitResult;
-import net.minecraft.world.phys.shapes.CollisionContext;
-import net.minecraft.world.phys.shapes.VoxelShape;
+import net.minecraft.block.Block;
+import net.minecraft.block.BlockState;
+import net.minecraft.block.ShapeContext;
+import net.minecraft.block.entity.BlockEntityType;
+import net.minecraft.entity.LivingEntity;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.item.ItemStack;
+import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.util.ActionResult;
+import net.minecraft.util.hit.BlockHitResult;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.shape.VoxelShape;
+import net.minecraft.world.BlockView;
+import net.minecraft.world.World;
+import net.minecraft.world.block.WireOrientation;
 import org.jetbrains.annotations.Nullable;
 
 public class SchematicannonBlock extends Block implements IBE<SchematicannonBlockEntity> {
 
-    public SchematicannonBlock(Properties properties) {
+    public SchematicannonBlock(Settings properties) {
         super(properties);
     }
 
     @Override
-    public VoxelShape getShape(BlockState state, BlockGetter worldIn, BlockPos pos, CollisionContext context) {
+    public VoxelShape getOutlineShape(BlockState state, BlockView worldIn, BlockPos pos, ShapeContext context) {
         return AllShapes.SCHEMATICANNON_SHAPE;
     }
 
     @Override
-    public void setPlacedBy(
-        Level level,
-        BlockPos pos,
-        BlockState state,
-        @Nullable LivingEntity entity,
-        ItemStack stack
-    ) {
+    public void onPlaced(World level, BlockPos pos, BlockState state, @Nullable LivingEntity entity, ItemStack stack) {
         if (entity != null) {
             withBlockEntityDo(
                 level, pos, be -> {
-                    be.defaultYaw = (-Mth.floor((entity.getYRot() + (entity.isShiftKeyDown() ? 180.0F : 0.0F)) * 16.0F / 360.0F + 0.5F) & 15) * 360.0F / 16.0F;
+                    be.defaultYaw = (-MathHelper.floor((entity.getYaw() + (entity.isSneaking() ? 180.0F : 0.0F)) * 16.0F / 360.0F + 0.5F) & 15) * 360.0F / 16.0F;
                 }
             );
         }
     }
 
     @Override
-    protected InteractionResult useWithoutItem(
-        BlockState state,
-        Level level,
-        BlockPos pos,
-        Player player,
-        BlockHitResult hitResult
-    ) {
-        if (level.isClientSide()) {
-            return InteractionResult.SUCCESS;
-        }
-        withBlockEntityDo(level, pos, be -> be.openHandledScreen((ServerPlayer) player));
-        return InteractionResult.SUCCESS;
+    protected ActionResult onUse(BlockState state, World level, BlockPos pos, PlayerEntity player, BlockHitResult hitResult) {
+        if (level.isClient())
+            return ActionResult.SUCCESS;
+        withBlockEntityDo(level, pos, be -> be.openHandledScreen((ServerPlayerEntity) player));
+        return ActionResult.SUCCESS;
     }
 
     @Override
-    public void neighborChanged(
+    public void neighborUpdate(
         BlockState state,
-        Level worldIn,
+        World worldIn,
         BlockPos pos,
         Block blockIn,
-        @Nullable Orientation wireOrientation,
+        @Nullable WireOrientation wireOrientation,
         boolean isMoving
     ) {
         withBlockEntityDo(worldIn, pos, be -> be.neighbourCheckCooldown = 0);

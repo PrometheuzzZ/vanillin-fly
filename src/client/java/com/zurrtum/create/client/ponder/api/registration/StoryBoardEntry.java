@@ -1,7 +1,7 @@
 package com.zurrtum.create.client.ponder.api.registration;
 
 import com.zurrtum.create.client.ponder.api.scene.PonderStoryBoard;
-import net.minecraft.resources.Identifier;
+import net.minecraft.util.Identifier;
 
 import java.util.List;
 
@@ -86,20 +86,18 @@ public interface StoryBoardEntry {
     StoryBoardEntry highlightAllTags();
 
     enum SceneOrderingType {
-        BEFORE, AFTER
+        BEFORE,
+        AFTER
     }
 
     record SceneOrderingEntry(SceneOrderingType type, Identifier sceneId) {
 
         public static SceneOrderingEntry after(String namespace, String sceneId) {
-            return new SceneOrderingEntry(SceneOrderingType.AFTER, Identifier.fromNamespaceAndPath(namespace, sceneId));
+            return new SceneOrderingEntry(SceneOrderingType.AFTER, Identifier.of(namespace, sceneId));
         }
 
         public static SceneOrderingEntry before(String namespace, String sceneId) {
-            return new SceneOrderingEntry(
-                SceneOrderingType.BEFORE,
-                Identifier.fromNamespaceAndPath(namespace, sceneId)
-            );
+            return new SceneOrderingEntry(SceneOrderingType.BEFORE, Identifier.of(namespace, sceneId));
         }
     }
 }

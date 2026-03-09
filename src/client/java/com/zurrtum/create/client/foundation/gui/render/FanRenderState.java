@@ -1,25 +1,24 @@
 package com.zurrtum.create.client.foundation.gui.render;
 
-import net.minecraft.client.gui.navigation.ScreenRectangle;
-import net.minecraft.client.gui.render.state.pip.PictureInPictureRenderState;
-import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.block.BlockState;
+import net.minecraft.client.gui.ScreenRect;
+import net.minecraft.client.gui.render.state.special.SpecialGuiElementRenderState;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix3x2f;
 
-public record FanRenderState(Matrix3x2f pose, int x0, int y0, BlockState target,
-                             ScreenRectangle bounds) implements PictureInPictureRenderState {
+public record FanRenderState(Matrix3x2f pose, int x1, int y1, BlockState target, ScreenRect bounds) implements SpecialGuiElementRenderState {
     public FanRenderState(Matrix3x2f pose, int x, int y, BlockState target) {
-        this(pose, x, y, target, new ScreenRectangle(x, y, 50, 44).transformMaxBounds(pose));
+        this(pose, x, y, target, new ScreenRect(x, y, 50, 44).transformEachVertex(pose));
     }
 
     @Override
-    public int x1() {
-        return x0 + 50;
+    public int x2() {
+        return x1 + 50;
     }
 
     @Override
-    public int y1() {
-        return y0 + 44;
+    public int y2() {
+        return y1 + 44;
     }
 
     @Override
@@ -28,7 +27,7 @@ public record FanRenderState(Matrix3x2f pose, int x0, int y0, BlockState target,
     }
 
     @Override
-    public @Nullable ScreenRectangle scissorArea() {
+    public @Nullable ScreenRect scissorArea() {
         return null;
     }
 }

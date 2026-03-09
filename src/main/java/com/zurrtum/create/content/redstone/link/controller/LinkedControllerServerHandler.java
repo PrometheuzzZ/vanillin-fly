@@ -8,9 +8,9 @@ import com.zurrtum.create.catnip.data.WorldAttached;
 import com.zurrtum.create.content.redstone.link.IRedstoneLinkable;
 import com.zurrtum.create.content.redstone.link.RedstoneLinkNetworkHandler.Frequency;
 import com.zurrtum.create.content.redstone.link.ServerLinkBehaviour;
-import net.minecraft.core.BlockPos;
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.world.WorldAccess;
 
 import java.util.*;
 
@@ -19,10 +19,9 @@ public class LinkedControllerServerHandler {
     public static WorldAttached<Map<UUID, Collection<ManualFrequencyEntry>>> receivedInputs = new WorldAttached<>($ -> new HashMap<>());
     static final int TIMEOUT = 30;
 
-    public static void tick(LevelAccessor world) {
+    public static void tick(WorldAccess world) {
         Map<UUID, Collection<ManualFrequencyEntry>> map = receivedInputs.get(world);
-        for (Iterator<Map.Entry<UUID, Collection<ManualFrequencyEntry>>> iterator = map.entrySet()
-            .iterator(); iterator.hasNext(); ) {
+        for (Iterator<Map.Entry<UUID, Collection<ManualFrequencyEntry>>> iterator = map.entrySet().iterator(); iterator.hasNext(); ) {
 
             Map.Entry<UUID, Collection<ManualFrequencyEntry>> entry = iterator.next();
             Collection<ManualFrequencyEntry> list = entry.getValue();
@@ -36,19 +35,12 @@ public class LinkedControllerServerHandler {
                 }
             }
 
-            if (list.isEmpty()) {
+            if (list.isEmpty())
                 iterator.remove();
-            }
         }
     }
 
-    public static void receivePressed(
-        LevelAccessor world,
-        BlockPos pos,
-        UUID uniqueID,
-        List<Couple<Frequency>> collect,
-        boolean pressed
-    ) {
+    public static void receivePressed(WorldAccess world, BlockPos pos, UUID uniqueID, List<Couple<Frequency>> collect, boolean pressed) {
         Map<UUID, Collection<ManualFrequencyEntry>> map = receivedInputs.get(world);
         Collection<ManualFrequencyEntry> list = map.computeIfAbsent(uniqueID, $ -> new ArrayList<>());
 
@@ -56,30 +48,27 @@ public class LinkedControllerServerHandler {
         for (Couple<Frequency> activated : collect) {
             for (ManualFrequencyEntry entry : list) {
                 if (entry.getSecond().equals(activated)) {
-                    if (!pressed) {
+                    if (!pressed)
                         entry.setFirst(0);
-                    } else {
+                    else
                         entry.updatePosition(pos);
-                    }
                     continue WithNext;
                 }
             }
 
-            if (!pressed) {
+            if (!pressed)
                 continue;
-            }
 
             ManualFrequencyEntry entry = new ManualFrequencyEntry(pos, activated);
             Create.REDSTONE_LINK_NETWORK_HANDLER.addToNetwork(world, entry);
             list.add(entry);
 
-            for (IRedstoneLinkable linkable : Create.REDSTONE_LINK_NETWORK_HANDLER.getNetworkOf(world, entry)) {
+            for (IRedstoneLinkable linkable : Create.REDSTONE_LINK_NETWORK_HANDLER.getNetworkOf(world, entry))
                 if (linkable instanceof ServerLinkBehaviour lb && lb.isListening()) {
-                    if (world.getPlayerByUUID(uniqueID) instanceof ServerPlayer player) {
+                    if (world.getPlayerByUuid(uniqueID) instanceof ServerPlayerEntity player) {
                         AllAdvancements.LINKED_CONTROLLER.trigger(player);
                     }
                 }
-            }
         }
     }
 
