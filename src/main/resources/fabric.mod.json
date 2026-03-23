@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "id": "vanillin",
+  "version": "${version}",
+  "name": "Vanillin Fly",
+  "description": "Vanillin Fly: client-side rendering optimization backend",
+  "authors": [
+    "ZurrTum",
+    "_PrometheuZ_",
+    "illystray"
+  ],
+  "contact": {
+    "homepage": "https://modrinth.com/project/vanillin-fly",
+    "sources": "https://github.com/PrometheuzzZ/vanillin-fly"
+  },
+  "license": "MIT",
+  "icon": "assets/pack.png",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "com.zurrtum.create.client.OptimizationOnlyClient"
+    ]
+  },
+  "custom": {
+    "loom:injected_interfaces": {
+      "net/minecraft/world/Container": [
+        "com/zurrtum/create/infrastructure/items/BaseInventory"
+      ],
+      "net/minecraft/world/WorldlyContainer": [
+        "com/zurrtum/create/infrastructure/items/BaseSidedInventory"
+      ]
+    }
+  },
+  "accessWidener": "vanillin.accesswidener",
+  "mixins": [
+    {
+      "config": "vanillin.client.mixins.json",
+      "environment": "client"
+    }
+  ],
+  "depends": {
+    "fabricloader": "*",
+    "minecraft": ">=1.21.1- <1.21.12-",
+    "java": ">=21"
+  }
+}

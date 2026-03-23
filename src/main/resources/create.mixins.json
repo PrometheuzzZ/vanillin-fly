@@ -1,0 +1,43 @@
+{
+  "required": true,
+  "package": "com.zurrtum.create.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "AbstractBoatMixin",
+    "BlockLightEngineMixin",
+    "BlocksMixin",
+    "ComponentSerializationMixin",
+    "ContainerMixin",
+    "DetectorRailBlockMixin",
+    "DiodeBlockMixin",
+    "EnchantingTableBlockMixin",
+    "EnchantmentMixin",
+    "ExperienceOrbMixin",
+    "ExperimentalRedstoneWireEvaluatorMixin",
+    "ExplosionDamageCalculatorMixin",
+    "FluidsMixin",
+    "ItemEntityMixin",
+    "LeashableMixin",
+    "LecternBlockEntityMixin",
+    "LevelChunkMixin",
+    "LevelMixin",
+    "LiquidBlockMixin",
+    "MultiNeighborUpdateMixin",
+    "NewMinecartBehaviorMixin",
+    "ObserverBlockMixin",
+    "OldMinecartBehaviorMixin",
+    "PistonHeadBlockMixin",
+    "RedstoneWireBlockMixin",
+    "ServerConfigurationPacketListenerImplMixin",
+    "SignalGetterMixin",
+    "SignBlockEntityMixin",
+    "StructureTemplateMixin",
+    "TooltipContextMixin",
+    "UtilMixin",
+    "WorldlyContainerMixin"
+  ],
+  "injectors": {
+    "maxShiftBy": 2,
+    "defaultRequire": 1
+  }
+}

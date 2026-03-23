@@ -1,0 +1,6 @@
+{
+  "model": {
+    "type": "create:model/translucent",
+    "model": "create:block/nixie_tube/item"
+  }
+}

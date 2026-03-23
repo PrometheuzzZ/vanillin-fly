@@ -1,0 +1,21 @@
+{
+  "required": true,
+  "package": "com.zurrtum.create.client.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "BlockEntityMixin",
+    "BlockEntityRenderDispatcherMixin",
+    "BlockEntityTypeMixin",
+    "EntityTypeMixin",
+    "FlywheelLevelRendererMixin",
+    "FogRendererMixin",
+    "GlStateManagerMixin",
+    "LevelChunkMixin",
+    "LightingMixin",
+    "PoseStackMixin",
+    "RenderSystemMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
